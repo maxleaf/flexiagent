@@ -1,0 +1,21 @@
+{
+ "marvell": ["mvpp2", "mvneta"],
+ "solarflare": ["sfc"],
+ "cisco": ["enic"],
+ "intel": ["e1000", "ixgbe", "i40e", "ice", "fm10k", "ipn3ke", "ifc"],
+ "aquantia": ["atlantic"],
+ "hisilicon": ["hns3"],
+ "atomic rules": ["ark"],
+ "broadcom": ["bnxt"],
+ "amd": ["axgbe"],
+ "netronome": ["nfp"],
+ "huawei": ["hinic"],
+ "amazon": ["ena"],
+ "paravirtualization": ["avp", "netvsc", "virtio", "vmxnet3"],
+ "mellanox": ["mlx4", "mlx5"],
+ "nxp": ["dpaa", "dpaa2", "enetc", "pfe"],
+ "netcope": ["szedata2", "nfb"],
+ "chelsio": ["cxgbe"],
+ "cavium": ["thunderx", "octeontx", "liquidio", "bnx2x", "qede"],
+ "other": ["virtio-pci", "igb"]
+}

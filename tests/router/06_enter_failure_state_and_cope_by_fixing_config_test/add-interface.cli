@@ -1,0 +1,12 @@
+[
+{
+  "entity": "agent",
+  "message": "add-interface",
+  "params": {
+      "pci":"0000:00:08.00",
+      "addr":"10.0.0.4/24",
+      "routing":"ospf",
+      "type":"lan"
+  }
+}
+]

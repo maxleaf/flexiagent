@@ -1,0 +1,11 @@
+[
+{
+  "entity": "agent",
+  "message": "start-router"
+}
+,
+{
+  "entity": "agent",
+  "message": "stop-router"
+}
+]

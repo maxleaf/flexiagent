@@ -1,0 +1,13 @@
+# This is a temporary file, which should be deleted once the versions.yaml
+# file is part of the installed package. This file should be placed in
+# /etc/flexiwan/agent/versions.yaml
+device: 1.2.3
+components:
+  router:
+    version: 1.0
+  agent:
+    version: 0.1.0
+  vpp:
+    version: 19.04
+  frr:
+    version: 1.0.0

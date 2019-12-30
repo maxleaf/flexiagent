@@ -1,0 +1,24 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+.vscode/
+pytestdebug.log
+.cache
+
+# Docs build
+/docs/_build
+
+
+# Packages
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Text files
+*.txt
+
