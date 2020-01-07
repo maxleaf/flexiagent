@@ -97,12 +97,20 @@ class FWROUTER_API:
             time.sleep(1)  # 1 sec
             try:           # Ensure watchdog thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
-                    fwglobals.log.debug("watchdog: vpp crash detected: initiate restore")
+                    fwglobals.log.debug("watchdog: initiate restore")
+
                     self.vpp_api.disconnect()       # Reset connection to vpp to force connection renewal
-                    self.restore_vpp_if_needed()
-                    fwglobals.log.debug("watchdog: vpp crash detected: restore finished")
+                    restored = self.restore_vpp_if_needed()  # Rerun VPP and apply configuration
+
+                    if not restored:                # If some magic happened and vpp is alive without restore, connect back to VPP
+                        if fwutils.vpp_does_run():
+                            fwglobals.log.debug("watchdog: vpp is alive with no restore!!! (pid=%s)" % str(fwutils.vpp_pid))
+                            self.vpp_api.connect()
+                        fwglobals.log.debug("watchdog: no need to restore")
+                    else:
+                        fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
-                fwglobals.log.error("watchdog: vpp crash detected: exception: %s" % str(e))
+                fwglobals.log.error("watchdog: exception: %s" % str(e))
                 pass
 
     def tunnel_stats_thread(self):
@@ -121,6 +129,8 @@ class FWROUTER_API:
         and it was started by management, start vpp and restore it's configuration.
         We do that by simulating 'start-router' request.
         Restore router state always to support multiple instances of Fwagent.
+
+        :returns: `False` if no restore was performed, `True` otherwise.
         """
         self._restore_router_failure()
 
@@ -132,8 +142,9 @@ class FWROUTER_API:
                 (str(vpp_runs), str(vpp_should_be_started)))
             self.router_started = vpp_runs
             if self.router_started:
+                fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
-            return
+            return False
 
         # Now start router.
         fwglobals.log.info("===restore vpp: started===")
@@ -143,6 +154,7 @@ class FWROUTER_API:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
             self._set_router_failure("failed to restore vpp configuration")
         fwglobals.log.info("====restore vpp: finished===")
+        return True
 
     def start_router(self):
         """Execute start router command.
@@ -580,7 +592,7 @@ class FWROUTER_API:
         self.router_started = True
         self._start_threads()
         self._unset_router_failure()
-        fwglobals.log.info("router was started")
+        fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
 
     def _stop_router(self, req, params):
