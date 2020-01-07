@@ -97,9 +97,12 @@ class FWROUTER_API:
             time.sleep(1)  # 1 sec
             try:           # Ensure watchdog thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
+                    fwglobals.log.debug("watchdog: vpp crash detected: initiate restore")
                     self.vpp_api.disconnect()       # Reset connection to vpp to force connection renewal
                     self.restore_vpp_if_needed()
-            except:
+                    fwglobals.log.debug("watchdog: vpp crash detected: restore finished")
+            except Exception as e:
+                fwglobals.log.error("watchdog: vpp crash detected: exception: %s" % str(e))
                 pass
 
     def tunnel_stats_thread(self):
