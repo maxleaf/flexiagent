@@ -78,15 +78,15 @@ class TestFwagent:
         return out.rstrip()
 
 def vpp_does_run():
-    vpp_pid = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if 'vpp' in p.info['name']]
-    runs = True if vpp_pid else False
+    runs = True if vpp_pid() else False
     return runs
 
 def vpp_pid():
-    vpp_pid = [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if 'vpp' in p.info['name']]
-    if len(vpp_pid) == 0:
-        return None
-    return str(vpp_pid[0]['pid'])
+    try:
+        pid = subprocess.check_output(['pidof', 'vpp'])
+    except:
+        pid = None
+    return pid
 
 def vpp_is_configured(config_entities, print_error=True):
 

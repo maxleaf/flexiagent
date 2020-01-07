@@ -34,8 +34,8 @@ UPDATE_LIST_MAX_SIZE = 120
 # Keeps the list of last updates
 updates_list = []
 
-# Keeps the list of VPP pids
-vpp_pids = []
+# Keeps the VPP pids
+vpp_pid = ''
 
 # Keeps last stats
 stats = {'ok':0, 'running':False, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0}
@@ -46,14 +46,14 @@ def update_stats():
     :returns: None.
     """
     global stats
-    global vpp_pids
+    global vpp_pid
 
     # If vpp is not running or has crashed (at least one of its process
     # IDs has changed), reset the statistics and update the vpp pids list
-    current_vpp_pids = fwutils.vpp_pids()
-    if not current_vpp_pids or current_vpp_pids != vpp_pids:
+    current_vpp_pid = fwutils.vpp_pid()
+    if not current_vpp_pid or current_vpp_pid != vpp_pid:
         reset_stats()
-        vpp_pids = current_vpp_pids
+        vpp_pid = current_vpp_pid
 
     new_stats = fwutils.get_vpp_if_count()
     if new_stats['ok'] == 1:
@@ -81,7 +81,7 @@ def update_stats():
             stats['bytes'] = if_bytes
             stats['tunnel_stats'] = tunnel_stats_get()
             stats['period'] = stats['time'] - prev_stats['time']
-            stats['running'] = True if fwutils.vpp_pids() else False
+            stats['running'] = True if fwutils.vpp_does_run() else False
     else:
         stats['ok'] = 0
 
@@ -115,7 +115,7 @@ def get_stats():
         state = 'running'
         reason = ''
     else:
-        status = True if fwutils.vpp_pids() else False
+        status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()
     if not res_update_list:
         res_update_list.append({
