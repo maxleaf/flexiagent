@@ -132,6 +132,7 @@ class FWROUTER_API:
                 (str(vpp_runs), str(vpp_should_be_started)))
             self.router_started = vpp_runs
             if self.router_started:
+                fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
             return
 
@@ -580,7 +581,7 @@ class FWROUTER_API:
         self.router_started = True
         self._start_threads()
         self._unset_router_failure()
-        fwglobals.log.info("router was started")
+        fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
 
     def _stop_router(self, req, params):
