@@ -93,35 +93,24 @@ def get_machine_id():
     except:
         return fwglobals.g.cfg.UUID
 
-def vpp_pids():
-    """Get list of VPP pids.
+def vpp_pid():
+    """Get pid of VPP process.
 
-    :returns:           List of process identifiers.
+    :returns:           process identifier.
     """
-    return [p.info for p in psutil.process_iter(attrs=['pid', 'name']) if 'vpp' in p.info['name']]
-	#return [5127]
+    try:
+        pid = subprocess.check_output(['pidof', 'vpp'])
+    except:
+        pid = None
+    return pid
 
 def vpp_does_run():
     """Check if VPP is running.
 
     :returns:           Return 'True' if VPP is running.
     """
-    runs = True if vpp_pids() else False
+    runs = True if vpp_pid() else False
     return runs
-
-def vpp_kill(pids):
-    """Kill VPP.
-
-    :param pids:        VPP pid.
-
-    :returns: Version value.
-    """
-    for pinfo in pids:
-		vpp_proc = psutil.Process(pid=pinfo['pid'])
-		try:
-			vpp_proc.terminate()
-		except:
-			pass
 
 def af_to_name(af_type):
     """Convert socket type.
@@ -689,7 +678,7 @@ def get_router_state():
         state = 'failed'
         with open(fwglobals.g.ROUTER_STATE_FILE, 'r') as f:
             reason = f.read()
-    elif vpp_pids():
+    elif vpp_pid():
         state = 'running'
     else:
         state = 'stopped'
