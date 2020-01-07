@@ -321,7 +321,8 @@ class Fwagent:
         def on_close(ws):
             self._on_close(ws)
 
-        websocket.enableTrace(fwglobals.g.cfg.DEBUG)
+        # Remove WebSocket send/recv message prints to STDOUT until proper logging configuration is implemented
+        #websocket.enableTrace(fwglobals.g.cfg.DEBUG)
 
         machine_id = fwutils.get_machine_id()
         if machine_id == None:
@@ -370,8 +371,6 @@ class Fwagent:
             self.connection_error_code = fwglobals.g.WS_STATUS_LOCAL_ERROR
             self.connection_error_msg  = str(error)
         fwglobals.log.error("connection got error: " + self.connection_error_msg)
-        if fwglobals.g.cfg.DEBUG:
-            traceback.print_tb(sys.exc_info()[2])
 
         # Create a file to signal the upgrade process that the
         # upgraded agent failed to connect to the management.
