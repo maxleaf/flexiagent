@@ -84,14 +84,17 @@ def get_machine_id():
 
     :returns: UUID.
     """
-    try:
+    if fwglobals.g.cfg.UUID:    # If UUID is configured manually, use it
+        return fwglobals.g.cfg.UUID
+
+    try:                        # Fetch UUID from machine
         if platform.system()=="Windows":
             machine_id = subprocess.check_output('wmic csproduct get uuid').decode().split('\n')[1].strip()
         else:
             machine_id = subprocess.check_output(['cat','/sys/class/dmi/id/product_uuid']).decode().split('\n')[0].strip()
         return machine_id.upper()
     except:
-        return fwglobals.g.cfg.UUID
+        return None
 
 def vpp_pid():
     """Get pid of VPP process.

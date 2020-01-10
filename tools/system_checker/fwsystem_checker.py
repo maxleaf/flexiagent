@@ -250,26 +250,30 @@ def main(args):
         # The start intercation with user.
         check_soft_configuration(checker, fix=False)
         choice = 'x'
-        while not (choice == '0' or choice == ''):
+        while not (choice == '' or choice == '0' or choice == '1'):
             choice = raw_input(
                             "\n" +
-                            "\t[0] - quit\n" +
-                            "\t 1  - check system configuration\n" +
-                            "\t 2  - configure system silently\n" +
-                            "\t 3  - configure system interactively\n" +
+                            "\t[0] - quit and use fixed parameters\n" +
+                            "\t 1  - quit\n" +
+                            "\t 2  - check system configuration\n" +
+                            "\t 3  - configure system silently\n" +
+                            "\t 4  - configure system interactively\n" +
                             "\t-------------------------------------\n" +
                             "Choose: ")
-            if choice == '1':
+            if choice == '2':
             	print('')
                 success = check_soft_configuration(checker, fix=False)
-            elif choice == '2':
+            elif choice == '3':
             	print('')
                 success = check_soft_configuration(checker, fix=True, quite=True)
-            elif choice == '3':
+            elif choice == '4':
             	print('')
                 success = check_soft_configuration(checker, fix=True, quite=False)
             else:
                 success = True
+
+        if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
+            os.system("sudo systemctl restart flexiwan-router")
 
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
         return (soft_status_code | hard_status_code)
