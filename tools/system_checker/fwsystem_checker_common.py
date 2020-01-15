@@ -24,6 +24,7 @@ import json
 import os
 import psutil
 import re
+import ruamel.yaml
 import subprocess
 import sys
 import uuid
@@ -242,34 +243,41 @@ class Checker:
             # Ensure proper syntax of retrieved UUID
             try:
                 uuid_obj = uuid.UUID(found_uuid)
+                if not uuid_obj.version:
+                    raise Exception("failed to deduce version of found UUID (%s)" % found_uuid)
             except ValueError:
                 raise Exception("found UUID '%s' doesn't comply to RFC" % found_uuid)
             return True
+
         except Exception as e:
             print(prompt + str(e))
-            try: # Check if fwagent configuration file has the simulated uuid
-                with open(self.CFG_FWAGENT_CONF_FILE, 'r') as f:
-                    conf = yaml.load(f, Loader=yaml.SafeLoader)
-                    if conf.get('agent') and conf['agent'].get('uuid'):
-                        return True
-                    else:
-                        raise Exception("UUID was found neither in system nor in %s" % self.CFG_FWAGENT_CONF_FILE)
-            except Exception as e:
-                print(prompt + str(e))
-                if not fix:
+
+            # Check if fwagent configuration file has the simulated uuid
+            with open(self.CFG_FWAGENT_CONF_FILE, 'r') as f:
+                conf = yaml.load(f, Loader=yaml.SafeLoader)
+                if conf.get('agent') and conf['agent'].get('uuid'):
+                    return True
+
+            print(prompt + "UUID was found neither in system nor in %s" % self.CFG_FWAGENT_CONF_FILE)
+            if not fix:
+                return False
+
+            # Fix UUID: generate it and save into fwagent configuration file.
+            # We use ruamel.yaml and not yaml to preserve comments.
+            new_uuid = str(uuid.uuid1()).upper()
+            if not silently:
+                choice = raw_input(prompt + "use %s ? [Y/n]: " % new_uuid)
+                if choice != 'y' and choice != 'Y' and choice != '':
                     return False
-                else:
-                    if silently:
-                        new_uuid = str(uuid.uuid1()).upper()
-                        ret = os.system('sed -i -E "s/agent:/agent:\\n    uuid: %s/" %s' % (new_uuid , self.CFG_FWAGENT_CONF_FILE)) # We use sed and not yaml.dump to preserve comments in fwagent_conf.yaml
-                        return True if res==0 else False
-                    else:
-                        new_uuid = str(uuid.uuid1()).upper()
-                        choice = raw_input(prompt + "use %s ? [Y/n]: " % new_uuid)
-                        if choice == 'y' or choice == 'Y' or choice == '':
-                            return True
-                        else:
-                            return False
+            f = open(self.CFG_FWAGENT_CONF_FILE, 'r')
+            ruamel_yaml = ruamel.yaml.YAML()
+            conf = ruamel_yaml.load(f)
+            conf['agent']['uuid'] = new_uuid
+            f.close()
+            f = open(self.CFG_FWAGENT_CONF_FILE, 'w')
+            ruamel_yaml.dump(conf, f)
+            f.close()
+            return True
 
     def hard_check_default_route_connectivity(self, fix=False, silently=False, prompt=''):
         """Check route connectivity.
