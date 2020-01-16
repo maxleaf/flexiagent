@@ -634,7 +634,7 @@ class Checker:
         if conf and conf.get('dpdk'):
             for param in conf['dpdk']:
                 if 'num-mbufs' in param:
-                    buffers = param['num-mbufs']
+                    buffers = int(param.split(' ')[1])
                     conf_param = param
                     break
         old = buffers
@@ -652,7 +652,9 @@ class Checker:
             return True     # No need to update
 
         if conf_param:
-            conf_param['num-mbufs'] = buffers
+            conf['dpdk'].remove(conf_param)
+            conf_param = 'num-mbufs %d' % buffers
+            conf['dpdk'].append(conf_param)
             self.vpp_config_modified = True
             return True
 

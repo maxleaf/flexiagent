@@ -319,6 +319,8 @@ def dump(config_dict, config_filename='/etc/vpp/startup.conf', backup_filename='
     os.system("sed -i -E 's/: ([^ ]+)/ \\1/' %s" % dest_filename)
     # Replace section opening ':' with '{'
     os.system("sed -i -E 's/:[ ]*$/ \{/' %s" % dest_filename)
+    # Remove empty list leftovers that might be created by ruamel_yaml.dump: []
+    os.system("sed -i -E '/^[ ]*\[[ ]*\][ ]*$/d' %s" % dest_filename)
 
     # Now we have to add section closing '}'
     # To my sorrow 'sed' can be used as multiline logic is needed.

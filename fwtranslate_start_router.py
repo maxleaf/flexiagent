@@ -59,7 +59,7 @@ import fwutils
 #      }
 #    }
 #
-#    OR 
+#    OR
 #
 #    {
 #      "entity": "agent",
@@ -73,7 +73,7 @@ import fwutils
 #    }
 #|
 # into list of commands:
-# 
+#
 #    1. generates ospfd.conf for FRR
 #    01. print CONTENT > ospfd.conf
 #    ------------------------------------------------------------
@@ -85,14 +85,14 @@ import fwutils
 #    !
 #    router ospf
 #      ospf router-id 192.168.56.107
-#    
+#
 #    2.Linux_sh1.sh
 #    ------------------------------------------------------------
 #    02. sudo ip link set dev enp0s8 down &&
 #        sudo ip addr flush dev enp0s8
 #    03. sudo ip link set dev enp0s9 down &&
 #        sudo ip addr flush dev enp0s9
-#    
+#
 #    3.vpp.cfg
 #    ------------------------------------------------------------
 #    04. sudo systemtctl start vpp
@@ -108,12 +108,16 @@ def start_router(params=None):
      """
     cmd_list = []
 
-    # Create commands that remove interfaces from Linux
+    # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
     #   sudo ip addr flush dev enp0s8
-    if params and 'pci' in params:
-        for pci in params['pci']:
-            iface_pci  = fwutils.pci_to_linux_iface(pci)
+    # The interfaces to be removed are stored within 'add-interface' requests
+    # in the configuration database.
+    pci_list = []
+    for key in fwglobals.g.router_api.db_requests.db:
+        if re.match('add-interface', key):
+            (_, params) = fwglobals.g.router_api.db_requests.fetch_request(key)
+            iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
             if iface_pci:
                 cmd = {}
                 cmd['cmd'] = {}
@@ -125,28 +129,42 @@ def start_router(params=None):
                 cmd['revert']['params']  = [ "sudo netplan apply" ]
                 cmd['revert']['descr']  = "apply netplan configuration"
                 cmd_list.append(cmd)
-	# If PCI-s to be captured by vpp were not provided explicitly
-	# within 'pci' parameter, try to fetch them from 'add-interface'
-	# requests that might be stored in configuration database.
-    else:
-        for key in fwglobals.g.router_api.db_requests.db:
-            if re.match('add-interface', key):
-                (_, params) = fwglobals.g.router_api.db_requests.fetch_request(key)
-                iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
-                if iface_pci:
-                    cmd = {}
-                    cmd['cmd'] = {}
-                    cmd['cmd']['name']    = "exec"
-                    cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
-                    cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
-                    cmd['revert'] = {}
-                    cmd['revert']['name']    = "exec"
-                    cmd['revert']['params']  = [ "sudo netplan apply" ]
-                    cmd['revert']['descr']  = "apply netplan configuration"
-                    cmd_list.append(cmd)
+
+            # If device is not vmxnet3 device, add it to list of devices
+            # that will be add to the /etc/vpp/startup.conf.
+            # The vmxnet3 devices should not appear in startup.conf.
+            # Othervise vpp will capture them with vfio-pci driver,
+            # and 'create interface vmxnet3' will fail with 'device in use'.
+            device_driver = params.get('driver')
+            if device_driver is None or device_driver != 'vmxnet3':
+                pci_list.append(params['pci'])
+
+    vpp_filename = fwglobals.g.VPP_CONFIG_FILE
+
+    # Add interfaces to the vpp configuration file, thus creating whitelist.
+    # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
+    # Other interfaces will be not captured by vpp even if they are DOWN.
+    if len(pci_list) > 0:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "add devices to %s" % vpp_filename
+        cmd['cmd']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_add_devices',
+            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': pci_list }
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "remove devices from %s" % vpp_filename
+        cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_remove_devices',
+            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': pci_list }
+        }
+        cmd_list.append(cmd)
 
     # Enable NAT in vpp configuration file
-    vpp_filename = fwglobals.g.VPP_CONFIG_FILE
     nat_status = os.popen("grep -E 'nat.*endpoint-dependent' %s" % vpp_filename).read()
     if len(nat_status.strip()) == 0:
         cmd = {}

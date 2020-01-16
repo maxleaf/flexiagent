@@ -308,7 +308,7 @@ def pci_to_vpp_if_name(pci):
                     vpp_if_name = match.group(1)
                     break
             return vpp_if_name
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
+    fwglobals.log.debug("pci_to_vpp_if_name(%s): not found in 'sh hard'" % (pci))
 
     # If no hardware interfaces were found, try vmxnet3 interfaces
     pci_bytes = pci_str_to_bytes(pci)
@@ -317,6 +317,8 @@ def pci_to_vpp_if_name(pci):
         if hw_if.pci_addr == pci_bytes:
             vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
             return vpp_if_name
+
+    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
     fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw)))
     return None
 
@@ -953,7 +955,7 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
-def vpp_startup_conf_update(filename, filename_backup, path, param, val, add):
+def vpp_startup_conf_update(filename, path, param, val, add, filename_backup=None):
     """Updates the /etc/vpp/startup.conf
 
     :param filename:    /etc/vpp/startup.conf
@@ -1015,3 +1017,29 @@ def vpp_startup_conf_update(filename, filename_backup, path, param, val, add):
     # Dump dictionary back into file
     fwtool_vpp_startupconf_dict.dump(conf, filename, filename_backup, debug=True)
 
+def vpp_startup_conf_add_devices(params):
+    filename = params['vpp_config_filename']
+    config   = fwtool_vpp_startupconf_dict.load(filename)
+
+    if not config.get('dpdk'):
+        config['dpdk'] = []
+    for dev in params['devices']:
+        config_param = 'dev %s' % dev
+        config['dpdk'].append(config_param)
+
+    fwtool_vpp_startupconf_dict.dump(config, filename, debug=False)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def vpp_startup_conf_remove_devices(params):
+    filename = params['vpp_config_filename']
+    config   = fwtool_vpp_startupconf_dict.load(filename)
+
+    if not config.get('dpdk'):
+        return
+    for dev in params['devices']:
+        config_param = 'dev %s' % dev
+        if config_param in config['dpdk']:
+            config['dpdk'].remove(config_param)
+
+    fwtool_vpp_startupconf_dict.dump(config, filename, debug=False)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
