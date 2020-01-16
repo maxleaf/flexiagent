@@ -312,14 +312,14 @@ def pci_to_vpp_if_name(pci):
 
     # If no hardware interfaces were found, try vmxnet3 interfaces
     pci_bytes = pci_str_to_bytes(pci)
-    hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
-    for hw_if in hw:
+    hw_1 = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
+    for hw_if in hw_1:
         if hw_if.pci_addr == pci_bytes:
             vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
             return vpp_if_name
 
     fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw)))
+    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw_1)))
     return None
 
 
