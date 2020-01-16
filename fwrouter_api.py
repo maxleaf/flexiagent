@@ -311,12 +311,12 @@ class FWROUTER_API:
         # Translate request to list of commands to be executed
         (cmd_list , req_key , complement) = self._translate(req, params)
 
-        # Execute commands only if vpp runs ('start-router' was received).
+        # Execute commands only if vpp runs.
         # Some 'remove-XXX' requests must be executed
         # even if vpp doesn't run right now. This is to clean stuff in Linux
         # that was added by correspondent 'add-XXX' request if the last was
         # applied to running vpp.
-        router_was_started = self.db_requests.exists('start-router')
+        router_was_started = fwutils.vpp_does_run()
         executed = False
         if router_was_started or re.match('remove-',  req):
             filter = 'must' if not router_was_started else None
