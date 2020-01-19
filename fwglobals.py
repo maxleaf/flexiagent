@@ -40,6 +40,14 @@ modules = {
 
 request_handlers = {
 
+    ##############################################################
+    # DEVICE API-s
+    # ------------------------------------------------------------
+    # These API-s implement interface between FlexiEdge device
+    # and FlexiManage server. The device API-s are invoked using
+    # requests sent by server to device over secured connection.
+    ##############################################################
+
     # Agent API
     'handle-request':               '_call_agent_api',
     'get-device-info':              '_call_agent_api',
@@ -60,6 +68,20 @@ request_handlers = {
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
     'modify-device':                '_call_router_api',
+
+
+
+    ##############################################################
+    # INTERNAL API-s
+    # ------------------------------------------------------------
+    # These API-s are invoked locally by handlers of server
+    # requests, e.g. by FWROUTER_API module.
+    # The FWROUTER_API module translates received requests
+    # into lists of commands that might be not executed immediately.
+    # These internal commands represent the INTERNAL API-s
+    # listed below. They are recorded into database and are invoked
+    # later, when router is started.
+    ##############################################################
 
     # OS API
     'interfaces':                   '_call_os_api',

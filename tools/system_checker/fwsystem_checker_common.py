@@ -50,7 +50,6 @@ class Checker:
         fwglobals.initialize()
 
         self.CFG_VPP_CONF_FILE      = fwglobals.g.VPP_CONFIG_FILE
-        self.CFG_VPP_CONF_FILE_ORIG = fwglobals.g.VPP_CONFIG_FILE_BACKUP
         self.CFG_FWAGENT_CONF_FILE  = fwglobals.g.FWAGENT_CONF_FILE
         self.debug                  = debug   # Don't use fwglobals.g.cfg.DEBUG to prevent temporary checker files even DEBUG is enabled globally
         self.wan_interfaces         = None
@@ -73,7 +72,7 @@ class Checker:
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         if self.vpp_config_modified:
-            fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, self.CFG_VPP_CONF_FILE_ORIG, self.debug)
+            fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
 
     def hard_check_sse42(self, supported):
         """Check SSE 4.2 support.

@@ -1015,7 +1015,7 @@ def vpp_startup_conf_update(filename, path, param, val, add, filename_backup=Non
             prev_section[prev_step] = None
 
     # Dump dictionary back into file
-    fwtool_vpp_startupconf_dict.dump(conf, filename, filename_backup, debug=True)
+    fwtool_vpp_startupconf_dict.dump(conf, filename)
 
 def vpp_startup_conf_add_devices(params):
     filename = params['vpp_config_filename']
@@ -1027,7 +1027,7 @@ def vpp_startup_conf_add_devices(params):
         config_param = 'dev %s' % dev
         config['dpdk'].append(config_param)
 
-    fwtool_vpp_startupconf_dict.dump(config, filename, debug=False)
+    fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_devices(params):
@@ -1041,5 +1041,5 @@ def vpp_startup_conf_remove_devices(params):
         if config_param in config['dpdk']:
             config['dpdk'].remove(config_param)
 
-    fwtool_vpp_startupconf_dict.dump(config, filename, debug=False)
+    fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.

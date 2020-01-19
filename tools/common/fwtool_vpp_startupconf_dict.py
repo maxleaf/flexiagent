@@ -278,7 +278,7 @@ def load(config_filename):
 #    }
 #    nat { endpoint-dependent }
 #######################################################################
-def dump(config_dict, config_filename='/etc/vpp/startup.conf', backup_filename='/etc/vpp/startup.conf.orig', debug=False):
+def dump(config_dict, config_filename, backup_filename=None, debug=False):
     """Flushes dictionary with comments (created by ruamel.yaml)
     into vpp configuration file (startup.conf)
 
@@ -287,8 +287,8 @@ def dump(config_dict, config_filename='/etc/vpp/startup.conf', backup_filename='
 
     :returns: None.
     """
-    # Backup original installation file and the last modified version
-    if not os.path.isfile(backup_filename):
+    # Backup configuration file if asked by user and no backup exists
+    if backup_filename and not os.path.isfile(backup_filename):
         shutil.copyfile(config_filename, backup_filename)
     dest_filename = config_filename + '.backup'
     shutil.copyfile(config_filename, dest_filename)
