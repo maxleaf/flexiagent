@@ -74,7 +74,7 @@ class FWROUTER_API:
         """Constructor method
         """
         self.vpp_api         = VPP_API()
-        self.db_requests     = FwDbRequests(request_db_file)    # Database of executed requests 
+        self.db_requests     = FwDbRequests(request_db_file)    # Database of executed requests
         self.router_started  = False
         self.router_failure  = False
         self.thread_watchdog = None
@@ -216,7 +216,7 @@ class FWROUTER_API:
         # to revert remove-* request if one of the subsequent requests
         # in the aggregated request fails and as a result of this whole aggregated request is rollback-ed.
         # For example, 'remove-interface' has 'pci' parameter only, and has no IP, LAN/WAN type, etc.
-        fwglobals.log.debug("FWROUTER_API: === start execution of aggregated request ===")
+        fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
         for req in requests:
             try:
                 (op, params), = req.items()
@@ -250,7 +250,7 @@ class FWROUTER_API:
                         pass
                 raise
 
-        fwglobals.log.debug("FWROUTER_API: === end execution of aggregated request ===")
+        fwglobals.log.debug("FWROUTER_API: === end handling aggregated request ===")
         return {'ok':1}
 
     def _extract_request_key(self, req, params):
@@ -311,12 +311,12 @@ class FWROUTER_API:
         # Translate request to list of commands to be executed
         (cmd_list , req_key , complement) = self._translate(req, params)
 
-        # Execute commands only if vpp runs ('start-router' was received).
+        # Execute commands only if vpp runs.
         # Some 'remove-XXX' requests must be executed
         # even if vpp doesn't run right now. This is to clean stuff in Linux
         # that was added by correspondent 'add-XXX' request if the last was
         # applied to running vpp.
-        router_was_started = self.db_requests.exists('start-router')
+        router_was_started = fwutils.vpp_does_run()
         executed = False
         if router_was_started or re.match('remove-',  req):
             filter = 'must' if not router_was_started else None
@@ -327,28 +327,6 @@ class FWROUTER_API:
         # e.g. 'remove-tunnel', or remove source request if the complement request
         # has been executed.
         self._update_db_requests(complement, req_key, req, params, cmd_list, executed)
-
-        # 'add-interface' and 'remove-interface' requests should update
-        # /etc/vpp/startup.conf immediately and not as a result of execution.
-        # This is because execution happens when vpp is up. This is too late,
-        # as /etc/vpp/startup.conf has no effect after vpp was started.
-        # Note we never add vmxnet3 interfaces to startup.conf to prevent
-        # vpp create and bind them to vfio-pci on startup.
-        # Instead they should be created explicitly using
-        # the 'vppctl create interface vmxnet3 <dev>' CLI or 'vmxnet3_create' API.
-        if re.match('(add|remove)-interface',  req):
-            if params.get('driver') == None  or  params['driver'] != 'vmxnet3':
-                add = True if req == 'add-interface' else False
-                pci = params['pci']
-                try:
-                    fwutils.vpp_startup_conf_update(
-                        fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP,
-                        'dpdk', 'dev %s' % pci, None, add)
-                except Exception as e:
-                    # For now we don't revert as it is to complicate at this stage.
-                    # Just move router to the failed state :(
-                    self._set_router_failure('vpp_startup_conf_update failed: %s' % str(e))
-                    raise e
 
         if re.match('(add|remove)-tunnel',  req):
             self._fill_tunnel_stats_dict()
@@ -421,8 +399,8 @@ class FWROUTER_API:
             # If filter was provided, execute only commands that have the provided filter
             if filter:
                 if not 'filter' in cmd or cmd['filter'] != filter:
-                    fwglobals.log.debug("FWROUTER_API:_execute: filter out command by filter=%s (req=%s, req_key=%s, cmd=%s, params=%s)" %
-                                        (filter, req, req_key, cmd['name'], str(cmd.get('params'))))
+                    fwglobals.log.debug("FWROUTER_API:_execute: filter out command by filter=%s (req=%s, req_key=%s, cmd=%s, cmd['filter']=%s, params=%s)" %
+                                        (filter, req, req_key, cmd['name'], str(cmd.get('filter')), str(cmd.get('params'))))
                     continue
 
             try:
@@ -443,19 +421,20 @@ class FWROUTER_API:
                     { 'result_attr' : cmd['cache_ret_val'][0] , 'cache' : cmd_cache , 'key' :  cmd['cache_ret_val'][1] }
                 reply = fwglobals.g.handle_request(cmd['name'], cmd.get('params'), result)
                 if reply['ok'] == 0:        # On failure go back revert already executed commands
-                    fwglobals.log.debug("FWROUTER_API: === failed execution of %s (key=%s) ===" % (req, req_key))
+                    fwglobals.log.debug("FWROUTER_API: %s failed ('ok' is 0)" % cmd['name'])
                     raise Exception("API failed: %s" % reply['message'])
 
             except Exception as e:
-                err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), traceback.format_exc()) 
+                err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), traceback.format_exc())
                 fwglobals.log.error(err_str)
                 fwglobals.log.debug("FWROUTER_API: === failed execution of %s (key=%s) ===" % (req, req_key))
                 # On failure go back to the begining of list and revert executed commands.
                 self._revert(cmd_list, idx)
+                fwglobals.log.debug("FWROUTER_API: === finished revert of %s (key=%s) ===" % (req, req_key))
                 raise Exception('failed to ' + cmd['descr'])
 
-            # On success susbstitute revert command also, as it will be needed
-            # for complement request, e.g. for remove-tunnel.
+            # At this point the execution succeeded.
+            # Now substitute the revert command, as it will be needed for complement request, e.g. for remove-tunnel.
             if 'revert' in t and 'params' in t['revert']:
                 try:
                     self._substitute(cmd_cache, t['revert'].get('params'))

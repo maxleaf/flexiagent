@@ -84,14 +84,17 @@ def get_machine_id():
 
     :returns: UUID.
     """
-    try:
+    if fwglobals.g.cfg.UUID:    # If UUID is configured manually, use it
+        return fwglobals.g.cfg.UUID
+
+    try:                        # Fetch UUID from machine
         if platform.system()=="Windows":
             machine_id = subprocess.check_output('wmic csproduct get uuid').decode().split('\n')[1].strip()
         else:
             machine_id = subprocess.check_output(['cat','/sys/class/dmi/id/product_uuid']).decode().split('\n')[0].strip()
         return machine_id.upper()
     except:
-        return fwglobals.g.cfg.UUID
+        return None
 
 def vpp_pid():
     """Get pid of VPP process.
@@ -305,16 +308,18 @@ def pci_to_vpp_if_name(pci):
                     vpp_if_name = match.group(1)
                     break
             return vpp_if_name
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
+    fwglobals.log.debug("pci_to_vpp_if_name(%s): not found in 'sh hard'" % (pci))
 
     # If no hardware interfaces were found, try vmxnet3 interfaces
     pci_bytes = pci_str_to_bytes(pci)
-    hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
-    for hw_if in hw:
+    hw_1 = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
+    for hw_if in hw_1:
         if hw_if.pci_addr == pci_bytes:
             vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
             return vpp_if_name
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw)))
+
+    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
+    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw_1)))
     return None
 
 
@@ -950,7 +955,7 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
-def vpp_startup_conf_update(filename, filename_backup, path, param, val, add):
+def vpp_startup_conf_update(filename, path, param, val, add, filename_backup=None):
     """Updates the /etc/vpp/startup.conf
 
     :param filename:    /etc/vpp/startup.conf
@@ -1010,5 +1015,31 @@ def vpp_startup_conf_update(filename, filename_backup, path, param, val, add):
             prev_section[prev_step] = None
 
     # Dump dictionary back into file
-    fwtool_vpp_startupconf_dict.dump(conf, filename, filename_backup, debug=True)
+    fwtool_vpp_startupconf_dict.dump(conf, filename)
 
+def vpp_startup_conf_add_devices(params):
+    filename = params['vpp_config_filename']
+    config   = fwtool_vpp_startupconf_dict.load(filename)
+
+    if not config.get('dpdk'):
+        config['dpdk'] = []
+    for dev in params['devices']:
+        config_param = 'dev %s' % dev
+        config['dpdk'].append(config_param)
+
+    fwtool_vpp_startupconf_dict.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def vpp_startup_conf_remove_devices(params):
+    filename = params['vpp_config_filename']
+    config   = fwtool_vpp_startupconf_dict.load(filename)
+
+    if not config.get('dpdk'):
+        return
+    for dev in params['devices']:
+        config_param = 'dev %s' % dev
+        if config_param in config['dpdk']:
+            config['dpdk'].remove(config_param)
+
+    fwtool_vpp_startupconf_dict.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
