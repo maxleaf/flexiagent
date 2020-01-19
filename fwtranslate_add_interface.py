@@ -76,25 +76,26 @@ def add_interface(params):
      """
     cmd_list = []
 
-    iface_pci  = params['pci'] 
+    iface_pci  = params['pci']
     iface_addr = params['addr']
-    iface_addr_bytes, iface_addr_len = fwutils.ip_str_to_bytes(params['addr'])
+    iface_addr_bytes, _ = fwutils.ip_str_to_bytes(params['addr'])
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
-    # --------------------------------------------------------------------------------------
-    # Note translation of 'add-interface' is called twice:
-    # - the first time when the 'add-interface' request is received from MGMT,
-    #   which might occur only if vpp was not started yet, as after start no interface can be added
-    # - the second time when the 'start-router' was received and,
-    #   as a result of this, the vpp was started and the configuration is being applied
-    #   from within _start_router() -> _apply_router_config().
-    # At the first time we detect that the interface requires special command in vpp,
-    # at the second time we generate this special command that should be executed on running vpp.
-    # The detection is based on fetching interface driver from Linux.
-    # It can't be done during the second time, because once vpp is started,
-    # it replaces the 'vmxnet3' driver with the dpdk driver, e.g. 'vfio-pci'.
-    if fwutils.pci_is_vmxnet3(iface_pci):   # This checks succeeds only if vpp is not started yet
+    # --------------------------------------------------------------------
+    # Note the 'add-interface' request is handled (translated and
+    # if vpp runs - executed) twice:
+    #  1. from within handle_received_request() when request is received
+    #  2. from within _apply_router_config() after vpp was started
+    # In the first case we can detect the vmxnet3 nature of interface device,
+    # as before vpp start device is controlled by kernel and is bound to vmxnet3 driver.
+    # In the second case we can't detect the vmxnet3 nature of interface device,
+    # as on startup vpp takes control over network devices and binds them
+    # to the same vfio-pci driver.
+    # As we have to run special command for vmxnet3 devices after vpp start,
+    # we have to pass the knowledge about nature of device between these two
+    # handlings. We do that using the 'driver' parameter of the request.
+    if fwutils.pci_is_vmxnet3(iface_pci):
         params['driver'] = 'vmxnet3'
     if 'driver' in params and params['driver'] == 'vmxnet3':
         pci_bytes = fwutils.pci_str_to_bytes(params['pci'])
@@ -131,7 +132,7 @@ def add_interface(params):
     #
     # # interface.api.json: sw_interface_set_flags (_vl_msg_id, client_index, context, sw_if_index, admin_up_down, crc=0x555485f5)
     # # * 'sw_if_index' is fetched from running VPP, so we use pci name of interface '0000:00:08.00' to note it now,
-    # # and we use 'substs' element in run time to resolve it and to substitute before the 'cmd' is executed.    
+    # # and we use 'substs' element in run time to resolve it and to substitute before the 'cmd' is executed.
     # cmd = {}
     # cmd['cmd'] = {}
     # cmd['cmd']['name']    = "sw_interface_set_flags"

@@ -40,6 +40,14 @@ modules = {
 
 request_handlers = {
 
+    ##############################################################
+    # DEVICE API-s
+    # ------------------------------------------------------------
+    # These API-s implement interface between FlexiEdge device
+    # and FlexiManage server. The device API-s are invoked using
+    # requests sent by server to device over secured connection.
+    ##############################################################
+
     # Agent API
     'handle-request':               '_call_agent_api',
     'get-device-info':              '_call_agent_api',
@@ -60,6 +68,20 @@ request_handlers = {
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
     'modify-device':                '_call_router_api',
+
+
+
+    ##############################################################
+    # INTERNAL API-s
+    # ------------------------------------------------------------
+    # These API-s are invoked locally by handlers of server
+    # requests, e.g. by FWROUTER_API module.
+    # The FWROUTER_API module translates received requests
+    # into lists of commands that might be not executed immediately.
+    # These internal commands represent the INTERNAL API-s
+    # listed below. They are recorded into database and are invoked
+    # later, when router is started.
+    ##############################################################
 
     # OS API
     'interfaces':                   '_call_os_api',
@@ -95,7 +117,10 @@ request_handlers = {
     'sw_interface_set_mac_address': '_call_vpp_api',
     'sw_interface_set_mtu':         '_call_vpp_api',
     'vmxnet3_create':               '_call_vpp_api',
-    'vxlan_add_del_tunnel':         '_call_vpp_api'
+    'vxlan_add_del_tunnel':         '_call_vpp_api',
+
+    # Python API
+    'python':                       '_call_python_api'
 }
 
 global g_initialized
@@ -241,6 +266,17 @@ class Fwglobals:
 
     def _call_vpp_api(self, req, params, result=None):
         return self.router_api.vpp_api.call_simple(req, params, result)
+
+    def _call_python_api(self, req, params):
+        module = __import__(params['module'])
+        func   = getattr(module, params['func'])
+        args   = params['args']
+        ok, ret = func(args)
+        if not ok:
+            log.error('_call_python_api: %s(%s) failed: %s' % \
+                    (params['func'], json.dumps(args), ret))
+        reply = {'ok':ok, 'message':ret}
+        return reply
 
     # result - how to store result of command.
     #          It is dict of {<attr> , <cache>, <cache key>}.
