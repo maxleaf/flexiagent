@@ -424,6 +424,7 @@ class Fwagent:
                     else:
                         fwglobals.log.debug("connect: no request was received in 30 seconds, drop connection")
                         ws.close()
+                        fwglobals.log.debug("connect: connection was terminated")
                         break
                 # Every 30 seconds update statistics
                 if (slept % 30) == 0:
