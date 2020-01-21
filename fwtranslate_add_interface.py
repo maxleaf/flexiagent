@@ -82,29 +82,21 @@ def add_interface(params):
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
-    # --------------------------------------------------------------------
-    # Note the 'add-interface' request is handled (translated and
-    # if vpp runs - executed) twice:
-    #  1. from within handle_received_request() when request is received
-    #  2. from within _apply_router_config() after vpp was started
-    # In the first case we can detect the vmxnet3 nature of interface device,
-    # as before vpp start device is controlled by kernel and is bound to vmxnet3 driver.
-    # In the second case we can't detect the vmxnet3 nature of interface device,
-    # as on startup vpp takes control over network devices and binds them
-    # to the same vfio-pci driver.
-    # As we have to run special command for vmxnet3 devices after vpp start,
-    # we have to pass the knowledge about nature of device between these two
-    # handlings. We do that using the 'driver' parameter of the request.
     if fwutils.pci_is_vmxnet3(iface_pci):
-        params['driver'] = 'vmxnet3'
-    if 'driver' in params and params['driver'] == 'vmxnet3':
         pci_bytes = fwutils.pci_str_to_bytes(params['pci'])
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "vmxnet3_create"
         cmd['cmd']['descr']   = "create vmxnet3 interface for %s" % iface_pci
         cmd['cmd']['params']  = { 'pci_addr':pci_bytes }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "vmxnet3_delete"
+        cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % iface_pci
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ] }
         cmd_list.append(cmd)
+        # Mark interface as a 'vmxnet3' to save fwutils.pci_is_vmxnet3()
+        # check in start_router() translation.
+        params['driver']      = 'vmxnet3'
 
     ######################################################################
     #  NO NEED TO SET IP AND UP/DOWN STATE IN VPP !
