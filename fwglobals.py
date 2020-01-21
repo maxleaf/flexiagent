@@ -117,6 +117,7 @@ request_handlers = {
     'sw_interface_set_mac_address': '_call_vpp_api',
     'sw_interface_set_mtu':         '_call_vpp_api',
     'vmxnet3_create':               '_call_vpp_api',
+    'vmxnet3_delete':               '_call_vpp_api',
     'vxlan_add_del_tunnel':         '_call_vpp_api',
 
     # Python API
