@@ -1011,6 +1011,7 @@ def vpp_startup_conf_update(filename, path, param, val, add, filename_backup=Non
     else:
         if len(found_elements) > 0:
             section.remove(found_elements[0])
+            section.append('ELEMENT_TO_BE_REMOVED')
         if len(section) == 0:
             prev_section[prev_step] = None
 
@@ -1040,6 +1041,8 @@ def vpp_startup_conf_remove_devices(params):
         config_param = 'dev %s' % dev
         if config_param in config['dpdk']:
             config['dpdk'].remove(config_param)
+    if len(config['dpdk']) == 0:
+        config['dpdk'].append('ELEMENT_TO_BE_REMOVED')  # Need this to avoid empty list section before dump(), as yaml goes crazy with empty list sections
 
     fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
