@@ -165,14 +165,20 @@ def start_router(params=None):
         cmd_list.append(cmd)
 
     # Enable NAT in vpp configuration file
-    nat_status = os.popen("grep -E 'nat.*endpoint-dependent' %s" % vpp_filename).read()
+    nat_status = os.popen("grep -E '  endpoint-dependent' %s" % vpp_filename).read()
     if len(nat_status.strip()) == 0:
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "enable NAT in vpp"
         cmd['cmd']['params']  = [
-            'sudo printf "\nnat { endpoint-dependent }\n" >> ' + vpp_filename ]
+            'sudo printf "\nnat {\n'
+            '  endpoint-dependent\n'
+            '  translation hash buckets 1048576\n'
+            '  translation hash memory 268435456\n'
+            '  user hash buckets 1024\n'
+            '  max translations per user 10000\n'
+            '}\n" >> ' + vpp_filename ]
         # Don't remove NAT on revert, as it should be enabled always
         cmd_list.append(cmd)
 
