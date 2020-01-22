@@ -751,8 +751,7 @@ class FwagentDaemon(object):
         if check_system and fwglobals.g.router_api.router_started:
             check_system = False    # No need to check system if VPP runs, it is too late :)
         if check_system and self._check_system() == False:
-            fwglobals.log.excep("FwagentDaemon: system checker failed, stop")
-            return
+            fwglobals.log.excep("FwagentDaemon: system checker failed")
 
         if start_vpp:
             try:
