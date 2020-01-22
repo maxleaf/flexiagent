@@ -55,7 +55,8 @@ fwrouter_translators = {
     'add-route':        {'module':'fwtranslate_add_route',    'api':'add_route',    'key_func':'get_request_key'},
     'remove-route':     {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-route'},
     'add-tunnel':       {'module':'fwtranslate_add_tunnel',   'api':'add_tunnel',   'key_func':'get_request_key'},
-    'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'}
+    'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'},
+    'add_app_rule':     {'module':'fwtranslate_add_app_rule', 'api':'add_app_rule', 'key_func':'get_request_key'}
 }
 
 class FWROUTER_API:
