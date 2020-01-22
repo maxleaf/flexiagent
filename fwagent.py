@@ -148,8 +148,14 @@ class Fwagent:
         try:
             with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as stream:
                 stream.write('Failed to connect to MGMT: %s' % err)
+                fwglobals.log.debug("_mark_connection_failure: %s" % str(e))
         except Exception as e:
             fwglobals.log.excep("Failed to create connection failure file: %s" % str(e))
+
+    def _clean_connection_failure(self):
+        if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
+            os.remove(fwglobals.g.CONN_FAILURE_FILE)
+            fwglobals.log.debug("_clean_connection_failure")
 
     def register(self):
         """Registers device with the flexiManage.
@@ -397,6 +403,8 @@ class Fwagent:
 
         :returns: None.
         """
+        self._clean_connection_failure()
+
         if loadsimulator.g.enabled():
             loadsimulator.g.simulate_event.set()
 
