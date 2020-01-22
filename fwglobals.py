@@ -98,6 +98,9 @@ request_handlers = {
     'disconnect_from_router':       '_call_os_api',
 
     # VPP API
+    'acl_add_replace':              '_call_vpp_api',
+    'abf_itf_attach_add_del':       '_call_vpp_api',
+    'abf_policy_add_del':           '_call_vpp_api',
     'bridge_domain_add_del':        '_call_vpp_api',
     'create_loopback_instance':     '_call_vpp_api',
     'delete_loopback':              '_call_vpp_api',
