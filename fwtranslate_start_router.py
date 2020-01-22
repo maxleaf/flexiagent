@@ -165,12 +165,6 @@ def start_router(params=None):
         cmd_list.append(cmd)
 
     # Enable NAT in vpp configuration file
-
-    # Before this we remove 'nat' section in old format (<= 1.1.43),
-    # as due to bug in 1.1.44 two 'nat' sections might appear in file.
-    # That causes exception in yaml.
-    os.system("sed -i -E '/nat.*endpoint-dependent/d' %s" % vpp_filename)
-
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
