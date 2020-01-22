@@ -68,6 +68,7 @@ request_handlers = {
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
     'modify-device':                '_call_router_api',
+    'add-app-rule':                 '_call_router_api',
 
 
 

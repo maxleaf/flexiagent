@@ -1,0 +1,44 @@
+[
+{
+	"entity": "agent",
+	"message": "start-router",
+	"params": {
+		"default-route": "192.168.0.1",
+	"interfaces": [
+	   {
+		"pci": "0000:00:03.00",
+		"addr": "192.168.0.110/24",
+		"type":"wan"
+	   },
+	   {
+		"pci": "0000:00:08.00",
+		"addr": "20.20.20.1/24",
+		"routing":"ospf",
+		"type":"lan"
+	   }
+	   ],
+    "routes": [
+      {
+        "addr": "default",
+        "via": "192.168.0.1"
+      }
+      ]
+	}
+},
+{
+  "entity":  "agent",
+  "message": "add-app-rule",
+  "params": {
+           "app":"google-dns",
+           "appid":1,
+           "_id":378987465,
+           "ip-range-low":"8.8.8.8",
+           "ip-range-high":"8.8.8.8",
+           "port-range-low":53,
+           "port-range-high":53,
+           "category":"network",
+           "subcategory":"dns",
+           "priority":"3"
+           }
+}
+]

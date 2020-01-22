@@ -44,7 +44,8 @@ fwrouter_modules = {
     'fwtranslate_start_router': __import__('fwtranslate_start_router'),
     'fwtranslate_add_interface':__import__('fwtranslate_add_interface'),
     'fwtranslate_add_route':    __import__('fwtranslate_add_route'),
-    'fwtranslate_add_tunnel':   __import__('fwtranslate_add_tunnel')
+    'fwtranslate_add_tunnel':   __import__('fwtranslate_add_tunnel'),
+    'fwtranslate_add_app_rule': __import__('fwtranslate_add_app_rule')
 }
 
 fwrouter_translators = {
@@ -56,7 +57,7 @@ fwrouter_translators = {
     'remove-route':     {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-route'},
     'add-tunnel':       {'module':'fwtranslate_add_tunnel',   'api':'add_tunnel',   'key_func':'get_request_key'},
     'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'},
-    'add_app_rule':     {'module':'fwtranslate_add_app_rule', 'api':'add_app_rule', 'key_func':'get_request_key'}
+    'add-app-rule':     {'module':'fwtranslate_add_app_rule', 'api':'add_app_rule', 'key_func':'get_request_key'}
 }
 
 class FWROUTER_API:
