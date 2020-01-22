@@ -587,12 +587,6 @@ class FWROUTER_API:
         self.router_started = False 
         self._stop_threads()
 
-        # Remove the 'nat' section in old format (<= 1.1.43),
-        # as due to bug in 1.1.44 two 'nat' sections might appear in file.
-        # That causes exception in yaml when whitelist devices or nat is removed
-        # by the stop-router list of commands.
-        os.system("sed -i -E '/nat.*endpoint-dependent/d' %s" % fwglobals.g.VPP_CONFIG_FILE)
-
         # Now translate and execute stop-router.
         # On any problem we have to force router stop,
         # so we handle exceptions here
