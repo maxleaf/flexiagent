@@ -167,6 +167,12 @@ class FWROUTER_API:
     def stop_router(self):
         """Execute stop router command.
         """
+        # Before this we remove 'nat' section in old format (<= 1.1.43),
+        # as due to bug in 1.1.44 two 'nat' sections might appear in file.
+        # That causes exception in yaml.
+        vpp_filename = fwglobals.g.VPP_CONFIG_FILE
+        os.system("sed -i -E '/nat.*endpoint-dependent/d' %s" % vpp_filename)
+
         fwglobals.log.info("FWROUTER_API: stop_router")
         if self.router_started == True:
             self.call('stop-router')
