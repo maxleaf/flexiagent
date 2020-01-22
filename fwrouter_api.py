@@ -167,12 +167,6 @@ class FWROUTER_API:
     def stop_router(self):
         """Execute stop router command.
         """
-        # Before this we remove 'nat' section in old format (<= 1.1.43),
-        # as due to bug in 1.1.44 two 'nat' sections might appear in file.
-        # That causes exception in yaml.
-        vpp_filename = fwglobals.g.VPP_CONFIG_FILE
-        os.system("sed -i -E '/nat.*endpoint-dependent/d' %s" % vpp_filename)
-
         fwglobals.log.info("FWROUTER_API: stop_router")
         if self.router_started == True:
             self.call('stop-router')
@@ -593,6 +587,12 @@ class FWROUTER_API:
         self.router_started = False 
         self._stop_threads()
 
+        # Remove the 'nat' section in old format (<= 1.1.43),
+        # as due to bug in 1.1.44 two 'nat' sections might appear in file.
+        # That causes exception in yaml when whitelist devices or nat is removed
+        # by the stop-router list of commands.
+        os.system("sed -i -E '/nat.*endpoint-dependent/d' %s" % fwglobals.g.VPP_CONFIG_FILE)
+
         # Now translate and execute stop-router.
         # On any problem we have to force router stop,
         # so we handle exceptions here
@@ -914,7 +914,7 @@ class FWROUTER_API:
             if 'add_param' in s:
                 if type(params) is dict:
                     params[s['add_param']] = new
-                else:  # list                 
+                else:  # list
                     params.insert({s['add_param'], new})
             elif 'replace' in s:
                 old = s['replace']
@@ -931,5 +931,5 @@ class FWROUTER_API:
         # Once all substitutions are made, remove substitution list from params
         if type(params) is dict:
             del params['substs']
-        else:  # list                 
+        else:  # list
             params.remove(substs_element)
