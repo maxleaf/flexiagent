@@ -100,6 +100,7 @@ request_handlers = {
 
     # VPP API
     'acl_add_replace':              '_call_vpp_api',
+    'acl_del':                      '_call_vpp_api',
     'abf_itf_attach_add_del':       '_call_vpp_api',
     'abf_policy_add_del':           '_call_vpp_api',
     'bridge_domain_add_del':        '_call_vpp_api',
