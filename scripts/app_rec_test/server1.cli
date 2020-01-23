@@ -29,9 +29,9 @@
   "entity":  "agent",
   "message": "add-app-rule",
   "params": {
+           "_id":378987465,
            "app":"google-dns",
            "appid":1,
-           "_id":378987465,
            "ip-range-low":"8.8.8.8",
            "ip-range-high":"8.8.8.8",
            "port-range-low":53,
@@ -40,5 +40,17 @@
            "subcategory":"dns",
            "priority":"3"
            }
+},
+{
+      "entity":  "agent",
+      "message": "add-policy",
+      "params": {
+            "_id":378987465,
+            "app":"none",
+            "category":"network",
+            "subcategory":"none",
+            "policy":"redirect",
+            "interface_id":"1"
+             }
 }
 ]

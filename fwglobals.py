@@ -69,8 +69,9 @@ request_handlers = {
     'remove-tunnel':                '_call_router_api',
     'modify-device':                '_call_router_api',
     'add-app-rule':                 '_call_router_api',
-
-
+    'remove-app-rule':              '_call_router_api',
+    'add-policy':                   '_call_router_api',
+    'remove-policy':                '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s

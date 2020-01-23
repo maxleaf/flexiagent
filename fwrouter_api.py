@@ -45,7 +45,8 @@ fwrouter_modules = {
     'fwtranslate_add_interface':__import__('fwtranslate_add_interface'),
     'fwtranslate_add_route':    __import__('fwtranslate_add_route'),
     'fwtranslate_add_tunnel':   __import__('fwtranslate_add_tunnel'),
-    'fwtranslate_add_app_rule': __import__('fwtranslate_add_app_rule')
+    'fwtranslate_add_app_rule': __import__('fwtranslate_add_app_rule'),
+    'fwtranslate_add_policy':   __import__('fwtranslate_add_policy')
 }
 
 fwrouter_translators = {
@@ -57,7 +58,10 @@ fwrouter_translators = {
     'remove-route':     {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-route'},
     'add-tunnel':       {'module':'fwtranslate_add_tunnel',   'api':'add_tunnel',   'key_func':'get_request_key'},
     'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'},
-    'add-app-rule':     {'module':'fwtranslate_add_app_rule', 'api':'add_app_rule', 'key_func':'get_request_key'}
+    'add-app-rule':     {'module':'fwtranslate_add_app_rule', 'api':'add_app_rule', 'key_func':'get_request_key'},
+    'remove-app-rule':  {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add-app-rule'},
+    'add-policy':       {'module':'fwtranslate_add_policy',   'api': 'add_policy',  'key_func': 'get_request_key'},
+    'remove-policy':    {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add_policy'},
 }
 
 class FWROUTER_API:
