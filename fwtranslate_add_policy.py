@@ -22,6 +22,7 @@
 
 import os
 import re
+import copy
 
 import fwglobals
 import fwtranslate_revert
@@ -47,6 +48,29 @@ import fwutils
 #
 #
 
+def _encode_paths():
+    br_paths = []
+
+    '''br_paths.append({'next_hop': 4294967295,
+                 'weight'      : 1,
+                 'afi'         : 0,
+                 'sw_if_index' : 4294967295,
+                 'preference'  : 0,
+                 'table_id'    : 0,
+                 'next_hop_id' : b'\x10\x02\x02\xac',
+                 'is_udp_encap': 0,
+                 'n_labels'    : 0,
+                 'label_stack' : 0})'''
+
+    return br_paths
+
+def _create_policy(policy_id, acl_index):
+    rule = ({'policy_id': policy_id,
+             'acl_index': acl_index,
+             'n_paths'  : 0,
+             'paths'    : _encode_paths()})
+    return rule
+
 def add_policy(params):
     """Generate commands ...
 
@@ -54,7 +78,25 @@ def add_policy(params):
 
      :returns: List of commands.
      """
+    # abf.api.json: abf_policy_add_del (is_add, ..., tunnel <type vl_api_abf_policy_t>, ...)
     cmd_list = []
+
+    cmd_params = {
+            'is_add'           : 1,
+            'policy'           : _create_policy(1, 0)
+    }
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']          = "abf_policy_add_del"
+    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['descr']         = "Add ABF for app %s" % (params['app'])
+    cmd['revert'] = {}
+    cmd['revert']['name']       = 'abf_policy_add_del'
+    cmd['revert']['params']     = copy.deepcopy(cmd_params)
+    cmd['revert']['params']['is_add'] = 0
+    cmd['revert']['descr']      = "Delete ABF for app %s" % (params['app'])
+    cmd_list.append(cmd)
 
     return cmd_list
 
