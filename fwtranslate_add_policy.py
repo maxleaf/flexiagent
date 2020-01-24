@@ -51,24 +51,36 @@ import fwutils
 def _encode_paths():
     br_paths = []
 
-    '''br_paths.append({'next_hop': 4294967295,
+    label_stack = {'is_uniform': 0,
+                   'label': 0,
+                   'ttl': 0,
+                   'exp': 0}
+
+    label_stack_list = []
+    for i in range(16):
+        label_stack_list.append(label_stack)
+
+    br_paths.append({'next_hop': b'\x10\x02\x02\xac',
                  'weight'      : 1,
                  'afi'         : 0,
                  'sw_if_index' : 4294967295,
                  'preference'  : 0,
                  'table_id'    : 0,
-                 'next_hop_id' : b'\x10\x02\x02\xac',
+                 'next_hop_id' : 4294967295,
                  'is_udp_encap': 0,
                  'n_labels'    : 0,
-                 'label_stack' : 0})'''
+                 'label_stack' : label_stack_list})
 
     return br_paths
 
 def _create_policy(policy_id, acl_index):
+
+    paths = _encode_paths()
+
     rule = ({'policy_id': policy_id,
              'acl_index': acl_index,
-             'n_paths'  : 0,
-             'paths'    : _encode_paths()})
+             'paths'    : paths,
+             'n_paths': len(paths)})
     return rule
 
 def add_policy(params):
