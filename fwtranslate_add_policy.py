@@ -83,6 +83,15 @@ def _create_policy(policy_id, acl_index):
              'n_paths': len(paths)})
     return rule
 
+def _attach_policy(policy_id, sw_if_index, priority, is_ipv6):
+
+     attach = ({'policy_id'   : policy_id,
+                'sw_if_index' : sw_if_index,
+                'priority'    : priority,
+                'is_ipv6'     : is_ipv6})
+
+     return attach
+
 def add_policy(params):
     """Generate commands ...
 
@@ -90,7 +99,6 @@ def add_policy(params):
 
      :returns: List of commands.
      """
-    # abf.api.json: abf_policy_add_del (is_add, ..., tunnel <type vl_api_abf_policy_t>, ...)
     cmd_list = []
 
     cmd_params = {
@@ -98,6 +106,7 @@ def add_policy(params):
             'policy'           : _create_policy(1, 0)
     }
 
+    # abf.api.json: abf_policy_add_del (is_add, ..., <type vl_api_abf_policy_t>, ...)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "abf_policy_add_del"
@@ -108,6 +117,26 @@ def add_policy(params):
     cmd['revert']['params']     = copy.deepcopy(cmd_params)
     cmd['revert']['params']['is_add'] = 0
     cmd['revert']['descr']      = "Delete ABF for app %s" % (params['app'])
+    cmd_list.append(cmd)
+
+    sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
+
+    cmd_params = {
+            'is_add'           : 1,
+            'attach'           : _attach_policy(1, sw_if_index, 0, 0)
+    }
+
+    # abf.api.json: abf_itf_attach_add_del (is_add, ..., <type vl_api_abf_itf_attach_t>, ...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']          = "abf_itf_attach_add_del"
+    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['descr']         = "Attach ABF for app %s" % (params['app'])
+    cmd['revert'] = {}
+    cmd['revert']['name']       = 'abf_itf_attach_add_del'
+    cmd['revert']['params']     = copy.deepcopy(cmd_params)
+    cmd['revert']['params']['is_add'] = 0
+    cmd['revert']['descr']      = "Attach ABF for app %s" % (params['app'])
     cmd_list.append(cmd)
 
     return cmd_list
