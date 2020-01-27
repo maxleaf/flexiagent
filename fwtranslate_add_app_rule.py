@@ -79,7 +79,7 @@ def _create_rule(ip=0, permit_deny=0, proto=0,
                  sport_from=0, sport_to=65535,
                  s_prefix=0, s_ip='\x00\x00\x00\x00',
                  dport_from=0, dport_to=65535,
-                 d_prefix=32, d_ip='\x08\x08\x08\x08'):
+                 d_prefix=0, d_ip='\x00\x00\x00\x00'):
 
     rule = ({'is_permit': permit_deny, 'is_ipv6': ip, 'proto': proto,
              'srcport_or_icmptype_first': sport_from,
@@ -102,7 +102,12 @@ def add_app_rule(params):
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
     cmd_list = []
     rules = []
-    rules.append(_create_rule(IPV4, PERMIT))
+
+    ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['ip'])
+
+    rules.append(_create_rule(ip=IPV4, permit_deny=PERMIT,
+                              dport_from=params['port-range-low'], dport_to=params['port-range-high'],
+                              d_prefix=params['ip-prefix'], d_ip=ip_bytes))
 
     cmd_params = {
             'acl_index'        : NEW_ACL_ID,

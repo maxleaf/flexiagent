@@ -64,7 +64,7 @@
            "app":"google-dns",
            "appid":1,
            "ip":"8.8.8.8",
-           "ip-prefix":"8.8.8.8",
+           "ip-prefix":32,
            "port-range-low":53,
            "port-range-high":53,
            "category":"network",
