@@ -48,7 +48,7 @@ import fwutils
 #
 #
 
-def _encode_paths():
+def _encode_paths(next_hop):
     br_paths = []
 
     label_stack = {'is_uniform': 0,
@@ -60,22 +60,22 @@ def _encode_paths():
     for i in range(16):
         label_stack_list.append(label_stack)
 
-    br_paths.append({'next_hop': b'\x10\x02\x02\xac',
-                 'weight'      : 1,
-                 'afi'         : 0,
-                 'sw_if_index' : 4294967295,
-                 'preference'  : 0,
-                 'table_id'    : 0,
-                 'next_hop_id' : 4294967295,
-                 'is_udp_encap': 0,
-                 'n_labels'    : 0,
-                 'label_stack' : label_stack_list})
+    br_paths.append({'next_hop': next_hop,
+                     'weight'      : 1,
+                     'afi'         : 0,
+                     'sw_if_index' : 4294967295,
+                     'preference'  : 0,
+                     'table_id'    : 0,
+                     'next_hop_id' : 4294967295,
+                     'is_udp_encap': 0,
+                     'n_labels'    : 0,
+                     'label_stack' : label_stack_list})
 
     return br_paths
 
-def _create_policy(policy_id, acl_index):
+def _create_policy(policy_id, acl_index, next_hop):
 
-    paths = _encode_paths()
+    paths = _encode_paths(next_hop)
 
     rule = ({'policy_id': policy_id,
              'acl_index': acl_index,
@@ -101,9 +101,11 @@ def add_policy(params):
      """
     cmd_list = []
 
+    ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
+
     cmd_params = {
             'is_add'           : 1,
-            'policy'           : _create_policy(1, 0)
+            'policy'           : _create_policy(0, 0, ip_bytes)
     }
 
     # abf.api.json: abf_policy_add_del (is_add, ..., <type vl_api_abf_policy_t>, ...)
@@ -123,7 +125,7 @@ def add_policy(params):
 
     cmd_params = {
             'is_add'           : 1,
-            'attach'           : _attach_policy(1, sw_if_index, 0, 0)
+            'attach'           : _attach_policy(0, sw_if_index, 0, 0)
     }
 
     # abf.api.json: abf_itf_attach_add_del (is_add, ..., <type vl_api_abf_itf_attach_t>, ...)
