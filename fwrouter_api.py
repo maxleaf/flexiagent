@@ -688,16 +688,24 @@ class FWROUTER_API:
         modify_route_requests = []
         if params:
             for route in params['routes']:
-                old_route_ent = {k:v for k,v in route.items() if k not in ['new_route']}
-                new_route_ent = {k:v for k,v in route.items() if k not in ['old_route']}
-                old_route_ent['via'] = old_route_ent.pop('old_route')
-                new_route_ent['via'] = new_route_ent.pop('new_route')
+                remove_route_params = {}
+                add_route_params = {}
+                
+                # Modified routes will have both the 'old_route' and 'new_route'
+                # fields, whereas added/removed routes will only have the 'new_route'
+                # or 'old_route' fields.
+                if route['old_route'] != '':
+                    remove_route_params = {k:v for k,v in route.items() if k not in ['new_route']}
+                    remove_route_params['via'] = remove_route_params.pop('old_route')
+                    # Remove route only if it exists in the database
+                    if self._get_request_params_from_db('remove-route', remove_route_params):
+                        modify_route_requests.append({'remove-route': remove_route_params})
 
-                # Remove route only if it exists in the database
-                if self._get_request_params_from_db('remove-route', old_route_ent):
-                    modify_route_requests.append({'remove-route': old_route_ent})
-                modify_route_requests.append({'add-route': new_route_ent})
-
+                if route['new_route'] != '':
+                    add_route_params = {k:v for k,v in route.items() if k not in ['old_route']}
+                    add_route_params['via'] = add_route_params.pop('new_route')
+                    modify_route_requests.append({'add-route': add_route_params})
+                
         return modify_route_requests
 
     def _create_modify_router_request(self, params):
