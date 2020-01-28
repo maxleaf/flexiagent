@@ -27,6 +27,7 @@ import copy
 import fwglobals
 import fwtranslate_revert
 import fwutils
+import fwapplications
 
 # add-policy
 # --------------------------------------
@@ -102,10 +103,11 @@ def add_policy(params):
     cmd_list = []
 
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
+    acl_id = fwapplications.g.acl_id_get(params['app'])
 
     cmd_params = {
             'is_add'           : 1,
-            'policy'           : _create_policy(0, 0, ip_bytes)
+            'policy'           : _create_policy(0, acl_id, ip_bytes)
     }
 
     # abf.api.json: abf_policy_add_del (is_add, ..., <type vl_api_abf_policy_t>, ...)

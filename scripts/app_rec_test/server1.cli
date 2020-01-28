@@ -77,7 +77,7 @@
       "message": "add-policy",
       "params": {
             "_id":378987465,
-            "app":"none",
+            "app":"google-dns",
             "category":"network",
             "subcategory":"none",
             "policy":"redirect",

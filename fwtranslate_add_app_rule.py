@@ -26,6 +26,7 @@ import re
 import fwglobals
 import fwtranslate_revert
 import fwutils
+import fwapplications
 
 # add-app-rule
 # --------------------------------------
@@ -123,9 +124,11 @@ def add_app_rule(params):
     cmd['cmd']['descr']         = "Add ACL for app %s" % (params['app'])
     cmd['revert'] = {}
     cmd['revert']['name']       = 'acl_del'
-    cmd['revert']['params']     = {'acl_index': params['_id']}
+    cmd['revert']['params']     = {'acl_index': 0}
     cmd['revert']['descr']      = "Delete ACL for app %s" % (params['app'])
     cmd_list.append(cmd)
+
+    fwapplications.g.app_add(params['app'], 0)
 
     return cmd_list
 
