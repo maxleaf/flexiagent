@@ -117,14 +117,17 @@ def add_app_rule(params):
             'tag'              : ''
     }
 
+    ret_attr = 'acl_index'
+    cache_key = 'acl_index'
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "acl_add_replace"
     cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['cache_ret_val'] = (ret_attr, cache_key)
     cmd['cmd']['descr']         = "Add ACL for app %s" % (params['app'])
     cmd['revert'] = {}
     cmd['revert']['name']       = 'acl_del'
-    cmd['revert']['params']     = {'acl_index': 0}
+    cmd['revert']['params']     = {'substs': [ { 'add_param':ret_attr, 'val_by_key':cache_key} ]}
     cmd['revert']['descr']      = "Delete ACL for app %s" % (params['app'])
     cmd_list.append(cmd)
 
