@@ -56,6 +56,7 @@ request_handlers = {
     'get-device-os-routes':         '_call_agent_api',
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
+    'save-app-info':                '_call_agent_api',
 
     # Router API
     'start-router':                 '_call_router_api',

@@ -26,7 +26,6 @@ import re
 import fwglobals
 import fwtranslate_revert
 import fwutils
-import fwapplications
 
 # add-app-rule
 # --------------------------------------
@@ -93,15 +92,15 @@ def _create_rule(ip=0, permit_deny=0, proto=0,
              'dst_ip_addr': d_ip})
     return rule
 
-def add_app_rule(params):
-    """Generate commands ...
+def _add_acl(params, cmd_list):
+    """Generate ACL command.
 
      :param params:        Parameters from flexiManage.
+     :param cmd_list:      Commands list.
 
-     :returns: List of commands.
+     :returns: Cache key of ACL id.
      """
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
-    cmd_list = []
     rules = []
 
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['ip'])
@@ -131,7 +130,42 @@ def add_app_rule(params):
     cmd['revert']['descr']      = "Delete ACL for app %s" % (params['app'])
     cmd_list.append(cmd)
 
-    fwapplications.g.app_add(params['app'], 0)
+    return cache_key
+
+def _add_app(params, cache_key, cmd_list):
+    """Generate APP in DB.
+
+     :param params:        Parameters from flexiManage.
+     :param cache_key:     ACL id cache key.
+     :param cmd_list:      Commands list.
+
+     """
+    cmd_params = {
+            'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ],
+            'app'   : params['app']
+    }
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']          = "save-app-info"
+    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['descr']         = "Add APP %s" % (params['app'])
+    cmd['revert'] = {}
+    cmd['revert']['name']       = 'save-app-info'
+    cmd['revert']['params']     = cmd_params
+    cmd['revert']['descr']      = "Delete APP %s" % (params['app'])
+    cmd_list.append(cmd)
+
+def add_app_rule(params):
+    """Generate commands ...
+
+     :param params:        Parameters from flexiManage.
+
+     :returns: List of commands.
+    """
+    cmd_list = []
+
+    acl_id_cache_key = _add_acl(params, cmd_list)
+    _add_app(params, acl_id_cache_key, cmd_list)
 
     return cmd_list
 

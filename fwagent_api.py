@@ -28,6 +28,7 @@ from shutil import copyfile
 import fwglobals
 import fwstats
 import fwutils
+import fwapplications
 
 fwagent_api = {
     'get-device-info':      '_get_device_info',
@@ -36,7 +37,8 @@ fwagent_api = {
     'get-device-os-routes': '_get_device_os_routes',
     'handle-request':       '_handle_request',
     'get-router-config':    '_get_router_config',
-    'upgrade-device-sw':    '_upgrade_device_sw'
+    'upgrade-device-sw':    '_upgrade_device_sw',
+    'save-app-info':        '_save_app_info'
 }
 
 class FWAGENT_API:
@@ -194,3 +196,14 @@ class FWAGENT_API:
             return reply
         except Exception as e:
             return {'ok':0 , 'message':str(e)}
+
+    def _save_app_info(self, params):
+        """Save application information.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with information and status code.
+        """
+        fwapplications.g.app_add(params['app'], params['acl_index'])
+        reply = {'ok':1}
+        return reply
