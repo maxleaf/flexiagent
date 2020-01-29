@@ -177,4 +177,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-policy:%s' % params['_id']
+    return 'add-policy:%s' % params['app']

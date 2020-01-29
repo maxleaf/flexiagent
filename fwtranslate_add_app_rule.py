@@ -176,4 +176,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-app-rule:%s' % params['_id']
+    return 'add-app-rule:%s' % params['app']

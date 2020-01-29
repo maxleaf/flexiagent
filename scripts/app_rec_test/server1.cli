@@ -60,56 +60,36 @@
   "entity":  "agent",
   "message": "add-app-rule",
   "params": [{
-           "_id":378987465,
            "app":"google-dns",
-           "appid":1,
            "ip":"8.8.8.8",
            "ip-prefix":32,
            "port-range-low":0,
-           "port-range-high":65535,
-           "category":"network",
-           "subcategory":"dns",
-           "priority":"3"
+           "port-range-high":65535
            },
            {
-           "_id":378987465,
            "app":"google-dns-2",
-           "appid":1,
            "ip":"8.8.4.4",
            "ip-prefix":32,
            "port-range-low":0,
-           "port-range-high":65535,
-           "category":"network",
-           "subcategory":"dns",
-           "priority":"3"
+           "port-range-high":65535
            }]
 },
 {
       "entity":  "agent",
       "message": "add-policy",
       "params": [{
-            "_id":378987465,
             "app":"google-dns",
-            "category":"network",
-            "subcategory":"none",
-            "policy":"redirect",
             "pci": "0000:00:08.00",
             "route": 
             {
-              "addr": "10.100.0.7/31",
               "via": "10.100.0.6"
             }
        },
        {
-            "_id":378987465,
             "app":"google-dns-2",
-            "category":"network",
-            "subcategory":"none",
-            "policy":"redirect",
             "pci": "0000:00:08.00",
             "route": 
             {
-              "addr": "10.100.0.7/31",
               "via": "10.100.0.6"
             }
        }]
