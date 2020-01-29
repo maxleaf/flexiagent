@@ -49,6 +49,28 @@ import fwapplications
 #
 #
 
+def generate_id(ret):
+    """Generate identifier.
+
+    :param ret:         Initial id value.
+
+    :returns: identifier.
+    """
+    ret += 1
+    if ret == 2**32:       # sad_id is u32 in VPP
+        ret = 0
+    return ret
+
+policy_index = 0
+def generate_policy_id():
+    """Generate SA identifier.
+
+    :returns: New SA identifier.
+    """
+    global policy_index
+    policy_index = generate_id(policy_index)
+    return copy.deepcopy(policy_index)
+
 def _encode_paths(next_hop):
     br_paths = []
 
@@ -104,10 +126,13 @@ def add_policy(params):
 
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
     acl_id = fwapplications.g.acl_id_get(params['app'])
+    policy_id = generate_policy_id()
+    priority = 0
+    is_ipv6 = 0
 
     cmd_params = {
             'is_add'           : 1,
-            'policy'           : _create_policy(0, acl_id, ip_bytes)
+            'policy'           : _create_policy(policy_id, acl_id, ip_bytes)
     }
 
     # abf.api.json: abf_policy_add_del (is_add, ..., <type vl_api_abf_policy_t>, ...)
@@ -127,7 +152,7 @@ def add_policy(params):
 
     cmd_params = {
             'is_add'           : 1,
-            'attach'           : _attach_policy(0, sw_if_index, 0, 0)
+            'attach'           : _attach_policy(policy_id, sw_if_index, priority, is_ipv6)
     }
 
     # abf.api.json: abf_itf_attach_add_del (is_add, ..., <type vl_api_abf_itf_attach_t>, ...)
