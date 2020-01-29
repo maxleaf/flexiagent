@@ -59,7 +59,7 @@
 {
   "entity":  "agent",
   "message": "add-app-rule",
-  "params": {
+  "params": [{
            "_id":378987465,
            "app":"google-dns",
            "appid":1,
@@ -70,12 +70,8 @@
            "category":"network",
            "subcategory":"dns",
            "priority":"3"
-           }
-},
-{
-  "entity":  "agent",
-  "message": "add-app-rule",
-  "params": {
+           },
+           {
            "_id":378987465,
            "app":"google-dns-2",
            "appid":1,
@@ -86,12 +82,12 @@
            "category":"network",
            "subcategory":"dns",
            "priority":"3"
-           }
+           }]
 },
 {
       "entity":  "agent",
       "message": "add-policy",
-      "params": {
+      "params": [{
             "_id":378987465,
             "app":"google-dns",
             "category":"network",
@@ -103,12 +99,8 @@
               "addr": "10.100.0.7/31",
               "via": "10.100.0.6"
             }
-       }
-},
-{
-      "entity":  "agent",
-      "message": "add-policy",
-      "params": {
+       },
+       {
             "_id":378987465,
             "app":"google-dns-2",
             "category":"network",
@@ -120,6 +112,6 @@
               "addr": "10.100.0.7/31",
               "via": "10.100.0.6"
             }
-       }
+       }]
 }
 ]
