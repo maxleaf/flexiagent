@@ -38,6 +38,9 @@ class FwApps:
     def app_add(self, name, acl_id):
         self.apps_map[name] = acl_id
 
+    def app_remove(self, name):
+        del self.apps_map[name]
+
     def acl_id_get(self, name):
         return self.apps_map[name]
 

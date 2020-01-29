@@ -150,7 +150,7 @@ def _add_app(params, cache_key, cmd_list):
     cmd['cmd']['params']        = cmd_params
     cmd['cmd']['descr']         = "Add APP %s" % (params['app'])
     cmd['revert'] = {}
-    cmd['revert']['name']       = 'save-app-info'
+    cmd['revert']['name']       = 'remove-app-info'
     cmd['revert']['params']     = cmd_params
     cmd['revert']['descr']      = "Delete APP %s" % (params['app'])
     cmd_list.append(cmd)

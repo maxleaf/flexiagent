@@ -38,7 +38,8 @@ fwagent_api = {
     'handle-request':       '_handle_request',
     'get-router-config':    '_get_router_config',
     'upgrade-device-sw':    '_upgrade_device_sw',
-    'save-app-info':        '_save_app_info'
+    'save-app-info':        '_save_app_info',
+    'remove-app-info':      '_remove_app_info'
 }
 
 class FWAGENT_API:
@@ -205,5 +206,16 @@ class FWAGENT_API:
         :returns: Dictionary with information and status code.
         """
         fwapplications.g.app_add(params['app'], params['acl_index'])
+        reply = {'ok':1}
+        return reply
+
+    def _remove_app_info(self, params):
+        """Remove application information.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with information and status code.
+        """
+        fwapplications.g.app_remove(params['app'])
         reply = {'ok':1}
         return reply
