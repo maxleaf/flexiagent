@@ -382,7 +382,8 @@ class Fwagent:
         # upgraded agent failed to connect to the management.
         self._mark_connection_failure(self.connection_error_msg)
 
-        ws.close()
+        if not loadsimulator.g.enabled():
+            ws.close()
 
     def _on_close(self, ws):
         """Websocket connection close handler
