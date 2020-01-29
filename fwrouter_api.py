@@ -60,8 +60,8 @@ fwrouter_translators = {
     'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'},
     'add-app-rule':     {'module':'fwtranslate_add_app_rule', 'api':'add_app_rule', 'key_func':'get_request_key'},
     'remove-app-rule':  {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add-app-rule'},
-    'add-policy':       {'module':'fwtranslate_add_policy',   'api': 'add_policy',  'key_func': 'get_request_key'},
-    'remove-policy':    {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add_policy'},
+    'add-policy':       {'module':'fwtranslate_add_policy',   'api': 'add_policy',  'key_func':'get_request_key'},
+    'remove-policy':    {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add-policy'},
 }
 
 class FWROUTER_API:
