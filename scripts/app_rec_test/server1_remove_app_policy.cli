@@ -13,7 +13,7 @@
 },
 {
   "entity":  "agent",
-  "message": "remove-app-rule",
+  "message": "remove-rule",
   "params": {
            "app":"google-dns",
            "ip":"8.8.8.8",

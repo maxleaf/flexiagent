@@ -58,7 +58,7 @@
 },
 {
   "entity":  "agent",
-  "message": "add-app-rule",
+  "message": "add-rule",
   "params": [{
            "app":"google-dns",
            "ip":"8.8.8.8",

@@ -33,21 +33,18 @@ import fwapplications
 # --------------------------------------
 # Translates request:
 #
-#git diff
 # {
 #      "entity":  "agent",
 #      "message": "add-policy",
 #      "params": {
-#            "_id":378987465,
-#            "app":"none",
-#            "category":"network",
-#            "subcategory":"none",
-#            "policy":"redirect",
-#            "interface_id":"378975625"
+#             "app":"google-dns",
+#             "pci": "0000:00:08.00",
+#             "route":
+#             {
+#               "via": "10.100.0.6"
 #             }
-#}
-#
-#
+#        }
+# }
 
 def generate_id(ret):
     """Generate identifier.

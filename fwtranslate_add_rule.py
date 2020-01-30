@@ -30,21 +30,15 @@ import fwutils
 # add-app-rule
 # --------------------------------------
 # Translates request:
-#
-#    "message": "add-app-rule",
+# {
+#    "message": "add-rule",
 #    "params":
 #          {"app":"google-dns",
-#           "appid":1,
-#           "_id":378987465,
-#           "ip-range-low":"8.8.8.8",
-#           "ip-range-high":"8.8.8.8",
+#           "ip":"8.8.8.8",
+#           "ip-prefix":32,
 #           "port-range-low":53,
-#           "port-range-high":53,
-#           "category":"network",
-#           "subcategory":"dns",
-#           "priority":"3"}
-#
-#
+#           "port-range-high":53}
+# }
 
 # traffic types
 IP = 0
@@ -155,7 +149,7 @@ def _add_app(params, cache_key, cmd_list):
     cmd['revert']['descr']      = "Delete APP %s" % (params['app'])
     cmd_list.append(cmd)
 
-def add_app_rule(params):
+def add_rule(params):
     """Generate commands ...
 
      :param params:        Parameters from flexiManage.
@@ -176,4 +170,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-app-rule:%s' % params['app']
+    return 'add-rule:%s' % params['app']
