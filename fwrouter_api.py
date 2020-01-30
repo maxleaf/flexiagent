@@ -795,6 +795,16 @@ class FWROUTER_API:
                     self._apply_db_request(key)
                     self._fill_tunnel_stats_dict()
 
+            # Configure rules
+            for key in self.db_requests.db:
+                if re.match('add-rule', key):
+                    self._apply_db_request(key)
+
+            # Configure policies
+            for key in self.db_requests.db:
+                if re.match('add-policy', key):
+                    self._apply_db_request(key)
+
         except Exception as e:
             err_str = "_apply_router_config failed: %s" % str(e)
             fwglobals.log.excep(err_str)
