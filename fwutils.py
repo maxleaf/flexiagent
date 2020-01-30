@@ -778,6 +778,22 @@ def print_router_config(full=False):
                     head_line_printed = True
                 _print_config_request(db_requests, key, full)
 
+        head_line_printed = False
+        for key in db_requests.db:
+            if re.match('add-rule', key):
+                if not head_line_printed:
+                    print("=========== RULES ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
+
+        head_line_printed = False
+        for key in db_requests.db:
+            if re.match('add-policy', key):
+                if not head_line_printed:
+                    print("=========== POLICIES ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
+
 #
 def _get_group_delimiter(lines, delimiter):
     """Helper function to iterate through a group lines by delimiter.
