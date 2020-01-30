@@ -278,20 +278,20 @@ class Fwagent:
         def on_close(ws):
             self._on_close(ws)
 
-        loadsimulator.g.simulate_websockets[id] = websocket.WebSocketApp(url,
-                                                                         header={header_UserAgent},
-                                                                         on_open=on_open,
-                                                                         on_message=on_message,
-                                                                         on_error=on_error,
-                                                                         on_close=on_close)
-
-        cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
-
         while loadsimulator.g.started:
+            loadsimulator.g.simulate_websockets[id] = websocket.WebSocketApp(url,
+                                                                            header={header_UserAgent},
+                                                                            on_open=on_open,
+                                                                            on_message=on_message,
+                                                                            on_error=on_error,
+                                                                            on_close=on_close)
+
+            cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
+
             loadsimulator.g.simulate_websockets[id].run_forever(sslopt={"cert_reqs": cert_required},
                                                                 ping_interval=25, ping_timeout=20)
             retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-            fwglobals.log.info("retry connection in %d seconds" % retry_sec)
+            fwglobals.log.info("websocket_thread %d: retry connection in %d seconds" % (id, retry_sec))
             time.sleep(retry_sec)
 
     def connect(self):
@@ -382,8 +382,7 @@ class Fwagent:
         # upgraded agent failed to connect to the management.
         self._mark_connection_failure(self.connection_error_msg)
 
-        if not loadsimulator.g.enabled():
-            ws.close()
+        ws.close()
 
     def _on_close(self, ws):
         """Websocket connection close handler
