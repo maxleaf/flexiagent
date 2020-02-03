@@ -97,11 +97,14 @@ def _add_acl(params, cmd_list):
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
     rules = []
 
-    ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['ip'])
+    for rule in params['rules']:
+        ip_bytes, ip_len = fwutils.ip_str_to_bytes(rule['ip'])
 
-    rules.append(_create_rule(ip=IPV4, permit_deny=PERMIT,
-                              dport_from=params['port-range-low'], dport_to=params['port-range-high'],
-                              d_prefix=params['ip-prefix'], d_ip=ip_bytes))
+        rules.append(_create_rule(ip=IPV4, permit_deny=PERMIT,
+                                  dport_from=rule['port-range-low'],
+                                  dport_to=rule['port-range-high'],
+                                  d_prefix=rule['ip-prefix'],
+                                  d_ip=ip_bytes))
 
     cmd_params = {
             'acl_index'        : NEW_ACL_ID,

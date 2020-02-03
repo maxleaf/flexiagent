@@ -61,17 +61,16 @@
   "message": "add-rule",
   "params": [{
            "app":"google-dns",
-           "ip":"8.8.8.8",
-           "ip-prefix":32,
-           "port-range-low":0,
-           "port-range-high":65535
-           },
-           {
-           "app":"google-dns-2",
-           "ip":"8.8.4.4",
-           "ip-prefix":32,
-           "port-range-low":0,
-           "port-range-high":65535
+           "rules":[{
+             "ip":"8.8.8.8",
+             "ip-prefix":32,
+             "port-range-low":0,
+             "port-range-high":65535},
+             {
+             "ip":"8.8.4.4",
+             "ip-prefix":32,
+             "port-range-low":0,
+             "port-range-high":65535}]
            }]
 },
 {
@@ -79,14 +78,6 @@
       "message": "add-policy",
       "params": [{
             "app":"google-dns",
-            "pci": "0000:00:08.00",
-            "route": 
-            {
-              "via": "10.100.0.6"
-            }
-       },
-       {
-            "app":"google-dns-2",
             "pci": "0000:00:08.00",
             "route": 
             {
