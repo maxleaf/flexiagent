@@ -78,10 +78,29 @@
            }]
 },
 {
+  "entity":  "agent",
+  "message": "add-rule",
+  "params": [{
+           "app":"yahoo-dns",
+           "id":1,
+           "category":"network",
+           "subcategory":"dns",
+           "priority":3,
+           "rules":[{
+             "ip":"67.195.1.92",
+             "ip-prefix":32,
+             "port-range-low":53,
+             "port-range-high":53}]
+           }]
+},
+{
       "entity":  "agent",
       "message": "add-policy",
       "params": [{
             "app":"google-dns",
+            "category":"network",
+            "subcategory":"dns",
+            "priority":3,
             "pci": "0000:00:08.00",
             "route": 
             {

@@ -122,7 +122,11 @@ def add_policy(params):
     cmd_list = []
 
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
-    acl_id = fwapplications.g.acl_id_get(params['app'])
+
+    acl_id = fwapplications.g.acl_id_get(params['app'],
+                                         params['category'],
+                                         params['subcategory'],
+                                         params['priority'])
     policy_id = generate_policy_id()
     priority = 0
     is_ipv6 = 0

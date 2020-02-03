@@ -23,6 +23,7 @@
 import os
 import re
 import time
+from collections import defaultdict
 
 import fwglobals
 
@@ -33,7 +34,8 @@ class FwApps:
     def __init__(self):
         """Constructor method.
         """
-        self.apps_map = {}
+        def tree(): return defaultdict(tree)
+        self.apps_map = tree()
 
     def app_add(self, name, acl_id, id, category, subcategory, priority):
         """Add application.
@@ -47,12 +49,9 @@ class FwApps:
 
         :returns: None.
         """
-        self.apps_map[name] = {
-            "acl_id": acl_id,
-            "id": id,
-            "category": category,
-            "subcategory": subcategory,
-            "priority": priority}
+        self.apps_map[category][subcategory][priority][name] = \
+            {"acl_id": acl_id,
+            "id": id}
 
     def app_remove(self, name):
         """Remove application.
@@ -61,16 +60,19 @@ class FwApps:
 
         :returns: None.
         """
-        del self.apps_map[name]
+        del self.apps[category][subcategory][priority][name]
 
-    def acl_id_get(self, name):
+    def acl_id_get(self, name, category, subcategory, priority):
         """Get ACL id.
 
         :param name: Application name.
+        :param category: Application category.
+        :param subcategory: Application subcategory.
+        :param priority: Application priority.
 
         :returns: ACL id.
         """
-        return self.apps_map[name]["acl_id"]
+        return self.apps_map[category][subcategory][priority][name]["acl_id"]
 
 def initialize():
     """Initialize a singleton.
