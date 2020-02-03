@@ -176,22 +176,21 @@ def add_policy(params):
     cmd_list = []
 
     app = params['app']
+    sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
 
-    acl_id = fwapplications.g.acl_id_get(params['app'],
-                                         params['category'],
-                                         params['subcategory'],
-                                         params['priority'])
+    acl_id_list = fwapplications.g.acl_id_list_get(params['app'],
+                                                   params['category'],
+                                                   params['subcategory'],
+                                                   params['priority'])
 
-    policy_id = generate_policy_id()
+    for acl_id in acl_id_list:
+        policy_id = generate_policy_id()
+        priority = 0
+        is_ipv6 = 0
 
-    _add_policy(app, policy_id, acl_id, ip_bytes, cmd_list)
-
-    priority = 0
-    is_ipv6 = 0
-    sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
-
-    _attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
+        _add_policy(app, policy_id, acl_id, ip_bytes, cmd_list)
+        _attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 
     return cmd_list
 

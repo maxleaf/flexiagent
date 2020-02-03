@@ -62,7 +62,7 @@ class FwApps:
         """
         del self.apps[category][subcategory][priority][name]
 
-    def acl_id_get(self, name, category, subcategory, priority):
+    def acl_id_list_get(self, name, category, subcategory, priority):
         """Get ACL id.
 
         :param name: Application name.
@@ -72,7 +72,11 @@ class FwApps:
 
         :returns: ACL id.
         """
-        return self.apps_map[category][subcategory][priority][name]["acl_id"]
+        acl_id_list = []
+
+        acl_id_list.append(self.apps_map[category][subcategory][priority][name]["acl_id"])
+
+        return acl_id_list
 
 def initialize():
     """Initialize a singleton.
