@@ -93,47 +93,27 @@ def _encode_paths(next_hop):
 
     return br_paths
 
-def _create_policy(policy_id, acl_index, next_hop):
+def _add_policy(app, policy_id, acl_id, ip, cmd_list):
+    """Generate add policy command.
 
-    paths = _encode_paths(next_hop)
-
-    rule = ({'policy_id': policy_id,
-             'acl_index': acl_index,
-             'paths'    : paths,
-             'n_paths': len(paths)})
-    return rule
-
-def _attach_policy(policy_id, sw_if_index, priority, is_ipv6):
-
-     attach = ({'policy_id'   : policy_id,
-                'sw_if_index' : sw_if_index,
-                'priority'    : priority,
-                'is_ipv6'     : is_ipv6})
-
-     return attach
-
-def add_policy(params):
-    """Generate commands ...
-
-     :param params:        Parameters from flexiManage.
+     :param app:        Application name.
+     :param policy_id:  Policy id.
+     :param acl_id:     ACL id.
+     :param ip:         Ip address.
+     :param cmd_list:   Commands list.
 
      :returns: List of commands.
      """
-    cmd_list = []
+    paths = _encode_paths(ip)
 
-    ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
-
-    acl_id = fwapplications.g.acl_id_get(params['app'],
-                                         params['category'],
-                                         params['subcategory'],
-                                         params['priority'])
-    policy_id = generate_policy_id()
-    priority = 0
-    is_ipv6 = 0
+    rule = ({'policy_id': policy_id,
+             'acl_index': acl_id,
+             'paths'    : paths,
+             'n_paths': len(paths)})
 
     cmd_params = {
             'is_add'           : 1,
-            'policy'           : _create_policy(policy_id, acl_id, ip_bytes)
+            'policy'           : rule
     }
 
     # abf.api.json: abf_policy_add_del (is_add, ..., <type vl_api_abf_policy_t>, ...)
@@ -141,19 +121,36 @@ def add_policy(params):
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "abf_policy_add_del"
     cmd['cmd']['params']        = cmd_params
-    cmd['cmd']['descr']         = "Add ABF for app %s" % (params['app'])
+    cmd['cmd']['descr']         = "Add ABF for app %s" % (app)
     cmd['revert'] = {}
     cmd['revert']['name']       = 'abf_policy_add_del'
     cmd['revert']['params']     = copy.deepcopy(cmd_params)
     cmd['revert']['params']['is_add'] = 0
-    cmd['revert']['descr']      = "Delete ABF for app %s" % (params['app'])
+    cmd['revert']['descr']      = "Delete ABF for app %s" % (app)
     cmd_list.append(cmd)
 
-    sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
+    return cmd_list
+
+def _attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list):
+    """Generate add policy command.
+
+     :param sw_if_index: Interface index.
+     :param app:         Application name.
+     :param policy_id:   Policy id.
+     :param priority:    Priority.
+     :param is_ipv6:     IPv6 flag.
+     :param cmd_list:    Commands list.
+
+     :returns: List of commands.
+    """
+    attach = ({'policy_id': policy_id,
+               'sw_if_index': sw_if_index,
+               'priority': priority,
+               'is_ipv6': is_ipv6})
 
     cmd_params = {
             'is_add'           : 1,
-            'attach'           : _attach_policy(policy_id, sw_if_index, priority, is_ipv6)
+            'attach'           : attach
     }
 
     # abf.api.json: abf_itf_attach_add_del (is_add, ..., <type vl_api_abf_itf_attach_t>, ...)
@@ -161,13 +158,40 @@ def add_policy(params):
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "abf_itf_attach_add_del"
     cmd['cmd']['params']        = cmd_params
-    cmd['cmd']['descr']         = "Attach ABF for app %s" % (params['app'])
+    cmd['cmd']['descr']         = "Attach ABF for app %s" % (app)
     cmd['revert'] = {}
     cmd['revert']['name']       = 'abf_itf_attach_add_del'
     cmd['revert']['params']     = copy.deepcopy(cmd_params)
     cmd['revert']['params']['is_add'] = 0
-    cmd['revert']['descr']      = "Attach ABF for app %s" % (params['app'])
+    cmd['revert']['descr']      = "Attach ABF for app %s" % (app)
     cmd_list.append(cmd)
+
+def add_policy(params):
+    """Generate commands ...
+
+     :param params:        Parameters from flexiManage.
+
+     :returns: List of commands.
+    """
+    cmd_list = []
+
+    app = params['app']
+    ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
+
+    acl_id = fwapplications.g.acl_id_get(params['app'],
+                                         params['category'],
+                                         params['subcategory'],
+                                         params['priority'])
+
+    policy_id = generate_policy_id()
+
+    _add_policy(app, policy_id, acl_id, ip_bytes, cmd_list)
+
+    priority = 0
+    is_ipv6 = 0
+    sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
+
+    _attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 
     return cmd_list
 

@@ -51,7 +51,7 @@ class FwApps:
         """
         self.apps_map[category][subcategory][priority][name] = \
             {"acl_id": acl_id,
-            "id": id}
+             "id": id}
 
     def app_remove(self, name):
         """Remove application.
