@@ -35,14 +35,42 @@ class FwApps:
         """
         self.apps_map = {}
 
-    def app_add(self, name, acl_id):
-        self.apps_map[name] = acl_id
+    def app_add(self, name, acl_id, id, category, subcategory, priority):
+        """Add application.
+
+        :param name: Application name.
+        :param acl_id: ACL id.
+        :param id: Application id.
+        :param category: Application category.
+        :param subcategory: Application subcategory.
+        :param priority: Application priority.
+
+        :returns: None.
+        """
+        self.apps_map[name] = {
+            "acl_id": acl_id,
+            "id": id,
+            "category": category,
+            "subcategory": subcategory,
+            "priority": priority}
 
     def app_remove(self, name):
+        """Remove application.
+
+        :param name: Application name.
+
+        :returns: None.
+        """
         del self.apps_map[name]
 
     def acl_id_get(self, name):
-        return self.apps_map[name]
+        """Get ACL id.
+
+        :param name: Application name.
+
+        :returns: ACL id.
+        """
+        return self.apps_map[name]["acl_id"]
 
 def initialize():
     """Initialize a singleton.

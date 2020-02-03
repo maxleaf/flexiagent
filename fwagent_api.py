@@ -205,8 +205,13 @@ class FWAGENT_API:
 
         :returns: Dictionary with information and status code.
         """
-        fwapplications.g.app_add(params['app'], params['acl_index'])
-        reply = {'ok':1}
+        fwapplications.g.app_add(params['app'],
+                                 params['acl_index'],
+                                 params['id'],
+                                 params['category'],
+                                 params['subcategory'],
+                                 params['priority'])
+        reply = {'ok': 1}
         return reply
 
     def _remove_app_info(self, params):
