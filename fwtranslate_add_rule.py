@@ -139,7 +139,11 @@ def _add_app(params, cache_key, cmd_list):
      """
     cmd_params = {
             'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ],
-            'app'   : params['app']
+            'app': params['app'],
+            'id': params['id'],
+            'category': params['category'],
+            'subcategory': params['subcategory'],
+            'priority': params['priority']
     }
     cmd = {}
     cmd['cmd'] = {}
