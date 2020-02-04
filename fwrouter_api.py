@@ -618,6 +618,7 @@ class FWROUTER_API:
         requests = []
         interfaces = []
         should_restart_router = False
+
         if 'modify_routes' in params:
             requests += self._create_modify_routes_request(params['modify_routes'])
         if 'modify_interfaces' in params:
@@ -628,6 +629,8 @@ class FWROUTER_API:
             # restart. Only restart if the router is currently running.
             should_restart_router = self.router_started
             requests += self._create_modify_router_request(params['modify_router'])
+        if 'modify_policy' in params:
+            requests += self._create_modify_policy_request(params['modify_policy'])
 
         try:
             if should_restart_router == True:
@@ -729,6 +732,24 @@ class FWROUTER_API:
                     modify_router_requests.append({'add-interface': ifc})
 
         return modify_router_requests
+
+    def _create_modify_policy_request(self, params):
+        """'modify-policy' pre-processing:
+        This command is a wrapper around the 'add-policy' and 'remove-policy' commands.
+
+        :param params:          Request parameters.
+
+        :returns: Array of requests.
+        """
+        modify_policy_requests = []
+
+        if params:
+            # Remove policy only if it exists in the database
+            if self._get_request_params_from_db('remove-policy', params):
+                modify_policy_requests.append({'remove-policy': params})
+            modify_policy_requests.append({'add-policy': params})
+
+        return modify_policy_requests
 
     def _set_router_failure(self, err_str):
         """Set router failure state.

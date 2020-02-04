@@ -99,11 +99,34 @@
       "params": [{
             "id":1,
             "category":"network",
+            "app":"google-dns",
+            "category":"network",
+            "subcategory":"dns",
+            "priority":3,
             "pci": "0000:00:08.00",
             "route": 
             {
               "via": "10.100.0.6"
             }
        }]
+},
+{
+      "entity":  "agent",
+      "message": "modify-device",
+      "params": {
+            "modify_policy": {
+              "id":1,
+              "category":"network",
+              "app":"yahoo-dns",
+              "category":"network",
+              "subcategory":"dns",
+              "priority":3,
+              "pci": "0000:00:08.00",
+              "route": 
+              {
+                "via": "10.100.0.6"
+              }
+            }
+       }
 }
 ]
