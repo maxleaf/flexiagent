@@ -174,15 +174,27 @@ def add_policy(params):
      :returns: List of commands.
     """
     cmd_list = []
+    app = ""
+    category = ""
+    subcategory = ""
+    priority = -1
 
-    app = params['app']
+    if 'app' in params:
+        app = params['app']
+
+    if 'category' in params:
+        category = params['category']
+
+    if 'subcategory' in params:
+        subcategory = params['subcategory']
+
+    if 'priority' in params:
+        priority = params['priority']
+
     sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
 
-    acl_id_list = fwapplications.g.acl_id_list_get(params['app'],
-                                                   params['category'],
-                                                   params['subcategory'],
-                                                   params['priority'])
+    acl_id_list = fwapplications.g.acl_id_list_get(app, category, subcategory, priority)
 
     for acl_id in acl_id_list:
         policy_id = generate_policy_id()
@@ -201,4 +213,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-policy:%s' % params['app']
+    return 'add-policy:%s' % params['id']

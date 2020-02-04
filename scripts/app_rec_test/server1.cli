@@ -82,7 +82,7 @@
   "message": "add-rule",
   "params": [{
            "app":"yahoo-dns",
-           "id":1,
+           "id":2,
            "category":"network",
            "subcategory":"dns",
            "priority":3,
@@ -98,6 +98,7 @@
       "message": "add-policy",
       "params": [{
             "app":"google-dns",
+            "id":1,
             "category":"network",
             "subcategory":"dns",
             "priority":3,
