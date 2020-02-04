@@ -780,9 +780,9 @@ def print_router_config(full=False):
 
         head_line_printed = False
         for key in db_requests.db:
-            if re.match('add-rule', key):
+            if re.match('add-app', key):
                 if not head_line_printed:
-                    print("=========== RULES ==========")
+                    print("=========== APPS ==========")
                     head_line_printed = True
                 _print_config_request(db_requests, key, full)
 

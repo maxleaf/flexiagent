@@ -58,7 +58,7 @@
 },
 {
   "entity":  "agent",
-  "message": "add-rule",
+  "message": "add-app",
   "params": [{
            "app":"google-dns",
            "id":1,
@@ -79,7 +79,7 @@
 },
 {
   "entity":  "agent",
-  "message": "add-rule",
+  "message": "add-app",
   "params": [{
            "app":"yahoo-dns",
            "id":2,
@@ -97,7 +97,7 @@
       "entity":  "agent",
       "message": "modify-device",
       "params": {
-            "modify_rule": {
+            "modify_app": {
               "apps":[{
                 "app":"google-dns",
                 "id":1,

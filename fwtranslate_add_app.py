@@ -27,17 +27,29 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
-# add-app-rule
+# add-app
 # --------------------------------------
 # Translates request:
 # {
-#    "message": "add-rule",
-#    "params":
-#          {"app":"google-dns",
-#           "ip":"8.8.8.8",
-#           "ip-prefix":32,
-#           "port-range-low":53,
-#           "port-range-high":53}
+#   "entity":  "agent",
+#   "message": "add-app",
+#   "params": [{
+#            "app":"google-dns",
+#            "id":1,
+#            "category":"network",
+#            "subcategory":"dns",
+#            "priority":3,
+#            "rules":[{
+#              "ip":"8.8.8.8",
+#              "ip-prefix":32,
+#              "port-range-low":53,
+#              "port-range-high":53},
+#              {
+#              "ip":"8.8.4.4",
+#              "ip-prefix":32,
+#              "port-range-low":53,
+#              "port-range-high":53}]
+#            }]
 # }
 
 # traffic types
@@ -156,8 +168,8 @@ def _add_app(params, cache_key, cmd_list):
     cmd['revert']['descr']      = "Delete APP %s" % (params['app'])
     cmd_list.append(cmd)
 
-def add_rule(params):
-    """Generate commands ...
+def add_app(params):
+    """Generate App commands.
 
      :param params:        Parameters from flexiManage.
 
@@ -171,10 +183,10 @@ def add_rule(params):
     return cmd_list
 
 def get_request_key(params):
-    """Return rule key.
+    """Return app key.
 
      :param params:        Parameters from flexiManage.
 
      :returns: A key.
      """
-    return 'add-rule:%s' % params['id']
+    return 'add-app:%s' % params['id']

@@ -45,7 +45,7 @@ fwrouter_modules = {
     'fwtranslate_add_interface':__import__('fwtranslate_add_interface'),
     'fwtranslate_add_route':    __import__('fwtranslate_add_route'),
     'fwtranslate_add_tunnel':   __import__('fwtranslate_add_tunnel'),
-    'fwtranslate_add_rule':     __import__('fwtranslate_add_rule'),
+    'fwtranslate_add_app':      __import__('fwtranslate_add_app'),
     'fwtranslate_add_policy':   __import__('fwtranslate_add_policy')
 }
 
@@ -58,8 +58,8 @@ fwrouter_translators = {
     'remove-route':     {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-route'},
     'add-tunnel':       {'module':'fwtranslate_add_tunnel',   'api':'add_tunnel',   'key_func':'get_request_key'},
     'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'},
-    'add-rule':         {'module':'fwtranslate_add_rule',     'api':'add_rule',     'key_func':'get_request_key'},
-    'remove-rule':      {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add-rule'},
+    'add-app':          {'module':'fwtranslate_add_app',      'api':'add_app',      'key_func':'get_request_key'},
+    'remove-app':       {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add-app'},
     'add-policy':       {'module':'fwtranslate_add_policy',   'api': 'add_policy',  'key_func':'get_request_key'},
     'remove-policy':    {'module':'fwtranslate_revert',       'api': 'revert',      'src': 'add-policy'},
 }
@@ -629,8 +629,8 @@ class FWROUTER_API:
             # restart. Only restart if the router is currently running.
             should_restart_router = self.router_started
             requests += self._create_modify_router_request(params['modify_router'])
-        if 'modify_rule' in params:
-            requests += self._create_modify_rule_request(params['modify_rule'])
+        if 'modify_app' in params:
+            requests += self._create_modify_app_request(params['modify_app'])
         if 'modify_policy' in params:
             requests += self._create_modify_policy_request(params['modify_policy'])
 
@@ -754,9 +754,9 @@ class FWROUTER_API:
 
         return modify_requests
 
-    def _create_modify_rule_request(self, params):
-        """'modify_rule' pre-processing:
-        This command is a wrapper around the 'add-rule' and 'remove-rule' commands.
+    def _create_modify_app_request(self, params):
+        """'modify_app' pre-processing:
+        This command is a wrapper around the 'add-app' and 'remove-app' commands.
 
         :param params:          Request parameters.
 
@@ -766,10 +766,10 @@ class FWROUTER_API:
 
         if params:
             for app in params['apps']:
-                # Remove rule only if it exists in the database
-                if self._get_request_params_from_db('remove-rule', app):
-                    modify_requests.append({'remove-rule': app})
-                modify_requests.append({'add-rule': app})
+                # Remove app only if it exists in the database
+                if self._get_request_params_from_db('remove-app', app):
+                    modify_requests.append({'remove-app': app})
+                modify_requests.append({'add-app': app})
 
         return modify_requests
 
@@ -838,9 +838,9 @@ class FWROUTER_API:
                     self._apply_db_request(key)
                     self._fill_tunnel_stats_dict()
 
-            # Configure rules
+            # Configure apps
             for key in self.db_requests.db:
-                if re.match('add-rule', key):
+                if re.match('add-app', key):
                     self._apply_db_request(key)
 
             # Configure policies
