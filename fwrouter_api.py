@@ -38,6 +38,7 @@ from vpp_api import VPP_API
 import fwtunnel_stats
 
 import fwtranslate_add_tunnel
+import fwtranslate_add_interface
 
 fwrouter_modules = {
     'fwtranslate_revert':       __import__('fwtranslate_revert') ,
@@ -602,6 +603,49 @@ class FWROUTER_API:
             self._set_router_failure("failed to stop router gracefully")
             raise e
 
+    def _create_remove_tunnels_request(self, params):
+        """Creates a list of remove-tunnel requests for all tunnels
+           that are connected to interfaces that are either modified
+           or unassigned.
+
+        :param params:          modify-device request parameters.
+
+        :returns: Array of remove-tunnel requests.
+        """
+
+        # Get the pci address of all changed interfaces
+        interfaces = [] if 'modify_router' not in params else params['modify_router'].get('unassign', [])
+        interfaces += [] if 'modify_interfaces' not in params else params['modify_interfaces'].get('interfaces', [])
+        pci_set = set(map(lambda interface: interface['pci'], interfaces))
+        ip_set = set()
+
+        # Create a set of the IP addresses that correspond to each PCI.
+        for pci in pci_set:
+            try:
+                key = fwtranslate_add_interface.get_request_key({'pci': pci})
+                (req, entry) = self.db_requests.fetch_request(key)
+                if entry != None:
+                    ip_set.add(entry['addr'].split('/')[0])
+
+            except Exception as e:
+                fwglobals.log.excep("failed to create remove-tunnel requests list %s" % str(e))
+                raise e
+
+        # Go over all tunnels in the database and add every tunnel
+        # which src field exists in the IP addresses set
+        tunnels_requests = []
+        for key in self.db_requests.db:
+            try:
+                if re.match('add-tunnel', key):
+                    (req, entry) = self.db_requests.fetch_request(key)
+                    if entry['src'] in ip_set:
+                        tunnels_requests.append({'remove-tunnel': {'tunnel-id': entry['tunnel-id']}})
+            except Exception as e:
+                fwglobals.log.excep("failed to create remove-tunnel requests list %s" % str(e))
+                raise e
+
+        return tunnels_requests
+
     def _handle_modify_device_request(self, params):
         """Handle modify_routes, modify_interfaces or modify_router request.
 
@@ -612,6 +656,13 @@ class FWROUTER_API:
         requests = []
         interfaces = []
         should_restart_router = False
+
+        # First, create a list of remove-tunnel requests to remove
+        # all tunnels that are connected to the modified interfaces.
+        # These tunnels must be removed before modifying the interface
+        # and will be added back (if needed) via a message from the MGMT.
+        if 'modify_interfaces' in params or 'modify_router' in params:
+            requests += self._create_remove_tunnels_request(params)
         if 'modify_routes' in params:
             requests += self._create_modify_routes_request(params['modify_routes'])
         if 'modify_interfaces' in params:
