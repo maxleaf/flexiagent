@@ -49,9 +49,7 @@ class FwApps:
 
         :returns: None.
         """
-        self.apps_map[category][subcategory][priority][name] = \
-            {"acl_id": acl_id,
-             "id": id}
+        self.apps_map[category][subcategory][priority][name] = acl_id
 
     def app_remove(self, name):
         """Remove application.
@@ -61,6 +59,31 @@ class FwApps:
         :returns: None.
         """
         del self.apps[category][subcategory][priority][name]
+
+    def _priority_iterate(self, category, subcategory, priority, acl_id_list):
+        """Get ACL id.
+
+        :param category: Application category.
+        :param subcategory: Application subcategory.
+        :param priority: Application priority.
+        :param acl_id_list: ACL id list.
+
+        :returns: None.
+        """
+        for acl_id in self.apps_map[category][subcategory][priority].values():
+            acl_id_list.append(acl_id)
+
+    def _subcategory_iterate(self, category, subcategory, acl_id_list):
+        """Get ACL id.
+
+        :param category: Application category.
+        :param subcategory: Application subcategory.
+        :param acl_id_list: ACL id list.
+
+        :returns: None.
+        """
+        for priority in self.apps_map[category][subcategory].keys():
+            self._priority_iterate(category, subcategory, priority, acl_id_list)
 
     def acl_id_list_get(self, name, category, subcategory, priority):
         """Get ACL id.
@@ -74,7 +97,14 @@ class FwApps:
         """
         acl_id_list = []
 
-        acl_id_list.append(self.apps_map[category][subcategory][priority][name]["acl_id"])
+        if not name:
+            if priority < 0:
+                self._subcategory_iterate(category, subcategory, acl_id_list)
+            else:
+                self._priority_iterate(category, subcategory, priority, acl_id_list)
+        else:
+            acl_id_list.append(self.apps_map[category]
+                               [subcategory][priority][name])
 
         return acl_id_list
 
