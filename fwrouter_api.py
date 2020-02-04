@@ -629,6 +629,8 @@ class FWROUTER_API:
             # restart. Only restart if the router is currently running.
             should_restart_router = self.router_started
             requests += self._create_modify_router_request(params['modify_router'])
+        if 'modify_rule' in params:
+            requests += self._create_modify_rule_request(params['modify_rule'])
         if 'modify_policy' in params:
             requests += self._create_modify_policy_request(params['modify_policy'])
 
@@ -734,7 +736,7 @@ class FWROUTER_API:
         return modify_router_requests
 
     def _create_modify_policy_request(self, params):
-        """'modify-policy' pre-processing:
+        """'modify_policy' pre-processing:
         This command is a wrapper around the 'add-policy' and 'remove-policy' commands.
 
         :param params:          Request parameters.
@@ -750,6 +752,24 @@ class FWROUTER_API:
             modify_policy_requests.append({'add-policy': params})
 
         return modify_policy_requests
+
+    def _create_modify_rule_request(self, params):
+        """'modify_rule' pre-processing:
+        This command is a wrapper around the 'add-rule' and 'remove-rule' commands.
+
+        :param params:          Request parameters.
+
+        :returns: Array of requests.
+        """
+        modify_requests = []
+
+        if params:
+            # Remove rule only if it exists in the database
+            if self._get_request_params_from_db('remove-rule', params):
+                modify_requests.append({'remove-rule': params})
+            modify_requests.append({'add-rule': params})
+
+        return modify_requests
 
     def _set_router_failure(self, err_str):
         """Set router failure state.

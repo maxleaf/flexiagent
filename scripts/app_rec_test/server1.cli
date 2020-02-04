@@ -95,6 +95,30 @@
 },
 {
       "entity":  "agent",
+      "message": "modify-device",
+      "params": {
+            "modify_rule": {
+              "app":"google-dns",
+              "id":1,
+              "category":"network",
+              "subcategory":"dns",
+              "priority":3,
+              "rules":[{
+                "ip":"7.7.7.7",
+                "ip-prefix":32,
+                "port-range-low":53,
+                "port-range-high":53},
+              {
+                "ip":"7.7.4.4",
+                "ip-prefix":32,
+                "port-range-low":53,
+                "port-range-high":53
+              }]
+            }
+      }
+},
+{
+      "entity":  "agent",
       "message": "add-policy",
       "params": [{
             "id":1,

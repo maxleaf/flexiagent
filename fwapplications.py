@@ -51,14 +51,17 @@ class FwApps:
         """
         self.apps_map[category][subcategory][priority][name] = acl_id
 
-    def app_remove(self, name):
+    def app_remove(self, name, category, subcategory, priority):
         """Remove application.
 
         :param name: Application name.
+        :param category: Application category.
+        :param subcategory: Application subcategory.
+        :param priority: Application priority.
 
         :returns: None.
         """
-        del self.apps[category][subcategory][priority][name]
+        del self.apps_map[category][subcategory][priority][name]
 
     def _priority_iterate(self, category, subcategory, priority, acl_id_list):
         """Get ACL id.

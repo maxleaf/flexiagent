@@ -182,7 +182,7 @@ class FWAGENT_API:
         :returns: Dictionary with configuration and status code.
         """
         configs = fwutils.get_router_config()
-        reply = {'ok':1, 'message': configs if configs != None else {}}
+        reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
 
     def _handle_request(self, params):
@@ -196,7 +196,7 @@ class FWAGENT_API:
             reply = fwglobals.g.handle_request(params['request'], params.get('params'))
             return reply
         except Exception as e:
-            return {'ok':0 , 'message':str(e)}
+            return {'ok': 0, 'message': str(e)}
 
     def _save_app_info(self, params):
         """Save application information.
@@ -221,6 +221,9 @@ class FWAGENT_API:
 
         :returns: Dictionary with information and status code.
         """
-        fwapplications.g.app_remove(params['app'])
-        reply = {'ok':1}
+        fwapplications.g.app_remove(params['app'],
+                                    params['category'],
+                                    params['subcategory'],
+                                    params['priority'])
+        reply = {'ok': 1}
         return reply
