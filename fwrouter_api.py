@@ -743,15 +743,16 @@ class FWROUTER_API:
 
         :returns: Array of requests.
         """
-        modify_policy_requests = []
+        modify_requests = []
 
         if params:
-            # Remove policy only if it exists in the database
-            if self._get_request_params_from_db('remove-policy', params):
-                modify_policy_requests.append({'remove-policy': params})
-            modify_policy_requests.append({'add-policy': params})
+            for policy in params['policies']:
+                # Remove policy only if it exists in the database
+                if self._get_request_params_from_db('remove-policy', policy):
+                    modify_requests.append({'remove-policy': policy})
+                modify_requests.append({'add-policy': policy})
 
-        return modify_policy_requests
+        return modify_requests
 
     def _create_modify_rule_request(self, params):
         """'modify_rule' pre-processing:
@@ -764,10 +765,11 @@ class FWROUTER_API:
         modify_requests = []
 
         if params:
-            # Remove rule only if it exists in the database
-            if self._get_request_params_from_db('remove-rule', params):
-                modify_requests.append({'remove-rule': params})
-            modify_requests.append({'add-rule': params})
+            for app in params['apps']:
+                # Remove rule only if it exists in the database
+                if self._get_request_params_from_db('remove-rule', app):
+                    modify_requests.append({'remove-rule': app})
+                modify_requests.append({'add-rule': app})
 
         return modify_requests
 
