@@ -85,6 +85,17 @@ class FwApps:
         for priority in self.apps_map[category][subcategory].keys():
             self._priority_iterate(category, subcategory, priority, acl_id_list)
 
+    def _category_iterate(self, category, acl_id_list):
+        """Get ACL id.
+
+        :param category: Application category.
+        :param acl_id_list: ACL id list.
+
+        :returns: None.
+        """
+        for subcategory in self.apps_map[category].keys():
+            self._subcategory_iterate(category, subcategory, acl_id_list)
+
     def acl_id_list_get(self, name, category, subcategory, priority):
         """Get ACL id.
 
@@ -99,7 +110,10 @@ class FwApps:
 
         if not name:
             if priority < 0:
-                self._subcategory_iterate(category, subcategory, acl_id_list)
+                if not subcategory:
+                    self._category_iterate(category, acl_id_list)
+                else:
+                    self._subcategory_iterate(category, subcategory, acl_id_list)
             else:
                 self._priority_iterate(category, subcategory, priority, acl_id_list)
         else:

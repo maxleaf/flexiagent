@@ -97,11 +97,8 @@
       "entity":  "agent",
       "message": "add-policy",
       "params": [{
-            "app":"google-dns",
             "id":1,
             "category":"network",
-            "subcategory":"dns",
-            "priority":3,
             "pci": "0000:00:08.00",
             "route": 
             {
