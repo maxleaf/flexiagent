@@ -28,7 +28,6 @@ from shutil import copyfile
 import fwglobals
 import fwstats
 import fwutils
-import fwapplications
 
 fwagent_api = {
     'get-device-info':      '_get_device_info',
@@ -205,12 +204,12 @@ class FWAGENT_API:
 
         :returns: Dictionary with information and status code.
         """
-        fwapplications.g.app_add(params['app'],
-                                 params['acl_index'],
-                                 params['id'],
-                                 params['category'],
-                                 params['subcategory'],
-                                 params['priority'])
+        fwglobals.g.apps_api.app_add(params['app'],
+                                     params['acl_index'],
+                                     params['id'],
+                                     params['category'],
+                                     params['subcategory'],
+                                     params['priority'])
         reply = {'ok': 1}
         return reply
 
@@ -221,9 +220,9 @@ class FWAGENT_API:
 
         :returns: Dictionary with information and status code.
         """
-        fwapplications.g.app_remove(params['app'],
-                                    params['category'],
-                                    params['subcategory'],
-                                    params['priority'])
+        fwglobals.g.apps_api.app_remove(params['app'],
+                                        params['category'],
+                                        params['subcategory'],
+                                        params['priority'])
         reply = {'ok': 1}
         return reply

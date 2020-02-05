@@ -983,7 +983,6 @@ if __name__ == '__main__':
 
     fwglobals.initialize()
     loadsimulator.initialize()
-    fwapplications.initialize()
 
     command_funcs = {
                     'version':lambda args: version(),

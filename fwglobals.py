@@ -31,6 +31,7 @@ from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
+from fwapplications import FwApps
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
@@ -241,6 +242,7 @@ class Fwglobals:
         self.router_api = FWROUTER_API(self.SQLITE_DB_FILE)
         self.os_api     = OS_API()
         self.router_api.restore_vpp_if_needed()
+        self.apps_api = FwApps()
 
     def finalize(self):
         """Destructor method

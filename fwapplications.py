@@ -124,18 +124,3 @@ class FwApps:
                                [subcategory][priority][name])
 
         return acl_id_list
-
-def initialize():
-    """Initialize a singleton.
-
-    :returns: None.
-    """
-    global g
-    g = FwApps()
-
-def is_initialized():
-    """Check if singleton is initialized.
-
-    :returns: 'True' if singleton is initialized and 'False' otherwise.
-    """
-    return 'g' in globals()

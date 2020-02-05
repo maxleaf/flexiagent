@@ -27,7 +27,6 @@ import copy
 import fwglobals
 import fwtranslate_revert
 import fwutils
-import fwapplications
 
 # add-policy
 # --------------------------------------
@@ -194,7 +193,7 @@ def add_policy(params):
     sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
 
-    acl_id_list = fwapplications.g.acl_id_list_get(app, category, subcategory, priority)
+    acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
 
     for acl_id in acl_id_list:
         policy_id = generate_policy_id()
