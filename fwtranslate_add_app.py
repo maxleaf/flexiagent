@@ -159,7 +159,7 @@ def _add_app(params, cache_key, cmd_list):
     }
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']          = "save-app-info"
+    cmd['cmd']['name']          = "add-app-info"
     cmd['cmd']['params']        = cmd_params
     cmd['cmd']['descr']         = "Add APP %s" % (params['app'])
     cmd['revert'] = {}

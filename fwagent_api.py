@@ -37,7 +37,7 @@ fwagent_api = {
     'handle-request':       '_handle_request',
     'get-router-config':    '_get_router_config',
     'upgrade-device-sw':    '_upgrade_device_sw',
-    'save-app-info':        '_save_app_info',
+    'add-app-info':         '_add_app_info',
     'remove-app-info':      '_remove_app_info'
 }
 
@@ -197,7 +197,7 @@ class FWAGENT_API:
         except Exception as e:
             return {'ok': 0, 'message': str(e)}
 
-    def _save_app_info(self, params):
+    def _add_app_info(self, params):
         """Save application information.
 
         :param params: Parameters from flexiManage.
