@@ -241,8 +241,9 @@ class Fwglobals:
         self.agent_api  = FWAGENT_API()
         self.router_api = FWROUTER_API(self.SQLITE_DB_FILE)
         self.os_api     = OS_API()
-        self.router_api.restore_vpp_if_needed()
         self.apps_api = FwApps()
+
+        self.router_api.restore_vpp_if_needed()
 
     def finalize(self):
         """Destructor method
