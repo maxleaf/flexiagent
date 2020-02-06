@@ -56,7 +56,6 @@ import fwstats
 import fwutils
 from fwlog import Fwlog
 import loadsimulator
-import fwapplications
 
 # Global signal handler for clean exit
 def global_signal_handler(signum, frame):
