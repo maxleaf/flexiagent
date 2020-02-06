@@ -38,7 +38,9 @@ fwagent_api = {
     'get-router-config':    '_get_router_config',
     'upgrade-device-sw':    '_upgrade_device_sw',
     'add-app-info':         '_add_app_info',
-    'remove-app-info':      '_remove_app_info'
+    'remove-app-info':      '_remove_app_info',
+    'add-policy-info':      '_add_policy_info',
+    'remove-policy-info':   '_remove_policy_info'
 }
 
 class FWAGENT_API:
@@ -224,5 +226,35 @@ class FWAGENT_API:
                                         params['category'],
                                         params['subcategory'],
                                         params['priority'])
+        reply = {'ok': 1}
+        return reply
+
+    def _add_policy_info(self, params):
+        """Save policy information.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with information and status code.
+        """
+        fwglobals.g.policy_api.app_add(params['app'],
+                                       params['acl_index'],
+                                       params['id'],
+                                       params['category'],
+                                       params['subcategory'],
+                                       params['priority'])
+        reply = {'ok': 1}
+        return reply
+
+    def _remove_policy_info(self, params):
+        """Remove policy information.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with information and status code.
+        """
+        fwglobals.g.policy_api.app_remove(params['app'],
+                                          params['category'],
+                                          params['subcategory'],
+                                          params['priority'])
         reply = {'ok': 1}
         return reply

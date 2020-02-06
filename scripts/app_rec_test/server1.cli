@@ -1,31 +1,5 @@
 [
 {
-	"entity": "agent",
-	"message": "start-router",
-	"params": {
-		"default-route": "192.168.0.1",
-	"interfaces": [
-	   {
-		"pci": "0000:00:03.00",
-		"addr": "192.168.0.110/24",
-		"type":"wan"
-	   },
-	   {
-		"pci": "0000:00:08.00",
-		"addr": "20.20.20.1/24",
-		"routing":"ospf",
-		"type":"lan"
-	   }
-	   ],
-    "routes": [
-      {
-        "addr": "default",
-        "via": "192.168.0.1"
-      }
-      ]
-	}
-},
-{
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
@@ -156,5 +130,31 @@
             }]
           }
        }
+},
+{
+	"entity": "agent",
+	"message": "start-router",
+	"params": {
+		"default-route": "192.168.0.1",
+	"interfaces": [
+	   {
+		"pci": "0000:00:03.00",
+		"addr": "192.168.0.110/24",
+		"type":"wan"
+	   },
+	   {
+		"pci": "0000:00:08.00",
+		"addr": "20.20.20.1/24",
+		"routing":"ospf",
+		"type":"lan"
+	   }
+	   ],
+    "routes": [
+      {
+        "addr": "default",
+        "via": "192.168.0.1"
+      }
+      ]
+	}
 }
 ]
