@@ -151,6 +151,18 @@ class FwPolicies:
         cmd['revert']['descr'] = "Attach ABF for app %s" % (app)
         cmd_list.append(cmd)
 
+    def _translate(self, app, category, subcategory, priority, pci, next_hop, cmd_list):
+        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
+        sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
+        priority = 0
+        is_ipv6 = 0
+
+        for acl_id in acl_id_list:
+            policy_id = self._generate_policy_id()
+
+            self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
+            self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
+
     def policy_add(self, id, app, category, subcategory, priority, pci, next_hop):
         """Add policy.
 
@@ -165,16 +177,8 @@ class FwPolicies:
         :returns: None.
         """
         cmd_list = []
-        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
-        sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
-        priority = 0
-        is_ipv6 = 0
 
-        for acl_id in acl_id_list:
-            policy_id = self._generate_policy_id()
-
-            self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
-            self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
+        self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
 
         fwglobals.g.router_api._execute('add-policy', 'add-policy:' + str(id), cmd_list)
 
@@ -191,3 +195,8 @@ class FwPolicies:
 
         :returns: None.
         """
+        cmd_list = []
+
+        self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
+
+        fwglobals.g.router_api._revert(cmd_list)
