@@ -22,7 +22,6 @@
 
 import os
 import re
-import copy
 
 import fwglobals
 import fwtranslate_revert
@@ -44,53 +43,6 @@ import fwutils
 #             }
 #        }
 # }
-
-def generate_id(ret):
-    """Generate identifier.
-
-    :param ret:         Initial id value.
-
-    :returns: identifier.
-    """
-    ret += 1
-    if ret == 2**32:       # sad_id is u32 in VPP
-        ret = 0
-    return ret
-
-policy_index = 0
-def generate_policy_id():
-    """Generate SA identifier.
-
-    :returns: New SA identifier.
-    """
-    global policy_index
-    policy_index = generate_id(policy_index)
-    return copy.deepcopy(policy_index)
-
-def _encode_paths(next_hop):
-    br_paths = []
-
-    label_stack = {'is_uniform': 0,
-                   'label': 0,
-                   'ttl': 0,
-                   'exp': 0}
-
-    label_stack_list = []
-    for i in range(16):
-        label_stack_list.append(label_stack)
-
-    br_paths.append({'next_hop': next_hop,
-                     'weight'      : 1,
-                     'afi'         : 0,
-                     'sw_if_index' : 4294967295,
-                     'preference'  : 0,
-                     'table_id'    : 0,
-                     'next_hop_id' : 4294967295,
-                     'is_udp_encap': 0,
-                     'n_labels'    : 0,
-                     'label_stack' : label_stack_list})
-
-    return br_paths
 
 def _add_policy(app, policy_id, acl_id, ip, cmd_list):
     """Generate add policy command.
@@ -173,6 +125,7 @@ def add_policy(params):
      :returns: List of commands.
     """
     cmd_list = []
+
     app = ""
     category = ""
     subcategory = ""
@@ -190,18 +143,28 @@ def add_policy(params):
     if 'priority' in params:
         priority = params['priority']
 
-    sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
 
-    acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
+    cmd_params = {
+            'id': params['id'],
+            'app': app,
+            'category': category,
+            'subcategory': subcategory,
+            'priority': priority,
+            'pci': params['pci'],
+            'next_hop': ip_bytes
+    }
 
-    for acl_id in acl_id_list:
-        policy_id = generate_policy_id()
-        priority = 0
-        is_ipv6 = 0
-
-        _add_policy(app, policy_id, acl_id, ip_bytes, cmd_list)
-        _attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']          = "add-policy-info"
+    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['descr']         = "Add policy %d" % (params['id'])
+    cmd['revert'] = {}
+    cmd['revert']['name']       = 'remove-policy-info'
+    cmd['revert']['params']     = cmd_params
+    cmd['revert']['descr']      = "Delete policy %d" % (params['id'])
+    cmd_list.append(cmd)
 
     return cmd_list
 

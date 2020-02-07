@@ -60,6 +60,8 @@ request_handlers = {
     'upgrade-device-sw':            '_call_agent_api',
     'add-app-info':                 '_call_agent_api',
     'remove-app-info':              '_call_agent_api',
+    'add-policy-info':              '_call_agent_api',
+    'remove-policy-info':           '_call_agent_api',
 
     # Router API
     'start-router':                 '_call_router_api',

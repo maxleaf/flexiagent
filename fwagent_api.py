@@ -236,12 +236,13 @@ class FWAGENT_API:
 
         :returns: Dictionary with information and status code.
         """
-        fwglobals.g.policy_api.app_add(params['app'],
-                                       params['acl_index'],
-                                       params['id'],
-                                       params['category'],
-                                       params['subcategory'],
-                                       params['priority'])
+        fwglobals.g.policy_api.policy_add(params['id'],
+                                          params['app'],
+                                          params['category'],
+                                          params['subcategory'],
+                                          params['priority'],
+                                          params['pci'],
+                                          params['next_hop'])
         reply = {'ok': 1}
         return reply
 
@@ -252,9 +253,12 @@ class FWAGENT_API:
 
         :returns: Dictionary with information and status code.
         """
-        fwglobals.g.policy_api.app_remove(params['app'],
-                                          params['category'],
-                                          params['subcategory'],
-                                          params['priority'])
+        fwglobals.g.policy_api.policy_remove(params['id'],
+                                             params['app'],
+                                             params['category'],
+                                             params['subcategory'],
+                                             params['priority'],
+                                             params['pci'],
+                                             params['next_hop'])
         reply = {'ok': 1}
         return reply
