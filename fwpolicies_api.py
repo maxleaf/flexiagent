@@ -194,7 +194,7 @@ class FwPolicies:
             policy_id = self._generate_policy_id()
 
             if acl_id not in self.acl_to_policy:
-                self.acl_to_policy[acl_id] = policy_id
+                self.acl_to_policy[acl_id] = {'policy_id': policy_id, 'sw_if_index': sw_if_index}
                 self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
                 self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 
