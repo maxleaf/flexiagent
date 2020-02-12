@@ -53,22 +53,10 @@ def add_policy(params):
     """
     cmd_list = []
 
-    app = ""
-    category = ""
-    subcategory = ""
-    priority = -1
-
-    if 'app' in params:
-        app = params['app']
-
-    if 'category' in params:
-        category = params['category']
-
-    if 'subcategory' in params:
-        subcategory = params['subcategory']
-
-    if 'priority' in params:
-        priority = params['priority']
+    app = params.get('app', '')
+    category = params.get('category', '')
+    subcategory = params.get('subcategory', '')
+    priority = params.get('priority', -1)
 
     ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
 
