@@ -217,7 +217,8 @@ class FwPolicies:
 
         self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
 
-        fwglobals.g.router_api._execute('add-policy', 'add-policy:' + str(id), cmd_list)
+        for cmd in cmd_list:
+            fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])
 
         reply = {'ok': 1}
         return reply
@@ -239,7 +240,8 @@ class FwPolicies:
 
         self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
 
-        fwglobals.g.router_api._revert(cmd_list)
+        for cmd in cmd_list:
+            fwglobals.g.handle_request(cmd['revert']['name'], cmd['revert']['params'])
 
         reply = {'ok': 1}
         return reply
