@@ -24,6 +24,11 @@ import copy
 import fwutils
 import fwglobals
 
+fwpolicy_api = {
+    'add-policy-info':         '_add_policy_info',
+    'remove-policy-info':      '_remove_policy_info',
+}
+
 class FwPolicies:
     """Policies class representation.
     """
@@ -32,6 +37,25 @@ class FwPolicies:
         """Constructor method.
         """
         self.policy_index = 0
+
+    def call(self, req, params):
+        """Invokes API specified by the 'req' parameter.
+
+        :param req: Request name.
+        :param params: Parameters from flexiManage.
+
+        :returns: Reply.
+        """
+        handler = fwpolicy_api.get(req)
+        assert handler, 'fwpolicy_api: "%s" request is not supported' % req
+
+        handler_func = getattr(self, handler)
+        assert handler_func, 'fwpolicy_api: handler=%s not found for req=%s' % (handler, req)
+
+        reply = handler_func(params)
+        if reply['ok'] == 0:
+            raise Exception("fwpolicy_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
+        return reply
 
     def _generate_id(self, ret):
         """Generate identifier.
@@ -163,40 +187,46 @@ class FwPolicies:
             self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
             self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 
-    def policy_add(self, id, app, category, subcategory, priority, pci, next_hop):
-        """Add policy.
+    def _add_policy_info(self, params):
+        """Save policy information.
 
-        :param id: Policy id.
-        :param app: Application name.
-        :param category: Application category.
-        :param subcategory: Application subcategory.
-        :param priority: Application priority.
-        :param pci: PCI index.
-        :param next_hop: Next hop ip address.
+        :param params: Parameters from flexiManage.
 
-        :returns: None.
+        :returns: Dictionary with information and status code.
         """
+        app = params['app']
+        category = params['category']
+        subcategory = params['subcategory']
+        priority = params['priority']
+        pci = params['pci']
+        next_hop = params['next_hop']
         cmd_list = []
 
         self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
 
         fwglobals.g.router_api._execute('add-policy', 'add-policy:' + str(id), cmd_list)
 
-    def policy_remove(self, id, app, category, subcategory, priority, pci, next_hop):
-        """Remove policy.
+        reply = {'ok': 1}
+        return reply
 
-        :param id: Policy id.
-        :param app: Application name.
-        :param category: Application category.
-        :param subcategory: Application subcategory.
-        :param priority: Application priority.
-        :param pci: PCI index.
-        :param next_hop: Next hop ip address.
+    def _remove_policy_info(self, params):
+        """Remove policy information.
 
-        :returns: None.
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with information and status code.
         """
+        app = params['app']
+        category = params['category']
+        subcategory = params['subcategory']
+        priority = params['priority']
+        pci = params['pci']
+        next_hop = params['next_hop']
         cmd_list = []
 
         self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
 
         fwglobals.g.router_api._revert(cmd_list)
+
+        reply = {'ok': 1}
+        return reply

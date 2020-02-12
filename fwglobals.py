@@ -37,6 +37,7 @@ from fwpolicies import FwPolicies
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
     'fwapps_api':   __import__('fwapplications'),
+    'fwpolicy_api': __import__('fwpolicies'),
     'fwrouter_api': __import__('fwrouter_api'),
     'os_api':       __import__('os_api'),
 }
@@ -59,12 +60,14 @@ request_handlers = {
     'get-device-os-routes':         '_call_agent_api',
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
-    'add-policy-info':              '_call_agent_api',
-    'remove-policy-info':           '_call_agent_api',
 
     # Applications API
     'add-app-info':                 '_call_apps_api',
     'remove-app-info':              '_call_apps_api',
+
+    # Policy API
+    'add-policy-info':              '_call_policy_api',
+    'remove-policy-info':           '_call_policy_api',
 
     # Router API
     'start-router':                 '_call_router_api',
@@ -279,6 +282,9 @@ class Fwglobals:
 
     def _call_apps_api(self, req, params):
         return self.apps_api.call(req, params)
+
+    def _call_policy_api(self, req, params):
+        return self.policy_api.call(req, params)
 
     def _call_router_api(self, req, params):
         return self.router_api.call(req, params)

@@ -198,37 +198,3 @@ class FWAGENT_API:
             return reply
         except Exception as e:
             return {'ok': 0, 'message': str(e)}
-
-    def _add_policy_info(self, params):
-        """Save policy information.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        fwglobals.g.policy_api.policy_add(params['id'],
-                                          params['app'],
-                                          params['category'],
-                                          params['subcategory'],
-                                          params['priority'],
-                                          params['pci'],
-                                          params['next_hop'])
-        reply = {'ok': 1}
-        return reply
-
-    def _remove_policy_info(self, params):
-        """Remove policy information.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        fwglobals.g.policy_api.policy_remove(params['id'],
-                                             params['app'],
-                                             params['category'],
-                                             params['subcategory'],
-                                             params['priority'],
-                                             params['pci'],
-                                             params['next_hop'])
-        reply = {'ok': 1}
-        return reply
