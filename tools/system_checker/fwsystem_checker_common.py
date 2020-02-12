@@ -190,7 +190,7 @@ class Checker:
                     match = re.search('\[02..\]:', params[0])   # [02XX] stands for Network Base Class
                     if not match:
                         continue
-                    match = re.search('([^ ]+) .*\[0200\]: ([^ ]+)', params[0])
+                    match = re.search('([^ ]+) .*\[02..\]: ([^ ]+)', params[0])
                     if not match:
                         print("device: %s" % (str(device)))
                         print("params[0]: %s" % (str(params[0])))
