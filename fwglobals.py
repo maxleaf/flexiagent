@@ -36,8 +36,8 @@ from fwpolicies import FwPolicies
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
-    'fwapps_api':   __import__('fwapplications'),
-    'fwpolicy_api': __import__('fwpolicies'),
+    'fwapps_api':   __import__('fwapplications_api'),
+    'fwpolicy_api': __import__('fwpolicies_api'),
     'fwrouter_api': __import__('fwrouter_api'),
     'os_api':       __import__('os_api'),
 }
