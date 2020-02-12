@@ -27,6 +27,11 @@ from collections import defaultdict
 
 import fwglobals
 
+fwapps_api = {
+    'add-app-info':         '_add_app_info',
+    'remove-app-info':      '_remove_app_info',
+}
+
 class FwApps:
     """Applications class representation.
     """
@@ -37,31 +42,60 @@ class FwApps:
         def tree(): return defaultdict(tree)
         self.apps_map = tree()
 
-    def app_add(self, name, acl_id, id, category, subcategory, priority):
+    def call(self, req, params):
+        """Invokes API specified by the 'req' parameter.
+
+        :param req: Request name.
+        :param params: Parameters from flexiManage.
+
+        :returns: Reply.
+        """
+        handler = fwapps_api.get(req)
+        assert handler, 'fwapps_api: "%s" request is not supported' % req
+
+        handler_func = getattr(self, handler)
+        assert handler_func, 'fwapps_api: handler=%s not found for req=%s' % (handler, req)
+
+        reply = handler_func(params)
+        if reply['ok'] == 0:
+            raise Exception("fwapps_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
+        return reply
+
+    def _add_app_info(self, params):
         """Add application.
 
-        :param name: Application name.
-        :param acl_id: ACL id.
-        :param id: Application id.
-        :param category: Application category.
-        :param subcategory: Application subcategory.
-        :param priority: Application priority.
+        :param params: Parameters from flexiManage.
 
-        :returns: None.
+        :returns: Reply.
         """
+        name = params['app']
+        acl_id = params['acl_index']
+        category = params['category']
+        subcategory = params['subcategory']
+        priority = params['priority']
+
         self.apps_map[category][subcategory][priority][name] = acl_id
 
-    def app_remove(self, name, category, subcategory, priority):
+        reply = {'ok': 1}
+        return reply
+
+    def _remove_app_info(self, params):
         """Remove application.
 
-        :param name: Application name.
-        :param category: Application category.
-        :param subcategory: Application subcategory.
-        :param priority: Application priority.
+        :param params: Parameters from flexiManage.
 
-        :returns: None.
+        :returns: Reply.
         """
+        name = params['app']
+        acl_id = params['acl_index']
+        category = params['category']
+        subcategory = params['subcategory']
+        priority = params['priority']
+
         del self.apps_map[category][subcategory][priority][name]
+
+        reply = {'ok': 1}
+        return reply
 
     def _priority_iterate(self, category, subcategory, priority, acl_id_list):
         """Get ACL id.

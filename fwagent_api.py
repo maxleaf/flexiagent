@@ -199,36 +199,6 @@ class FWAGENT_API:
         except Exception as e:
             return {'ok': 0, 'message': str(e)}
 
-    def _add_app_info(self, params):
-        """Save application information.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        fwglobals.g.apps_api.app_add(params['app'],
-                                     params['acl_index'],
-                                     params['id'],
-                                     params['category'],
-                                     params['subcategory'],
-                                     params['priority'])
-        reply = {'ok': 1}
-        return reply
-
-    def _remove_app_info(self, params):
-        """Remove application information.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        fwglobals.g.apps_api.app_remove(params['app'],
-                                        params['category'],
-                                        params['subcategory'],
-                                        params['priority'])
-        reply = {'ok': 1}
-        return reply
-
     def _add_policy_info(self, params):
         """Save policy information.
 
