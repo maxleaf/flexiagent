@@ -52,22 +52,6 @@
            }]
 },
 {
-  "entity":  "agent",
-  "message": "add-app",
-  "params": [{
-           "app":"yahoo-dns",
-           "id":2,
-           "category":"network",
-           "subcategory":"dns",
-           "priority":3,
-           "rules":[{
-             "ip":"67.195.1.92",
-             "ip-prefix":32,
-             "port-range-low":53,
-             "port-range-high":53}]
-           }]
-},
-{
       "entity":  "agent",
       "message": "modify-device",
       "params": {
@@ -99,8 +83,6 @@
       "params": [{
             "id":1,
             "category":"network",
-            "app":"google-dns",
-            "category":"network",
             "subcategory":"dns",
             "priority":3,
             "pci": "0000:00:08.00",
@@ -111,25 +93,20 @@
        }]
 },
 {
-      "entity":  "agent",
-      "message": "modify-device",
-      "params": {
-            "modify_policy": {
-              "policies": [{
-                "id":1,
-                "category":"network",
-                "app":"yahoo-dns",
-                "category":"network",
-                "subcategory":"dns",
-                "priority":3,
-                "pci": "0000:00:08.00",
-                "route": 
-                {
-                 "via": "10.100.0.6"
-                }
-            }]
-          }
-       }
+  "entity":  "agent",
+  "message": "add-app",
+  "params": [{
+           "app":"yahoo-dns",
+           "id":2,
+           "category":"network",
+           "subcategory":"dns",
+           "priority":3,
+           "rules":[{
+             "ip":"67.195.1.92",
+             "ip-prefix":32,
+             "port-range-low":53,
+             "port-range-high":53}]
+           }]
 },
 {
 	"entity": "agent",

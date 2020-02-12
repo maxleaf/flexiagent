@@ -76,6 +76,8 @@ class FwApps:
 
         self.apps_map[category][subcategory][priority][name] = {'acl_id': acl_id}
 
+        fwglobals.g.policy_api.refresh_policies()
+
         reply = {'ok': 1}
         return reply
 

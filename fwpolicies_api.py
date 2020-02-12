@@ -37,6 +37,8 @@ class FwPolicies:
         """Constructor method.
         """
         self.policy_index = 0
+        self.acl_to_policy = {}
+        self.policies_map = {}
 
     def call(self, req, params):
         """Invokes API specified by the 'req' parameter.
@@ -175,6 +177,13 @@ class FwPolicies:
         cmd['revert']['descr'] = "Attach ABF for app %s" % (app)
         cmd_list.append(cmd)
 
+    def _save_policy_info(self, params):
+        self.policies_map[params['id']] = params
+
+    def refresh_policies(self):
+        for policy in policies_map.values():
+            _add_policy_info(policy)
+
     def _translate(self, app, category, subcategory, priority, pci, next_hop, cmd_list):
         acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
         sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
@@ -184,8 +193,10 @@ class FwPolicies:
         for acl_id in acl_id_list:
             policy_id = self._generate_policy_id()
 
-            self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
-            self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
+            if acl_id not in self.acl_to_policy:
+                self.acl_to_policy[acl_id] = policy_id
+                self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
+                self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 
     def _add_policy_info(self, params):
         """Save policy information.
@@ -201,6 +212,8 @@ class FwPolicies:
         pci = params['pci']
         next_hop = params['next_hop']
         cmd_list = []
+
+        self._save_policy_info(params)
 
         self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
 
