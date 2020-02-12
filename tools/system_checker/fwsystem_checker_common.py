@@ -192,7 +192,9 @@ class Checker:
                         continue
                     match = re.search('([^ ]+) .*\[0200\]: ([^ ]+)', params[0])
                     if not match:
-                        raise Exception("not supported format of 'lspci -vnn' output: %s" % (str(params[0]))
+                        print("device: %s" % (str(device)))
+                        print("params[0]: %s" % (str(params[0])))
+                        raise Exception("not supported format of 'lspci -vnn' output")
                     pci          = match.group(1)
                     manufacturer = match.group(2)
                     driver       = device.split('Kernel driver in use: ', 1)[1].split('\n')[0]
