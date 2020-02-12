@@ -74,7 +74,7 @@ class FwApps:
         subcategory = params['subcategory']
         priority = params['priority']
 
-        self.apps_map[category][subcategory][priority][name] = acl_id
+        self.apps_map[category][subcategory][priority][name] = {'acl_id': acl_id}
 
         reply = {'ok': 1}
         return reply
@@ -107,8 +107,8 @@ class FwApps:
 
         :returns: None.
         """
-        for acl_id in self.apps_map[category][subcategory][priority].values():
-            acl_id_list.append(acl_id)
+        for app in self.apps_map[category][subcategory][priority].values():
+            acl_id_list.append(app['acl_id'])
 
     def _subcategory_iterate(self, category, subcategory, acl_id_list):
         """Get ACL id.
@@ -155,6 +155,6 @@ class FwApps:
                 self._priority_iterate(category, subcategory, priority, acl_id_list)
         else:
             acl_id_list.append(self.apps_map[category]
-                               [subcategory][priority][name])
+                               [subcategory][priority][name]['acl_id'])
 
         return acl_id_list
