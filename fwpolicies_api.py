@@ -181,8 +181,8 @@ class FwPolicies:
         self.policies_map[params['id']] = params
 
     def refresh_policies(self):
-        for policy in policies_map.values():
-            _add_policy_info(policy)
+        for policy in self.policies_map.values():
+            self._add_policy_info(policy)
 
     def _translate(self, app, category, subcategory, priority, pci, next_hop, cmd_list):
         acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)

@@ -31,8 +31,8 @@ from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
-from fwapplications import FwApps
-from fwpolicies import FwPolicies
+from fwapplications_api import FwApps
+from fwpolicies_api import FwPolicies
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
