@@ -133,11 +133,6 @@ class FwPolicies:
         cmd['cmd']['name'] = "abf_policy_add_del"
         cmd['cmd']['params'] = cmd_params
         cmd['cmd']['descr'] = "Add ABF for app %s" % (app)
-        cmd['revert'] = {}
-        cmd['revert']['name'] = 'abf_policy_add_del'
-        cmd['revert']['params'] = copy.deepcopy(cmd_params)
-        cmd['revert']['params']['is_add'] = 0
-        cmd['revert']['descr'] = "Delete ABF for app %s" % (app)
         cmd_list.append(cmd)
 
         return cmd_list
@@ -199,11 +194,6 @@ class FwPolicies:
         cmd['cmd']['name'] = "abf_itf_attach_add_del"
         cmd['cmd']['params'] = cmd_params
         cmd['cmd']['descr'] = "Attach ABF for app %s" % (app)
-        cmd['revert'] = {}
-        cmd['revert']['name'] = 'abf_itf_attach_add_del'
-        cmd['revert']['params'] = copy.deepcopy(cmd_params)
-        cmd['revert']['params']['is_add'] = 0
-        cmd['revert']['descr'] = "Attach ABF for app %s" % (app)
         cmd_list.append(cmd)
 
     def _detach_policy(self, sw_if_index, policy_id, priority, is_ipv6, cmd_list):
