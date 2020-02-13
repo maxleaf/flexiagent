@@ -306,14 +306,10 @@ class FwPolicies:
         category = params['category']
         subcategory = params['subcategory']
         priority = params['priority']
-        pci = params['pci']
-        next_hop = params['next_hop']
-        cmd_list = []
 
-        self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
-
-        for cmd in cmd_list:
-            fwglobals.g.handle_request(cmd['revert']['name'], cmd['revert']['params'])
+        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category,subcategory, priority)
+        for acl_id in acl_id_list:
+            self.remove_policy(acl_id)
 
         reply = {'ok': 1}
         return reply

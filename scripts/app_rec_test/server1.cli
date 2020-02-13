@@ -154,5 +154,20 @@
              "port-range-low":53,
              "port-range-high":53}]
            }]
+},
+{
+      "entity":  "agent",
+      "message": "remove-policy",
+      "params": [{
+            "id":1,
+            "category":"network",
+            "subcategory":"dns",
+            "priority":3,
+            "pci": "0000:00:08.00",
+            "route":
+            {
+              "via": "10.100.0.6"
+            }
+       }]
 }
 ]
