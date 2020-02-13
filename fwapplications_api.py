@@ -174,6 +174,8 @@ class FwApps:
         acl_id = self.apps_map[category][subcategory][priority][name]['acl_id']
         cmd_list = []
 
+        fwglobals.g.policy_api.remove_policy(acl_id)
+
         self._remove_acl(acl_id, cmd_list)
         for cmd in cmd_list:
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])

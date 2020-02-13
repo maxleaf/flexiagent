@@ -142,6 +142,35 @@ class FwPolicies:
 
         return cmd_list
 
+    def _remove_policy(self, policy_id, acl_id, ip, cmd_list):
+        """Generate remove policy command.
+
+         :param policy_id:  Policy id.
+         :param cmd_list:   Commands list.
+
+         :returns: List of commands.
+         """
+        paths = self._encode_paths(ip)
+
+        rule = ({'policy_id': policy_id,
+                 'acl_index': acl_id,
+                 'paths': paths,
+                 'n_paths': len(paths)})
+
+        cmd_params = {
+            'is_add': 0,
+            'policy': rule
+        }
+
+        # abf.api.json: abf_policy_add_del (is_add, ..., <type vl_api_abf_policy_t>, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name'] = 'abf_policy_add_del'
+        cmd['cmd']['params'] = cmd_params
+        cmd_list.append(cmd)
+
+        return cmd_list
+
     def _attach_policy(self, sw_if_index, app, policy_id, priority, is_ipv6, cmd_list):
         """Generate add policy command.
 
@@ -177,12 +206,52 @@ class FwPolicies:
         cmd['revert']['descr'] = "Attach ABF for app %s" % (app)
         cmd_list.append(cmd)
 
+    def _detach_policy(self, sw_if_index, policy_id, priority, is_ipv6, cmd_list):
+        """Generate detach policy command.
+
+         :param sw_if_index: Interface index.
+         :param policy_id:   Policy id.
+         :param cmd_list:    Commands list.
+
+         :returns: List of commands.
+        """
+        attach = ({'policy_id': policy_id,
+                   'sw_if_index': sw_if_index,
+                   'priority': priority,
+                   'is_ipv6': is_ipv6})
+
+        cmd_params = {
+            'is_add': 0,
+            'attach': attach
+        }
+
+        # abf.api.json: abf_itf_attach_add_del (is_add, ..., <type vl_api_abf_itf_attach_t>, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name'] = 'abf_itf_attach_add_del'
+        cmd['cmd']['params'] = cmd_params
+        cmd_list.append(cmd)
+
     def _save_policy_info(self, params):
         self.policies_map[params['id']] = params
 
     def refresh_policies(self):
         for policy in self.policies_map.values():
             self._add_policy_info(policy)
+
+    def remove_policy(self, acl_id):
+        cmd_list = []
+
+        if acl_id not in self.acl_to_policy:
+            return
+
+        policy = self.acl_to_policy[acl_id]
+
+        self._detach_policy(policy['sw_if_index'], policy['policy_id'], 0, 0, cmd_list)
+        self._remove_policy(policy['policy_id'], acl_id, policy['next_hop'], cmd_list)
+
+        for cmd in cmd_list:
+            fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])
 
     def _translate(self, app, category, subcategory, priority, pci, next_hop, cmd_list):
         acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
@@ -194,7 +263,10 @@ class FwPolicies:
             policy_id = self._generate_policy_id()
 
             if acl_id not in self.acl_to_policy:
-                self.acl_to_policy[acl_id] = {'policy_id': policy_id, 'sw_if_index': sw_if_index}
+                self.acl_to_policy[acl_id] = {'policy_id': policy_id,
+                                              'sw_if_index': sw_if_index,
+                                              'next_hop': next_hop}
+
                 self._add_policy(app, policy_id, acl_id, next_hop, cmd_list)
                 self._attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 

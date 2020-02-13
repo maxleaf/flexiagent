@@ -133,5 +133,26 @@
              "port-range-low":53,
              "port-range-high":53}]
            }]
+},
+{
+  "entity":  "agent",
+  "message": "remove-app",
+  "params": [{
+           "app":"google-dns",
+           "id":1,
+           "category":"network",
+           "subcategory":"dns",
+           "priority":3,
+           "rules":[{
+             "ip":"8.8.8.8",
+             "ip-prefix":32,
+             "port-range-low":53,
+             "port-range-high":53},
+             {
+             "ip":"8.8.4.4",
+             "ip-prefix":32,
+             "port-range-low":53,
+             "port-range-high":53}]
+           }]
 }
 ]
