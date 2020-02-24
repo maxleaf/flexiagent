@@ -38,6 +38,7 @@ from vpp_api import VPP_API
 import fwtunnel_stats
 
 import fwtranslate_add_tunnel
+import fwtranslate_add_interface
 
 fwrouter_modules = {
     'fwtranslate_revert':       __import__('fwtranslate_revert') ,
@@ -602,6 +603,49 @@ class FWROUTER_API:
             self._set_router_failure("failed to stop router gracefully")
             raise e
 
+    def _create_remove_tunnels_request(self, params):
+        """Creates a list of remove-tunnel requests for all tunnels
+           that are connected to interfaces that are either modified
+           or unassigned.
+
+        :param params:          modify-device request parameters.
+
+        :returns: Array of remove-tunnel requests.
+        """
+
+        # Get the pci address of all changed interfaces
+        interfaces = [] if 'modify_router' not in params else params['modify_router'].get('unassign', [])
+        interfaces += [] if 'modify_interfaces' not in params else params['modify_interfaces'].get('interfaces', [])
+        pci_set = set(map(lambda interface: interface['pci'], interfaces))
+        ip_set = set()
+
+        # Create a set of the IP addresses that correspond to each PCI.
+        for pci in pci_set:
+            try:
+                key = fwtranslate_add_interface.get_request_key({'pci': pci})
+                (req, entry) = self.db_requests.fetch_request(key)
+                if entry != None:
+                    ip_set.add(entry['addr'].split('/')[0])
+
+            except Exception as e:
+                fwglobals.log.excep("failed to create remove-tunnel requests list %s" % str(e))
+                raise e
+
+        # Go over all tunnels in the database and add every tunnel
+        # which src field exists in the IP addresses set
+        tunnels_requests = []
+        for key in self.db_requests.db:
+            try:
+                if re.match('add-tunnel', key):
+                    (req, entry) = self.db_requests.fetch_request(key)
+                    if entry['src'] in ip_set:
+                        tunnels_requests.append({'remove-tunnel': {'tunnel-id': entry['tunnel-id']}})
+            except Exception as e:
+                fwglobals.log.excep("failed to create remove-tunnel requests list %s" % str(e))
+                raise e
+
+        return tunnels_requests
+
     def _handle_modify_device_request(self, params):
         """Handle modify_routes, modify_interfaces or modify_router request.
 
@@ -612,6 +656,13 @@ class FWROUTER_API:
         requests = []
         interfaces = []
         should_restart_router = False
+
+        # First, create a list of remove-tunnel requests to remove
+        # all tunnels that are connected to the modified interfaces.
+        # These tunnels must be removed before modifying the interface
+        # and will be added back (if needed) via a message from the MGMT.
+        if 'modify_interfaces' in params or 'modify_router' in params:
+            requests += self._create_remove_tunnels_request(params)
         if 'modify_routes' in params:
             requests += self._create_modify_routes_request(params['modify_routes'])
         if 'modify_interfaces' in params:
@@ -688,16 +739,24 @@ class FWROUTER_API:
         modify_route_requests = []
         if params:
             for route in params['routes']:
-                old_route_ent = {k:v for k,v in route.items() if k not in ['new_route']}
-                new_route_ent = {k:v for k,v in route.items() if k not in ['old_route']}
-                old_route_ent['via'] = old_route_ent.pop('old_route')
-                new_route_ent['via'] = new_route_ent.pop('new_route')
+                remove_route_params = {}
+                add_route_params = {}
+                
+                # Modified routes will have both the 'old_route' and 'new_route'
+                # fields, whereas added/removed routes will only have the 'new_route'
+                # or 'old_route' fields.
+                if route['old_route'] != '':
+                    remove_route_params = {k:v for k,v in route.items() if k not in ['new_route']}
+                    remove_route_params['via'] = remove_route_params.pop('old_route')
+                    # Remove route only if it exists in the database
+                    if self._get_request_params_from_db('remove-route', remove_route_params):
+                        modify_route_requests.append({'remove-route': remove_route_params})
 
-                # Remove route only if it exists in the database
-                if self._get_request_params_from_db('remove-route', old_route_ent):
-                    modify_route_requests.append({'remove-route': old_route_ent})
-                modify_route_requests.append({'add-route': new_route_ent})
-
+                if route['new_route'] != '':
+                    add_route_params = {k:v for k,v in route.items() if k not in ['old_route']}
+                    add_route_params['via'] = add_route_params.pop('new_route')
+                    modify_route_requests.append({'add-route': add_route_params})
+                
         return modify_route_requests
 
     def _create_modify_router_request(self, params):
@@ -778,16 +837,17 @@ class FWROUTER_API:
                 if re.match('add-interface', key):
                     self._apply_db_request(key)
 
-            # Now configure routes
-            for key in self.db_requests.db:
-                if re.match('add-route', key):
-                    self._apply_db_request(key)
-
             # Configure tunnels
             for key in self.db_requests.db:
                 if re.match('add-tunnel', key):
                     self._apply_db_request(key)
                     self._fill_tunnel_stats_dict()
+
+            # Configure routes
+            # Do that after routes, as routes might use tunnels!
+            for key in self.db_requests.db:
+                if re.match('add-route', key):
+                    self._apply_db_request(key)
 
         except Exception as e:
             err_str = "_apply_router_config failed: %s" % str(e)
