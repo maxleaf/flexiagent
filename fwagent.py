@@ -861,24 +861,23 @@ class FwagentDaemon(object):
             if not connected:
                 # If connection was closed by management because of not approved device,
                 # retry the connection in few seconds.
-                # Otherwise - stop connection loop to prevent DDoS attack on server.
-                # Once we stop the loop, the agent doesn't try to communicate with
-                # manager anymore. To get out of this state the 'reset' or 'start' command
-                # should be invoked, effectively causing agent restart - new registration
-                # and connection loops.
-                # Alternatively the service can be restarted by systemctl.
-                if self.active and \
-                   self.agent.connection_error_code in fwglobals.g.ws_reconnect_status_codes:
+                # Otherwise - retry connection in few minutes to prevent DDoS attack on server.
+                if self.active:
+                    # If immediate reconnect was requested, don't sleep
                     if self.agent.should_reconnect:
                         self.agent.should_reconnect = False
                         continue
-                    retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                    # Get reconnect interval
+                    if self.agent.connection_error_code in fwglobals.g.ws_reconnect_status_codes:
+                        min_max = (fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                    else:
+                        min_max = (fwglobals.g.RETRY_INTERVAL_LONG_MIN, fwglobals.g.RETRY_INTERVAL_LONG_MAX)
+                    retry_sec = random.randint(min_max[0], min_max[1])
+                    # Go and sleep
                     fwglobals.log.info("retry connection in %d seconds" % retry_sec)
                     while retry_sec > 0 and self.active:
                         time.sleep(1)   # Check self.active every second to detect Ctrl-C as soon as possible
                         retry_sec -= 1
-                else:
-                    self.active = False
 
         fwglobals.log.info("connection loop was stopped, use 'fwagent start' to start it again")
 
