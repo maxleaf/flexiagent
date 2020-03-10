@@ -176,6 +176,28 @@ def add_interface(params):
                                 "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)
 
+    # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
+    if 'multilink' in params and 'labels' in params['multilink']:
+        labels = params['multilink']['labels']
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, iface_pci, labels)
+        cmd['cmd']['params']  = {
+                        'module': 'fwutils',
+                        'func'  : 'vpp_multilink_update_labels',
+                        'args'  : { 'labels': labels, 'is_dia': True, 'dev': iface_pci, 'remove': False }
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, iface_pci, labels)
+        cmd['revert']['params'] = {
+                        'module': 'fwutils',
+                        'func'  : 'vpp_multilink_update_labels',
+                        'args'  : { 'labels': labels, 'is_dia': True, 'dev': iface_pci, 'remove': True }
+        }
+        cmd_list.append(cmd)
+
     # Enable NAT.
     # On WAN interfaces run
     #   'nat44 add interface address GigabitEthernet0/9/0'

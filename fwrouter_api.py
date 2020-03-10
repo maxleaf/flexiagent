@@ -34,6 +34,7 @@ import fwutils
 
 from fwdb_requests import FwDbRequests
 from fwapplications_api import FwApps
+from fwmultilink import FwMultilink
 from vpp_api import VPP_API
 
 import fwtunnel_stats
@@ -86,6 +87,7 @@ class FWROUTER_API:
         """
         self.vpp_api         = VPP_API()
         self.db_requests     = FwDbRequests(request_db_file)    # Database of executed requests
+        self.multilink       = FwMultilink()
         self.router_started  = False
         self.router_failure  = False
         self.thread_watchdog = None

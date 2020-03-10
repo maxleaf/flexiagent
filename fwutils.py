@@ -1209,3 +1209,53 @@ def modify_dhcpd(params):
         return (False, None)
 
     return (True, None)
+
+def vpp_multilink_update_labels(params):
+    """Updates VPP with flexiwan multilink labels.
+    These labels are used for Multi-Link feature: user can mark interfaces
+    or tunnels with labels and than add policy to choose interface/tunnel by
+    label where to forward packets to.
+        REMARK: this function is temporary solution as it uses VPP CLI to
+    configure lables. Remove it, when correspondent Python API will be added.
+    In last case the API should be called directly from translation.
+
+    :param params: labels - python list of labels
+    :param params: is_dia - type of labels (DIA - Direct Internet Access)
+    :param params: remove - True to remove labels, False to add.
+    :param params: dev    - PCI if device to apply labels to.
+
+    :returns: List of label IDs.
+     """
+    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(params)
+    ids = ','.join(map(str, ids_list))
+
+    vppctl_cmd = '%s interface flexiwan label %s %s' % \
+                 ('clear' if params['remove'] else 'set',
+                 ids,
+                 pci_to_vpp_if_name(params['dev']))
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def multilink_lables_to_ids(params):
+    """Converts labels in form of strings into 2-byte integers that can be set
+    into vpp. Labels are used for Multi-Link feature: user can mark interfaces
+    or tunnels with labels and than add policy where to forward packets based on
+    these labels.
+
+    :param params: labels - python list of labels
+    :param params: is_dia - type of labels (DIA - Direct Internet Access)
+    :param params: remove - True if labels are going to be deleted.
+
+    :returns: List of label IDs.
+    """
+    names           = params['labels']
+    is_dia          = params['is_dia']
+    attach_if_exist = params.get('attach_if_exist', False)
+    detach_if_exist = params.get('detach_if_exist', False)
+
+    ids = fwglobals.g.router_api.multilink.get_label_ids_by_names(
+                names=params['labels'], is_dia=params['is_dia'], remove=params['remove'])
+    return ids
