@@ -20,6 +20,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import fwglobals
+
 class FwMultilink:
     """This is object that encapsulates data used by multi-link feature.
     """
@@ -36,32 +38,45 @@ class FwMultilink:
         :param is_dia:  type of label, used by VPP (Direct Internet Access).
         :param remove:  True if label refCounter should be decremented and
                         label should be removed from database if no more
-                        owners exist. False if refCounter should be incremented.
+                        refCounter exist. False if refCounter should be incremented.
 
         :returns: list of id-s.
         """
-        ids     = []
-        new_id  = len(self.labels)
+        gc_before = len(self.labels)
+
+        ids = []
         for name in names:
             if name in self.labels:
                 if remove:
-                    self.labels[name]['owners'] -= 1
+                    self.labels[name]['refCounter'] -= 1
                 else:
-                    self.labels[name]['owners'] += 1
+                    self.labels[name]['refCounter'] += 1
             else:
+                new_id  = len(self.labels)
                 if new_id > 0xFF:
                     raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label")
-                id = new_id | 0x100 if is_dia else new_id
                 self.labels[name] = {}
-                self.labels[name]['id'] = id
-                self.labels[name]['owners'] = 1
+                self.labels[name]['id']         = new_id
+                self.labels[name]['type']       = 'dia' if is_dia else ''
+                self.labels[name]['refCounter'] = 1
                 new_id  += 1
-            ids.append(self.labels[name]['id'])
 
-        # Clean id-s with no owners
+            if self.labels[name]['type'] == 'dia':
+                id = self.labels[name]['id'] | 0x100
+            else:
+                id = self.labels[name]['id']
+            ids.append(id)
+
+        # Clean id-s with no refCounter
         if remove:
             for name in names:
-                if name in self.labels and self.labels[name]['owners'] == 0:
+                if name in self.labels and self.labels[name]['refCounter'] == 0:
                     del self.labels[name]
 
+        gc_after = len(self.labels)
+
+        fwglobals.log.debug("get_label_ids_by_names: gc=%d, input:  %s, remove=%s, is_dia=%s" % \
+                            (gc_before ,names, str(remove), str(is_dia)))
+        fwglobals.log.debug("get_label_ids_by_names: gc=%d, output: %s" % \
+                            (gc_after, ','.join(map(str, ids))))
         return ids

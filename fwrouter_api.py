@@ -1088,7 +1088,10 @@ class FWROUTER_API:
             # Add new param/replace old value with new one
             if 'add_param' in s:
                 if type(params) is dict:
-                    params[s['add_param']] = new
+                    if 'args' in params:        # Take care of cmd['cmd']['name'] = "python" commands
+                        params['args'][s['add_param']] = new
+                    else:                       # Take care of rest commands
+                        params[s['add_param']] = new
                 else:  # list
                     params.insert({s['add_param'], new})
             elif 'replace' in s:
