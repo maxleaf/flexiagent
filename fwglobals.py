@@ -268,7 +268,7 @@ class Fwglobals:
         self.router_api.finalize()
 
     def __str__(self):
-        """Get string represantation of configuration.
+        """Get string representation of configuration.
 
         :returns: String in JSON format.
         """
@@ -351,7 +351,7 @@ class Fwglobals:
 
         except Exception as e:
             global log
-            err_str = "%s(%s): %s" % (req, format(params), str(e)) 
+            err_str = "%s(%s): %s" % (req, format(params), str(e))
             log.error(err_str + ': %s' % traceback.format_exc())
             reply = {"message":err_str, 'ok':0}
             return reply

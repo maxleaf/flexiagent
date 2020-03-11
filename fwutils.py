@@ -1221,11 +1221,11 @@ def vpp_multilink_update_labels(params):
     In last case the API should be called directly from translation.
 
     :param params: labels - python list of labels
-    :param params: is_dia - type of labels (DIA - Direct Internet Access)
-    :param params: remove - True to remove labels, False to add.
-    :param params: dev    - PCI if device to apply labels to.
+                   is_dia - type of labels (DIA - Direct Internet Access)
+                   remove - True to remove labels, False to add.
+                   dev    - PCI if device to apply labels to.
 
-    :returns: List of label IDs.
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
     ids_list = multilink_lables_to_ids(params)
@@ -1241,6 +1241,40 @@ def vpp_multilink_update_labels(params):
     op = 'clear' if params['remove'] else 'set'
 
     vppctl_cmd = '%s interface flexiwan label %s %s' %  (op, ids, vpp_if_name)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+
+def vpp_multilink_update_policy_rule(params):
+    """Updates VPP with flexiwan policy rules.
+    In general, policy rules instruct VPP to route packets to specific interface,
+    which is marked with multilink label that noted in policy rule.
+
+        REMARK: this function is temporary solution as it uses VPP CLI to
+    configure policy rules. Remove it, when correspondent Python API will be added.
+    In last case the API should be called directly from translation.
+
+    :param params: params - rule parameters:
+                        policy-id - the policy id (two byte integer)
+                        rule-id   - the rule id (two byte integer)
+                        label     - label of interface to be used for packet forwarding
+                   remove - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    op       = 'del' if params['remove'] else 'add'
+    rule_id  = int(params['rule']['rule-id']) | (int(params['policy-id']) << 16)
+    label_id = multilink_lables_to_ids([params['rule']['action']['link']['label']])[0]
+
+    vppctl_cmd = 'fwabf policy %s id %d action link label %s' %  (op, rule_id, label_id)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
