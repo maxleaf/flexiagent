@@ -162,7 +162,7 @@ def add_interface(params):
     cmd['revert']['descr']  = "del %s from interface %s in Linux" % (iface_addr, iface_pci)
     cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
                                "sudo ip addr del %s dev DEV-STUB" % (iface_addr) ]
-    cmd_list.append(cmd)
+#    cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "exec"
@@ -174,7 +174,7 @@ def add_interface(params):
     cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_pci)
     cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
                                 "sudo ip link set dev DEV-STUB down" ]
-    cmd_list.append(cmd)
+ #   cmd_list.append(cmd)
 
     # Enable NAT.
     # On WAN interfaces run
