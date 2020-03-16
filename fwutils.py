@@ -1077,3 +1077,27 @@ def vpp_startup_conf_remove_nat(params):
         del config['nat']
     fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def add_remove_netplan_interface(params):
+    pci = params['pci']
+    is_add = params['is_add']
+    fname = params['fname']
+
+    try:
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+        ethernets = config['network']['ethernets']
+        tap_name = pci_to_tap(pci)
+        if is_add == 1:
+            ethernets[tap_name] = {'dhcp4': True}
+        else:
+            del ethernets[tap_name]
+        with open(fname, 'w') as stream:
+            yaml.safe_dump(config, stream)
+
+        subprocess.check_output("sudo netplan apply", shell=True)
+    except:
+        err = "add_remove_netplan_interface failed: pci: %s, file: %s" % (pci, fname)
+        return (False, None)
+
+    return (True, None)

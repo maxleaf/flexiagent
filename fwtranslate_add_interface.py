@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
 import re
 
@@ -67,6 +68,30 @@ import fwutils
 #
 #    07. sudo systemctl restart frr
 #
+def _change_netplan_conf(pci, cmd_list):
+    args = {'is_add': 1, 'pci': pci, 'fname':'/etc/netplan/01-network-manager-all.yaml'}
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['params'] = {
+        'module': 'fwutils',
+        'func': 'add_remove_netplan_interface',
+        'args': args
+    }
+    cmd['cmd']['descr'] = "modify netplan config file"
+    cmd['revert'] = {}
+    cmd['revert']['name'] = 'python'
+    cmd['revert']['params'] = {
+        'module': 'fwutils',
+        'func': 'add_remove_netplan_interface',
+        'args': copy.deepcopy(args)
+    }
+    cmd['revert']['params']['args']['is_add'] = 0
+    cmd['revert']['descr'] = "clean netplan config file"
+
+    cmd_list.append(cmd)
+
+
 def add_interface(params):
     """Generate commands to configure interface in Linux and VPP
 
@@ -193,6 +218,8 @@ def add_interface(params):
                                  "sudo vppctl set dhcp client del intfc DEV-STUB"]
         cmd['revert']['descr'] = "disable DHCP client for interface %s (%s)" % (iface_pci, iface_addr)
         cmd_list.append(cmd)
+
+        _change_netplan_conf(iface_pci, cmd_list)
 
     # Enable NAT.
     # On WAN interfaces run
