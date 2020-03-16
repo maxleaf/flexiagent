@@ -151,30 +151,31 @@ def add_interface(params):
     # "if [ -z "$(ip addr | grep \'inet %s\')" ]" ensures that address was not configured yet by netplan.
     # Otherwise we will get "RTNETLINK answers: File exists" error.
     #
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "exec"
-    cmd['cmd']['descr']  = "set %s to interface %s in Linux" % (iface_addr, iface_pci)
-    cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                                'if [ -z "$(ip addr | grep \'inet %s\')" ]; then sudo ip addr add %s dev DEV-STUB; fi' % (iface_addr, iface_addr) ]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "del %s from interface %s in Linux" % (iface_addr, iface_pci)
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                               "sudo ip addr del %s dev DEV-STUB" % (iface_addr) ]
-#    cmd_list.append(cmd)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, iface_pci)
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                                "sudo ip link set dev DEV-STUB up" ]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_pci)
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                                "sudo ip link set dev DEV-STUB down" ]
- #   cmd_list.append(cmd)
+    if 'mode' not in params or params['mode'].lower() == 'static':
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "exec"
+        cmd['cmd']['descr']  = "set %s to interface %s in Linux" % (iface_addr, iface_pci)
+        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+                                    'if [ -z "$(ip addr | grep \'inet %s\')" ]; then sudo ip addr add %s dev DEV-STUB; fi' % (iface_addr, iface_addr) ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "del %s from interface %s in Linux" % (iface_addr, iface_pci)
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+                                   "sudo ip addr del %s dev DEV-STUB" % (iface_addr) ]
+        cmd_list.append(cmd)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, iface_pci)
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+                                    "sudo ip link set dev DEV-STUB up" ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_pci)
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+                                    "sudo ip link set dev DEV-STUB down" ]
+        cmd_list.append(cmd)
 
     # Enable NAT.
     # On WAN interfaces run
