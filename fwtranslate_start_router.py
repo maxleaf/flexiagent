@@ -235,16 +235,6 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = ["sudo vppctl set dhcp client intfc GigabitEthernet0/3/0"]
-    cmd['cmd']['descr'] = "enable dhcp client"
-    cmd['revert'] = {}
-    cmd['revert']['name'] = 'exec'
-    cmd['revert']['params'] = ["sudo vppctl set dhcp client del intfc GigabitEthernet0/3/0"]
-    cmd['revert']['descr'] = "disable dhcp client"
-    cmd_list.append(cmd)
-    cmd = {}
-    cmd['cmd'] = {}
     cmd['cmd']['name']    = 'exec'
     cmd['cmd']['params']  = [ 'sudo netplan apply' ]
     cmd['cmd']['descr']   = "netplan apply"

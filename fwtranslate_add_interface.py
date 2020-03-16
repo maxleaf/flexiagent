@@ -177,6 +177,23 @@ def add_interface(params):
                                     "sudo ip link set dev DEV-STUB down" ]
         cmd_list.append(cmd)
 
+    # Enable DHCP client.
+    # Run 'set dhcp client intfc GigabitEthernet0/3/0'
+    if 'mode' in params and params['mode'].lower() == 'dhcp':
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name'] = "exec"
+        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_vpp_if_name', 'arg':iface_pci } ]},
+                                 "sudo vppctl set dhcp client intfc DEV-STUB"]
+        cmd['cmd']['descr']  = "enable DHCP client for interface %s (%s)" % (iface_pci, iface_addr)
+        cmd['cmd']['descr'] = "enable dhcp client"
+        cmd['revert'] = {}
+        cmd['revert']['name'] = "exec"
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_vpp_if_name', 'arg':iface_pci } ]},
+                                 "sudo vppctl set dhcp client del intfc DEV-STUB"]
+        cmd['revert']['descr'] = "disable DHCP client for interface %s (%s)" % (iface_pci, iface_addr)
+        cmd_list.append(cmd)
+
     # Enable NAT.
     # On WAN interfaces run
     #   'nat44 add interface address GigabitEthernet0/9/0'
