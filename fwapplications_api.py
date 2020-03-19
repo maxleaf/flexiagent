@@ -145,7 +145,7 @@ class FwApps:
         name = params['app']
         category = params['category']
         subcategory = params['subcategory']
-        priority = params['priority']
+        importance = params['importance']
 
         cmd_list = []
         cmd_cache = {}
@@ -154,7 +154,7 @@ class FwApps:
             result = {'result_attr': 'acl_index', 'cache': cmd_cache, 'key': 'acl_index'}
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'], result)
             acl_id = cmd_cache['acl_index']
-            self.apps_map[category][subcategory][priority][name] = {'acl_id': acl_id}
+            self.apps_map[category][subcategory][importance][name] = {'acl_id': acl_id}
 
         fwglobals.g.policy_api.refresh_policies()
 
@@ -171,8 +171,8 @@ class FwApps:
         name = params['app']
         category = params['category']
         subcategory = params['subcategory']
-        priority = params['priority']
-        acl_id = self.apps_map[category][subcategory][priority][name]['acl_id']
+        importance = params['importance']
+        acl_id = self.apps_map[category][subcategory][importance][name]['acl_id']
         cmd_list = []
 
         fwglobals.g.policy_api.remove_policy(acl_id)
@@ -180,22 +180,22 @@ class FwApps:
         self._remove_acl(acl_id, cmd_list)
         for cmd in cmd_list:
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])
-            del self.apps_map[category][subcategory][priority][name]
+            del self.apps_map[category][subcategory][importance][name]
 
         reply = {'ok': 1}
         return reply
 
-    def _priority_iterate(self, category, subcategory, priority, acl_id_list):
+    def _priority_iterate(self, category, subcategory, importance, acl_id_list):
         """Get ACL id.
 
         :param category: Application category.
         :param subcategory: Application subcategory.
-        :param priority: Application priority.
+        :param importance: Application importance.
         :param acl_id_list: ACL id list.
 
         :returns: None.
         """
-        for app in self.apps_map[category][subcategory][priority].values():
+        for app in self.apps_map[category][subcategory][importance].values():
             acl_id_list.append(app['acl_id'])
 
     def _subcategory_iterate(self, category, subcategory, acl_id_list):
@@ -207,8 +207,8 @@ class FwApps:
 
         :returns: None.
         """
-        for priority in self.apps_map[category][subcategory].keys():
-            self._priority_iterate(category, subcategory, priority, acl_id_list)
+        for importance in self.apps_map[category][subcategory].keys():
+            self._priority_iterate(category, subcategory, importance, acl_id_list)
 
     def _category_iterate(self, category, acl_id_list):
         """Get ACL id.
@@ -221,28 +221,28 @@ class FwApps:
         for subcategory in self.apps_map[category].keys():
             self._subcategory_iterate(category, subcategory, acl_id_list)
 
-    def acl_id_list_get(self, name, category, subcategory, priority):
+    def acl_id_list_get(self, name, category, subcategory, importance):
         """Get ACL id.
 
         :param name: Application name.
         :param category: Application category.
         :param subcategory: Application subcategory.
-        :param priority: Application priority.
+        :param importance: Application importance.
 
         :returns: ACL id.
         """
         acl_id_list = []
 
         if not name:
-            if priority < 0:
+            if importance < 0:
                 if not subcategory:
                     self._category_iterate(category, acl_id_list)
                 else:
                     self._subcategory_iterate(category, subcategory, acl_id_list)
             else:
-                self._priority_iterate(category, subcategory, priority, acl_id_list)
+                self._priority_iterate(category, subcategory, importance, acl_id_list)
         else:
             acl_id_list.append(self.apps_map[category]
-                               [subcategory][priority][name]['acl_id'])
+                               [subcategory][importance][name]['acl_id'])
 
         return acl_id_list

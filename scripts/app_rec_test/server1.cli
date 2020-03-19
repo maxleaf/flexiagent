@@ -64,7 +64,7 @@
            "id":1,
            "category":"network",
            "subcategory":"dns",
-           "priority":3,
+           "importance":3,
            "rules":[{
              "proto": 17,
              "ip":"8.8.8.8",
@@ -89,7 +89,7 @@
                 "id":1,
                 "category":"network",
                 "subcategory":"dns",
-                "priority":3,
+                "importance":3,
                 "rules":[{
                   "proto": 17,
                   "ip":"7.7.7.7",
@@ -114,7 +114,7 @@
             "id":1,
             "category":"network",
             "subcategory":"dns",
-            "priority":3,
+            "importance":3,
             "pci": "0000:00:08.00",
             "route": 
             {
@@ -130,7 +130,7 @@
            "id":2,
            "category":"network",
            "subcategory":"dns",
-           "priority":3,
+           "importance":3,
            "rules":[{
              "proto": 17,
              "ip":"67.195.1.92",
