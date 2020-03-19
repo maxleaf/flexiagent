@@ -44,6 +44,15 @@ class FwApps:
         def tree(): return defaultdict(tree)
         self.apps_map = tree()
 
+    def _add_app_db(self, name, acl_id, category, subcategory, importance):
+        self.apps_map[category][subcategory][importance][name] = {'acl_id': acl_id}
+
+    def _remove_app_db(self, name, category, subcategory, importance):
+        del self.apps_map[category][subcategory][importance][name]
+
+    def _get_acl_id(self, name, category, subcategory, importance):
+        return self.apps_map[category][subcategory][importance][name]['acl_id']
+
     def _create_rule(self, is_ipv6=0, is_permit=0, proto=0,
                      sport_from=0, sport_to=65535,
                      s_prefix=0, s_ip='\x00\x00\x00\x00',
@@ -143,9 +152,9 @@ class FwApps:
         :returns: Reply.
         """
         name = params['app']
-        category = params['category']
-        subcategory = params['subcategory']
-        importance = params['importance']
+        category = params.get('category', '')
+        subcategory = params.get('subcategory', '')
+        importance = params.get('importance', '')
 
         cmd_list = []
         cmd_cache = {}
@@ -154,7 +163,7 @@ class FwApps:
             result = {'result_attr': 'acl_index', 'cache': cmd_cache, 'key': 'acl_index'}
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'], result)
             acl_id = cmd_cache['acl_index']
-            self.apps_map[category][subcategory][importance][name] = {'acl_id': acl_id}
+            self._add_app_db(name, acl_id, category, subcategory, importance)
 
         fwglobals.g.policy_api.refresh_policies()
 
@@ -169,10 +178,10 @@ class FwApps:
         :returns: Reply.
         """
         name = params['app']
-        category = params['category']
-        subcategory = params['subcategory']
-        importance = params['importance']
-        acl_id = self.apps_map[category][subcategory][importance][name]['acl_id']
+        category = params.get('category', '')
+        subcategory = params.get('subcategory', '')
+        importance = params.get('importance', '')
+        acl_id = self._get_acl_id(name, category, subcategory, importance)
         cmd_list = []
 
         fwglobals.g.policy_api.remove_policy(acl_id)
@@ -180,7 +189,7 @@ class FwApps:
         self._remove_acl(acl_id, cmd_list)
         for cmd in cmd_list:
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])
-            del self.apps_map[category][subcategory][importance][name]
+            self._remove_app_db(name, category, subcategory, importance)
 
         reply = {'ok': 1}
         return reply
