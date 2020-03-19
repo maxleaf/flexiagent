@@ -1073,3 +1073,23 @@ def vpp_startup_conf_remove_devices(params):
 
     fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def vpp_startup_conf_add_nat(params):
+    filename = params['vpp_config_filename']
+    config   = fwtool_vpp_startupconf_dict.load(filename)
+    config['nat'] = []
+    config['nat'].append('endpoint-dependent')
+    config['nat'].append('translation hash buckets 1048576')
+    config['nat'].append('translation hash memory 268435456')
+    config['nat'].append('user hash buckets 1024')
+    config['nat'].append('max translations per user 10000')
+    fwtool_vpp_startupconf_dict.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def vpp_startup_conf_remove_nat(params):
+    filename = params['vpp_config_filename']
+    config   = fwtool_vpp_startupconf_dict.load(filename)
+    if config.get('nat'):
+        del config['nat']
+    fwtool_vpp_startupconf_dict.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.

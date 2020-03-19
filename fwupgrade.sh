@@ -47,13 +47,16 @@ handle_upgrade_failure() {
         log 'Reverting to previous version ('"$prev_ver"')...'
         res=$(apt-get -y install --allow-downgrades "$AGENT_SERVICE"="$prev_ver")
 
+        log $res
+
         if [ ${PIPESTATUS[0]} != 0 ]; then
-            log $res
             log 'Failed to revert to previous version. Restarting fwagent'
             # Agent must be restarted if revert fails, or otherwise
             # it will remain stopped.
             systemctl restart "$AGENT_SERVICE"
         fi
+
+        log 'handle_upgrade_failure: exit 1'
         exit 1
     fi
 

@@ -165,22 +165,24 @@ def start_router(params=None):
         cmd_list.append(cmd)
 
     # Enable NAT in vpp configuration file
-    nat_status = os.popen("grep -E '  endpoint-dependent' %s" % vpp_filename).read()
-    if len(nat_status.strip()) == 0:
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "enable NAT in vpp"
-        cmd['cmd']['params']  = [
-            'sudo printf "\nnat {\n'
-            '  endpoint-dependent\n'
-            '  translation hash buckets 1048576\n'
-            '  translation hash memory 268435456\n'
-            '  user hash buckets 1024\n'
-            '  max translations per user 10000\n'
-            '}\n" >> ' + vpp_filename ]
-        # Don't remove NAT on revert, as it should be enabled always
-        cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "add NAT to %s" % vpp_filename
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'vpp_startup_conf_add_nat',
+        'args'  : { 'vpp_config_filename' : vpp_filename }
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "remove NAT from %s" % vpp_filename
+    cmd['revert']['params'] = {
+        'module': 'fwutils',
+        'func'  : 'vpp_startup_conf_remove_nat',
+        'args'  : { 'vpp_config_filename' : vpp_filename }
+    }
+    cmd_list.append(cmd)
 
     # Create commands that start vpp and configure it with addresses
     #   sudo systemtctl start vpp

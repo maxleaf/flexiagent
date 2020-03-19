@@ -190,8 +190,10 @@ class Checker:
                     match = re.search('\[02..\]:', params[0])   # [02XX] stands for Network Base Class
                     if not match:
                         continue
-                    match = re.search('([^ ]+) .*\[0200\]: ([^ ]+)', params[0])
+                    match = re.search('([^ ]+) .*\[02..\]: ([^ ]+)', params[0])
                     if not match:
+                        print("device: %s" % (str(device)))
+                        print("params[0]: %s" % (str(params[0])))
                         raise Exception("not supported format of 'lspci -vnn' output")
                     pci          = match.group(1)
                     manufacturer = match.group(2)
@@ -242,8 +244,8 @@ class Checker:
             # Ensure proper syntax of retrieved UUID
             try:
                 uuid_obj = uuid.UUID(found_uuid)
-                if not uuid_obj.version:
-                    raise Exception("failed to deduce version of found UUID (%s)" % found_uuid)
+                if uuid_obj.variant==uuid.RFC_4122 and not uuid_obj.version:
+                    raise Exception("failed to deduce version of found UUID according RFC4122: %s" % found_uuid)
             except ValueError:
                 raise Exception("found UUID '%s' doesn't comply to RFC" % found_uuid)
             return True

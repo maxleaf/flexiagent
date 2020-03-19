@@ -191,6 +191,8 @@ class Fwglobals:
         self.NUM_RETRIES_ALLOWED = 3
         self.RETRY_INTERVAL_MIN  = 5 # seconds - is used for both registration and main connection
         self.RETRY_INTERVAL_MAX  = 15
+        self.RETRY_INTERVAL_LONG_MIN = 50
+        self.RETRY_INTERVAL_LONG_MAX = 70
         self.DATA_PATH           = '/etc/flexiwan/agent/'
         self.FWAGENT_CONF_FILE   = self.DATA_PATH + 'fwagent_conf.yaml'  # Optional, if not present, defaults are taken
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'

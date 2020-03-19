@@ -148,8 +148,14 @@ class Fwagent:
         try:
             with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as stream:
                 stream.write('Failed to connect to MGMT: %s' % err)
+                fwglobals.log.debug("_mark_connection_failure: %s" % str(err))
         except Exception as e:
             fwglobals.log.excep("Failed to create connection failure file: %s" % str(e))
+
+    def _clean_connection_failure(self):
+        if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
+            os.remove(fwglobals.g.CONN_FAILURE_FILE)
+            fwglobals.log.debug("_clean_connection_failure")
 
     def register(self):
         """Registers device with the flexiManage.
@@ -272,20 +278,20 @@ class Fwagent:
         def on_close(ws):
             self._on_close(ws)
 
-        loadsimulator.g.simulate_websockets[id] = websocket.WebSocketApp(url,
-                                                                         header={header_UserAgent},
-                                                                         on_open=on_open,
-                                                                         on_message=on_message,
-                                                                         on_error=on_error,
-                                                                         on_close=on_close)
-
-        cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
-
         while loadsimulator.g.started:
+            loadsimulator.g.simulate_websockets[id] = websocket.WebSocketApp(url,
+                                                                            header={header_UserAgent},
+                                                                            on_open=on_open,
+                                                                            on_message=on_message,
+                                                                            on_error=on_error,
+                                                                            on_close=on_close)
+
+            cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
+
             loadsimulator.g.simulate_websockets[id].run_forever(sslopt={"cert_reqs": cert_required},
                                                                 ping_interval=25, ping_timeout=20)
             retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-            fwglobals.log.info("retry connection in %d seconds" % retry_sec)
+            fwglobals.log.info("websocket_thread %d: retry connection in %d seconds" % (id, retry_sec))
             time.sleep(retry_sec)
 
     def connect(self):
@@ -397,6 +403,8 @@ class Fwagent:
 
         :returns: None.
         """
+        self._clean_connection_failure()
+
         if loadsimulator.g.enabled():
             loadsimulator.g.simulate_event.set()
 
@@ -751,8 +759,7 @@ class FwagentDaemon(object):
         if check_system and fwglobals.g.router_api.router_started:
             check_system = False    # No need to check system if VPP runs, it is too late :)
         if check_system and self._check_system() == False:
-            fwglobals.log.excep("FwagentDaemon: system checker failed, stop")
-            return
+            fwglobals.log.excep("FwagentDaemon: system checker failed")
 
         if start_vpp:
             try:
@@ -854,24 +861,23 @@ class FwagentDaemon(object):
             if not connected:
                 # If connection was closed by management because of not approved device,
                 # retry the connection in few seconds.
-                # Otherwise - stop connection loop to prevent DDoS attack on server.
-                # Once we stop the loop, the agent doesn't try to communicate with
-                # manager anymore. To get out of this state the 'reset' or 'start' command
-                # should be invoked, effectively causing agent restart - new registration
-                # and connection loops.
-                # Alternatively the service can be restarted by systemctl.
-                if self.active and \
-                   self.agent.connection_error_code in fwglobals.g.ws_reconnect_status_codes:
+                # Otherwise - retry connection in few minutes to prevent DDoS attack on server.
+                if self.active:
+                    # If immediate reconnect was requested, don't sleep
                     if self.agent.should_reconnect:
                         self.agent.should_reconnect = False
                         continue
-                    retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                    # Get reconnect interval
+                    if self.agent.connection_error_code in fwglobals.g.ws_reconnect_status_codes:
+                        min_max = (fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                    else:
+                        min_max = (fwglobals.g.RETRY_INTERVAL_LONG_MIN, fwglobals.g.RETRY_INTERVAL_LONG_MAX)
+                    retry_sec = random.randint(min_max[0], min_max[1])
+                    # Go and sleep
                     fwglobals.log.info("retry connection in %d seconds" % retry_sec)
                     while retry_sec > 0 and self.active:
                         time.sleep(1)   # Check self.active every second to detect Ctrl-C as soon as possible
                         retry_sec -= 1
-                else:
-                    self.active = False
 
         fwglobals.log.info("connection loop was stopped, use 'fwagent start' to start it again")
 
