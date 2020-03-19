@@ -25,7 +25,6 @@ import os
 import re
 import time
 import fwutils
-from collections import defaultdict
 
 import fwglobals
 
@@ -42,16 +41,44 @@ class FwApps:
         """Constructor method.
         """
         def tree(): return defaultdict(tree)
-        self.apps_map = tree()
+        self.app_2_acl = {}
+        self.categories = {}
+        self.subcategories = {}
+        self.importances = {}
 
     def _add_app_db(self, name, acl_id, category, subcategory, importance):
-        self.apps_map[category][subcategory][importance][name] = {'acl_id': acl_id}
+        self.app_2_acl[name] = acl_id
+
+        if category:
+            if category not in self.categories:
+                self.categories[category] = set()
+            self.categories[category].add(acl_id)
+
+        if subcategory:
+            if subcategory not in self.subcategories:
+                self.subcategories[subcategory] = set()
+            self.subcategories[subcategory].add(acl_id)
+
+        if importance:
+            if importance not in self.importances:
+                self.importances[importance] = set()
+            self.importances[importance].add(acl_id)
 
     def _remove_app_db(self, name, category, subcategory, importance):
-        del self.apps_map[category][subcategory][importance][name]
+        acl_id = self.app_2_acl[name]
+        del self.app_2_acl[name]
 
-    def _get_acl_id(self, name, category, subcategory, importance):
-        return self.apps_map[category][subcategory][importance][name]['acl_id']
+        if category:
+            self.categories[category].remove(acl_id)
+
+        if subcategory:
+            self.subcategories[subcategory].remove(acl_id)
+
+        if importance:
+            self.importances[importance].remove(acl_id)
+
+    def _get_acl_id(self, name):
+        return self.app_2_acl[name]
 
     def _create_rule(self, is_ipv6=0, is_permit=0, proto=0,
                      sport_from=0, sport_to=65535,
@@ -152,9 +179,9 @@ class FwApps:
         :returns: Reply.
         """
         name = params['app']
-        category = params.get('category', '')
-        subcategory = params.get('subcategory', '')
-        importance = params.get('importance', '')
+        category = params.get('category', None)
+        subcategory = params.get('subcategory', None)
+        importance = params.get('importance', None)
 
         cmd_list = []
         cmd_cache = {}
@@ -178,10 +205,10 @@ class FwApps:
         :returns: Reply.
         """
         name = params['app']
-        category = params.get('category', '')
-        subcategory = params.get('subcategory', '')
-        importance = params.get('importance', '')
-        acl_id = self._get_acl_id(name, category, subcategory, importance)
+        category = params.get('category', None)
+        subcategory = params.get('subcategory', None)
+        importance = params.get('importance', None)
+        acl_id = self._get_acl_id(name)
         cmd_list = []
 
         fwglobals.g.policy_api.remove_policy(acl_id)
@@ -194,42 +221,6 @@ class FwApps:
         reply = {'ok': 1}
         return reply
 
-    def _priority_iterate(self, category, subcategory, importance, acl_id_list):
-        """Get ACL id.
-
-        :param category: Application category.
-        :param subcategory: Application subcategory.
-        :param importance: Application importance.
-        :param acl_id_list: ACL id list.
-
-        :returns: None.
-        """
-        for app in self.apps_map[category][subcategory][importance].values():
-            acl_id_list.append(app['acl_id'])
-
-    def _subcategory_iterate(self, category, subcategory, acl_id_list):
-        """Get ACL id.
-
-        :param category: Application category.
-        :param subcategory: Application subcategory.
-        :param acl_id_list: ACL id list.
-
-        :returns: None.
-        """
-        for importance in self.apps_map[category][subcategory].keys():
-            self._priority_iterate(category, subcategory, importance, acl_id_list)
-
-    def _category_iterate(self, category, acl_id_list):
-        """Get ACL id.
-
-        :param category: Application category.
-        :param acl_id_list: ACL id list.
-
-        :returns: None.
-        """
-        for subcategory in self.apps_map[category].keys():
-            self._subcategory_iterate(category, subcategory, acl_id_list)
-
     def acl_id_list_get(self, name, category, subcategory, importance):
         """Get ACL id.
 
@@ -238,20 +229,24 @@ class FwApps:
         :param subcategory: Application subcategory.
         :param importance: Application importance.
 
-        :returns: ACL id.
+        :returns: ACL ids list.
         """
-        acl_id_list = []
+        acl_ids = set()
+        sets = []
 
-        if not name:
-            if importance < 0:
-                if not subcategory:
-                    self._category_iterate(category, acl_id_list)
-                else:
-                    self._subcategory_iterate(category, subcategory, acl_id_list)
-            else:
-                self._priority_iterate(category, subcategory, importance, acl_id_list)
+        if name:
+            acl_ids.add(self._get_acl_id(name))
         else:
-            acl_id_list.append(self.apps_map[category]
-                               [subcategory][importance][name]['acl_id'])
+            if category and category in self.categories:
+                sets.append(self.categories[category])
 
-        return acl_id_list
+            if subcategory and subcategory in self.subcategories:
+                sets.append(self.subcategories[subcategory])
+
+            if importance and importance in self.importances:
+                sets.append(self.importances[importance])
+
+        if sets:
+            acl_ids = set.intersection(*sets)
+
+        return list(acl_ids)

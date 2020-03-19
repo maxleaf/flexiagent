@@ -243,8 +243,8 @@ class FwPolicies:
         for cmd in cmd_list:
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])
 
-    def _translate(self, app, category, subcategory, priority, pci, next_hop, cmd_list):
-        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, priority)
+    def _translate(self, app, category, subcategory, importance, pci, next_hop, cmd_list):
+        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, importance)
         sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
         priority = 0
         is_ipv6 = 0
@@ -267,17 +267,19 @@ class FwPolicies:
 
         :returns: Dictionary with information and status code.
         """
-        app = params['app']
-        category = params['category']
-        subcategory = params['subcategory']
-        priority = params['priority']
+        app = params.get('app', None)
+        category = params.get('category', None)
+        subcategory = params.get('subcategory', None)
+        importance = params.get('importance', None)
+
         pci = params['pci']
-        next_hop = params['next_hop']
+        next_hop, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
+
         cmd_list = []
 
         self._save_policy_info(params)
 
-        self._translate(app, category, subcategory, priority, pci, next_hop, cmd_list)
+        self._translate(app, category, subcategory, importance, pci, next_hop, cmd_list)
 
         for cmd in cmd_list:
             fwglobals.g.handle_request(cmd['cmd']['name'], cmd['cmd']['params'])
@@ -292,12 +294,12 @@ class FwPolicies:
 
         :returns: Dictionary with information and status code.
         """
-        app = params['app']
-        category = params['category']
-        subcategory = params['subcategory']
-        priority = params['priority']
+        app = params.get('app', None)
+        category = params.get('category', None)
+        subcategory = params.get('subcategory', None)
+        importance = params.get('importance', None)
 
-        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category,subcategory, priority)
+        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, importance)
         for acl_id in acl_id_list:
             self.remove_policy(acl_id)
 

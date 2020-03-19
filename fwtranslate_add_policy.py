@@ -53,31 +53,14 @@ def add_policy(params):
     """
     cmd_list = []
 
-    app = params.get('app', '')
-    category = params.get('category', '')
-    subcategory = params.get('subcategory', '')
-    priority = params.get('priority', -1)
-
-    ip_bytes, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
-
-    cmd_params = {
-            'id': params['id'],
-            'app': app,
-            'category': category,
-            'subcategory': subcategory,
-            'priority': priority,
-            'pci': params['pci'],
-            'next_hop': ip_bytes
-    }
-
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "add-policy-info"
-    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['params']        = params
     cmd['cmd']['descr']         = "Add policy %d" % (params['id'])
     cmd['revert'] = {}
     cmd['revert']['name']       = 'remove-policy-info'
-    cmd['revert']['params']     = cmd_params
+    cmd['revert']['params']     = params
     cmd['revert']['descr']      = "Delete policy %d" % (params['id'])
     cmd_list.append(cmd)
 
