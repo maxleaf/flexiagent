@@ -68,6 +68,8 @@ request_handlers = {
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
     'modify-device':                '_call_router_api',
+    'add-dhcp-config':              '_call_router_api',
+    'remove-dhcp-config':           '_call_router_api',
 
 
 
@@ -187,6 +189,8 @@ class Fwglobals:
         self.VPP_CONFIG_FILE_BACKUP = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
+        self.DHCPD_CONFIG_FILE = '/etc/dhcp/dhcpd.conf'
+        self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090

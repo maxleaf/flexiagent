@@ -683,6 +683,8 @@ def reset_router_config():
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
 
+    reset_dhcpd()
+
 def get_router_state():
     """Check if VPP is running.
 
@@ -731,6 +733,10 @@ def get_router_config(full=False):
         for key in db_requests.db:
             if re.match('add-tunnel', key):
                 cfg.append(_dump_config_request(db_requests, key, full))
+        # Dump dhcp configuration
+        for key in db_requests.db:
+            if re.match('add-dhcp-config', key):
+                cfg.append(_dump_config_request(db_requests, key, full))
         return cfg if len(cfg) > 0 else None
 
 def print_router_config(full=False):
@@ -775,6 +781,14 @@ def print_router_config(full=False):
             if re.match('add-tunnel', key):
                 if not head_line_printed:
                     print("=========== TUNNELS ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
+
+        head_line_printed = False
+        for key in db_requests.db:
+            if re.match('add-dhcp-config', key):
+                if not head_line_printed:
+                    print("=========== DHCP CONFIG ==========")
                     head_line_printed = True
                 _print_config_request(db_requests, key, full)
 
@@ -1077,3 +1091,101 @@ def vpp_startup_conf_remove_nat(params):
         del config['nat']
     fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def _get_interface_address(pci):
+    """ Get interface ip address from commands DB.
+    """
+    for key, request in fwglobals.g.router_api.db_requests.db.items():
+
+        if not re.search('add-interface', key):
+            continue
+        if request['params']['pci'] != pci:
+            continue
+        addr = request['params']['addr']
+        return addr
+
+    return None
+
+def reset_dhcpd():
+    if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
+
+    cmd = 'sudo systemctl stop isc-dhcp-server'
+
+    try:
+        output = subprocess.check_output(cmd, shell=True)
+    except:
+        return False
+
+    return True
+
+def modify_dhcpd(params):
+    """Modify /etc/dhcp/dhcpd configuration file.
+
+    :param params:   Parameters from flexiManage.
+
+    :returns: String with sed commands.
+    """
+    pci = params['params']['interface']
+    range_start = params['params'].get('range_start', '')
+    range_end = params['params'].get('range_end', '')
+    dns = params['params'].get('dns', {})
+    mac_assign = params['params'].get('mac_assign', {})
+    is_add = params['params']['is_add']
+
+    address = IPNetwork(_get_interface_address(pci))
+    router = str(address.ip)
+    subnet = str(address.network)
+    netmask = str(address.netmask)
+
+    if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+
+    config_file = fwglobals.g.DHCPD_CONFIG_FILE
+
+    remove_string = 'sudo sed -e "/subnet %s netmask %s {/,/}/d" ' \
+                    '-i %s; ' % (subnet, netmask, config_file)
+
+    range_string = ''
+    if range_start:
+        range_string = 'range %s %s;\n' % (range_start, range_end)
+
+    if dns:
+        dns_string = 'option domain-name-servers'
+        for d in dns[:-1]:
+            dns_string += ' %s,' % d
+        dns_string += ' %s;\n' % dns[-1]
+    else:
+        dns_string = ''
+
+    subnet_string = 'subnet %s netmask %s' % (subnet, netmask)
+    routers_string = 'option routers %s;\n' % (router)
+    dhcp_string = 'echo "' + subnet_string + ' {\n' + range_string + \
+                 routers_string + dns_string + '}"' + ' | sudo tee -a %s;' % config_file
+
+    if is_add == 1:
+        exec_string = remove_string + dhcp_string
+    else:
+        exec_string = remove_string
+
+    for mac in mac_assign:
+        remove_string_2 = 'sudo sed -e "/host %s {/,/}/d" ' \
+                          '-i %s; ' % (mac['host'], config_file)
+
+        host_string = 'host %s {\n' % (mac['host'])
+        ethernet_string = 'hardware ethernet %s;\n' % (mac['mac'])
+        ip_address_string = 'fixed-address %s;\n' % (mac['ipv4'])
+        mac_assign_string = 'echo "' + host_string + ethernet_string + ip_address_string + \
+                            '}"' + ' | sudo tee -a %s;' % config_file
+
+        if is_add == 1:
+            exec_string += remove_string_2 + mac_assign_string
+        else:
+            exec_string += remove_string_2
+
+    try:
+        output = subprocess.check_output(exec_string, shell=True)
+    except:
+        return (False, None)
+
+    return (True, None)
