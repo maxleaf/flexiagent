@@ -288,6 +288,15 @@ class FWROUTER_API:
             addr = request['params']['loopback-iface']['addr']
             fwtunnel_stats.tunnel_stats_add(id, addr)
 
+    def _need_to_translate(self, req):
+        if re.search('-app',  req):
+            return False
+
+        if re.search('-policy',  req):
+            return False
+
+        return True
+
     def _call_simple(self, req, params):
         """Execute request.
 
@@ -316,7 +325,10 @@ class FWROUTER_API:
             raise Exception("device failed, can't fulfill requests")
 
         # Translate request to list of commands to be executed
-        (cmd_list , req_key , complement) = self._translate(req, params)
+        if self._need_to_translate(req):
+            (cmd_list , req_key , complement) = self._translate(req, params)
+        else:
+            (cmd_list, req_key, complement) = self._translate(req, params, False)
 
         # Execute commands only if vpp runs.
         # Some 'remove-XXX' requests must be executed
@@ -341,7 +353,7 @@ class FWROUTER_API:
         return {'ok':1}
 
 
-    def _translate(self, req, params=None):
+    def _translate(self, req, params=None, get_cmd_list=True):
         """Translate request in a series of commands.
 
         :param req:         Request name.
@@ -349,6 +361,7 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
+        cmd_list = []
         api_defs = fwrouter_translators.get(req)
         assert api_defs, 'FWROUTER_API: there is no api for request "' + req + '"'
 
@@ -362,7 +375,8 @@ class FWROUTER_API:
         if fwrouter_translators[req]['api'] == 'revert':
             try:
                 src_req_key = self._extract_request_key(req, params)
-                cmd_list = func(src_req_key)
+                if get_cmd_list:
+                    cmd_list = func(src_req_key)
                 return (cmd_list , src_req_key , True)   # True stands for reverting requests, like stop-router, remove-tunnel, etc.
             except KeyError as e:
                 pass
@@ -370,13 +384,14 @@ class FWROUTER_API:
         # Handle all the rest but revert requests
         request_key_func = getattr(module, fwrouter_translators[req]['key_func'])
         if params:
-            cmd_list    = func(params)
+            if get_cmd_list:
+                cmd_list    = func(params)
             request_key = request_key_func(params)
         else:
-            cmd_list    = func()
+            if get_cmd_list:
+                cmd_list    = func()
             request_key = request_key_func()
         return (cmd_list, request_key, False)     # False stands for initiating requests, like start-router, add-tunnel, etc.
-
 
     def _execute(self, req, req_key, cmd_list, filter=None):
         """Execute request.
