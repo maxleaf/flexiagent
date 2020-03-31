@@ -56,9 +56,6 @@ class FwPolicies:
             raise Exception("fwpolicy_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
         return reply
 
-    def refresh_policies(self):
-        pass
-
     def _add_policy_info(self, params):
         """Save policy information.
 

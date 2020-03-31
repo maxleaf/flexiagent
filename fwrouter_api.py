@@ -288,6 +288,17 @@ class FWROUTER_API:
             addr = request['params']['loopback-iface']['addr']
             fwtunnel_stats.tunnel_stats_add(id, addr)
 
+    def refresh_policies(self):
+        params = dict()
+        params['modify_policy'] = {}
+        params['modify_policy']['policies'] = []
+
+        for key, request in self.db_requests.db.items():
+            if re.search('add-policy', key):
+                params['modify_policy']['policies'].append(request['params'])
+
+        self.call('modify-device', params)
+
     def _need_to_translate(self, req):
         if re.search('-app',  req):
             return False

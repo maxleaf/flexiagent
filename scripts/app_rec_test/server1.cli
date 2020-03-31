@@ -86,7 +86,7 @@
       "message": "add-policy",
       "params": [{
             "id":1,
-            "importance":"3",
+            "category":"network",
             "pci": "0000:00:08.00",
             "route": 
             {
