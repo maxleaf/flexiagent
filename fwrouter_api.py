@@ -33,6 +33,7 @@ import fwglobals
 import fwutils
 
 from fwdb_requests import FwDbRequests
+from fwapplications_api import FwApps
 from vpp_api import VPP_API
 
 import fwtunnel_stats
@@ -156,6 +157,9 @@ class FWROUTER_API:
         # Now start router.
         fwglobals.log.info("===restore vpp: started===")
         try:
+            with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
+                db_app_rec.clean()
+
             fwglobals.g.handle_request('start-router', None)
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))

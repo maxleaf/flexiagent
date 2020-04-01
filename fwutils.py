@@ -29,6 +29,7 @@ import subprocess
 import psutil
 import socket
 import re
+import fwapplications_api
 import fwdb_requests
 import fwglobals
 import fwstats
@@ -42,6 +43,7 @@ sys.path.append(common_tools)
 import fwtool_vpp_startupconf_dict
 
 from fwdb_requests import FwDbRequests
+from fwapplications_api import FwApps
 
 dpdk = __import__('dpdk-devbind')
 
@@ -682,6 +684,8 @@ def reset_router_config():
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
+    with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
+        db_app_rec.clean()
 
 def get_router_state():
     """Check if VPP is running.

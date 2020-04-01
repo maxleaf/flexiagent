@@ -21,12 +21,14 @@
 ################################################################################
 
 import ctypes
+import fwglobals
+import fwutils
+import json
 import os
 import re
+from sqlitedict import SqliteDict
 import time
-import fwutils
 
-import fwglobals
 
 fwapps_api = {
     'add-app-info':         '_add_app_info',
@@ -37,45 +39,83 @@ class FwApps:
     """Applications class representation.
     """
 
-    def __init__(self):
+    def __init__(self, db_file):
         """Constructor method.
         """
-        def tree(): return defaultdict(tree)
-        self.app_2_acl = {}
-        self.categories = {}
-        self.subcategories = {}
-        self.importances = {}
+        self.db_filename = db_file
+        self.app_2_acl = SqliteDict(db_file, 'app_2_acl', autocommit=True)
+        self.categories = SqliteDict(db_file, 'categories', autocommit=True)
+        self.subcategories = SqliteDict(db_file, 'subcategories', autocommit=True)
+        self.importances = SqliteDict(db_file, 'importances', autocommit=True)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # The three arguments to `__exit__` describe the exception
+        # caused the `with` statement execution to fail. If the `with`
+        # statement finishes without an exception being raised, these
+        # arguments will be `None`.
+        self.finalize()
+
+    def finalize(self):
+        """Destructor method
+        """
+        self.app_2_acl.close()
+        self.categories.close()
+        self.subcategories.close()
+        self.importances.close()
+
+    def clean(self):
+        """Clean DB
+
+        :returns: None.
+        """
+        self.app_2_acl.clear()
+        self.categories.clear()
+        self.subcategories.clear()
+        self.importances.clear()
+
+    def _add_acl_id(self, dict, key, acl_id):
+        if key not in dict:
+            dict[key] = '{}'
+
+        json_dict = json.loads(dict[key])
+        json_dict[acl_id] = acl_id
+        dict[key] = json.dumps(json_dict)
+
+    def _remove_acl_id(self, dict, key, acl_id):
+        json_dict = json.loads(dict[key])
+        del json_dict[acl_id]
+        dict[key] = json.dumps(json_dict)
+
+    def _get_acl_ids(self, dict, key):
+        return set(json.loads(dict[key]).values())
 
     def _add_app_db(self, name, acl_id, category, subcategory, importance):
         self.app_2_acl[name] = acl_id
 
         if category:
-            if category not in self.categories:
-                self.categories[category] = set()
-            self.categories[category].add(acl_id)
+            self._add_acl_id(self.categories, category, acl_id)
 
         if subcategory:
-            if subcategory not in self.subcategories:
-                self.subcategories[subcategory] = set()
-            self.subcategories[subcategory].add(acl_id)
+            self._add_acl_id(self.subcategories, subcategory, acl_id)
 
         if importance:
-            if importance not in self.importances:
-                self.importances[importance] = set()
-            self.importances[importance].add(acl_id)
+            self._add_acl_id(self.importances, importance, acl_id)
 
     def _remove_app_db(self, name, category, subcategory, importance):
         acl_id = self.app_2_acl[name]
         del self.app_2_acl[name]
 
         if category:
-            self.categories[category].remove(acl_id)
+            self._remove_acl_id(self.categories, category, acl_id)
 
         if subcategory:
-            self.subcategories[subcategory].remove(acl_id)
+            self._remove_acl_id(self.subcategories, subcategory, acl_id)
 
         if importance:
-            self.importances[importance].remove(acl_id)
+            self._remove_acl_id(self.importances, importance, acl_id)
 
     def _get_acl_id(self, name):
         return self.app_2_acl[name]
@@ -154,13 +194,13 @@ class FwApps:
             acl_ids.add(self._get_acl_id(name))
         else:
             if category and category in self.categories:
-                sets.append(self.categories[category])
+                sets.append(self._get_acl_ids(self.categories, category))
 
             if subcategory and subcategory in self.subcategories:
-                sets.append(self.subcategories[subcategory])
+                sets.append(self._get_acl_ids(self.subcategories, subcategory))
 
             if importance and importance in self.importances:
-                sets.append(self.importances[importance])
+                sets.append(self._get_acl_ids(self.importances, importance))
 
         if sets:
             acl_ids = set.intersection(*sets)
