@@ -57,15 +57,20 @@ def add_route(params):
      """
     cmd_list = []
 
+    metric = params.get('metric', None)
+    metric_str = ''
+    if metric:
+        metric_str = ' metric %s' % metric
+
     if params['addr'] != 'default':
         if not 'pci' in params:
-            add_cmd = [ "sudo ip route add %s via %s" % (params['addr'], params['via']) ]
-            del_cmd = [ "sudo ip route del %s via %s" % (params['addr'], params['via']) ]
+            add_cmd = [ "sudo ip route add %s via %s%s" % (params['addr'], params['via'], metric_str) ]
+            del_cmd = [ "sudo ip route del %s via %s%s" % (params['addr'], params['via'], metric_str) ]
         else:
             add_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                        "sudo ip route add %s via %s dev DEV-STUB" % (params['addr'], params['via']) ]
+                        "sudo ip route add %s via %s dev DEV-STUB%s" % (params['addr'], params['via'], metric_str) ]
             del_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                        "sudo ip route del %s via %s dev DEV-STUB" % (params['addr'], params['via']) ]
+                        "sudo ip route del %s via %s dev DEV-STUB%s" % (params['addr'], params['via'], metric_str) ]
     else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
         (old_ip, old_dev) = fwutils.get_default_route()
         old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
