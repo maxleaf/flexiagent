@@ -1,5 +1,15 @@
 [
 {
+      "entity":  "agent",
+      "message": "add-dhcp-config",
+      "params": {
+          "interface": "0000:00:08.00",
+          "range_start": "20.20.20.2",
+          "range_end": "20.20.20.255",
+          "dns": ["8.8.8.8", "8.8.8.4"]
+       }
+},
+{
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
