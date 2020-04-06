@@ -92,27 +92,27 @@ class FwApps:
     def _get_acl_ids(self, dict, key):
         return set(json.loads(dict[key]).values())
 
-    def _add_app_db(self, name, acl_id, category, subcategory, importance):
+    def _add_app_db(self, name, acl_id, category, serviceClass, importance):
         self.app_2_acl[name] = acl_id
 
         if category:
             self._add_acl_id(self.categories, category, acl_id)
 
-        if subcategory:
-            self._add_acl_id(self.subcategories, subcategory, acl_id)
+        if serviceClass:
+            self._add_acl_id(self.subcategories, serviceClass, acl_id)
 
         if importance:
             self._add_acl_id(self.importances, importance, acl_id)
 
-    def _remove_app_db(self, name, category, subcategory, importance):
+    def _remove_app_db(self, name, category, serviceClass, importance):
         acl_id = self.app_2_acl[name]
         del self.app_2_acl[name]
 
         if category:
             self._remove_acl_id(self.categories, category, acl_id)
 
-        if subcategory:
-            self._remove_acl_id(self.subcategories, subcategory, acl_id)
+        if serviceClass:
+            self._remove_acl_id(self.subcategories, serviceClass, acl_id)
 
         if importance:
             self._remove_acl_id(self.importances, importance, acl_id)
@@ -149,10 +149,10 @@ class FwApps:
         name = params['app']
         acl_id = params['acl_index']
         category = params.get('category', None)
-        subcategory = params.get('subcategory', None)
+        serviceClass = params.get('serviceClass', None)
         importance = params.get('importance', None)
 
-        self._add_app_db(name, acl_id, category, subcategory, importance)
+        self._add_app_db(name, acl_id, category, serviceClass, importance)
         fwglobals.g.router_api.refresh_policies()
 
         reply = {'ok': 1}
@@ -168,21 +168,21 @@ class FwApps:
         name = params['app']
         acl_id = params['acl_index']
         category = params.get('category', None)
-        subcategory = params.get('subcategory', None)
+        serviceClass = params.get('serviceClass', None)
         importance = params.get('importance', None)
 
         fwglobals.g.policy_api.remove_policy(acl_id)
-        self._remove_app_db(name, category, subcategory, importance)
+        self._remove_app_db(name, category, serviceClass, importance)
 
         reply = {'ok': 1}
         return reply
 
-    def acl_id_list_get(self, name, category, subcategory, importance):
+    def acl_id_list_get(self, name, category, serviceClass, importance):
         """Get ACL id.
 
         :param name: Application name.
         :param category: Application category.
-        :param subcategory: Application subcategory.
+        :param serviceClass: Application serviceClass.
         :param importance: Application importance.
 
         :returns: ACL ids list.
@@ -196,8 +196,8 @@ class FwApps:
             if category and category in self.categories:
                 sets.append(self._get_acl_ids(self.categories, category))
 
-            if subcategory and subcategory in self.subcategories:
-                sets.append(self._get_acl_ids(self.subcategories, subcategory))
+            if serviceClass and serviceClass in self.subcategories:
+                sets.append(self._get_acl_ids(self.subcategories, serviceClass))
 
             if importance and importance in self.importances:
                 sets.append(self._get_acl_ids(self.importances, importance))

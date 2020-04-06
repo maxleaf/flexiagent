@@ -39,7 +39,7 @@ import fwutils
 #            "app":"google-dns",
 #            "id":1,
 #            "category":"network",
-#            "subcategory":"dns",
+#            "serviceClass":"dns",
 #            "priority":3,
 #            "rules":[{
 #              "ip":"8.8.8.8",

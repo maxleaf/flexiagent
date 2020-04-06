@@ -68,7 +68,7 @@
            "port-range-low":0,
            "port-range-high":65535,
            "category":"network",
-           "subcategory":"dns",
+           "serviceClass":"dns",
            "priority":"3"
            }
 },
@@ -79,7 +79,7 @@
             "_id":378987465,
             "app":"none",
             "category":"network",
-            "subcategory":"none",
+            "serviceClass":"none",
             "policy":"redirect",
             "pci": "0000:00:08.00",
             "route": 

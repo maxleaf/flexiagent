@@ -191,11 +191,11 @@ def add_policy(params):
     pci = params.get('pci', None)
     app = params.get('app', None)
     category = params.get('category', None)
-    subcategory = params.get('subcategory', None)
+    serviceClass = params.get('serviceClass', None)
     importance = params.get('importance', None)
     next_hop, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
 
-    acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, subcategory, importance)
+    acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, serviceClass, importance)
     sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
 
     for acl_id in acl_id_list:

@@ -47,7 +47,7 @@
            "app":"google-dns",
            "id":1,
            "category":"network",
-           "subcategory":"dns",
+           "serviceClass":"dns",
            "importance":"3",
            "rules":[{
              "proto": 17,
@@ -72,7 +72,7 @@
                 "app":"google-dns",
                 "id":1,
                 "category":"network",
-                "subcategory":"dns",
+                "serviceClass":"dns",
                 "importance":"3",
                 "rules":[{
                   "proto": 17,
@@ -111,7 +111,7 @@
            "app":"yahoo-dns",
            "id":2,
            "category":"network",
-           "subcategory":"dns",
+           "serviceClass":"dns",
            "importance":"2",
            "rules":[{
              "proto": 17,
