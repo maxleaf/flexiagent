@@ -52,13 +52,11 @@
            "rules":[{
              "protocol": 17,
              "ip":"8.8.8.8/32",
-             "port-range-low":53,
-             "port-range-high":53},
+             "ports":"53-54"},
              {
              "protocol": 17,
              "ip":"8.8.4.4/32",
-             "port-range-low":53,
-             "port-range-high":53}]
+             "ports":"53-54"}]
            }]
 },
 {
@@ -75,13 +73,11 @@
                 "rules":[{
                   "protocol": 17,
                   "ip":"7.7.7.7/32",
-                  "port-range-low":53,
-                  "port-range-high":53},
+                  "ports":"53-54"},
                 {
                   "protocol": 17,
                   "ip":"7.7.4.4/32",
-                  "port-range-low":53,
-                  "port-range-high":53
+                  "ports":"53-54"
                 }]
               }]
             }
@@ -112,8 +108,7 @@
            "rules":[{
              "protocol": 17,
              "ip":"67.195.1.92/32",
-             "port-range-low":53,
-             "port-range-high":53}]
+             "ports":"53"}]
            }]
 },
 {

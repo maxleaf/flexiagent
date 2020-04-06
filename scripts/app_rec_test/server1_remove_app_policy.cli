@@ -17,8 +17,7 @@
   "params": {
            "app":"google-dns",
            "ip":"8.8.8.8/32",
-           "port-range-low":0,
-           "port-range-high":65535
+           "ports":"0-65535"
            }
 }
 ]

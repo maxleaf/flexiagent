@@ -64,8 +64,7 @@
            "app":"google-dns",
            "appid":1,
            "ip":"8.8.8.8/32",
-           "port-range-low":0,
-           "port-range-high":65535,
+           "ports":"0-65535",
            "category":"network",
            "serviceClass":"dns",
            "priority":"3"

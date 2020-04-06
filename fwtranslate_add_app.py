@@ -45,12 +45,11 @@ from netaddr import *
 #            "priority":3,
 #            "rules":[{
 #              "ip":"8.8.8.8/32",
-#              "port-range-low":53,
-#              "port-range-high":53},
+#              "ports":"53"
+#              },
 #              {
 #              "ip":"8.8.4.4/32",
-#              "port-range-low":53,
-#              "port-range-high":53}]
+#              "ports":"53"}]
 #            }]
 # }
 def _create_rule(is_ipv6=0, is_permit=0, proto=0,
@@ -86,9 +85,14 @@ def _add_acl(params, cmd_list, cache_key):
         ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
         ip_prefix = ip_network.prefixlen
 
+        ports = map(int, rule['ports'].split('-'))
+        dport_from = dport_to = ports[0]
+        if len(ports) > 1:
+            dport_to = ports[1]
+
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
-                                  dport_from=rule['port-range-low'],
-                                  dport_to=rule['port-range-high'],
+                                  dport_from=dport_from,
+                                  dport_to=dport_to,
                                   d_prefix=ip_prefix,
                                   proto=rule['protocol'],
                                   d_ip=ip_bytes))
