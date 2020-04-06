@@ -42,7 +42,7 @@
 },
 {
   "entity":  "agent",
-  "message": "add-app",
+  "message": "add-application",
   "params": [{
            "app":"google-dns",
            "id":1,
@@ -106,7 +106,7 @@
 },
 {
   "entity":  "agent",
-  "message": "add-app",
+  "message": "add-application",
   "params": [{
            "app":"yahoo-dns",
            "id":2,

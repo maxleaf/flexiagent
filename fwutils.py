@@ -790,7 +790,7 @@ def print_router_config(full=False):
 
         head_line_printed = False
         for key in db_requests.db:
-            if re.match('add-app', key):
+            if re.match('add-application', key):
                 if not head_line_printed:
                     print("=========== APPS ==========")
                     head_line_printed = True

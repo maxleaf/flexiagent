@@ -63,8 +63,8 @@ fwrouter_translators = {
     'remove-tunnel':       {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-tunnel'},
     'add-dhcp-config':     {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config',   'key_func':'get_request_key'},
     'remove-dhcp-config':  {'module':'fwtranslate_revert',          'api':'revert',            'src': 'add-dhcp-config'},
-    'add-app':             {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
-    'remove-app':          {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-app'},
+    'add-application':     {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
+    'remove-application':  {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
     'add-policy':          {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
     'remove-policy':       {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-policy'},
 }
@@ -870,7 +870,7 @@ class FWROUTER_API:
 
     def _create_modify_app_request(self, params):
         """'modify_app' pre-processing:
-        This command is a wrapper around the 'add-app' and 'remove-app' commands.
+        This command is a wrapper around the 'add-application' and 'remove-application' commands.
 
         :param params:          Request parameters.
 
@@ -881,9 +881,9 @@ class FWROUTER_API:
         if params:
             for app in params['apps']:
                 # Remove app only if it exists in the database
-                if self._get_request_params_from_db('remove-app', app):
-                    modify_requests.append({'remove-app': app})
-                modify_requests.append({'add-app': app})
+                if self._get_request_params_from_db('remove-application', app):
+                    modify_requests.append({'remove-application': app})
+                modify_requests.append({'add-application': app})
 
         return modify_requests
 
@@ -949,7 +949,7 @@ class FWROUTER_API:
 
             # Configure apps
             for key in self.db_requests.db:
-                if re.match('add-app', key):
+                if re.match('add-application', key):
                     self._apply_db_request(key)
 
             # Configure policies

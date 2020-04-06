@@ -29,12 +29,12 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
-# add-app
+# add-application
 # --------------------------------------
 # Translates request:
 # {
 #   "entity":  "agent",
-#   "message": "add-app",
+#   "message": "add-application",
 #   "params": [{
 #            "app":"google-dns",
 #            "id":1,
@@ -151,4 +151,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-app:%s' % params['id']
+    return 'add-application:%s' % params['id']

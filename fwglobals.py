@@ -82,8 +82,8 @@ request_handlers = {
     'modify-device':                '_call_router_api',
     'add-dhcp-config':              '_call_router_api',
     'remove-dhcp-config':           '_call_router_api',
-    'add-app':                      '_call_router_api',
-    'remove-app':                   '_call_router_api',
+    'add-application':              '_call_router_api',
+    'remove-application':           '_call_router_api',
     'add-policy':                   '_call_router_api',
     'remove-policy':                '_call_router_api',
 
