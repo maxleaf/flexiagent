@@ -87,7 +87,7 @@ def _add_acl(params, cmd_list, cache_key):
                                   dport_from=rule['port-range-low'],
                                   dport_to=rule['port-range-high'],
                                   d_prefix=rule['ip-prefix'],
-                                  proto=rule['proto'],
+                                  proto=rule['protocol'],
                                   d_ip=ip_bytes))
 
     add_params = {

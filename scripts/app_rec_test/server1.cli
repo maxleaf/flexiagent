@@ -50,13 +50,13 @@
            "serviceClass":"dns",
            "importance":"3",
            "rules":[{
-             "proto": 17,
+             "protocol": 17,
              "ip":"8.8.8.8",
              "ip-prefix":32,
              "port-range-low":53,
              "port-range-high":53},
              {
-             "proto": 17,
+             "protocol": 17,
              "ip":"8.8.4.4",
              "ip-prefix":32,
              "port-range-low":53,
@@ -75,13 +75,13 @@
                 "serviceClass":"dns",
                 "importance":"3",
                 "rules":[{
-                  "proto": 17,
+                  "protocol": 17,
                   "ip":"7.7.7.7",
                   "ip-prefix":32,
                   "port-range-low":53,
                   "port-range-high":53},
                 {
-                  "proto": 17,
+                  "protocol": 17,
                   "ip":"7.7.4.4",
                   "ip-prefix":32,
                   "port-range-low":53,
@@ -114,7 +114,7 @@
            "serviceClass":"dns",
            "importance":"2",
            "rules":[{
-             "proto": 17,
+             "protocol": 17,
              "ip":"67.195.1.92",
              "ip-prefix":32,
              "port-range-low":53,
