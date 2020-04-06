@@ -29,6 +29,8 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
+from netaddr import *
+
 # add-application
 # --------------------------------------
 # Translates request:
@@ -42,13 +44,11 @@ import fwutils
 #            "serviceClass":"dns",
 #            "priority":3,
 #            "rules":[{
-#              "ip":"8.8.8.8",
-#              "ip-prefix":32,
+#              "ip":"8.8.8.8/32",
 #              "port-range-low":53,
 #              "port-range-high":53},
 #              {
-#              "ip":"8.8.4.4",
-#              "ip-prefix":32,
+#              "ip":"8.8.4.4/32",
 #              "port-range-low":53,
 #              "port-range-high":53}]
 #            }]
@@ -81,12 +81,15 @@ def _add_acl(params, cmd_list, cache_key):
     rules = []
 
     for rule in params['rules']:
-        ip_bytes, ip_len = fwutils.ip_str_to_bytes(rule['ip'])
+        ip_network = IPNetwork(rule['ip'])
+
+        ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
+        ip_prefix = ip_network.prefixlen
 
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
                                   dport_from=rule['port-range-low'],
                                   dport_to=rule['port-range-high'],
-                                  d_prefix=rule['ip-prefix'],
+                                  d_prefix=ip_prefix,
                                   proto=rule['protocol'],
                                   d_ip=ip_bytes))
 
