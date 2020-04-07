@@ -179,23 +179,8 @@ def _add_policy_info(params, cmd_list):
 
     return cmd_list
 
-def add_policy(params):
-    """Generate commands ...
-
-     :param params:        Parameters from flexiManage.
-
-     :returns: List of commands.
-    """
-    cmd_list = []
-
-    pci = params.get('pci', None)
-    app = params.get('app', None)
-    category = params.get('category', None)
-    serviceClass = params.get('serviceClass', None)
-    importance = params.get('importance', None)
-    next_hop, ip_len = fwutils.ip_str_to_bytes(params['route']['via'])
-
-    acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, serviceClass, importance)
+def _create_policy_commands(pci, app, category, service_class, importance, next_hop, cmd_list):
+    acl_id_list = fwglobals.g.apps_api.acl_id_list_get(app, category, service_class, importance)
     sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
 
     for acl_id in acl_id_list:
@@ -206,7 +191,26 @@ def add_policy(params):
         _add_policy(app, policy_id, acl_id, next_hop, cmd_list)
         _attach_policy(sw_if_index, app, policy_id, priority, is_ipv6, cmd_list)
 
-    _add_policy_info(params, cmd_list)
+def add_policy(params):
+    """Generate commands ...
+
+     :param params:        Parameters from flexiManage.
+
+     :returns: List of commands.
+    """
+    cmd_list = []
+
+    for rule in params['rules']:
+        application = rule['classification'].get('application', None)
+        if application:
+            pci = application.get('pci', None)
+            app = application.get('app', None)
+            category = application.get('category', None)
+            service_class = application.get('serviceClass', None)
+            importance = application.get('importance', None)
+            next_hop, ip_len = fwutils.ip_str_to_bytes(application['route']['via'])
+
+            _create_policy_commands(pci, app, category, service_class, importance, next_hop, cmd_list)
 
     return cmd_list
 

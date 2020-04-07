@@ -87,14 +87,22 @@
       "entity":  "agent",
       "message": "add-policy-multi-link",
       "params": [{
-            "id":1,
-            "category":"network",
-            "pci": "0000:00:08.00",
-            "route": 
-            {
-              "via": "10.100.0.6"
+        "id":1,
+        "rules": [{
+          "id": 1,
+          "priority": 100,
+          "classification": {
+            "application": {
+              "category":"network",
+              "pci": "0000:00:08.00",
+              "route":
+              {
+                "via": "10.100.0.6"
+              }
             }
-       }]
+          }
+        }]
+      }]
 },
 {
   "entity":  "agent",
