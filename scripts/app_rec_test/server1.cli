@@ -36,7 +36,11 @@
       "addr":"10.100.0.7/31",
       "mac":"02:00:27:fd:00:04",
       "mtu":1360,
-      "routing":"ospf"
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "brown", "gray" ]
+      }
+
     }
   }
 },
@@ -130,7 +134,13 @@
 	   {
 		"pci": "0000:00:03.00",
 		"addr": "192.168.0.110/24",
-		"type":"wan"
+		"type":"wan",
+		"multilink": {
+          "labels": [
+            "green",
+            "blue",
+            "red"]
+        }
 	   },
 	   {
 		"pci": "0000:00:08.00",
