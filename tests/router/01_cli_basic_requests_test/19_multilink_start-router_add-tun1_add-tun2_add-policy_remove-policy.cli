@@ -97,7 +97,7 @@
 ,
 {
   "entity":  "agent",
-  "message": "add-policy",
+  "message": "add-policy-multi-link",
   "params": {
     "policy-id": 1,
     "rules": [
@@ -120,7 +120,7 @@
 ,
 {
   "entity":  "agent",
-  "message": "remove-policy",
+  "message": "remove-policy-multi-link",
   "params": {
     "policy-id": 1
   }

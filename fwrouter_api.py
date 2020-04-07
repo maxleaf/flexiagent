@@ -54,20 +54,20 @@ fwrouter_modules = {
 }
 
 fwrouter_translators = {
-    'start-router':        {'module':'fwtranslate_start_router',    'api':'start_router',      'key_func':'get_request_key'},
-    'stop-router':         {'module':'fwtranslate_revert',          'api':'revert',            'src':'start-router'},
-    'add-interface':       {'module':'fwtranslate_add_interface',   'api':'add_interface',     'key_func':'get_request_key'},
-    'remove-interface':    {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-interface'},
-    'add-route':           {'module':'fwtranslate_add_route',       'api':'add_route',         'key_func':'get_request_key'},
-    'remove-route':        {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-route'},
-    'add-tunnel':          {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel',        'key_func':'get_request_key'},
-    'remove-tunnel':       {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-tunnel'},
-    'add-dhcp-config':     {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config',   'key_func':'get_request_key'},
-    'remove-dhcp-config':  {'module':'fwtranslate_revert',          'api':'revert',            'src': 'add-dhcp-config'},
-    'add-application':     {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
-    'remove-application':  {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
-    'add-policy':          {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
-    'remove-policy':       {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-policy'},
+    'start-router':               {'module':'fwtranslate_start_router',    'api':'start_router',      'key_func':'get_request_key'},
+    'stop-router':                {'module':'fwtranslate_revert',          'api':'revert',            'src':'start-router'},
+    'add-interface':              {'module':'fwtranslate_add_interface',   'api':'add_interface',     'key_func':'get_request_key'},
+    'remove-interface':           {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-interface'},
+    'add-route':                  {'module':'fwtranslate_add_route',       'api':'add_route',         'key_func':'get_request_key'},
+    'remove-route':               {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-route'},
+    'add-tunnel':                 {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel',        'key_func':'get_request_key'},
+    'remove-tunnel':              {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-tunnel'},
+    'add-dhcp-config':            {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config',   'key_func':'get_request_key'},
+    'remove-dhcp-config':         {'module':'fwtranslate_revert',          'api':'revert',            'src': 'add-dhcp-config'},
+    'add-application':            {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
+    'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
+    'add-policy-multi-link':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
+    'remove-policy-multi-link':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-policy-multi-link'},
 }
 
 class FWROUTER_API:
@@ -303,7 +303,7 @@ class FWROUTER_API:
         params['modify_policy']['policies'] = []
 
         for key, request in self.db_requests.db.items():
-            if re.search('add-policy', key):
+            if re.search('add-policy-multi-link', key):
                 params['modify_policy']['policies'].append(request['params'])
 
         self.call('modify-device', params)
@@ -852,7 +852,7 @@ class FWROUTER_API:
 
     def _create_modify_policy_request(self, params):
         """'modify_policy' pre-processing:
-        This command is a wrapper around the 'add-policy' and 'remove-policy' commands.
+        This command is a wrapper around the 'add-policy-multi-link' and 'remove-policy-multi-link' commands.
 
         :param params:          Request parameters.
 
@@ -864,9 +864,9 @@ class FWROUTER_API:
         if params:
             for policy in params['policies']:
                 # Remove policy only if it exists in the database
-                if self._get_request_params_from_db('remove-policy', policy):
-                    modify_requests.append({'remove-policy': policy})
-                modify_requests.append({'add-policy': policy})
+                if self._get_request_params_from_db('remove-policy-multi-link', policy):
+                    modify_requests.append({'remove-policy-multi-link': policy})
+                modify_requests.append({'add-policy-multi-link': policy})
 
         return modify_requests
 
@@ -956,7 +956,7 @@ class FWROUTER_API:
 
             # Configure policies
             for key in self.db_requests.db:
-                if re.match('add-policy', key):
+                if re.match('add-policy-multi-link', key):
                     self._apply_db_request(key)
 
             # Configure routes

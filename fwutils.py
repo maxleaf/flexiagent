@@ -798,7 +798,7 @@ def print_router_config(full=False):
 
         head_line_printed = False
         for key in db_requests.db:
-            if re.match('add-policy', key):
+            if re.match('add-policy-multi-link', key):
                 if not head_line_printed:
                     print("=========== POLICIES ==========")
                     head_line_printed = True

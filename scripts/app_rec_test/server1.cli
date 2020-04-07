@@ -85,7 +85,7 @@
 },
 {
       "entity":  "agent",
-      "message": "add-policy",
+      "message": "add-policy-multi-link",
       "params": [{
             "id":1,
             "category":"network",
