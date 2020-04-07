@@ -203,14 +203,17 @@ def add_policy(params):
     for rule in params['rules']:
         application = rule['classification'].get('application', None)
         if application:
-            pci = application.get('pci', None)
-            app = application.get('app', None)
+            app = application.get('name', None)
             category = application.get('category', None)
             service_class = application.get('serviceClass', None)
             importance = application.get('importance', None)
-            next_hop, ip_len = fwutils.ip_str_to_bytes(application['route']['via'])
+        action = rule.get('action', None)
 
-            _create_policy_commands(pci, app, category, service_class, importance, next_hop, cmd_list)
+        if action:
+            pci = action.get('pci', None)
+            next_hop, ip_len = fwutils.ip_str_to_bytes(action['route']['via'])
+
+        _create_policy_commands(pci, app, category, service_class, importance, next_hop, cmd_list)
 
     return cmd_list
 

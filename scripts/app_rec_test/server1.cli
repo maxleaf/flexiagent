@@ -93,12 +93,14 @@
           "priority": 100,
           "classification": {
             "application": {
-              "category":"network",
-              "pci": "0000:00:08.00",
-              "route":
-              {
-                "via": "10.100.0.6"
-              }
+              "category":"network"
+            }
+          },
+          "action": {
+            "pci": "0000:00:08.00",
+            "route":
+            {
+              "via": "10.100.0.6"
             }
           }
         }]
