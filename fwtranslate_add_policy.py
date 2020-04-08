@@ -28,13 +28,13 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
-# add-policy-multi-link
+# add-multilink-policy
 # --------------------------------------
 # Translates request:
 #
 # {
 #      "entity":  "agent",
-#      "message": "add-policy-multi-link",
+#      "message": "add-multilink-policy",
 #      "params": {
 #             "app":"google-dns",
 #             "pci": "0000:00:08.00",
@@ -224,4 +224,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-policy-multi-link:%s' % params['id']
+    return 'add-multilink-policy:%s' % params['id']

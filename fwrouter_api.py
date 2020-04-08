@@ -66,8 +66,8 @@ fwrouter_translators = {
     'remove-dhcp-config':         {'module':'fwtranslate_revert',          'api':'revert',            'src': 'add-dhcp-config'},
     'add-application':            {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
     'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
-    'add-policy-multi-link':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
-    'remove-policy-multi-link':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-policy-multi-link'},
+    'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
+    'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
 }
 
 class FWROUTER_API:
@@ -303,7 +303,7 @@ class FWROUTER_API:
         params['modify_policy']['policies'] = []
 
         for key, request in self.db_requests.db.items():
-            if re.search('add-policy-multi-link', key):
+            if re.search('add-multilink-policy', key):
                 params['modify_policy']['policies'].append(request['params'])
 
         self.call('modify-device', params)
@@ -852,7 +852,7 @@ class FWROUTER_API:
 
     def _create_modify_policy_request(self, params):
         """'modify_policy' pre-processing:
-        This command is a wrapper around the 'add-policy-multi-link' and 'remove-policy-multi-link' commands.
+        This command is a wrapper around the 'add-multilink-policy' and 'remove-multilink-policy' commands.
 
         :param params:          Request parameters.
 
@@ -864,9 +864,9 @@ class FWROUTER_API:
         if params:
             for policy in params['policies']:
                 # Remove policy only if it exists in the database
-                if self._get_request_params_from_db('remove-policy-multi-link', policy):
-                    modify_requests.append({'remove-policy-multi-link': policy})
-                modify_requests.append({'add-policy-multi-link': policy})
+                if self._get_request_params_from_db('remove-multilink-policy', policy):
+                    modify_requests.append({'remove-multilink-policy': policy})
+                modify_requests.append({'add-multilink-policy': policy})
 
         return modify_requests
 
@@ -956,7 +956,7 @@ class FWROUTER_API:
 
             # Configure policies
             for key in self.db_requests.db:
-                if re.match('add-policy-multi-link', key):
+                if re.match('add-multilink-policy', key):
                     self._apply_db_request(key)
 
             # Configure routes

@@ -72,7 +72,7 @@
 },
 {
       "entity":  "agent",
-      "message": "add-policy-multi-link",
+      "message": "add-multilink-policy",
       "params": {
             "_id":378987465,
             "app":"none",

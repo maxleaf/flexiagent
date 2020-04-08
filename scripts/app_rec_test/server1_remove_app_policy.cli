@@ -1,7 +1,7 @@
 [
 {
       "entity":  "agent",
-      "message": "remove-policy-multi-link",
+      "message": "remove-multilink-policy",
       "params": {
             "app":"google-dns",
             "pci": "0000:00:08.00",

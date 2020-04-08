@@ -84,8 +84,8 @@ request_handlers = {
     'remove-dhcp-config':           '_call_router_api',
     'add-application':              '_call_router_api',
     'remove-application':           '_call_router_api',
-    'add-policy-multi-link':        '_call_router_api',
-    'remove-policy-multi-link':     '_call_router_api',
+    'add-multilink-policy':        '_call_router_api',
+    'remove-multilink-policy':     '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s

@@ -89,7 +89,7 @@
 },
 {
       "entity":  "agent",
-      "message": "add-policy-multi-link",
+      "message": "add-multilink-policy",
       "params": [{
         "id":1,
         "rules": [{
