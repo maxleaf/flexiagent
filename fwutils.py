@@ -1220,10 +1220,11 @@ def vpp_multilink_update_labels(params):
     configure lables. Remove it, when correspondent Python API will be added.
     In last case the API should be called directly from translation.
 
-    :param params: labels - python list of labels
-                   is_dia - type of labels (DIA - Direct Internet Access)
-                   remove - True to remove labels, False to add.
-                   dev    - PCI if device to apply labels to.
+    :param params: labels      - python list of labels
+                   is_dia      - type of labels (DIA - Direct Internet Access)
+                   remove      - True to remove labels, False to add.
+                   dev         - PCI if device to apply labels to.
+                   next_hop_ip - IP address of next hop.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1238,9 +1239,11 @@ def vpp_multilink_update_labels(params):
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
 
-    op = 'clear' if params['remove'] else 'set'
+    op = 'del' if params['remove'] else 'add'
 
-    vppctl_cmd = '%s interface flexiwan label %s %s' %  (op, ids, vpp_if_name)
+    next_hop = fwglobals.g.router_api.get_label_next_hop(params['is_dia'])
+
+    vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
 
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 

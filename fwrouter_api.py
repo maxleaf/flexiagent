@@ -1111,3 +1111,11 @@ class FWROUTER_API:
             del params['substs']
         else:  # list
             params.remove(substs_element)
+
+    def get_label_next_hop(self, is_dia):
+        if is_dia:
+            for key, request in self.db_requests.db.items():
+                if re.search('add-route:default', key):
+                    return request['params']['via']
+        else:
+            return ''
