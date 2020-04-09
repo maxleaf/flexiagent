@@ -432,6 +432,21 @@ def vpp_if_name_to_tap(vpp_if_name):
     tap = match.group(1)
     return tap
 
+def vpp_sw_if_index_to_name(sw_if_index):
+    """Convert VPP sw_if_index into VPP interface name.
+
+     :param sw_if_index:      VPP sw_if_index.
+
+     :returns: VPP interface name.
+     """
+    name = ''
+
+    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
+        if sw_if_index == sw_if.sw_if_index:
+            name = sw_if.interface_name.rstrip(' \t\r\n\0')
+
+    return name
+
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
 # To do that we dump all interfaces from VPP, find the one with the provided index,
@@ -447,10 +462,7 @@ def vpp_sw_if_index_to_tap(sw_if_index):
 
      :returns: Linux TAP interface name.
      """
-    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
-        if sw_if_index == sw_if.sw_if_index:
-            tap = vpp_if_name_to_tap(sw_if.interface_name.rstrip(' \t\r\n\0'))
-            return tap
+    return vpp_if_name_to_tap(vpp_sw_if_index_to_name(sw_if_index))
 
 def save_file(txt, fname, dir='/tmp'):
     """Save txt to file under a dir (default = /tmp)
@@ -1235,13 +1247,19 @@ def vpp_multilink_update_labels(params):
     if 'dev' in params:
         vpp_if_name = pci_to_vpp_if_name(params['dev'])
     elif 'sw_if_index' in params:
-        vpp_if_name = "sw_if_index " + str(params['sw_if_index'])
+        vpp_if_name = vpp_sw_if_index_to_name(params['sw_if_index'])
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
 
     op = 'del' if params['remove'] else 'add'
 
-    next_hop = fwglobals.g.router_api.get_label_next_hop(params['is_dia'])
+    if params['is_dia']:
+        next_hop = fwglobals.g.router_api.get_default_route_address()
+    else:
+        network = IPNetwork(params['addr'])
+        for ip in network:
+            if ip.value != network.value:
+                next_hop = str(ip)
 
     vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
 
@@ -1250,6 +1268,7 @@ def vpp_multilink_update_labels(params):
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 

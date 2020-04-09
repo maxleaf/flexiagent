@@ -271,7 +271,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                         'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
                         'module': 'fwutils',
                         'func'  : 'vpp_multilink_update_labels',
-                        'args'  : { 'labels': labels, 'is_dia': False, 'remove': False }
+                        'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': False }
         }
         cmd['revert'] = {}
         cmd['revert']['name']   = "python"
@@ -280,7 +280,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                         'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
                         'module': 'fwutils',
                         'func'  : 'vpp_multilink_update_labels',
-                        'args'  : { 'labels': labels, 'is_dia': False, 'remove': True }
+                        'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': True }
         }
         cmd_list.append(cmd)
 
