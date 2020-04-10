@@ -101,11 +101,16 @@
             }
           },
           "action": {
-            "pci": "0000:00:08.00",
-            "route":
-            {
-              "via": "10.100.0.6"
-            }
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
           }
         }]
       }]

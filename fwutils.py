@@ -1241,7 +1241,8 @@ def vpp_multilink_update_labels(params):
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
-    ids_list = multilink_lables_to_ids(params)
+    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(
+        params['labels'], is_dia=params['is_dia'], remove=params['remove'])
     ids = ','.join(map(str, ids_list))
 
     if 'dev' in params:
@@ -1291,30 +1292,19 @@ def vpp_multilink_update_policy_rule(params):
     """
 
     op       = 'del' if params['remove'] else 'add'
-    rule_id  = int(params['rule']['rule-id']) | (int(params['policy-id']) << 16)
-    label_id = multilink_lables_to_ids([params['rule']['action']['link']['label']])[0]
+    rule_id  = params['rule']['id'] | params['policy-id'] << 16
 
-    vppctl_cmd = 'fwabf policy %s id %d action link label %s' %  (op, rule_id, label_id)
+    links    = params['rule']['action']['links']
+    labels   = links[0]['pathlabels']
+    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
+    ids = ','.join(map(str, ids_list))
+
+    vppctl_cmd = 'fwabf policy %s id %d action labels %s' %  (op, rule_id, ids)
 
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
-def multilink_lables_to_ids(params):
-    """Converts labels in form of strings into 2-byte integers that can be set
-    into vpp. Labels are used for Multi-Link feature: user can mark interfaces
-    or tunnels with labels and than add policy where to forward packets based on
-    these labels.
-
-    :param params: labels - python list of labels
-    :param params: is_dia - type of labels (DIA - Direct Internet Access)
-    :param params: remove - True if labels are going to be deleted.
-
-    :returns: List of label IDs.
-    """
-    ids = fwglobals.g.router_api.multilink.get_label_ids_by_names(
-                names=params['labels'], is_dia=params['is_dia'], remove=params['remove'])
-    return ids
