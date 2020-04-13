@@ -28,14 +28,11 @@ class FwMultilink:
     def __init__(self):
         self.labels = {}    # Map of label strings (aka names) into integers (aka id-s) used by VPP.
 
-    def get_label_ids_by_names(self, names, is_dia=False, remove=False):
+    def get_label_ids_by_names(self, names, remove=False):
         """Maps label names into label id-s.
-        Label ID is two bytes integer, where higher byte holds 'is_dia' flag
-        and lower byte holds the label id in range [0..255].
-        DIY stands for Direct Internet Access. It is used by VPP.
+        Label ID is two bytes integer.
 
         :param names:   list of strings that represent label names.
-        :param is_dia:  type of label, used by VPP (Direct Internet Access).
         :param remove:  True if label refCounter should be decremented and
                         label should be removed from database if no more
                         refCounter exist. False if refCounter should be incremented.
@@ -53,18 +50,14 @@ class FwMultilink:
                     self.labels[name]['refCounter'] += 1
             else:
                 new_id  = len(self.labels)
-                if new_id > 0xFF:
+                if new_id > 254:
                     raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label")
                 self.labels[name] = {}
                 self.labels[name]['id']         = new_id
-                self.labels[name]['type']       = 'dia' if is_dia else ''
                 self.labels[name]['refCounter'] = 1
                 new_id  += 1
 
-            if self.labels[name]['type'] == 'dia':
-                id = self.labels[name]['id'] | 0x100
-            else:
-                id = self.labels[name]['id']
+            id = self.labels[name]['id']
             ids.append(id)
 
         # Clean id-s with no refCounter
@@ -75,8 +68,8 @@ class FwMultilink:
 
         gc_after = len(self.labels)
 
-        fwglobals.log.debug("get_label_ids_by_names: gc=%d, input:  %s, remove=%s, is_dia=%s" % \
-                            (gc_before ,names, str(remove), str(is_dia)))
+        fwglobals.log.debug("get_label_ids_by_names: gc=%d, input:  %s, remove=%s" % \
+                            (gc_before ,names, str(remove)))
         fwglobals.log.debug("get_label_ids_by_names: gc=%d, output: %s" % \
                             (gc_after, ','.join(map(str, ids))))
         return ids

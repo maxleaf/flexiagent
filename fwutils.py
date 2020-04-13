@@ -1242,7 +1242,7 @@ def vpp_multilink_update_labels(params):
     """
 
     ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(
-        params['labels'], is_dia=params['is_dia'], remove=params['remove'])
+            params['labels'], remove=params['remove'])
     ids = ','.join(map(str, ids_list))
 
     if 'dev' in params:
