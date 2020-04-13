@@ -21,12 +21,51 @@
 ################################################################################
 
 import fwglobals
+import json
+from sqlitedict import SqliteDict
 
 class FwMultilink:
     """This is object that encapsulates data used by multi-link feature.
     """
-    def __init__(self):
-        self.labels = {}    # Map of label strings (aka names) into integers (aka id-s) used by VPP.
+    def __init__(self, db_file):
+        self.db_filename = db_file
+        # Map of label strings (aka names) into integers (aka id-s) used by VPP.
+        self.labels = SqliteDict(db_file, autocommit=True)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.finalize()
+
+    def finalize(self):
+        """Destructor method
+        """
+        self.labels.close()
+
+    def clean(self):
+        """Clean DB
+
+        :returns: None.
+        """
+        self.labels.clear()
+
+    def _add_dict_entry(self, dict_key, key, value):
+        if dict_key not in self.labels:
+            self.labels[dict_key] = '{}'
+
+        json_dict = json.loads(self.labels[dict_key])
+        json_dict[key] = value
+        self.labels[dict_key] = json.dumps(json_dict)
+
+    def _remove_dict_entry(self, dict_key, key):
+        json_dict = json.loads(self.labels[dict_key])
+        del json_dict[key]
+        self.labels[dict_key] = json.dumps(json_dict)
+
+    def _get_dict_entry(self, dict_key, key):
+        json_dict = json.loads(self.labels[dict_key])
+        return json_dict[key]
 
     def get_label_ids_by_names(self, names, remove=False):
         """Maps label names into label id-s.
@@ -44,27 +83,30 @@ class FwMultilink:
         ids = []
         for name in names:
             if name in self.labels:
+                old_value = self._get_dict_entry(name, 'refCounter')
                 if remove:
-                    self.labels[name]['refCounter'] -= 1
+                    self._add_dict_entry(name, 'refCounter', old_value - 1)
                 else:
-                    self.labels[name]['refCounter'] += 1
+                    self._add_dict_entry(name, 'refCounter', old_value + 1)
             else:
-                new_id  = len(self.labels)
+                new_id = len(self.labels)
                 if new_id > 254:
                     raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label")
-                self.labels[name] = {}
-                self.labels[name]['id']         = new_id
-                self.labels[name]['refCounter'] = 1
-                new_id  += 1
 
-            id = self.labels[name]['id']
+                self._add_dict_entry(name, 'id', new_id)
+                self._add_dict_entry(name, 'refCounter', 1)
+                new_id += 1
+
+            id = self._get_dict_entry(name, 'id')
             ids.append(id)
 
         # Clean id-s with no refCounter
         if remove:
             for name in names:
-                if name in self.labels and self.labels[name]['refCounter'] == 0:
-                    del self.labels[name]
+                if name in self.labels:
+                    ref_counter = self._get_dict_entry(name, 'refCounter')
+                    if ref_counter == 0:
+                        del self.labels[name]
 
         gc_after = len(self.labels)
 

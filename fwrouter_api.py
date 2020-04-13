@@ -82,12 +82,12 @@ class FWROUTER_API:
 
     :param request_db_file: Requests DB file name
     """
-    def __init__(self, request_db_file):
+    def __init__(self, request_db_file, multilink_db_file):
         """Constructor method
         """
         self.vpp_api         = VPP_API()
         self.db_requests     = FwDbRequests(request_db_file)    # Database of executed requests
-        self.multilink       = FwMultilink()
+        self.multilink       = FwMultilink(multilink_db_file)
         self.router_started  = False
         self.router_failure  = False
         self.thread_watchdog = None
@@ -164,6 +164,8 @@ class FWROUTER_API:
         try:
             with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
                 db_app_rec.clean()
+            with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
+                db_multilink.clean()
 
             fwglobals.g.handle_request('start-router', None)
         except Exception as e:

@@ -209,6 +209,7 @@ class Fwglobals:
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.DHCPD_CONFIG_FILE = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE = self.DATA_PATH + '.app_rec.sqlite'
+        self.MULTILINK_DB_FILE = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
@@ -255,7 +256,7 @@ class Fwglobals:
         :returns: None.
         """
         self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE)
+        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
         self.apps_api   = FwApps(self.APP_REC_DB_FILE)
         self.policy_api = FwPolicies()

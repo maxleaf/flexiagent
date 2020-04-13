@@ -44,6 +44,8 @@ import fwtool_vpp_startupconf_dict
 
 from fwdb_requests import FwDbRequests
 from fwapplications_api import FwApps
+from fwmultilink import FwMultilink
+
 
 dpdk = __import__('dpdk-devbind')
 
@@ -698,6 +700,8 @@ def reset_router_config():
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
     with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
         db_app_rec.clean()
+    with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
+        db_multilink.clean()
 
     reset_dhcpd()
 
