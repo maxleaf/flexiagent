@@ -1288,47 +1288,28 @@ def vpp_multilink_update_policy_rule(params):
 
     :param params: params - rule parameters:
                         policy-id - the policy id (two byte integer)
-                        rule-id   - the rule id (two byte integer)
-                        label     - label of interface to be used for packet forwarding
-                   remove - True to remove rule, False to add.
+                        labels    - labels of interfaces to be used for packet forwarding
+                        remove    - True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
-    op       = 'del' if params['remove'] else 'add'
-    rule_id  = params['rule']['id'] | params['policy-id'] << 16
-
-    links    = params['rule']['action']['links']
-    labels   = links[0]['pathlabels']
+    op = 'del' if params['remove'] else 'add'
+    policy_id = params['policy_id']
+    labels = params['labels']
     ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
     ids = ','.join(map(str, ids_list))
 
-    app = params.get('app', None)
-    policy_id = rule_id
-    if app:
-        name = app.get('name', None)
-        category = app.get('category', None)
-        service_class = app.get('serviceClass', None)
-        importance = app.get('importance', None)
-
-        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(name, category, service_class, importance)
-        for acl_id in acl_id_list:
-            vppctl_cmd = 'fwabf policy %s id %d acl %d action labels %s' % (op, policy_id, acl_id, ids)
-
-            fwglobals.log.debug("vppctl " + vppctl_cmd)
-
-            out = _vppctl_read(vppctl_cmd, wait=False)
-            if out is None:
-                return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
-
-            policy_id += 1
+    acl_id = params.get('acl_id', None)
+    if acl_id is None:
+        vppctl_cmd = 'fwabf policy %s id %d action labels %s' % (op, policy_id, ids)
     else:
-        vppctl_cmd = 'fwabf policy %s id %d action labels %s' % (op, rule_id, ids)
+        vppctl_cmd = 'fwabf policy %s id %d acl %d action labels %s' % (op, policy_id, acl_id, ids)
 
         fwglobals.log.debug("vppctl " + vppctl_cmd)
 
-        out = _vppctl_read(vppctl_cmd, wait=False)
-        if out is None:
-            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.

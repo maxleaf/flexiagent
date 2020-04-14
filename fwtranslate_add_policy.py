@@ -67,7 +67,36 @@ import fwutils
 #    }
 # }
 
-def _add_policy_rule(params, policy_id, app, cmd_list):
+policy_index = 0
+
+def _generate_id(ret):
+    """Generate identifier.
+
+    :param ret:         Initial id value.
+
+    :returns: identifier.
+    """
+    ret += 1
+    if ret == 2 ** 32:  # sad_id is u32 in VPP
+        ret = 0
+    return ret
+
+def _generate_policy_id():
+    """Generate policy identifier.
+
+    :returns: New policy identifier.
+    """
+    global policy_index
+    policy_index = _generate_id(policy_index)
+    return copy.deepcopy(policy_index)
+
+def reset_policy_id():
+    """Reset policy identifier.
+    """
+    global policy_index
+    policy_index = 0
+
+def _add_policy_rule(policy_id, labels, acl_id, cmd_list):
     """Translates single policy rule into commands to be applied to VPP.
 
      :param params:    policy rule parameters received from flexiManage.
@@ -78,19 +107,19 @@ def _add_policy_rule(params, policy_id, app, cmd_list):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "add rule (id=%d) to policy (id=%d)" % (params['id'], policy_id)
+    cmd['cmd']['descr']   = "add policy (id=%d)" % (policy_id)
     cmd['cmd']['params']  = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'rule': params, 'policy-id': policy_id, 'app': app, 'remove': False }
+                    'args'  : { 'labels': labels, 'policy_id': policy_id, 'acl_id': acl_id, 'remove': False }
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "remove rule (id=%d) to policy (id=%d)" % (params['id'], policy_id)
+    cmd['revert']['descr']  = "remove policy (id=%d)" % (policy_id)
     cmd['revert']['params'] = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'rule': params, 'policy-id': policy_id, 'app': app, 'remove': True }
+                    'args'  : { 'labels': labels, 'policy_id': policy_id, 'acl_id': acl_id, 'remove': True }
     }
     cmd_list.append(cmd)
     return cmd_list
@@ -105,10 +134,25 @@ def add_policy(params):
     cmd_list = []
 
     for rule in params['rules']:
+        links = rule['action']['links']
+        labels = links[0]['pathlabels']
+
         classification = rule['classification']
         app = classification.get('application', None)
 
-        _add_policy_rule(rule, params['id'], app, cmd_list)
+        if app:
+            name = app.get('name', None)
+            category = app.get('category', None)
+            service_class = app.get('serviceClass', None)
+            importance = app.get('importance', None)
+
+            acl_id_list = fwglobals.g.apps_api.acl_id_list_get(name, category, service_class, importance)
+            for acl_id in acl_id_list:
+                policy_id = _generate_policy_id()
+                _add_policy_rule(policy_id, labels, acl_id, cmd_list)
+        else:
+            policy_id = _generate_policy_id()
+            _add_policy_rule(policy_id, labels, None, cmd_list)
 
     return cmd_list
 
