@@ -67,7 +67,7 @@ import fwutils
 #    }
 # }
 
-def _add_policy_rule(params, policy_id, cmd_list):
+def _add_policy_rule(params, policy_id, app, cmd_list):
     """Translates single policy rule into commands to be applied to VPP.
 
      :param params:    policy rule parameters received from flexiManage.
@@ -82,7 +82,7 @@ def _add_policy_rule(params, policy_id, cmd_list):
     cmd['cmd']['params']  = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'rule': params, 'policy-id': policy_id, 'remove': False }
+                    'args'  : { 'rule': params, 'policy-id': policy_id, 'app': app, 'remove': False }
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -90,7 +90,7 @@ def _add_policy_rule(params, policy_id, cmd_list):
     cmd['revert']['params'] = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'rule': params, 'policy-id': policy_id, 'remove': True }
+                    'args'  : { 'rule': params, 'policy-id': policy_id, 'app': app, 'remove': True }
     }
     cmd_list.append(cmd)
     return cmd_list
@@ -105,7 +105,10 @@ def add_policy(params):
     cmd_list = []
 
     for rule in params['rules']:
-        _add_policy_rule(rule, params['id'], cmd_list)
+        classification = rule['classification']
+        app = classification.get('application', None)
+
+        _add_policy_rule(rule, params['id'], app, cmd_list)
 
     return cmd_list
 

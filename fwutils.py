@@ -1303,12 +1303,32 @@ def vpp_multilink_update_policy_rule(params):
     ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
     ids = ','.join(map(str, ids_list))
 
-    vppctl_cmd = 'fwabf policy %s id %d action labels %s' %  (op, rule_id, ids)
+    app = params.get('app', None)
+    policy_id = rule_id
+    if app:
+        name = app.get('name', None)
+        category = app.get('category', None)
+        service_class = app.get('serviceClass', None)
+        importance = app.get('importance', None)
 
-    fwglobals.log.debug("vppctl " + vppctl_cmd)
+        acl_id_list = fwglobals.g.apps_api.acl_id_list_get(name, category, service_class, importance)
+        for acl_id in acl_id_list:
+            vppctl_cmd = 'fwabf policy %s id %d acl %d action labels %s' % (op, policy_id, acl_id, ids)
 
-    out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None:
-        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+            fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+            out = _vppctl_read(vppctl_cmd, wait=False)
+            if out is None:
+                return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+            policy_id += 1
+    else:
+        vppctl_cmd = 'fwabf policy %s id %d action labels %s' % (op, rule_id, ids)
+
+        fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+        out = _vppctl_read(vppctl_cmd, wait=False)
+        if out is None:
+            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
