@@ -1313,3 +1313,30 @@ def vpp_multilink_update_policy_rule(params):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def vpp_multilink_attach_policy_rule(params):
+    """Attach VPP with flexiwan policy rules.
+
+    :param params: params - rule parameters:
+                        sw_if_index -  Interface index.
+                        policy_id   - the policy id (two byte integer)
+                        remove      - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    op = 'del' if params['remove'] else 'add'
+    ip_version = 'ip6' if params['is_ipv6'] else 'ip4'
+    policy_id = params['policy_id']
+    sw_if_index = params['sw_if_index']
+    priority = params['priority']
+    int_name = vpp_sw_if_index_to_name(sw_if_index)
+
+    vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.

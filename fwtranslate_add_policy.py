@@ -124,6 +124,53 @@ def _add_policy_rule(policy_id, labels, acl_id, cmd_list):
     cmd_list.append(cmd)
     return cmd_list
 
+def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
+    """Generate attach policy command.
+
+     :param sw_if_index: Interface index.
+     :param policy_id:   Policy id.
+     :param priority:    Priority.
+     :param is_ipv6:     IPv6 flag.
+     :param cmd_list:    Commands list.
+
+     :returns: List of commands.
+    """
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "attach policy (id=%d)" % (policy_id)
+    cmd['cmd']['params']  = {
+                    'module': 'fwutils',
+                    'func'  : 'vpp_multilink_attach_policy_rule',
+                    'args'  : { 'sw_if_index': sw_if_index, 'policy_id': policy_id, 'priority': priority, 'is_ipv6': is_ipv6, 'remove': False }
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "detach policy (id=%d)" % (policy_id)
+    cmd['revert']['params'] = {
+                    'module': 'fwutils',
+                    'func'  : 'vpp_multilink_attach_policy_rule',
+                    'args'  : { 'sw_if_index': sw_if_index, 'policy_id': policy_id, 'priority': priority, 'is_ipv6': is_ipv6, 'remove': True }
+    }
+    cmd_list.append(cmd)
+
+def _attach_policy_lans(policy_id, priority, cmd_list):
+    """Generate attach policy commands.
+
+     :param policy_id:   Policy id.
+     :param priority:    Priority.
+     :param cmd_list:    Commands list.
+
+     :returns: List of commands.
+    """
+    is_ipv6 = 0
+    interfaces = fwglobals.g.router_api.get_pci_lan_interfaces()
+
+    for pci in interfaces:
+        sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
+        print (sw_if_index)
+        _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
+
 def add_policy(params):
     """Generate commands ...
 
@@ -134,6 +181,7 @@ def add_policy(params):
     cmd_list = []
 
     for rule in params['rules']:
+        priority = rule['priority']
         links = rule['action']['links']
         labels = links[0]['pathlabels']
 
@@ -150,9 +198,12 @@ def add_policy(params):
             for acl_id in acl_id_list:
                 policy_id = _generate_policy_id()
                 _add_policy_rule(policy_id, labels, acl_id, cmd_list)
+                _attach_policy_lans(policy_id, priority, cmd_list)
+
         else:
             policy_id = _generate_policy_id()
             _add_policy_rule(policy_id, labels, None, cmd_list)
+            _attach_policy_lans(policy_id, priority, cmd_list)
 
     return cmd_list
 

@@ -1118,3 +1118,12 @@ class FWROUTER_API:
         for key, request in self.db_requests.db.items():
             if re.search('add-route:default', key):
                 return request['params']['via']
+
+    def get_pci_lan_interfaces(self):
+        interfaces = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('lan', request['params']['type']):
+                    interfaces.append(request['params']['pci'])
+
+        return interfaces
