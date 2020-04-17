@@ -86,16 +86,23 @@ def _add_acl(params, cmd_list, cache_key):
         ip_prefix = ip_network.prefixlen
 
         ports = map(int, rule['ports'].split('-'))
-        dport_from = dport_to = ports[0]
+        port_from = port_to = ports[0]
         if len(ports) > 1:
-            dport_to = ports[1]
+            port_to = ports[1]
 
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
-                                  dport_from=dport_from,
-                                  dport_to=dport_to,
+                                  dport_from=port_from,
+                                  dport_to=port_to,
                                   d_prefix=ip_prefix,
                                   proto=rule['protocol'],
                                   d_ip=ip_bytes))
+
+        rules.append(_create_rule(is_ipv6=0, is_permit=1,
+                                  sport_from=port_from,
+                                  sport_to=port_to,
+                                  s_prefix=ip_prefix,
+                                  proto=rule['protocol'],
+                                  s_ip=ip_bytes))
 
     add_params = {
         'acl_index': ctypes.c_uint(-1).value,
