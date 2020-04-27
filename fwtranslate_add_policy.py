@@ -154,7 +154,7 @@ def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
     }
     cmd_list.append(cmd)
 
-def _attach_policy_lans(policy_id, priority, cmd_list):
+def _attach_policy_lans_loopbacks(policy_id, priority, cmd_list):
     """Generate attach policy commands.
 
      :param policy_id:   Policy id.
@@ -164,11 +164,15 @@ def _attach_policy_lans(policy_id, priority, cmd_list):
      :returns: List of commands.
     """
     is_ipv6 = 0
-    interfaces = fwglobals.g.router_api.get_pci_lan_interfaces()
+    lan_pci_list = fwglobals.g.router_api.get_pci_lan_interfaces()
 
-    for pci in interfaces:
+    for pci in lan_pci_list:
         sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
-        print (sw_if_index)
+        _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
+
+    loopback_ip_list = fwglobals.g.router_api.get_ip_tunnel_interfaces()
+    for ip in loopback_ip_list:
+        sw_if_index = fwutils.vpp_ip_to_sw_if_index(ip)
         _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
 
 def add_policy(params):
@@ -198,12 +202,12 @@ def add_policy(params):
             for acl_id in acl_id_list:
                 policy_id = _generate_policy_id()
                 _add_policy_rule(policy_id, labels, acl_id, cmd_list)
-                _attach_policy_lans(policy_id, priority, cmd_list)
+                _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
 
         else:
             policy_id = _generate_policy_id()
             _add_policy_rule(policy_id, labels, None, cmd_list)
-            _attach_policy_lans(policy_id, priority, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
 
     return cmd_list
 

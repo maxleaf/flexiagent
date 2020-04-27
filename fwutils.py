@@ -466,6 +466,22 @@ def vpp_sw_if_index_to_tap(sw_if_index):
      """
     return vpp_if_name_to_tap(vpp_sw_if_index_to_name(sw_if_index))
 
+def vpp_ip_to_sw_if_index(ip):
+    """Convert ip address into VPP sw_if_index.
+
+     :param ip: IP address.
+
+     :returns: sw_if_index.
+     """
+    network = IPNetwork(ip)
+
+    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
+        tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
+        if tap:
+            int_address = IPNetwork(get_interface_address(tap))
+            if network == int_address:
+                return sw_if.sw_if_index
+
 def save_file(txt, fname, dir='/tmp'):
     """Save txt to file under a dir (default = /tmp)
 

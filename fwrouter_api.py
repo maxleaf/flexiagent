@@ -1127,3 +1127,11 @@ class FWROUTER_API:
                     interfaces.append(request['params']['pci'])
 
         return interfaces
+
+    def get_ip_tunnel_interfaces(self):
+        ip_list = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-tunnel', key):
+                ip_list.append(request['params']['loopback-iface']['addr'])
+
+        return ip_list
