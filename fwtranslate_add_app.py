@@ -80,21 +80,28 @@ def _add_acl(params, cmd_list, cache_key):
      """
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
     rules = []
+    ip_prefix = None
+    ip_bytes = None
+    proto = None
+    port_from = port_to = None
 
     for rule in params['rules']:
-        proto = proto_map[rule['protocol']]
-        ip_prefix = None
-        ip_bytes = None
+        protocol = rule.get('protocol', None)
+        if protocol:
+            proto = proto_map[rule['protocol']]
+
         ip = rule.get('ip', None)
         if ip:
             ip_network = IPNetwork(rule['ip'])
             ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
             ip_prefix = ip_network.prefixlen
 
-        ports = map(int, rule['ports'].split('-'))
-        port_from = port_to = ports[0]
-        if len(ports) > 1:
-            port_to = ports[1]
+        ports = rule.get('ports', None)
+        if ports:
+            ports_map = map(int, ports.split('-'))
+            port_from = port_to = ports_map[0]
+            if len(ports_map) > 1:
+                port_to = ports_map[1]
 
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
                                   dport_from=port_from,

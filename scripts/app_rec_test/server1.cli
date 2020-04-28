@@ -130,6 +130,61 @@
            }]
 },
 {
+  "entity":  "agent",
+  "message": "add-application",
+  "params": [{
+           "name":"yahoo",
+           "id":"3",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "ip":"67.26.43.44/24"
+             }]
+           }]
+},
+{
+        "entity": "agent",
+        "message": "add-application",
+        "params": [
+            {
+                "name": "echo",
+                "id": "4",
+                "category": "management",
+                "serviceClass": "oam",
+                "importance": "medium",
+                "description": "Echo Protocol",
+                "rules": [
+                    {
+                        "protocol": "tcp",
+                        "ports": "7"
+                    },
+                    {
+                        "protocol": "udp",
+                        "ports": "7"
+                    }
+                ]
+            },
+             {
+                "name": "discard",
+                "id": "5",
+                "category": "management",
+                "serviceClass": "oam",
+                "importance": "medium",
+                "description": "Discard Protocol",
+                "rules": [
+                    {
+                        "protocol": "tcp",
+                        "ports": "9"
+                    },
+                    {
+                        "protocol": "udp",
+                        "ports": "9"
+                    }
+                ]
+            }]
+},
+{
 	"entity": "agent",
 	"message": "start-router",
 	"params": {
