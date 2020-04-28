@@ -61,15 +61,17 @@ class FwagentCli:
     def __init__(self):
         """Constructor.
         """
-        self.agent      = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
-        self.prompt     = 'fwagent> '
+        self.daemon = None
+        self.agent  = None
+        self.prompt = 'fwagent> '
 
         try:
-            self.agent = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
-            self.agent.ping()   # Check if daemon runs. If it does not, create local instance of Fwagent
+            self.daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
+            self.daemon.ping()   # Check if daemon runs. If it does not, create local instance of Fwagent
         except Pyro4.errors.CommunicationError:
             fwglobals.log.warning("FwagentCli: no daemon Fwagent was found, use local instance")
-            self.agent = fwagent.Fwagent()
+            self.daemon = None
+            self.agent  = fwagent.Fwagent()
 
     def __enter__(self):
         return self
@@ -79,12 +81,11 @@ class FwagentCli:
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
-        if isinstance(self.agent, fwagent.Fwagent):
+        if self.agent:
             # If we used local instance of Fwagent and not daemon, kill it.
             # Otherwise we might hang up in vpp watchdog,
             # if router was started by cli execution.
             self.agent.__exit__(exc_type, exc_value, traceback)
-        return
 
     def run_loop(self):
         while True:
@@ -109,8 +110,12 @@ class FwagentCli:
     def execute(self, api_str):
         try:
             (api_name, api_args) = parse_api_str(api_str)
-            api_func = getattr(self.agent, api_name)
-            api_func(**api_args)
+            if self.daemon:
+                rpc_api_func = getattr(self.daemon, 'api')
+                rpc_api_func(api_name, api_args)
+            elif self.agent:
+                api_func = getattr(self.agent, api_name)
+                api_func(**api_args)
             fwglobals.log.info(self.prompt + 'SUCCESS')
         except FwagentCliErrorParser as e:
             fwglobals.log.error(self.prompt + 'FAILED to parse api call: %s' % str(e))

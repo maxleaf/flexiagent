@@ -876,12 +876,15 @@ class FwagentDaemon(object):
         fwglobals.log.info("connection loop was stopped, use 'fwagent start' to start it again")
 
 
-    def inject_requests(self, filename, ignore_errors=False):
-        """Wrapper for Fwagent.inject_requests()
+    def api(self, api_name, api_args=None):
+        """Wrapper for Fwagent methods
         """
         if self.agent:
-            self.agent.inject_requests(filename, ignore_errors)
-
+            api_func = getattr(self.agent, api_name)
+            if api_args:
+                api_func(**api_args)
+            else:
+                api_func()
 
 def daemon():
     """Handles 'fwagent daemon' command.
