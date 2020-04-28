@@ -31,6 +31,8 @@ import fwutils
 
 from netaddr import *
 
+proto_map = {'icmp':1, 'tcp':6, 'udp':17}
+
 # add-application
 # --------------------------------------
 # Translates request:
@@ -80,10 +82,14 @@ def _add_acl(params, cmd_list, cache_key):
     rules = []
 
     for rule in params['rules']:
-        ip_network = IPNetwork(rule['ip'])
-
-        ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
-        ip_prefix = ip_network.prefixlen
+        proto = proto_map[rule['protocol']]
+        ip_prefix = None
+        ip_bytes = None
+        ip = rule.get('ip', None)
+        if ip:
+            ip_network = IPNetwork(rule['ip'])
+            ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
+            ip_prefix = ip_network.prefixlen
 
         ports = map(int, rule['ports'].split('-'))
         port_from = port_to = ports[0]
@@ -94,14 +100,14 @@ def _add_acl(params, cmd_list, cache_key):
                                   dport_from=port_from,
                                   dport_to=port_to,
                                   d_prefix=ip_prefix,
-                                  proto=rule['protocol'],
+                                  proto=proto,
                                   d_ip=ip_bytes))
 
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
                                   sport_from=port_from,
                                   sport_to=port_to,
                                   s_prefix=ip_prefix,
-                                  proto=rule['protocol'],
+                                  proto=proto,
                                   s_ip=ip_bytes))
 
     add_params = {
@@ -116,11 +122,11 @@ def _add_acl(params, cmd_list, cache_key):
     cmd['cmd']['name'] = "acl_add_replace"
     cmd['cmd']['params'] = add_params
     cmd['cmd']['cache_ret_val'] = (cache_key, cache_key)
-    cmd['cmd']['descr'] = "Add ACL for app %s" % (params['app'])
+    cmd['cmd']['descr'] = "Add ACL for app %s" % (params['name'])
     cmd['revert'] = {}
     cmd['revert']['name'] = "acl_del"
     cmd['revert']['params'] = {'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]}
-    cmd['revert']['descr'] = "Remove ACL for app %s" % (params['app'])
+    cmd['revert']['descr'] = "Remove ACL for app %s" % (params['name'])
     cmd_list.append(cmd)
 
 def _add_app_info(params, cmd_list, cache_key):
@@ -137,11 +143,11 @@ def _add_app_info(params, cmd_list, cache_key):
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "add-app-info"
     cmd['cmd']['params']        = new_params
-    cmd['cmd']['descr']         = "Add APP %s" % (params['app'])
+    cmd['cmd']['descr']         = "Add APP %s" % (params['name'])
     cmd['revert'] = {}
     cmd['revert']['name']       = 'remove-app-info'
     cmd['revert']['params']     = new_params
-    cmd['revert']['descr']      = "Delete APP %s" % (params['app'])
+    cmd['revert']['descr']      = "Delete APP %s" % (params['name'])
     cmd_list.append(cmd)
 
 def add_app(params):

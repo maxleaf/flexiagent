@@ -146,7 +146,7 @@ class FwApps:
 
         :returns: Reply.
         """
-        name = params['app']
+        name = params['name']
         acl_id = params['acl_index']
         category = params.get('category', None)
         serviceClass = params.get('serviceClass', None)
@@ -165,7 +165,7 @@ class FwApps:
 
         :returns: Reply.
         """
-        name = params['app']
+        name = params['name']
         acl_id = params['acl_index']
         category = params.get('category', None)
         serviceClass = params.get('serviceClass', None)

@@ -48,17 +48,17 @@
   "entity":  "agent",
   "message": "add-application",
   "params": [{
-           "app":"google-dns",
-           "id":1,
+           "name":"google-dns",
+           "id":"1",
            "category":"network",
            "serviceClass":"dns",
            "importance":"3",
            "rules":[{
-             "protocol": 17,
+             "protocol": "udp",
              "ip":"8.8.8.8/32",
              "ports":"53-54"},
              {
-             "protocol": 17,
+             "protocol": "udp",
              "ip":"8.8.4.4/32",
              "ports":"53-54"}]
            }]
@@ -69,17 +69,17 @@
       "params": {
             "modify_app": {
               "apps":[{
-                "app":"google-dns",
-                "id":1,
+                "name":"google-dns",
+                "id":"1",
                 "category":"network",
                 "serviceClass":"dns",
                 "importance":"3",
                 "rules":[{
-                  "protocol": 17,
+                  "protocol": "udp",
                   "ip":"7.7.7.7/32",
                   "ports":"53-54"},
                 {
-                  "protocol": 17,
+                  "protocol": "udp",
                   "ip":"7.7.4.4/32",
                   "ports":"53-54"
                 }]
@@ -119,14 +119,13 @@
   "entity":  "agent",
   "message": "add-application",
   "params": [{
-           "app":"yahoo-dns",
-           "id":2,
+           "name":"dns",
+           "id":"2",
            "category":"network",
            "serviceClass":"dns",
            "importance":"2",
            "rules":[{
-             "protocol": 17,
-             "ip":"67.195.1.92/32",
+             "protocol": "udp",
              "ports":"53"}]
            }]
 },
