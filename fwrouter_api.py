@@ -208,6 +208,12 @@ class FWROUTER_API:
         if req == 'modify-device':
             return self._handle_modify_device_request(params)
 
+        # add-application requests are split into many add requests.
+        # This code should be replaced.
+        if req == 'add-application':
+            requests = [{req: param} for param in params['applications']]
+            return self._call_aggregated(requests)
+
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,
