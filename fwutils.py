@@ -773,6 +773,14 @@ def get_router_config(full=False):
         for key in db_requests.db:
             if re.match('add-dhcp-config', key):
                 cfg.append(_dump_config_request(db_requests, key, full))
+        # Dump applications configuration
+        for key in db_requests.db:
+            if re.match('add-application', key):
+                cfg.append(_dump_config_request(db_requests, key, full))
+        # Dump policy configuration
+        for key in db_requests.db:
+            if re.match('add-multilink-policy', key):
+                cfg.append(_dump_config_request(db_requests, key, full))
         return cfg if len(cfg) > 0 else None
 
 def print_router_config(full=False):
