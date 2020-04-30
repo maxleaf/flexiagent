@@ -311,10 +311,10 @@ class FWROUTER_API:
         self.call('modify-device', params)
 
     def _need_to_translate(self, req):
-        if re.search('-app',  req):
+        if re.search('add-application',  req):
             return False
 
-        if re.search('-policy',  req):
+        if re.search('add-multilink-policy',  req):
             return False
 
         return True

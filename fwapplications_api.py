@@ -86,7 +86,7 @@ class FwApps:
 
     def _remove_acl_id(self, dict, key, acl_id):
         json_dict = json.loads(dict[key])
-        del json_dict[acl_id]
+        del json_dict[str(acl_id)]
         dict[key] = json.dumps(json_dict)
 
     def _get_acl_ids(self, dict, key):
@@ -104,8 +104,7 @@ class FwApps:
         if importance:
             self._add_acl_id(self.importances, importance, acl_id)
 
-    def _remove_app_db(self, name, category, serviceClass, importance):
-        acl_id = self.app_2_acl[name]
+    def _remove_app_db(self, name, acl_id, category, serviceClass, importance):
         del self.app_2_acl[name]
 
         if category:
@@ -171,8 +170,8 @@ class FwApps:
         serviceClass = params.get('serviceClass', None)
         importance = params.get('importance', None)
 
-        fwglobals.g.policy_api.remove_policy(acl_id)
-        self._remove_app_db(name, category, serviceClass, importance)
+        self._remove_app_db(name, acl_id, category, serviceClass, importance)
+        fwglobals.g.router_api.refresh_policies()
 
         reply = {'ok': 1}
         return reply
