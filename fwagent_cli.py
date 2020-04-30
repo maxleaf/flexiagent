@@ -23,6 +23,7 @@
 import os
 import Pyro4
 import re
+import time
 import traceback
 
 import fwagent
@@ -58,12 +59,17 @@ class FwagentCli:
         If no agent runs on background, the FwagentCli will create new instance
     of Fwagent and will use it. This instance is  destroyed on FwagentCli exit.
     """
-    def __init__(self):
+    def __init__(self, agent_linger=None):
         """Constructor.
+        :param agent_linger: sleep duration before destroying local instance
+                             of fwagent. It might be used to keep vpp running
+                             for a linger number of seconds, as agent
+                             termination kills the vpp.
         """
-        self.daemon = None
-        self.agent  = None
-        self.prompt = 'fwagent> '
+        self.daemon       = None
+        self.agent        = None
+        self.agent_linger = agent_linger
+        self.prompt       = 'fwagent> '
 
         try:
             self.daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
@@ -85,6 +91,8 @@ class FwagentCli:
             # If we used local instance of Fwagent and not daemon, kill it.
             # Otherwise we might hang up in vpp watchdog,
             # if router was started by cli execution.
+            if self.agent_linger:
+                time.sleep(self.agent_linger)
             self.agent.__exit__(exc_type, exc_value, traceback)
 
     def run_loop(self):

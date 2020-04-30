@@ -974,13 +974,11 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
             "cli: generate 'api' out of 'script_fname': " + api)
 
     import fwagent_cli
-    with fwagent_cli.FwagentCli() as cli:
+    with fwagent_cli.FwagentCli(agent_linger=linger) as cli:
         if api:
             cli.execute(api)
         else:
             cli.run_loop()
-    if linger:
-        time.sleep(linger)
     if clean_request_db:
         fwglobals.g.router_api.db_requests.clean()
 
