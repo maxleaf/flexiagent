@@ -61,31 +61,28 @@
              "protocol": "udp",
              "ip":"8.8.4.4/32",
              "ports":"53-54"}]
-           }]}
-},
-{
-      "entity":  "agent",
-      "message": "modify-device",
-      "params": {
-            "modify_app": {
-              "apps":[{
-                "name":"google-dns",
-                "id":"1",
-                "category":"network",
-                "serviceClass":"dns",
-                "importance":"3",
-                "rules":[{
-                  "protocol": "udp",
-                  "ip":"7.7.7.7/32",
-                  "ports":"53-54"},
-                {
-                  "protocol": "udp",
-                  "ip":"7.7.4.4/32",
-                  "ports":"53-54"
-                }]
-              }]
-            }
-      }
+           },
+           {
+           "name":"dns",
+           "id":"2",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "protocol": "udp",
+             "ports":"53"}]
+           },
+           {
+           "name":"yahoo",
+           "id":"3",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "ip":"67.26.43.44/24"
+             }]
+           }
+           ]}
 },
 {
       "entity":  "agent",
@@ -116,78 +113,6 @@
       }]
 },
 {
-  "entity":  "agent",
-  "message": "add-application",
-  "params": {"applications": [{
-           "name":"dns",
-           "id":"2",
-           "category":"network",
-           "serviceClass":"dns",
-           "importance":"2",
-           "rules":[{
-             "protocol": "udp",
-             "ports":"53"}]
-           }]
-           }
-},
-{
-  "entity":  "agent",
-  "message": "add-application",
-  "params": {"applications": [{
-           "name":"yahoo",
-           "id":"3",
-           "category":"network",
-           "serviceClass":"dns",
-           "importance":"2",
-           "rules":[{
-             "ip":"67.26.43.44/24"
-             }]
-           }]
-           }
-},
-{
-        "entity": "agent",
-        "message": "add-application",
-        "params": {"applications": [
-            {
-                "name": "echo",
-                "id": "4",
-                "category": "management",
-                "serviceClass": "oam",
-                "importance": "medium",
-                "description": "Echo Protocol",
-                "rules": [
-                    {
-                        "protocol": "tcp",
-                        "ports": "7"
-                    },
-                    {
-                        "protocol": "udp",
-                        "ports": "7"
-                    }
-                ]
-            },
-             {
-                "name": "discard",
-                "id": "5",
-                "category": "management",
-                "serviceClass": "oam",
-                "importance": "medium",
-                "description": "Discard Protocol",
-                "rules": [
-                    {
-                        "protocol": "tcp",
-                        "ports": "9"
-                    },
-                    {
-                        "protocol": "udp",
-                        "ports": "9"
-                    }
-                ]
-            }]
-            }
-},
-{
 	"entity": "agent",
 	"message": "start-router",
 	"params": {
@@ -215,10 +140,5 @@
       }
       ]
 	}
-},
-{
-  "entity":  "agent",
-  "message": "remove-application",
-  "params": {}
 }
 ]

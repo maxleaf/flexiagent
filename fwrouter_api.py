@@ -208,12 +208,6 @@ class FWROUTER_API:
         if req == 'modify-device':
             return self._handle_modify_device_request(params)
 
-        # add-application requests are split into many add requests.
-        # This code should be replaced.
-        if req == 'add-application':
-            requests = [{req: param} for param in params['applications']]
-            return self._call_aggregated(requests)
-
         # remove-application request is empty and results in removing all applications.
         # This code should be replaced.
         if req == 'remove-application':

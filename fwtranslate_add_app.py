@@ -166,8 +166,9 @@ def add_app(params):
     """
     cmd_list = []
 
-    _add_acl(params, cmd_list, 'acl_index')
-    _add_app_info(params, cmd_list, 'acl_index')
+    for app in params['applications']:
+        _add_acl(app, cmd_list, 'acl_index')
+        _add_app_info(app, cmd_list, 'acl_index')
 
     return cmd_list
 
@@ -178,4 +179,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-application:%s' % params['id']
+    return 'add-application'
