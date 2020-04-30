@@ -208,14 +208,6 @@ class FWROUTER_API:
         if req == 'modify-device':
             return self._handle_modify_device_request(params)
 
-        # remove-application request is empty and results in removing all applications.
-        # This code should be replaced.
-        if req == 'remove-application':
-            if not params:
-                params = fwglobals.g.router_api.get_request_params('add-application')
-                requests = [{req: param} for param in params]
-                return self._call_aggregated(requests)
-
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,

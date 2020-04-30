@@ -140,5 +140,10 @@
       }
       ]
 	}
+},
+{
+  "entity":  "agent",
+  "message": "remove-application",
+  "params": {}
 }
 ]
