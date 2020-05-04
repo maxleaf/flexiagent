@@ -152,7 +152,6 @@ class FwApps:
         importance = params.get('importance', None)
 
         self._add_app_db(name, acl_id, category, serviceClass, importance)
-        fwglobals.g.router_api.refresh_policies()
 
         reply = {'ok': 1}
         return reply
@@ -171,7 +170,6 @@ class FwApps:
         importance = params.get('importance', None)
 
         self._remove_app_db(name, acl_id, category, serviceClass, importance)
-        fwglobals.g.router_api.refresh_policies()
 
         reply = {'ok': 1}
         return reply

@@ -346,8 +346,10 @@ class FWROUTER_API:
         if self._test_router_failure() and not re.match('add-|remove-',  req):
             raise Exception("device failed, can't fulfill requests")
 
+        router_was_started = fwutils.vpp_does_run()
+
         # Translate request to list of commands to be executed
-        if self._need_to_translate(req):
+        if self._need_to_translate(req) or router_was_started:
             (cmd_list , req_key , complement) = self._translate(req, params)
         else:
             (cmd_list, req_key, complement) = self._translate(req, params, False)
@@ -357,7 +359,6 @@ class FWROUTER_API:
         # even if vpp doesn't run right now. This is to clean stuff in Linux
         # that was added by correspondent 'add-XXX' request if the last was
         # applied to running vpp.
-        router_was_started = fwutils.vpp_does_run()
         executed = False
         if router_was_started or re.match('remove-',  req):
             filter = 'must' if not router_was_started else None
