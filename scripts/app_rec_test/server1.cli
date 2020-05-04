@@ -44,6 +44,7 @@
     }
   }
 },
+[
 {
   "entity":  "agent",
   "message": "add-application",
@@ -111,7 +112,8 @@
           }
         }]
       }
-},
+}
+],
 {
 	"entity": "agent",
 	"message": "start-router",

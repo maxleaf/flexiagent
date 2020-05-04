@@ -501,7 +501,7 @@ class Fwagent:
         if self.ws:
             self.ws.close()
 
-    def handle_received_request(self, msg):
+    def _handle_received_msg(self, msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -513,6 +513,7 @@ class Fwagent:
         :returns: None.
         """
         print_message = fwglobals.g.cfg.DEBUG
+
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
@@ -522,12 +523,27 @@ class Fwagent:
         reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
 
         if not 'entity' in reply and 'entity' in msg:
-            reply.update({'entity':msg['entity']+'Reply'})
+            reply.update({'entity': msg['entity'] + 'Reply'})
         if not 'message' in reply:
             reply.update({'message': 'success'})
 
         if print_message:
             fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+        return reply
+
+    def handle_received_request(self, msg):
+        """Handles standalone or aggregated message.
+
+        :param msg:  Message instance.
+
+        :returns: None.
+        """
+        if type(msg) is list:
+            for request in msg:
+                reply = self._handle_received_msg(request)
+        else:
+            reply = self._handle_received_msg(msg)
+
         return reply
 
 def version():
