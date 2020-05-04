@@ -208,6 +208,9 @@ class FWROUTER_API:
         if req == 'modify-device':
             return self._handle_modify_device_request(params)
 
+        if re.match('remove-application|add-application', req):
+            return self._handle_add_remove_application(req, params)
+
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,
@@ -299,16 +302,30 @@ class FWROUTER_API:
             addr = request['params']['loopback-iface']['addr']
             fwtunnel_stats.tunnel_stats_add(id, addr)
 
-    def refresh_policies(self):
-        params = dict()
-        params['modify_policy'] = {}
-        params['modify_policy']['policies'] = []
+    def _handle_add_remove_application(self, req, params):
+        """Handle add-application and remove-application.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        remove_requests = []
+        add_requests = []
 
         for key, request in self.db_requests.db.items():
             if re.search('add-multilink-policy', key):
-                params['modify_policy']['policies'].append(request['params'])
+                add_requests.append({'add-multilink-policy': request['params']})
+                remove_requests.append({'remove-multilink-policy': request['params']})
 
-        self.call('modify-device', params)
+        self._call_aggregated(remove_requests)
+
+        if re.match('add-application', req):
+            self._call_simple('remove-application', params)
+
+        self._call_simple(req, params)
+
+        return self._call_aggregated(add_requests)
 
     def _need_to_translate(self, req):
         if re.search('add-application',  req):

@@ -49,39 +49,15 @@
   "entity":  "agent",
   "message": "add-application",
   "params": {"applications":[{
-           "name":"google-dns",
+           "name":"test",
            "id":"1",
            "category":"network",
            "serviceClass":"dns",
            "importance":"3",
            "rules":[{
              "protocol": "udp",
-             "ip":"8.8.8.8/32",
-             "ports":"53-54"},
-             {
-             "protocol": "udp",
-             "ip":"8.8.4.4/32",
-             "ports":"53-54"}]
-           },
-           {
-           "name":"dns",
-           "id":"2",
-           "category":"network",
-           "serviceClass":"dns",
-           "importance":"2",
-           "rules":[{
-             "protocol": "udp",
-             "ports":"53"}]
-           },
-           {
-           "name":"yahoo",
-           "id":"3",
-           "category":"network",
-           "serviceClass":"dns",
-           "importance":"2",
-           "rules":[{
-             "ip":"67.26.43.44/24"
-             }]
+             "ip":"4.1.8.4/32",
+             "ports":"100"}]
            }
            ]}
 },
@@ -142,5 +118,45 @@
       }
       ]
 	}
+},
+{
+  "entity":  "agent",
+  "message": "add-application",
+  "params": {"applications":[{
+           "name":"google-dns",
+           "id":"1",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"3",
+           "rules":[{
+             "protocol": "udp",
+             "ip":"8.8.8.8/32",
+             "ports":"53-54"},
+             {
+             "protocol": "udp",
+             "ip":"8.8.4.4/32",
+             "ports":"53-54"}]
+           },
+           {
+           "name":"dns",
+           "id":"2",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "protocol": "udp",
+             "ports":"53"}]
+           },
+           {
+           "name":"yahoo",
+           "id":"3",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "ip":"67.26.43.44/24"
+             }]
+           }
+           ]}
 }
 ]
