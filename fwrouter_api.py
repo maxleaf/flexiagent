@@ -1141,7 +1141,7 @@ class FWROUTER_API:
         interfaces = []
         for key, request in self.db_requests.db.items():
             if re.search('add-interface', key):
-                if re.match('lan', request['params']['type']):
+                if re.match('lan', request['params']['type'], re.IGNORECASE):
                     interfaces.append(request['params']['pci'])
 
         return interfaces
