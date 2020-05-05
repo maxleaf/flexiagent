@@ -35,7 +35,6 @@ class FwPolicies:
     def __init__(self):
         """Constructor method.
         """
-        self.policies_map = {}
 
     def call(self, req, params):
         """Invokes API specified by the 'req' parameter.
@@ -63,7 +62,7 @@ class FwPolicies:
 
         :returns: Dictionary with information and status code.
         """
-        self.policies_map[params['id']] = params
+        fwutils.vpp_multilink_update_policy_rule(params)
 
         reply = {'ok': 1}
         return reply
@@ -75,7 +74,7 @@ class FwPolicies:
 
         :returns: Dictionary with information and status code.
         """
-        del self.policies_map[params['id']]
+        fwutils.vpp_multilink_update_policy_rule(params)
 
         reply = {'ok': 1}
         return reply

@@ -70,7 +70,7 @@ def _create_rule(is_ipv6=0, is_permit=0, proto=0,
              'dst_ip_addr': d_ip})
     return rule
 
-def _add_acl(params, cmd_list, cache_key):
+def add_one_acl(rule, cmd_list, cache_key):
     """Generate ACL command.
 
      :param params:        Parameters from flexiManage.
@@ -85,37 +85,36 @@ def _add_acl(params, cmd_list, cache_key):
     proto = None
     port_from = port_to = None
 
-    for rule in params['rules']:
-        protocol = rule.get('protocol', None)
-        if protocol:
-            proto = proto_map[rule['protocol']]
+    protocol = rule.get('protocol', None)
+    if protocol:
+        proto = proto_map[rule['protocol']]
 
-        ip = rule.get('ip', None)
-        if ip:
-            ip_network = IPNetwork(rule['ip'])
-            ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
-            ip_prefix = ip_network.prefixlen
+    ip = rule.get('ip', None)
+    if ip:
+        ip_network = IPNetwork(rule['ip'])
+        ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
+        ip_prefix = ip_network.prefixlen
 
-        ports = rule.get('ports', None)
-        if ports:
-            ports_map = map(int, ports.split('-'))
-            port_from = port_to = ports_map[0]
-            if len(ports_map) > 1:
-                port_to = ports_map[1]
+    ports = rule.get('ports', None)
+    if ports:
+        ports_map = map(int, ports.split('-'))
+        port_from = port_to = ports_map[0]
+        if len(ports_map) > 1:
+            port_to = ports_map[1]
 
-        rules.append(_create_rule(is_ipv6=0, is_permit=1,
-                                  dport_from=port_from,
-                                  dport_to=port_to,
-                                  d_prefix=ip_prefix,
-                                  proto=proto,
-                                  d_ip=ip_bytes))
+    rules.append(_create_rule(is_ipv6=0, is_permit=1,
+                              dport_from=port_from,
+                              dport_to=port_to,
+                              d_prefix=ip_prefix,
+                              proto=proto,
+                              d_ip=ip_bytes))
 
-        rules.append(_create_rule(is_ipv6=0, is_permit=1,
-                                  sport_from=port_from,
-                                  sport_to=port_to,
-                                  s_prefix=ip_prefix,
-                                  proto=proto,
-                                  s_ip=ip_bytes))
+    rules.append(_create_rule(is_ipv6=0, is_permit=1,
+                              sport_from=port_from,
+                              sport_to=port_to,
+                              s_prefix=ip_prefix,
+                              proto=proto,
+                              s_ip=ip_bytes))
 
     add_params = {
         'acl_index': ctypes.c_uint(-1).value,
@@ -129,12 +128,24 @@ def _add_acl(params, cmd_list, cache_key):
     cmd['cmd']['name'] = "acl_add_replace"
     cmd['cmd']['params'] = add_params
     cmd['cmd']['cache_ret_val'] = (cache_key, cache_key)
-    cmd['cmd']['descr'] = "Add ACL for app %s" % (params['name'])
+    cmd['cmd']['descr'] = "Add ACL"
     cmd['revert'] = {}
     cmd['revert']['name'] = "acl_del"
     cmd['revert']['params'] = {'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]}
-    cmd['revert']['descr'] = "Remove ACL for app %s" % (params['name'])
+    cmd['revert']['descr'] = "Remove ACL"
     cmd_list.append(cmd)
+
+def _add_acl(params, cmd_list, cache_key):
+    """Generate ACL command.
+
+     :param params:        Parameters from flexiManage.
+     :param cmd_list:      Commands list.
+
+     :returns: None.
+     """
+
+    for rule in params['rules']:
+        add_one_acl(rule, cmd_list, cache_key)
 
 def _add_app_info(params, cmd_list, cache_key):
     """Generate App commands.

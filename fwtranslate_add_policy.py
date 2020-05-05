@@ -27,6 +27,7 @@ import re
 import fwglobals
 import fwtranslate_revert
 import fwutils
+from fwtranslate_add_app import add_one_acl
 
 # add-multilink-policy
 # --------------------------------------
@@ -124,6 +125,39 @@ def _add_policy_rule(policy_id, labels, acl_id, cmd_list):
     cmd_list.append(cmd)
     return cmd_list
 
+def _add_policy_rule_from_cache_key(policy_id, labels, cache_key, cmd_list):
+    """Translates single policy rule into commands to be applied to VPP.
+
+     :param params:    policy rule parameters received from flexiManage.
+     :param cmd_list:  list of policy commands where the rule commands should be added to.
+
+     :returns: Updated list of commands.
+     """
+
+    add_args = {
+        'substs' : [{'add_param': 'acl_id', 'val_by_key': cache_key}],
+        'labels': labels,
+        'policy_id': policy_id,
+        'remove': False
+    }
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "add-policy-info"
+    cmd['cmd']['descr']   = "add policy (id=%d)" % (policy_id)
+    cmd['cmd']['params']  = add_args
+
+    remove_args = copy.deepcopy(add_args)
+    remove_args['remove'] = True
+
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "remove-policy-info"
+    cmd['revert']['descr']  = "remove policy (id=%d)" % (policy_id)
+    cmd['revert']['params'] = remove_args
+
+    cmd_list.append(cmd)
+    return cmd_list
+
 def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
     """Generate attach policy command.
 
@@ -191,8 +225,15 @@ def add_policy(params):
 
         classification = rule['classification']
         app = classification.get('application', None)
+        prefix = classification.get('prefix', None)
 
-        if app:
+        if prefix:
+            add_one_acl(prefix, cmd_list, 'acl_index')
+            policy_id = _generate_policy_id()
+            _add_policy_rule_from_cache_key(policy_id, labels, 'acl_index', cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
+
+        elif app:
             name = app.get('name', None)
             category = app.get('category', None)
             service_class = app.get('serviceClass', None)
