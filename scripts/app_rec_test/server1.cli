@@ -158,5 +158,35 @@
              }]
            }
            ]}
+},
+{
+      "entity":  "agent",
+      "message": "add-multilink-policy",
+      "params": {
+        "id":2,
+        "rules": [{
+          "id": 1,
+          "priority": 100,
+          "classification": {
+          "prefix": {
+                "ip": "9.9.9.0/24",
+                "ports": "5060-5090",
+                "protocol": "udp"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
+          }
+        }]
+      }
 }
 ]
