@@ -259,4 +259,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-multilink-policy:%s' % params['id']
+    return 'add-multilink-policy'

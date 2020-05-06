@@ -211,6 +211,9 @@ class FWROUTER_API:
         if re.match('remove-application|add-application', req):
             return self._handle_add_remove_application(req, params)
 
+        if re.match('add-multilink-policy', req):
+            return self._handle_add_multilink_policy(req, params)
+
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,
@@ -326,6 +329,17 @@ class FWROUTER_API:
         self._call_simple(req, params)
 
         return self._call_aggregated(add_requests)
+
+    def _handle_add_multilink_policy(self, req, params):
+        """Handle add-multilink-policy.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        self._call_simple('remove-multilink-policy', {})
+        return self._call_simple(req, params)
 
     def _need_to_translate(self, req):
         if re.search('add-application',  req):

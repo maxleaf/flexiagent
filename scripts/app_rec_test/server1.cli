@@ -65,7 +65,6 @@
       "entity":  "agent",
       "message": "add-multilink-policy",
       "params": {
-        "id":1,
         "rules": [{
           "id": 1,
           "priority": 100,
@@ -163,7 +162,6 @@
       "entity":  "agent",
       "message": "add-multilink-policy",
       "params": {
-        "id":2,
         "rules": [{
           "id": 1,
           "priority": 100,
