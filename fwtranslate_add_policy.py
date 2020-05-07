@@ -21,13 +21,14 @@
 ################################################################################
 
 import copy
+import ctypes
 import os
 import re
 
 import fwglobals
 import fwtranslate_revert
 import fwutils
-from fwtranslate_add_app import add_one_acl
+from fwtranslate_add_app import add_acl_rule
 
 # add-multilink-policy
 # --------------------------------------
@@ -209,6 +210,37 @@ def _attach_policy_lans_loopbacks(policy_id, priority, cmd_list):
         sw_if_index = fwutils.vpp_ip_to_sw_if_index(ip)
         _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
 
+def _add_acl(params, cmd_list, cache_key):
+    """Generate ACL command.
+
+     :param params:        Parameters from flexiManage.
+     :param cmd_list:      Commands list.
+
+     :returns: None.
+     """
+    rules = []
+
+    add_acl_rule(params, rules)
+
+    add_params = {
+        'acl_index': ctypes.c_uint(-1).value,
+        'count': len(rules),
+        'r': rules,
+        'tag': ''
+    }
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "acl_add_replace"
+    cmd['cmd']['params'] = add_params
+    cmd['cmd']['cache_ret_val'] = (cache_key, cache_key)
+    cmd['cmd']['descr'] = "Add ACL"
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "acl_del"
+    cmd['revert']['params'] = {'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]}
+    cmd['revert']['descr'] = "Remove ACL"
+    cmd_list.append(cmd)
+
 def add_policy(params):
     """Generate commands ...
 
@@ -228,7 +260,7 @@ def add_policy(params):
         prefix = classification.get('prefix', None)
 
         if prefix:
-            add_one_acl(prefix, cmd_list, 'acl_index')
+            _add_acl(prefix, cmd_list, 'acl_index')
             policy_id = _generate_policy_id()
             _add_policy_rule_from_cache_key(policy_id, labels, 'acl_index', cmd_list)
             _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)

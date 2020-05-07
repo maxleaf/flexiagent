@@ -70,16 +70,15 @@ def _create_rule(is_ipv6=0, is_permit=0, proto=0,
              'dst_ip_addr': d_ip})
     return rule
 
-def add_one_acl(rule, cmd_list, cache_key):
-    """Generate ACL command.
+def add_acl_rule(rule, rules):
+    """Add ACL rule.
 
-     :param params:        Parameters from flexiManage.
-     :param cmd_list:      Commands list.
+     :param rule:       Rule field.
+     :param rules:      Rules list.
 
      :returns: None.
      """
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
-    rules = []
     ip_prefix = None
     ip_bytes = None
     proto = None
@@ -116,6 +115,19 @@ def add_one_acl(rule, cmd_list, cache_key):
                               proto=proto,
                               s_ip=ip_bytes))
 
+def _add_acl(params, cmd_list, cache_key):
+    """Generate ACL command.
+
+     :param params:        Parameters from flexiManage.
+     :param cmd_list:      Commands list.
+
+     :returns: None.
+     """
+    rules = []
+
+    for rule in params['rules']:
+        add_acl_rule(rule, rules)
+
     add_params = {
         'acl_index': ctypes.c_uint(-1).value,
         'count': len(rules),
@@ -134,18 +146,6 @@ def add_one_acl(rule, cmd_list, cache_key):
     cmd['revert']['params'] = {'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]}
     cmd['revert']['descr'] = "Remove ACL"
     cmd_list.append(cmd)
-
-def _add_acl(params, cmd_list, cache_key):
-    """Generate ACL command.
-
-     :param params:        Parameters from flexiManage.
-     :param cmd_list:      Commands list.
-
-     :returns: None.
-     """
-
-    for rule in params['rules']:
-        add_one_acl(rule, cmd_list, cache_key)
 
 def _add_app_info(params, cmd_list, cache_key):
     """Generate App commands.
