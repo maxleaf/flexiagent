@@ -214,6 +214,9 @@ class FWROUTER_API:
         if re.match('add-multilink-policy', req):
             return self._handle_add_multilink_policy(req, params)
 
+        if re.match('remove-tunnel|add-tunnel', req):
+            return self._handle_add_remove_tunnel(req, params)
+
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,
@@ -340,6 +343,28 @@ class FWROUTER_API:
         """
         self._call_simple('remove-multilink-policy', {})
         return self._call_simple(req, params)
+
+    def _handle_add_remove_tunnel(self, req, params):
+        """Handle add-tunnel and remove-tunnel.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        remove_requests = []
+        add_requests = []
+
+        for key, request in self.db_requests.db.items():
+            if re.search('add-multilink-policy', key):
+                add_requests.append({'add-multilink-policy': request['params']})
+                remove_requests.append({'remove-multilink-policy': request['params']})
+
+        self._call_aggregated(remove_requests)
+
+        self._call_simple(req, params)
+
+        return self._call_aggregated(add_requests)
 
     def _need_to_translate(self, req):
         if re.search('add-application',  req):
