@@ -1364,3 +1364,25 @@ def vpp_multilink_attach_policy_rule(params):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def get_interface_sw_if_index(ip):
+    """Convert interface src IP address into gateway VPP sw_if_index.
+
+    :param ip: IP address.
+
+    :returns: sw_if_index.
+    """
+
+    pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
+    return pci_to_vpp_sw_if_index(pci)
+
+def get_interface_gateway(ip):
+    """Convert interface src IP address into gateway IP address.
+
+    :param ip: IP address.
+
+    :returns: IP address.
+    """
+
+    pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
+    return ip_str_to_bytes(gw_ip)[0]

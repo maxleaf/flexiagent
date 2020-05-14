@@ -418,12 +418,14 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
     src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
     dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
     cmd_params = {
-            'is_add'           : 1,
-            'src_address'      : src_addr_bytes,
-            'dst_address'      : dst_addr_bytes,
-            'vni'              : bridge_id,
-            'instance'         : bridge_id,
-            'decap_next_index' : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
+            'is_add'               : 1,
+            'src_address'          : src_addr_bytes,
+            'dst_address'          : dst_addr_bytes,
+            'vni'                  : bridge_id,
+            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway', 'arg': src}],
+            'instance'             : bridge_id,
+            'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }
     cmd = {}
     cmd['cmd'] = {}
