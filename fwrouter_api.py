@@ -1175,3 +1175,12 @@ class FWROUTER_API:
                 params.append(request['params'])
 
         return params
+
+    def get_wan_interface_gw(self, ip):
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('wan', request['params']['type'], re.IGNORECASE):
+                    if re.search(ip, request['params']['addr']):
+                        return request['params']['pci'], request['params']['gateway']
+
+        return None
