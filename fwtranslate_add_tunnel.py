@@ -221,18 +221,6 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     cmd['revert']['descr']      = "delete loopback interface (mac=%s, id=%d)" % (mac, id)
     cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_add_del_address (..., sw_if_index, is_add, address_length, address, ...)
-    # 'sw_if_index' is returned by the previous command and it is stored in the executor cache.
-    # So executor takes it out of the cache while executing this command.
-    iface_addr_bytes, iface_addr_len = fwutils.ip_str_to_bytes(addr)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "sw_interface_add_del_address"
-    cmd['cmd']['descr']   = "set %s to loopback interface" % addr
-    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'is_add':1, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
-    cmd_list.append(cmd)
-
     # l2.api.json: l2_flags (..., sw_if_index, bd_id, is_set, flags, ...)
     cmd = {}
     cmd['cmd'] = {}
@@ -242,14 +230,37 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                               'is_set':0 , 'feature_bitmap':1 }  # 1 stands for LEARN (see test\test_l2bd_multi_instance.py)
     cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "sw_interface_set_flags"
-    cmd['cmd']['descr']   = "UP loopback interface %s" % addr
-    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'admin_up_down':1 }
-    cmd_list.append(cmd)
+    if internal:
+        # interface.api.json: sw_interface_add_del_address (..., sw_if_index, is_add, address_length, address, ...)
+        # 'sw_if_index' is returned by the previous command and it is stored in the executor cache.
+        # So executor takes it out of the cache while executing this command.
+        iface_addr_bytes, iface_addr_len = fwutils.ip_str_to_bytes(addr)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_add_del_address"
+        cmd['cmd']['descr']     = "set %s to loopback interface" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'is_add':1, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_add_del_address"
+        cmd['revert']['descr']  = "unset %s from loopback interface" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'is_add':0, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
+        cmd_list.append(cmd)
+
+        # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_set_flags"
+        cmd['cmd']['descr']     = "UP loopback interface %s" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'admin_up_down':1 }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_set_flags"
+        cmd['revert']['descr']  = "DOWN loopback interface %s" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'admin_up_down':0 }
+        cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
     cmd = {}
@@ -263,26 +274,27 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
     if 'multilink' in iface_params and 'labels' in iface_params['multilink']:
         labels = iface_params['multilink']['labels']
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "python"
-        cmd['cmd']['descr']   = "add multilink labels into loopback interface %s: %s" % (addr, labels)
-        cmd['cmd']['params']  = {
-                        'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                        'module': 'fwutils',
-                        'func'  : 'vpp_multilink_update_labels',
-                        'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': False }
-        }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "remove multilink labels from loopback interface %s: %s" % (addr, labels)
-        cmd['revert']['params'] = {
-                        'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                        'module': 'fwutils',
-                        'func'  : 'vpp_multilink_update_labels',
-                        'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': True }
-        }
-        cmd_list.append(cmd)
+        if len(labels) > 0:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "python"
+            cmd['cmd']['descr']   = "add multilink labels into loopback interface %s: %s" % (addr, labels)
+            cmd['cmd']['params']  = {
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': False }
+            }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "python"
+            cmd['revert']['descr']  = "remove multilink labels from loopback interface %s: %s" % (addr, labels)
+            cmd['revert']['params'] = {
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': True }
+            }
+            cmd_list.append(cmd)
 
     # Configure tap of loopback interface in Linux
     # ------------------------------------------------------------
@@ -292,17 +304,27 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     if not internal:
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "UP loopback interface %s in Linux" % addr
-        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
-                                "sudo ip addr add %s dev DEV-STUB" % (addr) ]
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "set %s to loopback interface in Linux" % addr
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip addr add %s dev DEV-STUB" % (addr) ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "unset %s from loopback interface in Linux" % addr
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip addr del %s dev DEV-STUB" % (addr) ]
         cmd_list.append(cmd)
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "set %s to loopback interface in Linux" % addr
-        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
-                                "sudo ip link set dev DEV-STUB up" ]
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "UP loopback interface %s in Linux" % addr
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip link set dev DEV-STUB up" ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "DOWN loopback interface %s in Linux" % addr
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip link set dev DEV-STUB down" ]
         cmd_list.append(cmd)
         cmd = {}
         cmd['cmd'] = {}
