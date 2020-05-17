@@ -959,16 +959,19 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
     :param api:                 The fwagent function to be executed,
                                 e.g. 'inject_requests(requests.json)'.
                                 If provided, no prompt loop will be run.
-    :param script_fname:        Shortcat for --api==inject_requests(<script_fname>)
+    :param script_fname:        Shortcut for --api=inject_requests(<script_fname>)
                                 command. Is kept for backward compatibility.
     :returns: None.
     """
     fwglobals.log.info("started in cli mode (clean_request_db=%s, linger=%s, api=%s)" % \
                         (str(clean_request_db), str(linger), str(api)))
 
-    # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
+    # Preserve historical 'fwagent cli -f' option, as it requires less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
     if script_fname:
+        # Convert relative path into absolute, as daemon fwagent might have
+        # working directory other than the typed 'fwagent cli -f' command.
+        script_fname = os.path.abspath(script_fname)
         api = 'inject_requests(%s)' % (script_fname)
         fwglobals.log.debug(
             "cli: generate 'api' out of 'script_fname': " + api)
