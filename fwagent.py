@@ -472,7 +472,7 @@ class Fwagent:
         pmsg = json.loads(message)
         msg = pmsg['msg']
 
-        reply = self.handle_received_request(msg)
+        reply = self.handle_received_msg(msg)
 
         fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
@@ -501,7 +501,7 @@ class Fwagent:
         if self.ws:
             self.ws.close()
 
-    def _handle_received_msg(self, msg):
+    def _handle_received_request(self, msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -516,7 +516,7 @@ class Fwagent:
 
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
+            fwglobals.log.debug("_handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
 
         self.requestReceived = True
 
@@ -528,11 +528,13 @@ class Fwagent:
             reply.update({'message': 'success'})
 
         if print_message:
-            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+            fwglobals.log.debug("_handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
         return reply
 
-    def handle_received_request(self, msg):
-        """Handles standalone or aggregated message.
+    def handle_received_msg(self, msg):
+        """Handles standalone or aggregated message. Standalone message
+        represents one single API request, like 'add-interface'. Aggregated
+        message represents JSON list of API requests.
 
         :param msg:  Message instance.
 
@@ -540,9 +542,9 @@ class Fwagent:
         """
         if type(msg) is list:
             for request in msg:
-                reply = self._handle_received_msg(request)
+                reply = self._handle_received_request(request)
         else:
-            reply = self._handle_received_msg(msg)
+            reply = self._handle_received_request(msg)
 
         return reply
 
@@ -551,20 +553,19 @@ class Fwagent:
         thus simulating receiving requests over network from the flexiManage.
         This function is used for Unit Testing.
 
-        :param script_fname:  name of the JSON file, were from to load request.
+        :param filename:      name of the JSON file, were from to load requests.
 
         :param ignore_errors: if False, failure to inject some of the loaded
-                              request will cause this function to return, so
-                              rest of loaded requests will be ignored.
-
+                              requests will cause this function to return, so
+                              rest of loaded requests will be not executed.
         :returns: N/A.
         """
         with open(filename, 'r') as f:
             requests = json.loads(f.read())
             for (idx, req) in enumerate(requests):
-                reply = self._handle_received_msg(req)
+                reply = self._handle_received_request(req)
                 if reply['ok'] == 0 and ignore_errors == False:
-                    raise Exception('failed to inject request #%d in %s: %s' % \
+                    raise Exception('failed to inject message #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))
 
 def version():
@@ -991,6 +992,9 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
     # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
     if script_fname:
+        # Convert relative path into absolute, as daemon fwagent might have
+        # working directory other than the typed 'fwagent cli -f' command.
+        script_fname = os.path.abspath(script_fname)
         api = 'inject_requests(%s)' % (script_fname)
         fwglobals.log.debug(
             "cli: generate 'api' out of 'script_fname': " + api)
