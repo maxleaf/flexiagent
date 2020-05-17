@@ -562,10 +562,16 @@ class Fwagent:
         """
         with open(filename, 'r') as f:
             requests = json.loads(f.read())
-            for (idx, req) in enumerate(requests):
-                reply = self._handle_received_request(req)
-                if reply['ok'] == 0 and ignore_errors == False:
-                    raise Exception('failed to inject message #%d in %s: %s' % \
+            if type(requests) is list:   # Take care of file with list of requests
+                for (idx, req) in enumerate(requests):
+                    reply = self._handle_received_request(req)
+                    if reply['ok'] == 0 and ignore_errors == False:
+                        raise Exception('failed to inject request #%d in %s: %s' % \
+                                        ((idx+1), filename, reply['message']))
+            else:   # Take care of file with single request
+                reply = self._handle_received_request(requests)
+                if reply['ok'] == 0:
+                    raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))
 
 def version():
