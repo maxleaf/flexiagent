@@ -33,6 +33,8 @@ import fwglobals
 import fwutils
 
 from fwdb_requests import FwDbRequests
+from fwapplications_api import FwApps
+from fwmultilink import FwMultilink
 from vpp_api import VPP_API
 
 import fwtunnel_stats
@@ -41,22 +43,31 @@ import fwtranslate_add_tunnel
 import fwtranslate_add_interface
 
 fwrouter_modules = {
-    'fwtranslate_revert':       __import__('fwtranslate_revert') ,
-    'fwtranslate_start_router': __import__('fwtranslate_start_router'),
-    'fwtranslate_add_interface':__import__('fwtranslate_add_interface'),
-    'fwtranslate_add_route':    __import__('fwtranslate_add_route'),
-    'fwtranslate_add_tunnel':   __import__('fwtranslate_add_tunnel')
+    'fwtranslate_revert':          __import__('fwtranslate_revert') ,
+    'fwtranslate_start_router':    __import__('fwtranslate_start_router'),
+    'fwtranslate_add_interface':   __import__('fwtranslate_add_interface'),
+    'fwtranslate_add_route':       __import__('fwtranslate_add_route'),
+    'fwtranslate_add_tunnel':      __import__('fwtranslate_add_tunnel'),
+    'fwtranslate_add_dhcp_config': __import__('fwtranslate_add_dhcp_config'),
+    'fwtranslate_add_app':         __import__('fwtranslate_add_app'),
+    'fwtranslate_add_policy':      __import__('fwtranslate_add_policy')
 }
 
 fwrouter_translators = {
-    'start-router':     {'module':'fwtranslate_start_router', 'api':'start_router', 'key_func':'get_request_key'},
-    'stop-router':      {'module':'fwtranslate_revert',       'api':'revert',       'src':'start-router'},
-    'add-interface':    {'module':'fwtranslate_add_interface','api':'add_interface','key_func':'get_request_key'},
-    'remove-interface': {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-interface'},
-    'add-route':        {'module':'fwtranslate_add_route',    'api':'add_route',    'key_func':'get_request_key'},
-    'remove-route':     {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-route'},
-    'add-tunnel':       {'module':'fwtranslate_add_tunnel',   'api':'add_tunnel',   'key_func':'get_request_key'},
-    'remove-tunnel':    {'module':'fwtranslate_revert',       'api':'revert',       'src':'add-tunnel'}
+    'start-router':               {'module':'fwtranslate_start_router',    'api':'start_router',      'key_func':'get_request_key'},
+    'stop-router':                {'module':'fwtranslate_revert',          'api':'revert',            'src':'start-router'},
+    'add-interface':              {'module':'fwtranslate_add_interface',   'api':'add_interface',     'key_func':'get_request_key'},
+    'remove-interface':           {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-interface'},
+    'add-route':                  {'module':'fwtranslate_add_route',       'api':'add_route',         'key_func':'get_request_key'},
+    'remove-route':               {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-route'},
+    'add-tunnel':                 {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel',        'key_func':'get_request_key'},
+    'remove-tunnel':              {'module':'fwtranslate_revert',          'api':'revert',            'src':'add-tunnel'},
+    'add-dhcp-config':            {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config',   'key_func':'get_request_key'},
+    'remove-dhcp-config':         {'module':'fwtranslate_revert',          'api':'revert',            'src': 'add-dhcp-config'},
+    'add-application':            {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
+    'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
+    'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
+    'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
 }
 
 class FWROUTER_API:
@@ -71,11 +82,12 @@ class FWROUTER_API:
 
     :param request_db_file: Requests DB file name
     """
-    def __init__(self, request_db_file):
+    def __init__(self, request_db_file, multilink_db_file):
         """Constructor method
         """
         self.vpp_api         = VPP_API()
         self.db_requests     = FwDbRequests(request_db_file)    # Database of executed requests
+        self.multilink       = FwMultilink(multilink_db_file)
         self.router_started  = False
         self.router_failure  = False
         self.thread_watchdog = None
@@ -150,6 +162,11 @@ class FWROUTER_API:
         # Now start router.
         fwglobals.log.info("===restore vpp: started===")
         try:
+            with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
+                db_app_rec.clean()
+            with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
+                db_multilink.clean()
+
             fwglobals.g.handle_request('start-router', None)
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -190,6 +207,15 @@ class FWROUTER_API:
         # the change in-place, without removing and adding the interface.
         if req == 'modify-device':
             return self._handle_modify_device_request(params)
+
+        if re.match('remove-application|add-application', req):
+            return self._handle_add_remove_application(req, params)
+
+        if re.match('add-multilink-policy', req):
+            return self._handle_add_multilink_policy(req, params)
+
+        if re.match('remove-tunnel|add-tunnel', req):
+            return self._handle_add_remove_tunnel(req, params)
 
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
@@ -282,6 +308,73 @@ class FWROUTER_API:
             addr = request['params']['loopback-iface']['addr']
             fwtunnel_stats.tunnel_stats_add(id, addr)
 
+    def _handle_add_remove_application(self, req, params):
+        """Handle add-application and remove-application.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        remove_requests = []
+        add_requests = []
+
+        for key, request in self.db_requests.db.items():
+            if re.search('add-multilink-policy', key):
+                add_requests.append({'add-multilink-policy': request['params']})
+                remove_requests.append({'remove-multilink-policy': request['params']})
+
+        self._call_aggregated(remove_requests)
+
+        if re.match('add-application', req):
+            self._call_simple('remove-application', params)
+
+        self._call_simple(req, params)
+
+        return self._call_aggregated(add_requests)
+
+    def _handle_add_multilink_policy(self, req, params):
+        """Handle add-multilink-policy.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        self._call_simple('remove-multilink-policy', {})
+        return self._call_simple(req, params)
+
+    def _handle_add_remove_tunnel(self, req, params):
+        """Handle add-tunnel and remove-tunnel.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        remove_requests = []
+        add_requests = []
+
+        for key, request in self.db_requests.db.items():
+            if re.search('add-multilink-policy', key):
+                add_requests.append({'add-multilink-policy': request['params']})
+                remove_requests.append({'remove-multilink-policy': request['params']})
+
+        self._call_aggregated(remove_requests)
+
+        self._call_simple(req, params)
+
+        return self._call_aggregated(add_requests)
+
+    def _need_to_translate(self, req):
+        if re.search('add-application',  req):
+            return False
+
+        if re.search('add-multilink-policy',  req):
+            return False
+
+        return True
+
     def _call_simple(self, req, params):
         """Execute request.
 
@@ -309,15 +402,19 @@ class FWROUTER_API:
         if self._test_router_failure() and not re.match('add-|remove-',  req):
             raise Exception("device failed, can't fulfill requests")
 
+        router_was_started = fwutils.vpp_does_run()
+
         # Translate request to list of commands to be executed
-        (cmd_list , req_key , complement) = self._translate(req, params)
+        if self._need_to_translate(req) or router_was_started:
+            (cmd_list , req_key , complement) = self._translate(req, params)
+        else:
+            (cmd_list, req_key, complement) = self._translate(req, params, False)
 
         # Execute commands only if vpp runs.
         # Some 'remove-XXX' requests must be executed
         # even if vpp doesn't run right now. This is to clean stuff in Linux
         # that was added by correspondent 'add-XXX' request if the last was
         # applied to running vpp.
-        router_was_started = fwutils.vpp_does_run()
         executed = False
         if router_was_started or re.match('remove-',  req):
             filter = 'must' if not router_was_started else None
@@ -335,7 +432,7 @@ class FWROUTER_API:
         return {'ok':1}
 
 
-    def _translate(self, req, params=None):
+    def _translate(self, req, params=None, get_cmd_list=True):
         """Translate request in a series of commands.
 
         :param req:         Request name.
@@ -343,6 +440,7 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
+        cmd_list = []
         api_defs = fwrouter_translators.get(req)
         assert api_defs, 'FWROUTER_API: there is no api for request "' + req + '"'
 
@@ -356,7 +454,8 @@ class FWROUTER_API:
         if fwrouter_translators[req]['api'] == 'revert':
             try:
                 src_req_key = self._extract_request_key(req, params)
-                cmd_list = func(src_req_key)
+                if get_cmd_list:
+                    cmd_list = func(src_req_key)
                 return (cmd_list , src_req_key , True)   # True stands for reverting requests, like stop-router, remove-tunnel, etc.
             except KeyError as e:
                 pass
@@ -364,13 +463,14 @@ class FWROUTER_API:
         # Handle all the rest but revert requests
         request_key_func = getattr(module, fwrouter_translators[req]['key_func'])
         if params:
-            cmd_list    = func(params)
+            if get_cmd_list:
+                cmd_list    = func(params)
             request_key = request_key_func(params)
         else:
-            cmd_list    = func()
+            if get_cmd_list:
+                cmd_list    = func()
             request_key = request_key_func()
         return (cmd_list, request_key, False)     # False stands for initiating requests, like start-router, add-tunnel, etc.
-
 
     def _execute(self, req, req_key, cmd_list, filter=None):
         """Execute request.
@@ -587,6 +687,7 @@ class FWROUTER_API:
         # on restoring vpp by it, when the current thread stops vpp on purpose 
         self.router_started = False 
         self._stop_threads()
+        fwutils.reset_dhcpd()
 
         # Now translate and execute stop-router.
         # On any problem we have to force router stop,
@@ -673,6 +774,12 @@ class FWROUTER_API:
             # restart. Only restart if the router is currently running.
             should_restart_router = self.router_started
             requests += self._create_modify_router_request(params['modify_router'])
+        if 'modify_dhcp_config' in params:
+            requests += self._create_modify_dhcp_config_request(params['modify_dhcp_config'])
+        if 'modify_app' in params:
+            requests += self._create_modify_app_request(params['modify_app'])
+        if 'modify_policy' in params:
+            requests += self._create_modify_policy_request(params['modify_policy'])
 
         try:
             if should_restart_router == True:
@@ -783,6 +890,64 @@ class FWROUTER_API:
 
         return modify_router_requests
 
+    def _create_modify_dhcp_config_request(self, params):
+        """'modify_dhcp_config' pre-processing:
+        This command is a wrapper around the 'add-dhcp-config' and 'remove-dhcp-config' commands.
+
+        :param params:          Request parameters.
+
+        :returns: Array of requests.
+        """
+        modify_requests = []
+
+        if params:
+            for config in params['dhcp_configs']:
+                # Remove dhcp config only if it exists in the database
+                if self._get_request_params_from_db('remove-dhcp-config', config):
+                    modify_requests.append({'remove-dhcp-config': config})
+                modify_requests.append({'add-dhcp-config': config})
+
+        return modify_requests
+
+    def _create_modify_policy_request(self, params):
+        """'modify_policy' pre-processing:
+        This command is a wrapper around the 'add-multilink-policy' and 'remove-multilink-policy' commands.
+
+        :param params:          Request parameters.
+
+        :returns: Array of requests.
+            """
+
+        modify_requests = []
+
+        if params:
+            for policy in params['policies']:
+                # Remove policy only if it exists in the database
+                if self._get_request_params_from_db('remove-multilink-policy', policy):
+                    modify_requests.append({'remove-multilink-policy': policy})
+                modify_requests.append({'add-multilink-policy': policy})
+
+        return modify_requests
+
+    def _create_modify_app_request(self, params):
+        """'modify_app' pre-processing:
+        This command is a wrapper around the 'add-application' and 'remove-application' commands.
+
+        :param params:          Request parameters.
+
+        :returns: Array of requests.
+        """
+        modify_requests = []
+
+        if params:
+            for app in params['apps']:
+                # Remove app only if it exists in the database
+                if self._get_request_params_from_db('remove-application', app):
+                    modify_requests.append({'remove-application': app})
+                modify_requests.append({'add-application': app})
+
+        return modify_requests
+
     def _set_router_failure(self, err_str):
         """Set router failure state.
 
@@ -843,10 +1008,25 @@ class FWROUTER_API:
                     self._apply_db_request(key)
                     self._fill_tunnel_stats_dict()
 
+            # Configure apps
+            for key in self.db_requests.db:
+                if re.match('add-application', key):
+                    self._apply_db_request(key)
+
+            # Configure policies
+            for key in self.db_requests.db:
+                if re.match('add-multilink-policy', key):
+                    self._apply_db_request(key)
+
             # Configure routes
             # Do that after routes, as routes might use tunnels!
             for key in self.db_requests.db:
                 if re.match('add-route', key):
+                    self._apply_db_request(key)
+
+            # Configure dhcp server
+            for key in self.db_requests.db:
+                if re.match('add-dhcp-config', key):
                     self._apply_db_request(key)
 
         except Exception as e:
@@ -967,7 +1147,10 @@ class FWROUTER_API:
             # Add new param/replace old value with new one
             if 'add_param' in s:
                 if type(params) is dict:
-                    params[s['add_param']] = new
+                    if 'args' in params:        # Take care of cmd['cmd']['name'] = "python" commands
+                        params['args'][s['add_param']] = new
+                    else:                       # Take care of rest commands
+                        params[s['add_param']] = new
                 else:  # list
                     params.insert({s['add_param'], new})
             elif 'replace' in s:
@@ -987,3 +1170,42 @@ class FWROUTER_API:
             del params['substs']
         else:  # list
             params.remove(substs_element)
+
+    def get_default_route_address(self):
+        for key, request in self.db_requests.db.items():
+            if re.search('add-route:default', key):
+                return request['params']['via']
+
+    def get_pci_lan_interfaces(self):
+        interfaces = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('lan', request['params']['type'], re.IGNORECASE):
+                    interfaces.append(request['params']['pci'])
+
+        return interfaces
+
+    def get_ip_tunnel_interfaces(self):
+        ip_list = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-tunnel', key):
+                ip_list.append(request['params']['loopback-iface']['addr'])
+
+        return ip_list
+
+    def get_request_params(self, name):
+        params = []
+        for key, request in self.db_requests.db.items():
+            if re.search(name, key):
+                params.append(request['params'])
+
+        return params
+
+    def get_wan_interface_gw(self, ip):
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('wan', request['params']['type'], re.IGNORECASE):
+                    if re.search(ip, request['params']['addr']):
+                        return request['params']['pci'], request['params']['gateway']
+
+        return None

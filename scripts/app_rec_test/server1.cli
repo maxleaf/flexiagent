@@ -1,0 +1,191 @@
+[
+{
+      "entity":  "agent",
+      "message": "add-dhcp-config",
+      "params": {
+          "interface": "0000:00:08.00",
+          "range_start": "20.20.20.2",
+          "range_end": "20.20.20.255",
+          "dns": ["8.8.8.8", "8.8.8.4"]
+       }
+},
+[
+{
+  "entity":  "agent",
+  "message": "add-application",
+  "params": {"applications":[{
+           "name":"test",
+           "id":"1",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"3",
+           "rules":[{
+             "protocol": "udp",
+             "ip":"4.1.8.4/32",
+             "ports":"100"}]
+           }
+           ]}
+},
+{
+      "entity":  "agent",
+      "message": "add-multilink-policy",
+      "params": {
+        "rules": [{
+          "id": 1,
+          "priority": 100,
+          "classification": {
+            "application": {
+              "category":"network"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
+          }
+        }]
+      }
+}
+],
+{
+	"entity": "agent",
+	"message": "start-router",
+	"params": {
+	"interfaces": [
+	   {
+		"pci": "0000:00:03.00",
+		"addr": "192.168.0.110/24",
+		"gateway": "192.168.0.1",
+		"type":"wan",
+		"multilink": {
+          "labels": [
+            "red"]
+        }
+	   },
+	   {
+		"pci": "0000:00:08.00",
+		"addr": "20.20.20.1/24",
+		"routing":"ospf",
+		"type":"lan"
+	   }
+	   ],
+    "routes": [
+      {
+        "addr": "default",
+        "via": "192.168.0.1"
+      }
+      ]
+	}
+},
+{
+  "entity":  "agent",
+  "message": "add-application",
+  "params": {"applications":[{
+           "name":"google-dns",
+           "id":"1",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"3",
+           "rules":[{
+             "protocol": "udp",
+             "ip":"8.8.8.8/32",
+             "ports":"53-54"},
+             {
+             "protocol": "udp",
+             "ip":"8.8.4.4/32",
+             "ports":"53-54"}]
+           },
+           {
+           "name":"dns",
+           "id":"2",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "protocol": "udp",
+             "ports":"53"}]
+           },
+           {
+           "name":"yahoo",
+           "id":"3",
+           "category":"network",
+           "serviceClass":"dns",
+           "importance":"2",
+           "rules":[{
+             "ip":"67.26.43.44/24"
+             }]
+           }
+           ]}
+},
+{
+      "entity":  "agent",
+      "message": "add-multilink-policy",
+      "params": {
+        "rules": [{
+          "id": 1,
+          "priority": 100,
+          "classification": {
+          "prefix": {
+                "ip": "9.9.9.0/24",
+                "ports": "5060-5090",
+                "protocol": "udp"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
+          }
+        }]
+      }
+},
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.0.110",
+    "dst": "192.168.0.104",
+    "tunnel-id": 1,
+    "ipsec": {
+      "local-sa": {
+         "spi": 5,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "4e2f8c6fcdd1bdafa13235d388e31bef",
+         "integr-alg": "sha1-96",
+         "integr-key": "2e11aa3a41c04c6440cb39fa40313689"
+      },
+      "remote-sa": {
+         "spi": 4,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "9be852e667ae2436d0197a91aca318a2",
+         "integr-alg": "sha1-96",
+         "integr-key": "be6baffee24ec9f7aac8044ca859c40d"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.7/31",
+      "mac":"02:00:27:fd:00:04",
+      "mtu":1360,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "brown" ]
+      }
+
+    }
+  }
+}
+]

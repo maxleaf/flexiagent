@@ -36,7 +36,11 @@ fwagent_api = {
     'get-device-os-routes': '_get_device_os_routes',
     'handle-request':       '_handle_request',
     'get-router-config':    '_get_router_config',
-    'upgrade-device-sw':    '_upgrade_device_sw'
+    'upgrade-device-sw':    '_upgrade_device_sw',
+    'add-app-info':         '_add_app_info',
+    'remove-app-info':      '_remove_app_info',
+    'add-policy-info':      '_add_policy_info',
+    'remove-policy-info':   '_remove_policy_info'
 }
 
 class FWAGENT_API:
@@ -179,7 +183,7 @@ class FWAGENT_API:
         :returns: Dictionary with configuration and status code.
         """
         configs = fwutils.get_router_config()
-        reply = {'ok':1, 'message': configs if configs != None else {}}
+        reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
 
     def _handle_request(self, params):
@@ -193,4 +197,4 @@ class FWAGENT_API:
             reply = fwglobals.g.handle_request(params['request'], params.get('params'))
             return reply
         except Exception as e:
-            return {'ok':0 , 'message':str(e)}
+            return {'ok': 0, 'message': str(e)}

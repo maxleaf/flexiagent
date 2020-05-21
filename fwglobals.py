@@ -31,11 +31,15 @@ from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
+from fwapplications_api import FwApps
+from fwpolicies_api import FwPolicies
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
+    'fwapps_api':   __import__('fwapplications_api'),
+    'fwpolicy_api': __import__('fwpolicies_api'),
     'fwrouter_api': __import__('fwrouter_api'),
-    'os_api':       __import__('os_api')
+    'os_api':       __import__('os_api'),
 }
 
 request_handlers = {
@@ -57,6 +61,14 @@ request_handlers = {
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
 
+    # Applications API
+    'add-app-info':                 '_call_apps_api',
+    'remove-app-info':              '_call_apps_api',
+
+    # Policy API
+    'add-policy-info':              '_call_policy_api',
+    'remove-policy-info':           '_call_policy_api',
+
     # Router API
     'start-router':                 '_call_router_api',
     'stop-router':                  '_call_router_api',
@@ -68,8 +80,12 @@ request_handlers = {
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
     'modify-device':                '_call_router_api',
-
-
+    'add-dhcp-config':              '_call_router_api',
+    'remove-dhcp-config':           '_call_router_api',
+    'add-application':              '_call_router_api',
+    'remove-application':           '_call_router_api',
+    'add-multilink-policy':        '_call_router_api',
+    'remove-multilink-policy':     '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s
@@ -98,6 +114,10 @@ request_handlers = {
     'disconnect_from_router':       '_call_os_api',
 
     # VPP API
+    'abf_itf_attach_add_del':       '_call_vpp_api',
+    'abf_policy_add_del':           '_call_vpp_api',
+    'acl_add_replace':              '_call_vpp_api',
+    'acl_del':                      '_call_vpp_api',
     'bridge_domain_add_del':        '_call_vpp_api',
     'create_loopback_instance':     '_call_vpp_api',
     'delete_loopback':              '_call_vpp_api',
@@ -187,6 +207,10 @@ class Fwglobals:
         self.VPP_CONFIG_FILE_BACKUP = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
+        self.DHCPD_CONFIG_FILE = '/etc/dhcp/dhcpd.conf'
+        self.APP_REC_DB_FILE = self.DATA_PATH + '.app_rec.sqlite'
+        self.MULTILINK_DB_FILE = self.DATA_PATH + '.multilink.sqlite'
+        self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
@@ -232,8 +256,11 @@ class Fwglobals:
         :returns: None.
         """
         self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE)
+        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
+        self.apps_api   = FwApps(self.APP_REC_DB_FILE)
+        self.policy_api = FwPolicies()
+
         self.router_api.restore_vpp_if_needed()
 
     def finalize(self):
@@ -242,7 +269,7 @@ class Fwglobals:
         self.router_api.finalize()
 
     def __str__(self):
-        """Get string represantation of configuration.
+        """Get string representation of configuration.
 
         :returns: String in JSON format.
         """
@@ -260,6 +287,12 @@ class Fwglobals:
 
     def _call_agent_api(self, req, params):
         return self.agent_api.call(req, params)
+
+    def _call_apps_api(self, req, params):
+        return self.apps_api.call(req, params)
+
+    def _call_policy_api(self, req, params):
+        return self.policy_api.call(req, params)
 
     def _call_router_api(self, req, params):
         return self.router_api.call(req, params)
@@ -319,7 +352,7 @@ class Fwglobals:
 
         except Exception as e:
             global log
-            err_str = "%s(%s): %s" % (req, format(params), str(e)) 
+            err_str = "%s(%s): %s" % (req, format(params), str(e))
             log.error(err_str + ': %s' % traceback.format_exc())
             reply = {"message":err_str, 'ok':0}
             return reply
