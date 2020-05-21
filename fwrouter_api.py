@@ -1209,3 +1209,12 @@ class FWROUTER_API:
                         return request['params']['pci'], request['params']['gateway']
 
         return None
+
+    def get_wan_interface_addr_pci(self):
+        wan_list = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('wan', request['params']['type'], re.IGNORECASE):
+                    wan_list.append({'addr': request['params']['addr'], 'pci': request['params']['pci']})
+
+        return wan_list

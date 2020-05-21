@@ -1410,3 +1410,24 @@ def get_interface_gateway(ip):
 
     pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
+
+def wan_ip_was_changed():
+    wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
+
+    try:
+        for wan in wan_list:
+            iface = pci_to_linux_iface(wan['pci'])
+
+            addr = get_interface_address(iface)
+
+            fwglobals.log.debug(iface)
+            fwglobals.log.debug(addr)
+            fwglobals.log.debug(wan['addr'])
+
+            if addr is not wan['addr']:
+                return True
+    except:
+        fwglobals.log.error('Exception')
+        return True
+
+    return False

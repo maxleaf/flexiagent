@@ -107,6 +107,8 @@ def get_stats():
     res_update_list = list(updates_list)
     del updates_list[:]
 
+    reconfig = fwutils.wan_ip_was_changed()
+
     # If the list of updates is empty, append a dummy update to 
     # set the most up-to-date status of the router. If not, update
     # the last element in the list with the current status of the router
@@ -126,12 +128,14 @@ def get_stats():
             'stats': {},
             'tunnel_stats': {},
             'period': 0,
-            'utc': time.time()
+            'utc': time.time(),
+            'reconfig': reconfig
         })
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
+        res_update_list[-1]['reconfig'] = reconfig
 
     return {'message': res_update_list, 'ok': 1}
     
@@ -150,4 +154,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0, 'reconfig':False}
