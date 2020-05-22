@@ -830,6 +830,31 @@ def print_router_config(full=False):
 
         head_line_printed = False
         for key in db_requests.db:
+            if re.match('add-dhcp-config', key):
+                if not head_line_printed:
+                    print("=========== DHCP CONFIG ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
+
+def print_multilink_policy_config(full=False):
+    """Print multilink policy configuration.
+
+     :param full:         Return requests together with translated commands.
+
+     :returns: None.
+     """
+    def _print_config_request(db_requests, key, full):
+        (_, params) = db_requests.fetch_request(key)
+        print("Key:\n   %s" % key)
+        print("Request:\n   %s" % json.dumps(params, sort_keys=True, indent=4))
+        if full:
+            cmd_list = db_requests.fetch_cmd_list(key)
+            print("Commands:\n  %s" % yaml_dump(cmd_list))
+        print("")
+
+    with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
+        head_line_printed = False
+        for key in db_requests.db:
             if re.match('add-application', key):
                 if not head_line_printed:
                     print("=========== APPS ==========")
@@ -843,15 +868,6 @@ def print_router_config(full=False):
                     print("=========== POLICIES ==========")
                     head_line_printed = True
                 _print_config_request(db_requests, key, full)
-
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-dhcp-config', key):
-                if not head_line_printed:
-                    print("=========== DHCP CONFIG ==========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-
 #
 def _get_group_delimiter(lines, delimiter):
     """Helper function to iterate through a group lines by delimiter.

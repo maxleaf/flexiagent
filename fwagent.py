@@ -691,6 +691,8 @@ def show(agent_info, router_info):
             fwutils.print_router_config()
         elif router_info == 'request_db':
             fwutils.print_router_config(full=True)
+        elif router_info == 'multilink-policy':
+            fwutils.print_multilink_policy_config()
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -1062,7 +1064,7 @@ if __name__ == '__main__':
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db'],
+    parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db', 'multilink-policy'],
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version'],
                         help="show various agent parameters")
