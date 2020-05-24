@@ -306,8 +306,11 @@ class Fwglobals:
     def _call_python_api(self, req, params):
         module = __import__(params['module'])
         func   = getattr(module, params['func'])
-        args   = params['args']
-        ok, ret = func(args)
+        args   = params.get('args')
+        if args:
+            ok, ret = func(args)
+        else:
+            ok, ret = func()
         if not ok:
             log.error('_call_python_api: %s(%s) failed: %s' % \
                     (params['func'], json.dumps(args), ret))
