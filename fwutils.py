@@ -1364,12 +1364,20 @@ def vpp_multilink_update_policy_rule(params):
     labels = params['labels']
     ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
     ids = ','.join(map(str, ids_list))
+    fallback = ''
+    order = ''
+
+    if re.match(params['fallback'], 'drop'):
+        fallback = 'fallback drop'
+
+    if re.match(params['order'], 'load-balancing'):
+        order = 'select_group random'
 
     acl_id = params.get('acl_id', None)
     if acl_id is None:
-        vppctl_cmd = 'fwabf policy %s id %d action labels %s' % (op, policy_id, ids)
+        vppctl_cmd = 'fwabf policy %s id %d action %s %s labels %s' % (op, policy_id, fallback, order, ids)
     else:
-        vppctl_cmd = 'fwabf policy %s id %d acl %d action labels %s' % (op, policy_id, acl_id, ids)
+        vppctl_cmd = 'fwabf policy %s id %d acl %d action %s %s labels %s' % (op, policy_id, acl_id, fallback, order, ids)
 
         fwglobals.log.debug("vppctl " + vppctl_cmd)
 

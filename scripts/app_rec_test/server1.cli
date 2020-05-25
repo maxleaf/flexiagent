@@ -136,7 +136,7 @@
             }
           },
           "action": {
-            "fallback": "by-destination",
+            "fallback": "drop",
             "links": [
               {
                 "order": "priority",
@@ -168,12 +168,12 @@
                 ]
               }
             ],
-            "order": "priority"
+            "order": "load-balancing"
           }
         },
         {
             "action": {
-                "fallback": "by-destination",
+                "fallback": "drop",
                 "links": [
                     {
                         "order": "priority",
@@ -182,7 +182,7 @@
                         ]
                     }
                 ],
-                "order": "priority"
+                "order": "load-balancing"
             },
             "classification": {
                 "application": {
