@@ -161,11 +161,11 @@ def _add_app_info(params, cmd_list, cache_key):
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "add-app-info"
     cmd['cmd']['params']        = new_params
-    cmd['cmd']['descr']         = "Add APP %s" % (params['name'])
+    cmd['cmd']['descr']         = "Add APP %s" % (params['id'])
     cmd['revert'] = {}
     cmd['revert']['name']       = 'remove-app-info'
     cmd['revert']['params']     = new_params
-    cmd['revert']['descr']      = "Delete APP %s" % (params['name'])
+    cmd['revert']['descr']      = "Delete APP %s" % (params['id'])
     cmd_list.append(cmd)
 
 def add_app(params):

@@ -145,13 +145,13 @@ class FwApps:
 
         :returns: Reply.
         """
-        name = params['name']
+        id = params['id']
         acl_id = params['acl_index']
         category = params.get('category', None)
         serviceClass = params.get('serviceClass', None)
         importance = params.get('importance', None)
 
-        self._add_app_db(name, acl_id, category, serviceClass, importance)
+        self._add_app_db(id, acl_id, category, serviceClass, importance)
 
         reply = {'ok': 1}
         return reply
@@ -163,13 +163,13 @@ class FwApps:
 
         :returns: Reply.
         """
-        name = params['name']
+        id = params['id']
         acl_id = params['acl_index']
         category = params.get('category', None)
         serviceClass = params.get('serviceClass', None)
         importance = params.get('importance', None)
 
-        self._remove_app_db(name, acl_id, category, serviceClass, importance)
+        self._remove_app_db(id, acl_id, category, serviceClass, importance)
 
         reply = {'ok': 1}
         return reply

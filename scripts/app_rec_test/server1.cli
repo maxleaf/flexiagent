@@ -9,7 +9,6 @@
           "dns": ["8.8.8.8", "8.8.8.4"]
        }
 },
-[
 {
   "entity":  "agent",
   "message": "add-application",
@@ -52,8 +51,7 @@
           }
         }]
       }
-}
-],
+},
 {
 	"entity": "agent",
 	"message": "start-router",
@@ -88,7 +86,6 @@
   "entity":  "agent",
   "message": "add-application",
   "params": {"applications":[{
-           "name":"google-dns",
            "id":"1",
            "category":"network",
            "serviceClass":"dns",
@@ -139,7 +136,7 @@
             }
           },
           "action": {
-            "fallback": "by-destination",
+            "fallback": "drop",
             "links": [
               {
                 "order": "priority",
@@ -150,6 +147,54 @@
             ],
             "order": "priority"
           }
+        },
+        {
+          "id": 2,
+          "priority": 100,
+          "classification": {
+          "prefix": {
+                "ip": "19.19.9.0/24",
+                "ports": "4060-4090",
+                "protocol": "tcp"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "load-balancing"
+          }
+        },
+        {
+            "action": {
+                "fallback": "drop",
+                "links": [
+                    {
+                        "order": "priority",
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16"
+                        ]
+                    }
+                ],
+                "order": "load-balancing"
+            },
+            "classification": {
+                "application": {
+                    "appId": "1",
+                    "category": "",
+                    "importance": "",
+                    "serviceClass": ""
+                },
+                "prefix": {}
+            },
+            "id": "5eca8c5459ac7532e9315788",
+            "priority": 1
         }]
       }
 },
