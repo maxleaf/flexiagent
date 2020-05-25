@@ -98,7 +98,7 @@ def reset_policy_id():
     global policy_index
     policy_index = 0
 
-def _add_policy_rule(policy_id, labels, acl_id, cmd_list):
+def _add_policy_rule(policy_id, labels, acl_id, fallback, order, cmd_list):
     """Translates single policy rule into commands to be applied to VPP.
 
      :param params:    policy rule parameters received from flexiManage.
@@ -113,7 +113,9 @@ def _add_policy_rule(policy_id, labels, acl_id, cmd_list):
     cmd['cmd']['params']  = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'labels': labels, 'policy_id': policy_id, 'acl_id': acl_id, 'remove': False }
+                    'args'  : { 'labels': labels, 'policy_id': policy_id,
+                                'acl_id': acl_id, 'fallback': fallback,
+                                'order': order, 'remove': False }
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -121,12 +123,14 @@ def _add_policy_rule(policy_id, labels, acl_id, cmd_list):
     cmd['revert']['params'] = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'labels': labels, 'policy_id': policy_id, 'acl_id': acl_id, 'remove': True }
+                    'args'  : { 'labels': labels, 'policy_id': policy_id,
+                                'acl_id': acl_id, 'fallback': fallback,
+                                'order': order, 'remove': True }
     }
     cmd_list.append(cmd)
     return cmd_list
 
-def _add_policy_rule_from_cache_key(policy_id, labels, cache_key, cmd_list):
+def _add_policy_rule_from_cache_key(policy_id, labels, cache_key, fallback, order, cmd_list):
     """Translates single policy rule into commands to be applied to VPP.
 
      :param params:    policy rule parameters received from flexiManage.
@@ -139,6 +143,8 @@ def _add_policy_rule_from_cache_key(policy_id, labels, cache_key, cmd_list):
         'substs' : [{'add_param': 'acl_id', 'val_by_key': cache_key}],
         'labels': labels,
         'policy_id': policy_id,
+        'fallback': fallback,
+        'order': order,
         'remove': False
     }
 
@@ -252,6 +258,8 @@ def add_policy(params):
 
     for rule in params['rules']:
         priority = rule['priority']
+        fallback = rule['action']['fallback']
+        order = rule['action']['order']
         links = rule['action']['links']
         labels = links[0]['pathlabels']
 
@@ -262,7 +270,7 @@ def add_policy(params):
         if prefix:
             _add_acl(prefix, cmd_list, 'acl_index')
             policy_id = _generate_policy_id()
-            _add_policy_rule_from_cache_key(policy_id, labels, 'acl_index', cmd_list)
+            _add_policy_rule_from_cache_key(policy_id, labels, 'acl_index', fallback, order, cmd_list)
             _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
 
         elif app:
@@ -274,12 +282,12 @@ def add_policy(params):
             acl_id_list = fwglobals.g.apps_api.acl_id_list_get(id, category, service_class, importance)
             for acl_id in acl_id_list:
                 policy_id = _generate_policy_id()
-                _add_policy_rule(policy_id, labels, acl_id, cmd_list)
+                _add_policy_rule(policy_id, labels, acl_id, fallback, order, cmd_list)
                 _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
 
         else:
             policy_id = _generate_policy_id()
-            _add_policy_rule(policy_id, labels, None, cmd_list)
+            _add_policy_rule(policy_id, labels, None, fallback, order, cmd_list)
             _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
 
     return cmd_list
