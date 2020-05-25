@@ -266,12 +266,12 @@ def add_policy(params):
             _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
 
         elif app:
-            name = app.get('name', None)
+            id = app.get('appId', None)
             category = app.get('category', None)
             service_class = app.get('serviceClass', None)
             importance = app.get('importance', None)
 
-            acl_id_list = fwglobals.g.apps_api.acl_id_list_get(name, category, service_class, importance)
+            acl_id_list = fwglobals.g.apps_api.acl_id_list_get(id, category, service_class, importance)
             for acl_id in acl_id_list:
                 policy_id = _generate_policy_id()
                 _add_policy_rule(policy_id, labels, acl_id, cmd_list)
