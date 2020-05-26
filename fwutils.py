@@ -20,6 +20,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+
+import hashlib
 import inspect
 import json
 import os
@@ -1475,17 +1477,21 @@ def get_interface_gateway(ip):
     return ip_str_to_bytes(gw_ip)[0]
 
 def wan_ip_was_changed():
+    res = ''
     wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
     router_was_started = vpp_does_run()
     if not router_was_started:
-        return False
+        return ''
 
     for wan in wan_list:
         name = pci_to_vpp_if_name(wan['pci'])
-        fwglobals.log.debug('name %s' % name)
         addr = vpp_intf_name_to_ip(name)
 
         if addr is not wan['addr']:
-            return True
+            res = res + addr
 
-    return False
+    if res:
+        hash = hashlib.md5(res).hexdigest()
+        return hash
+
+    return ''
