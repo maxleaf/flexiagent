@@ -167,13 +167,17 @@ def get_interface_address(iface):
 
     :returns: IP address.
     """
-    addresses = psutil.net_if_addrs()[iface]
+    interfaces = psutil.net_if_addrs()
+    if iface not in interfaces:
+        return None
+
+    addresses = interfaces[iface]
     for addr in addresses:
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    raise Exception("get_interface_address(%s): no IPv4 address was found" % iface)
+    raise None
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -1478,14 +1482,23 @@ def get_interface_gateway(ip):
 
 def wan_ip_was_changed():
     res = ''
-    wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
     router_was_started = vpp_does_run()
-    if not router_was_started:
-        return ''
+    wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
 
     for wan in wan_list:
-        name = pci_to_vpp_if_name(wan['pci'])
-        addr = vpp_intf_name_to_ip(name)
+        if router_was_started:
+            name = pci_to_linux_iface(wan['pci'])
+        else:
+            name = pci_to_tap(wan['pci'])
+
+        if name is None:
+            return ''
+
+        fwglobals.log.debug(name)
+        addr = get_interface_address(name)
+
+        if addr is None:
+            return ''
 
         if addr is not wan['addr']:
             res = res + addr

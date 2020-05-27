@@ -1,6 +1,11 @@
 [
 {
 	"entity": "agent",
+	"message": "get-device-stats",
+	"params": {}
+},
+{
+	"entity": "agent",
 	"message": "get-device-info",
 	"params": {}
 },
@@ -37,7 +42,7 @@
 },
 {
 	"entity": "agent",
-	"message": "get-device-info",
+	"message": "get-device-stats",
 	"params": {}
 },
 {
@@ -47,7 +52,7 @@
 },
 {
 	"entity": "agent",
-	"message": "get-device-info",
+	"message": "get-device-stats",
 	"params": {}
 },
 {
@@ -57,7 +62,37 @@
 },
 {
 	"entity": "agent",
+	"message": "get-device-stats",
+	"params": {}
+},
+{
+	"entity": "agent",
 	"message": "get-device-info",
+	"params": {}
+},
+{
+	"entity": "agent",
+	"message": "get-device-stats",
+	"params": {}
+},
+{
+	"entity": "agent",
+	"message": "get-device-info",
+	"params": {}
+},
+{
+	"entity": "agent",
+	"message": "get-device-stats",
+	"params": {}
+},
+{
+	"entity": "agent",
+	"message": "get-device-info",
+	"params": {}
+},
+{
+	"entity": "agent",
+	"message": "get-device-stats",
 	"params": {}
 },
 {
