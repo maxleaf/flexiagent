@@ -1336,9 +1336,7 @@ def vpp_multilink_update_policy_rule(params):
 
     op = 'del' if params['remove'] else 'add'
     policy_id = params['policy_id']
-    labels = params['labels']
-    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
-    ids = ','.join(map(str, ids_list))
+    links = params['links']
     fallback = ''
     order = ''
 
@@ -1350,11 +1348,24 @@ def vpp_multilink_update_policy_rule(params):
 
     acl_id = params.get('acl_id', None)
     if acl_id is None:
-        vppctl_cmd = 'fwabf policy %s id %d action %s %s labels %s' % (op, policy_id, fallback, order, ids)
+        vppctl_cmd = 'fwabf policy %s id %d action %s %s' % (op, policy_id, fallback, order)
     else:
-        vppctl_cmd = 'fwabf policy %s id %d acl %d action %s %s labels %s' % (op, policy_id, acl_id, fallback, order, ids)
+        vppctl_cmd = 'fwabf policy %s id %d acl %d action %s %s' % (op, policy_id, acl_id, fallback, order)
 
-        fwglobals.log.debug("vppctl " + vppctl_cmd)
+    group_id = 1
+    for link in links:
+        order = ''
+        if re.match(link['order'], 'load-balancing'):
+            order = 'random'
+
+        labels = link['pathlabels']
+        ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
+        ids = ','.join(map(str, ids_list))
+
+        vppctl_cmd += ' group %u %s labels %s' % (group_id, order, ids)
+        group_id = group_id + 1
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
