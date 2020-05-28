@@ -35,7 +35,6 @@ import fwglobals
 import fwstats
 import shutil
 import sys
-import time
 import yaml
 from netaddr import IPNetwork, IPAddress
 
@@ -523,30 +522,6 @@ def _sub_file(fname, smap):
         return {'message':'File substituted', 'ok':1}
     else:
         return {'message':'File does not exist', 'ok':0}
-
-# This function should be replaced with VPP Python API binding
-# called directly by translator when upgraded to the latest VPP from the 19.01.
-def vpp_enable_tap_inject():
-    """Runs 'vppctl enable tap-inject' and checks the output.
-    If output is 'Connection refused' retry few times.
-
-    :returns:  ("", 1) on success, (<error>, 0) on failure
-    """
-    timeout = 30  # Seconds
-    waited  = 0
-    try:
-        while waited < timeout:
-            out = subprocess.check_output(['vppctl', 'enable', 'tap-inject'])
-            if len(out) == 0:
-                return ("", 1)
-            elif not re.search("Connection refused", out):
-                return (out, 0)
-            else:
-                time.sleep(3)
-                waited += 3
-        return (out, 0)
-    except Exception as e:
-        return (str(e), 0)
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
