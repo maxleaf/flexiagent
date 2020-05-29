@@ -24,6 +24,7 @@ import copy
 import ctypes
 import os
 import re
+import time
 
 import fwglobals
 import fwtranslate_revert
@@ -195,7 +196,7 @@ def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
     }
     cmd_list.append(cmd)
 
-def _attach_policy_lans_loopbacks(policy_id, priority, cmd_list):
+def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list):
     """Generate attach policy commands.
 
      :param policy_id:   Policy id.
@@ -205,13 +206,11 @@ def _attach_policy_lans_loopbacks(policy_id, priority, cmd_list):
      :returns: List of commands.
     """
     is_ipv6 = 0
-    lan_pci_list = fwglobals.g.router_api.get_pci_lan_interfaces()
 
     for pci in lan_pci_list:
         sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
         _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
 
-    loopback_ip_list = fwglobals.g.router_api.get_ip_tunnel_interfaces()
     for ip in loopback_ip_list:
         sw_if_index = fwutils.vpp_ip_to_sw_if_index(ip)
         _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
@@ -255,6 +254,8 @@ def add_policy(params):
      :returns: List of commands.
     """
     cmd_list = []
+    lan_pci_list = fwglobals.g.router_api.get_pci_lan_interfaces()
+    loopback_ip_list = fwglobals.g.router_api.get_ip_tunnel_interfaces()
 
     for rule in params['rules']:
         priority = rule['priority']
@@ -270,7 +271,7 @@ def add_policy(params):
             _add_acl(prefix, cmd_list, 'acl_index')
             policy_id = _generate_policy_id()
             _add_policy_rule_from_cache_key(policy_id, links, 'acl_index', fallback, order, cmd_list)
-            _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
 
         elif app:
             id = app.get('appId', None)
@@ -282,12 +283,12 @@ def add_policy(params):
             for acl_id in acl_id_list:
                 policy_id = _generate_policy_id()
                 _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list)
-                _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
+                _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
 
         else:
             policy_id = _generate_policy_id()
             _add_policy_rule(policy_id, links, None, fallback, order, cmd_list)
-            _attach_policy_lans_loopbacks(policy_id, priority, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
 
     return cmd_list
 
