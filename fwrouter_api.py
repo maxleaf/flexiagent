@@ -1182,7 +1182,8 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('lan', request['params']['type'], re.IGNORECASE):
                     sw_if_index = fwutils.pci_to_vpp_sw_if_index(request['params']['pci'])
-                    interfaces.append(sw_if_index)
+                    int_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
+                    interfaces.append(int_name)
 
         return interfaces
 
@@ -1191,7 +1192,8 @@ class FWROUTER_API:
         for key, request in self.db_requests.db.items():
             if re.search('add-tunnel', key):
                 sw_if_index = fwutils.vpp_ip_to_sw_if_index(request['params']['loopback-iface']['addr'])
-                ip_list.append(sw_if_index)
+                int_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
+                ip_list.append(int_name)
 
         return ip_list
 

@@ -166,10 +166,10 @@ def _add_policy_rule_from_cache_key(policy_id, links, cache_key, fallback, order
     cmd_list.append(cmd)
     return cmd_list
 
-def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
+def _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list):
     """Generate attach policy command.
 
-     :param sw_if_index: Interface index.
+     :param int_name:    Interface name.
      :param policy_id:   Policy id.
      :param priority:    Priority.
      :param is_ipv6:     IPv6 flag.
@@ -184,7 +184,7 @@ def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
     cmd['cmd']['params']  = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_attach_policy_rule',
-                    'args'  : { 'sw_if_index': sw_if_index, 'policy_id': policy_id, 'priority': priority, 'is_ipv6': is_ipv6, 'remove': False }
+                    'args'  : { 'int_name': int_name, 'policy_id': policy_id, 'priority': priority, 'is_ipv6': is_ipv6, 'remove': False}
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -192,7 +192,7 @@ def _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list):
     cmd['revert']['params'] = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_attach_policy_rule',
-                    'args'  : { 'sw_if_index': sw_if_index, 'policy_id': policy_id, 'priority': priority, 'is_ipv6': is_ipv6, 'remove': True }
+                    'args'  : { 'int_name': int_name, 'policy_id': policy_id, 'priority': priority, 'is_ipv6': is_ipv6, 'remove': True}
     }
     cmd_list.append(cmd)
 
@@ -207,11 +207,11 @@ def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip
     """
     is_ipv6 = 0
 
-    for sw_if_index in lan_pci_list:
-        _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
+    for int_name in lan_pci_list:
+        _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list)
 
-    for sw_if_index in loopback_ip_list:
-        _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
+    for int_name in loopback_ip_list:
+        _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list)
 
 def _add_acl(params, cmd_list, cache_key):
     """Generate ACL command.

@@ -1385,9 +1385,8 @@ def vpp_multilink_attach_policy_rule(params):
     op = 'del' if params['remove'] else 'add'
     ip_version = 'ip6' if params['is_ipv6'] else 'ip4'
     policy_id = params['policy_id']
-    sw_if_index = params['sw_if_index']
+    int_name = params['int_name']
     priority = params['priority']
-    int_name = vpp_sw_if_index_to_name(sw_if_index)
 
     vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
 
