@@ -127,7 +127,7 @@
       "params": {
         "rules": [{
           "id": 1,
-          "priority": 100,
+          "priority": 200,
           "classification": {
           "prefix": {
                 "ip": "9.9.9.0/24",
@@ -195,6 +195,83 @@
             },
             "id": "5eca8c5459ac7532e9315788",
             "priority": 1
+        }]
+      }
+},
+{
+      "entity":  "agent",
+      "message": "add-multilink-policy",
+      "params": {
+        "rules": [{
+          "id": 1,
+          "priority": 5,
+          "classification": {
+          "prefix": {
+                "ip": "9.9.9.0/24",
+                "ports": "5060-5090",
+                "protocol": "udp"
+            }
+          },
+          "action": {
+            "fallback": "drop",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
+          }
+        },
+        {
+          "id": 2,
+          "priority": 4,
+          "classification": {
+          "prefix": {
+                "ip": "19.19.9.0/24",
+                "ports": "4060-4090",
+                "protocol": "tcp"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "load-balancing"
+          }
+        },
+        {
+            "action": {
+                "fallback": "drop",
+                "links": [
+                    {
+                        "order": "priority",
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16"
+                        ]
+                    }
+                ],
+                "order": "load-balancing"
+            },
+            "classification": {
+                "application": {
+                    "appId": "1",
+                    "category": "",
+                    "importance": "",
+                    "serviceClass": ""
+                },
+                "prefix": {}
+            },
+            "id": "5eca8c5459ac7532e9315788",
+            "priority": 3
         }]
       }
 },
