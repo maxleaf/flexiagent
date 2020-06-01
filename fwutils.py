@@ -367,8 +367,6 @@ def pci_str_to_bytes(pci_str):
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
-pci_to_sw_if_index = {}
-
 def pci_to_vpp_sw_if_index(pci):
     """Convert PCI address into VPP sw_if_index.
 
@@ -376,9 +374,6 @@ def pci_to_vpp_sw_if_index(pci):
 
     :returns: sw_if_index.
     """
-    if pci in pci_to_sw_if_index.keys():
-        return pci_to_sw_if_index[pci]
-
     vpp_if_name = pci_to_vpp_if_name(pci)
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, str(vpp_if_name)))
     if vpp_if_name is None:
@@ -387,7 +382,6 @@ def pci_to_vpp_sw_if_index(pci):
     sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
     for sw_if in sw_ifs:
         if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
-            pci_to_sw_if_index[pci] = sw_if.sw_if_index
             return sw_if.sw_if_index
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
     return None
@@ -472,8 +466,6 @@ def vpp_sw_if_index_to_tap(sw_if_index):
      """
     return vpp_if_name_to_tap(vpp_sw_if_index_to_name(sw_if_index))
 
-ip_to_sw_if_index = {}
-
 def vpp_ip_to_sw_if_index(ip):
     """Convert ip address into VPP sw_if_index.
 
@@ -481,9 +473,6 @@ def vpp_ip_to_sw_if_index(ip):
 
      :returns: sw_if_index.
      """
-    if ip in ip_to_sw_if_index.keys():
-        return ip_to_sw_if_index[ip]
-
     network = IPNetwork(ip)
 
     for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
@@ -491,7 +480,6 @@ def vpp_ip_to_sw_if_index(ip):
         if tap:
             int_address = IPNetwork(get_interface_address(tap))
             if network == int_address:
-                ip_to_sw_if_index[ip] = sw_if.sw_if_index
                 return sw_if.sw_if_index
 
 def save_file(txt, fname, dir='/tmp'):

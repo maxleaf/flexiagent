@@ -207,12 +207,10 @@ def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip
     """
     is_ipv6 = 0
 
-    for pci in lan_pci_list:
-        sw_if_index = fwutils.pci_to_vpp_sw_if_index(pci)
+    for sw_if_index in lan_pci_list:
         _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
 
-    for ip in loopback_ip_list:
-        sw_if_index = fwutils.vpp_ip_to_sw_if_index(ip)
+    for sw_if_index in loopback_ip_list:
         _attach_policy(sw_if_index, policy_id, priority, is_ipv6, cmd_list)
 
 def _add_acl(params, cmd_list, cache_key):
