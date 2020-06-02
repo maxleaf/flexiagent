@@ -26,33 +26,6 @@
            ]}
 },
 {
-      "entity":  "agent",
-      "message": "add-multilink-policy",
-      "params": {
-        "rules": [{
-          "id": 1,
-          "priority": 100,
-          "classification": {
-            "application": {
-              "category":"network"
-            }
-          },
-          "action": {
-            "fallback": "by-destination",
-            "links": [
-              {
-                "order": "priority",
-                "pathlabels": [
-                  "5e8d7cc005369313f5ceff16"
-                ]
-              }
-            ],
-            "order": "priority"
-          }
-        }]
-      }
-},
-{
 	"entity": "agent",
 	"message": "start-router",
 	"params": {
@@ -155,5 +128,32 @@
 
     }
   }
+},
+{
+      "entity":  "agent",
+      "message": "add-multilink-policy",
+      "params": {
+        "rules": [{
+          "id": 1,
+          "priority": 100,
+          "classification": {
+            "application": {
+              "category":"network"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
+          }
+        }]
+      }
 }
 ]
