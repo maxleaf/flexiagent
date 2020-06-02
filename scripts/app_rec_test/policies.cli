@@ -26405,7 +26405,7 @@
                     "appId": "", 
                     "category": "remote_access", 
                     "importance": "", 
-                    "serviceClass": "oam"
+                    "serviceClass": ""
                 }, 
                 "prefix": {}
             }, 
