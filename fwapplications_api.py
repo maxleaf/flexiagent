@@ -188,7 +188,8 @@ class FwApps:
         sets = []
 
         if name:
-            acl_ids.add(self._get_acl_id(name))
+            if name in self.app_2_acl:
+                acl_ids.add(self._get_acl_id(name))
         else:
             if category and category in self.categories:
                 sets.append(self._get_acl_ids(self.categories, category))
