@@ -26413,6 +26413,373 @@
             "priority": 1
         }
     ]
-}}
+}
+},
+{
+            "entity": "agent",
+            "message": "add-multilink-policy",
+            "params": {
+                "id": "5ebcf64dc7a6206df922ac9c",
+    "rules": [
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "management", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52744a81d8258b96bfa1c", 
+            "priority": 0
+        }, 
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "remote_access", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52fb4a81d8258b96bff68", 
+            "priority": 1
+        }
+    ]
+}
+},
+{
+            "entity": "agent",
+            "message": "add-multilink-policy",
+            "params": {
+                "id": "5ebcf64dc7a6206df922ac9c",
+    "rules": [
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "management", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52744a81d8258b96bfa1c", 
+            "priority": 0
+        }, 
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "remote_access", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52fb4a81d8258b96bff68", 
+            "priority": 1
+        }
+    ]
+}
+},
+{
+            "entity": "agent",
+            "message": "add-multilink-policy",
+            "params": {
+                "id": "5ebcf64dc7a6206df922ac9c",
+    "rules": [
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "management", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52744a81d8258b96bfa1c", 
+            "priority": 0
+        }, 
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "remote_access", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52fb4a81d8258b96bff68", 
+            "priority": 1
+        }
+    ]
+}
+},
+{
+            "entity": "agent",
+            "message": "add-multilink-policy",
+            "params": {
+                "id": "5ebcf64dc7a6206df922ac9c",
+    "rules": [
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "management", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52744a81d8258b96bfa1c", 
+            "priority": 0
+        }, 
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "remote_access", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52fb4a81d8258b96bff68", 
+            "priority": 1
+        }
+    ]
+}
+},
+{
+            "entity": "agent",
+            "message": "add-multilink-policy",
+            "params": {
+                "id": "5ebcf64dc7a6206df922ac9c",
+    "rules": [
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "management", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52744a81d8258b96bfa1c", 
+            "priority": 0
+        }, 
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "remote_access", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52fb4a81d8258b96bff68", 
+            "priority": 1
+        }
+    ]
+}
+},
+{
+            "entity": "agent",
+            "message": "add-multilink-policy",
+            "params": {
+                "id": "5ebcf64dc7a6206df922ac9c",
+    "rules": [
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "management", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52744a81d8258b96bfa1c", 
+            "priority": 0
+        }, 
+        {
+            "action": {
+                "fallback": "by-destination", 
+                "links": [
+                    {
+                        "order": "priority", 
+                        "pathlabels": [
+                            "5e8d7cc005369313f5ceff16", 
+                            "5e8d7ccc05369313f5ceff19"
+                        ]
+                    }
+                ], 
+                "order": "priority"
+            }, 
+            "classification": {
+                "application": {
+                    "appId": "", 
+                    "category": "remote_access", 
+                    "importance": "", 
+                    "serviceClass": ""
+                }, 
+                "prefix": {}
+            }, 
+            "id": "5ed52fb4a81d8258b96bff68", 
+            "priority": 1
+        }
+    ]
+}
+}
 ]
 
