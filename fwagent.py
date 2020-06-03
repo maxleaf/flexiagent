@@ -541,8 +541,15 @@ class Fwagent:
         :returns: None.
         """
         if type(msg) is list:
+            executed_list = []
             for request in msg:
                 reply = self._handle_received_request(request)
+                if reply['ok'] == 1:
+                    request['message'] = request['message'].replace('add-', 'remove-')
+                    executed_list.append(request)
+                else:
+                    for executed_req in executed_list:
+                        self._handle_received_request(executed_req)
         else:
             reply = self._handle_received_request(msg)
 
