@@ -179,7 +179,7 @@ def generate_sa_id():
     sa_index = generate_id(sa_index)
     return copy.deepcopy(sa_index)
 
-def _add_loopback(cmd_list, cache_key, mac, addr, mtu, id, internal=False):
+def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     """Add loopback command into the list.
 
     :param cmd_list:            List of commands.
@@ -197,6 +197,10 @@ def _add_loopback(cmd_list, cache_key, mac, addr, mtu, id, internal=False):
     #    set int mac address loop0 08:00:27:fd:12:01
     #    set int mtu 1420 loop0
     # --------------------------------------------------------------------------
+
+    addr = iface_params['addr']
+    mac  = iface_params['mac']
+    mtu  = iface_params['mtu']
 
     # ret_attr  - attribute of the object returned by command,
     #             value of which is stored in cache to be available
@@ -217,18 +221,6 @@ def _add_loopback(cmd_list, cache_key, mac, addr, mtu, id, internal=False):
     cmd['revert']['descr']      = "delete loopback interface (mac=%s, id=%d)" % (mac, id)
     cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_add_del_address (..., sw_if_index, is_add, address_length, address, ...)
-    # 'sw_if_index' is returned by the previous command and it is stored in the executor cache.
-    # So executor takes it out of the cache while executing this command.
-    iface_addr_bytes, iface_addr_len = fwutils.ip_str_to_bytes(addr)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "sw_interface_add_del_address"
-    cmd['cmd']['descr']   = "set %s to loopback interface" % addr
-    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'is_add':1, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
-    cmd_list.append(cmd)
-
     # l2.api.json: l2_flags (..., sw_if_index, bd_id, is_set, flags, ...)
     cmd = {}
     cmd['cmd'] = {}
@@ -238,14 +230,37 @@ def _add_loopback(cmd_list, cache_key, mac, addr, mtu, id, internal=False):
                               'is_set':0 , 'feature_bitmap':1 }  # 1 stands for LEARN (see test\test_l2bd_multi_instance.py)
     cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "sw_interface_set_flags"
-    cmd['cmd']['descr']   = "UP loopback interface %s" % addr
-    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'admin_up_down':1 }
-    cmd_list.append(cmd)
+    if internal:
+        # interface.api.json: sw_interface_add_del_address (..., sw_if_index, is_add, address_length, address, ...)
+        # 'sw_if_index' is returned by the previous command and it is stored in the executor cache.
+        # So executor takes it out of the cache while executing this command.
+        iface_addr_bytes, iface_addr_len = fwutils.ip_str_to_bytes(addr)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_add_del_address"
+        cmd['cmd']['descr']     = "set %s to loopback interface" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'is_add':1, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_add_del_address"
+        cmd['revert']['descr']  = "unset %s from loopback interface" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'is_add':0, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
+        cmd_list.append(cmd)
+
+        # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_set_flags"
+        cmd['cmd']['descr']     = "UP loopback interface %s" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'admin_up_down':1 }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_set_flags"
+        cmd['revert']['descr']  = "DOWN loopback interface %s" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'admin_up_down':0 }
+        cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
     cmd = {}
@@ -256,6 +271,31 @@ def _add_loopback(cmd_list, cache_key, mac, addr, mtu, id, internal=False):
                               'mtu': [ mtu , 0, 0, 0 ] }
     cmd_list.append(cmd)
 
+    # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
+    if 'multilink' in iface_params and 'labels' in iface_params['multilink']:
+        labels = iface_params['multilink']['labels']
+        if len(labels) > 0:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "python"
+            cmd['cmd']['descr']   = "add multilink labels into loopback interface %s: %s" % (addr, labels)
+            cmd['cmd']['params']  = {
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': False }
+            }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "python"
+            cmd['revert']['descr']  = "remove multilink labels from loopback interface %s: %s" % (addr, labels)
+            cmd['revert']['params'] = {
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': True }
+            }
+            cmd_list.append(cmd)
+
     # Configure tap of loopback interface in Linux
     # ------------------------------------------------------------
     # sudo ip addr add <loopback ip> dev <tap of loopback iface>
@@ -264,17 +304,27 @@ def _add_loopback(cmd_list, cache_key, mac, addr, mtu, id, internal=False):
     if not internal:
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "UP loopback interface %s in Linux" % addr
-        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
-                                "sudo ip addr add %s dev DEV-STUB" % (addr) ]
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "set %s to loopback interface in Linux" % addr
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip addr add %s dev DEV-STUB" % (addr) ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "unset %s from loopback interface in Linux" % addr
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip addr del %s dev DEV-STUB" % (addr) ]
         cmd_list.append(cmd)
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "set %s to loopback interface in Linux" % addr
-        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
-                                "sudo ip link set dev DEV-STUB up" ]
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "UP loopback interface %s in Linux" % addr
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip link set dev DEV-STUB up" ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "DOWN loopback interface %s in Linux" % addr
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                    "sudo ip link set dev DEV-STUB down" ]
         cmd_list.append(cmd)
         cmd = {}
         cmd['cmd'] = {}
@@ -390,12 +440,14 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
     src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
     dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
     cmd_params = {
-            'is_add'           : 1,
-            'src_address'      : src_addr_bytes,
-            'dst_address'      : dst_addr_bytes,
-            'vni'              : bridge_id,
-            'instance'         : bridge_id,
-            'decap_next_index' : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
+            'is_add'               : 1,
+            'src_address'          : src_addr_bytes,
+            'dst_address'          : dst_addr_bytes,
+            'vni'                  : bridge_id,
+            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway', 'arg': src}],
+            'instance'             : bridge_id,
+            'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }
     cmd = {}
     cmd['cmd'] = {}
@@ -510,9 +562,7 @@ def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id)
     _add_loopback(
                 cmd_list,
                 'loop0_sw_if_index',
-                params['loopback-iface']['mac'],
-                params['loopback-iface']['addr'],
-                params['loopback-iface']['mtu'],
+                params['loopback-iface'],
                 id=bridge_id)
     _add_bridge(
                 cmd_list, bridge_id)
@@ -551,9 +601,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
     _add_loopback(
                 cmd_list,
                 'loop1_sw_if_index',
-                loop1_cfg['mac'],
-                loop1_cfg['ip'],
-                mtu=9000,
+                loop1_cfg,
                 id=bridge_id,
                 internal=True)
     _add_bridge(
@@ -566,7 +614,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 l2gre_tunnel_ips['dst'])
     _add_interface_to_bridge(
                 cmd_list,
-                iface_description='loop1_' + loop1_cfg['ip'],
+                iface_description='loop1_' + loop1_cfg['addr'],
                 bridge_id=bridge_id,
                 bvi=1,
                 cache_key='loop1_sw_if_index')
@@ -585,7 +633,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
 	# The bridge can send them back on the network if ARP request was received
 	# on network. But it can't send them to previous nodes,
 	# if the request were generated by them.
-    remote_loop1_ip  = remote_loop1_cfg['ip'].split('/')[0]  # Remove length of address
+    remote_loop1_ip  = remote_loop1_cfg['addr'].split('/')[0]  # Remove length of address
     remote_loop1_mac = remote_loop1_cfg['mac']
     cmd = {}
     cmd['cmd'] = {}
@@ -627,8 +675,8 @@ def add_tunnel(params):
 
     # Add loop1-bridge-vxlan
     vxlan_ips = {'src':params['src'], 'dst':params['dst']}
-    loop1_cfg = {'ip':str(loop1_ip), 'mac':str(loop1_mac)}
-    remote_loop1_cfg = {'ip':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
+    loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
+    remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
     _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=(params['tunnel-id']*2+1))
 
     # --------------------------------------------------------------------------

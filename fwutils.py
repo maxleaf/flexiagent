@@ -29,6 +29,7 @@ import subprocess
 import psutil
 import socket
 import re
+import fwapplications_api
 import fwdb_requests
 import fwglobals
 import fwstats
@@ -42,6 +43,9 @@ sys.path.append(common_tools)
 import fwtool_vpp_startupconf_dict
 
 from fwdb_requests import FwDbRequests
+from fwapplications_api import FwApps
+from fwmultilink import FwMultilink
+
 
 dpdk = __import__('dpdk-devbind')
 
@@ -362,6 +366,7 @@ def pci_str_to_bytes(pci_str):
 # To do that we convert firstly the pci into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
+
 def pci_to_vpp_sw_if_index(pci):
     """Convert PCI address into VPP sw_if_index.
 
@@ -369,7 +374,6 @@ def pci_to_vpp_sw_if_index(pci):
 
     :returns: sw_if_index.
     """
-
     vpp_if_name = pci_to_vpp_if_name(pci)
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, str(vpp_if_name)))
     if vpp_if_name is None:
@@ -377,8 +381,8 @@ def pci_to_vpp_sw_if_index(pci):
 
     sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
     for sw_if in sw_ifs:
-        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces 
-            return  sw_if.sw_if_index
+        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
+            return sw_if.sw_if_index
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
     return None
 
@@ -430,6 +434,21 @@ def vpp_if_name_to_tap(vpp_if_name):
     tap = match.group(1)
     return tap
 
+def vpp_sw_if_index_to_name(sw_if_index):
+    """Convert VPP sw_if_index into VPP interface name.
+
+     :param sw_if_index:      VPP sw_if_index.
+
+     :returns: VPP interface name.
+     """
+    name = ''
+
+    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
+        if sw_if_index == sw_if.sw_if_index:
+            name = sw_if.interface_name.rstrip(' \t\r\n\0')
+
+    return name
+
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
 # To do that we dump all interfaces from VPP, find the one with the provided index,
@@ -445,10 +464,23 @@ def vpp_sw_if_index_to_tap(sw_if_index):
 
      :returns: Linux TAP interface name.
      """
+    return vpp_if_name_to_tap(vpp_sw_if_index_to_name(sw_if_index))
+
+def vpp_ip_to_sw_if_index(ip):
+    """Convert ip address into VPP sw_if_index.
+
+     :param ip: IP address.
+
+     :returns: sw_if_index.
+     """
+    network = IPNetwork(ip)
+
     for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
-        if sw_if_index == sw_if.sw_if_index:
-            tap = vpp_if_name_to_tap(sw_if.interface_name.rstrip(' \t\r\n\0'))
-            return tap
+        tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
+        if tap:
+            int_address = IPNetwork(get_interface_address(tap))
+            if network == int_address:
+                return sw_if.sw_if_index
 
 def save_file(txt, fname, dir='/tmp'):
     """Save txt to file under a dir (default = /tmp)
@@ -682,6 +714,12 @@ def reset_router_config():
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
+    with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
+        db_app_rec.clean()
+    with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
+        db_multilink.clean()
+
+    reset_dhcpd()
 
 def get_router_state():
     """Check if VPP is running.
@@ -731,6 +769,18 @@ def get_router_config(full=False):
         for key in db_requests.db:
             if re.match('add-tunnel', key):
                 cfg.append(_dump_config_request(db_requests, key, full))
+        # Dump dhcp configuration
+        for key in db_requests.db:
+            if re.match('add-dhcp-config', key):
+                cfg.append(_dump_config_request(db_requests, key, full))
+        # Dump applications configuration
+        for key in db_requests.db:
+            if re.match('add-application', key):
+                cfg.append(_dump_config_request(db_requests, key, full))
+        # Dump policy configuration
+        for key in db_requests.db:
+            if re.match('add-multilink-policy', key):
+                cfg.append(_dump_config_request(db_requests, key, full))
         return cfg if len(cfg) > 0 else None
 
 def print_router_config(full=False):
@@ -778,6 +828,46 @@ def print_router_config(full=False):
                     head_line_printed = True
                 _print_config_request(db_requests, key, full)
 
+        head_line_printed = False
+        for key in db_requests.db:
+            if re.match('add-dhcp-config', key):
+                if not head_line_printed:
+                    print("=========== DHCP CONFIG ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
+
+def print_multilink_policy_config(full=False):
+    """Print multilink policy configuration.
+
+     :param full:         Return requests together with translated commands.
+
+     :returns: None.
+     """
+    def _print_config_request(db_requests, key, full):
+        (_, params) = db_requests.fetch_request(key)
+        print("Key:\n   %s" % key)
+        print("Request:\n   %s" % json.dumps(params, sort_keys=True, indent=4))
+        if full:
+            cmd_list = db_requests.fetch_cmd_list(key)
+            print("Commands:\n  %s" % yaml_dump(cmd_list))
+        print("")
+
+    with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
+        head_line_printed = False
+        for key in db_requests.db:
+            if re.match('add-application', key):
+                if not head_line_printed:
+                    print("=========== APPS ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
+
+        head_line_printed = False
+        for key in db_requests.db:
+            if re.match('add-multilink-policy', key):
+                if not head_line_printed:
+                    print("=========== POLICIES ==========")
+                    head_line_printed = True
+                _print_config_request(db_requests, key, full)
 #
 def _get_group_delimiter(lines, delimiter):
     """Helper function to iterate through a group lines by delimiter.
@@ -1077,3 +1167,255 @@ def vpp_startup_conf_remove_nat(params):
         del config['nat']
     fwtool_vpp_startupconf_dict.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def _get_interface_address(pci):
+    """ Get interface ip address from commands DB.
+    """
+    for key, request in fwglobals.g.router_api.db_requests.db.items():
+
+        if not re.search('add-interface', key):
+            continue
+        if request['params']['pci'] != pci:
+            continue
+        addr = request['params']['addr']
+        return addr
+
+    return None
+
+def reset_dhcpd():
+    if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
+
+    cmd = 'sudo systemctl stop isc-dhcp-server'
+
+    try:
+        output = subprocess.check_output(cmd, shell=True)
+    except:
+        return False
+
+    return True
+
+def modify_dhcpd(params):
+    """Modify /etc/dhcp/dhcpd configuration file.
+
+    :param params:   Parameters from flexiManage.
+
+    :returns: String with sed commands.
+    """
+    pci = params['params']['interface']
+    range_start = params['params'].get('range_start', '')
+    range_end = params['params'].get('range_end', '')
+    dns = params['params'].get('dns', {})
+    mac_assign = params['params'].get('mac_assign', {})
+    is_add = params['params']['is_add']
+
+    address = IPNetwork(_get_interface_address(pci))
+    router = str(address.ip)
+    subnet = str(address.network)
+    netmask = str(address.netmask)
+
+    if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+
+    config_file = fwglobals.g.DHCPD_CONFIG_FILE
+
+    remove_string = 'sudo sed -e "/subnet %s netmask %s {/,/}/d" ' \
+                    '-i %s; ' % (subnet, netmask, config_file)
+
+    range_string = ''
+    if range_start:
+        range_string = 'range %s %s;\n' % (range_start, range_end)
+
+    if dns:
+        dns_string = 'option domain-name-servers'
+        for d in dns[:-1]:
+            dns_string += ' %s,' % d
+        dns_string += ' %s;\n' % dns[-1]
+    else:
+        dns_string = ''
+
+    subnet_string = 'subnet %s netmask %s' % (subnet, netmask)
+    routers_string = 'option routers %s;\n' % (router)
+    dhcp_string = 'echo "' + subnet_string + ' {\n' + range_string + \
+                 routers_string + dns_string + '}"' + ' | sudo tee -a %s;' % config_file
+
+    if is_add == 1:
+        exec_string = remove_string + dhcp_string
+    else:
+        exec_string = remove_string
+
+    for mac in mac_assign:
+        remove_string_2 = 'sudo sed -e "/host %s {/,/}/d" ' \
+                          '-i %s; ' % (mac['host'], config_file)
+
+        host_string = 'host %s {\n' % (mac['host'])
+        ethernet_string = 'hardware ethernet %s;\n' % (mac['mac'])
+        ip_address_string = 'fixed-address %s;\n' % (mac['ipv4'])
+        mac_assign_string = 'echo "' + host_string + ethernet_string + ip_address_string + \
+                            '}"' + ' | sudo tee -a %s;' % config_file
+
+        if is_add == 1:
+            exec_string += remove_string_2 + mac_assign_string
+        else:
+            exec_string += remove_string_2
+
+    try:
+        output = subprocess.check_output(exec_string, shell=True)
+    except:
+        return (False, None)
+
+    return (True, None)
+
+def vpp_multilink_update_labels(params):
+    """Updates VPP with flexiwan multilink labels.
+    These labels are used for Multi-Link feature: user can mark interfaces
+    or tunnels with labels and than add policy to choose interface/tunnel by
+    label where to forward packets to.
+
+        REMARK: this function is temporary solution as it uses VPP CLI to
+    configure lables. Remove it, when correspondent Python API will be added.
+    In last case the API should be called directly from translation.
+
+    :param params: labels      - python list of labels
+                   is_dia      - type of labels (DIA - Direct Internet Access)
+                   remove      - True to remove labels, False to add.
+                   dev         - PCI if device to apply labels to.
+                   next_hop_ip - IP address of next hop.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(
+            params['labels'], remove=params['remove'])
+    ids = ','.join(map(str, ids_list))
+
+    if 'dev' in params:
+        vpp_if_name = pci_to_vpp_if_name(params['dev'])
+    elif 'sw_if_index' in params:
+        vpp_if_name = vpp_sw_if_index_to_name(params['sw_if_index'])
+    else:
+        return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
+
+    op = 'del' if params['remove'] else 'add'
+
+    if params['is_dia']:
+        next_hop = fwglobals.g.router_api.get_default_route_address()
+    else:
+        network = IPNetwork(params['addr'])
+        for ip in network:
+            if ip.value != network.value:
+                next_hop = str(ip)
+
+    vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+
+def vpp_multilink_update_policy_rule(params):
+    """Updates VPP with flexiwan policy rules.
+    In general, policy rules instruct VPP to route packets to specific interface,
+    which is marked with multilink label that noted in policy rule.
+
+        REMARK: this function is temporary solution as it uses VPP CLI to
+    configure policy rules. Remove it, when correspondent Python API will be added.
+    In last case the API should be called directly from translation.
+
+    :param params: params - rule parameters:
+                        policy-id - the policy id (two byte integer)
+                        labels    - labels of interfaces to be used for packet forwarding
+                        remove    - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    op = 'del' if params['remove'] else 'add'
+    policy_id = params['policy_id']
+    links = params['links']
+    fallback = ''
+    order = ''
+
+    if re.match(params['fallback'], 'drop'):
+        fallback = 'fallback drop'
+
+    if re.match(params['order'], 'load-balancing'):
+        order = 'select_group random'
+
+    acl_id = params.get('acl_id', None)
+    if acl_id is None:
+        vppctl_cmd = 'fwabf policy %s id %d action %s %s' % (op, policy_id, fallback, order)
+    else:
+        vppctl_cmd = 'fwabf policy %s id %d acl %d action %s %s' % (op, policy_id, acl_id, fallback, order)
+
+    group_id = 1
+    for link in links:
+        order = ''
+        if re.match(link['order'], 'load-balancing'):
+            order = 'random'
+
+        labels = link['pathlabels']
+        ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
+        ids = ','.join(map(str, ids_list))
+
+        vppctl_cmd += ' group %u %s labels %s' % (group_id, order, ids)
+        group_id = group_id + 1
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def vpp_multilink_attach_policy_rule(params):
+    """Attach VPP with flexiwan policy rules.
+
+    :param params: params - rule parameters:
+                        sw_if_index -  Interface index.
+                        policy_id   - the policy id (two byte integer)
+                        remove      - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    op = 'del' if params['remove'] else 'add'
+    ip_version = 'ip6' if params['is_ipv6'] else 'ip4'
+    policy_id = params['policy_id']
+    int_name = params['int_name']
+    priority = params['priority']
+
+    vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def get_interface_sw_if_index(ip):
+    """Convert interface src IP address into gateway VPP sw_if_index.
+
+    :param ip: IP address.
+
+    :returns: sw_if_index.
+    """
+
+    pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
+    return pci_to_vpp_sw_if_index(pci)
+
+def get_interface_gateway(ip):
+    """Convert interface src IP address into gateway IP address.
+
+    :param ip: IP address.
+
+    :returns: IP address.
+    """
+
+    pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
+    return ip_str_to_bytes(gw_ip)[0]

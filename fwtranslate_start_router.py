@@ -34,37 +34,6 @@ import fwutils
 #      "entity": "agent",
 #      "message": "start-router",
 #      "params": {
-#        "interfaces": [
-#           {
-#               "name":"0000:00:08.00",
-#               "addr":"10.0.0.4/24"
-#           },
-#           {
-#               "name":"0000:00:09.00",
-#               "addr":"192.168.56.101/24",
-#               "routing":"ospf"
-#           }
-#        ],
-#        "routes": [
-#           {
-#             "addr": "default",
-#             "via": "10.0.0.10"
-#           },
-#           {
-#             "addr": "9.9.9.9",
-#             "via": "192.168.56.102",
-#             "pci":"0000:00:09.00"
-#           }
-#        ]
-#      }
-#    }
-#
-#    OR
-#
-#    {
-#      "entity": "agent",
-#      "message": "start-router",
-#      "params": {
 #        "pci": [
 #           "0000:00:08.00",
 #           "0000:00:09.00"
