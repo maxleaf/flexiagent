@@ -80,24 +80,6 @@ def add_interface(params):
     iface_addr = params['addr']
     iface_addr_bytes, _ = fwutils.ip_str_to_bytes(params['addr'])
 
-    # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
-    # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
-    if fwutils.pci_is_vmxnet3(iface_pci):
-        pci_bytes = fwutils.pci_str_to_bytes(params['pci'])
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "vmxnet3_create"
-        cmd['cmd']['descr']   = "create vmxnet3 interface for %s" % iface_pci
-        cmd['cmd']['params']  = { 'pci_addr':pci_bytes }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "vmxnet3_delete"
-        cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % iface_pci
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ] }
-        cmd_list.append(cmd)
-        # Mark interface as a 'vmxnet3' to save fwutils.pci_is_vmxnet3()
-        # check in start_router() translation.
-        params['driver']      = 'vmxnet3'
-
     ######################################################################
     #  NO NEED TO SET IP AND UP/DOWN STATE IN VPP !
     #  WE DO THAT IN LINUX, TAP-INJECT REFLECTS THESE CHANGES TO VPP
