@@ -1432,7 +1432,6 @@ def _create_static_route(args):
 
     cmd_show = "sudo ip route show exact %s %s" % (params['addr'], metric_str)
     try:
-        fwglobals.log.debug(cmd_show)
         output = subprocess.check_output(cmd_show, shell=True)
     except:
         return (False, None)
@@ -1440,10 +1439,8 @@ def _create_static_route(args):
     lines = output.splitlines()
     next_hop = ''
     if lines:
-        fwglobals.log.debug('lines:')
         removed = False
         for line in lines:
-            fwglobals.log.debug(line)
             words = line.split('via ')
             if len(words) > 1:
                 if remove and not removed and re.search(params['via'], words[1]):
