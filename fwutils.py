@@ -1420,6 +1420,57 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
+def _create_static_route(args):
+    params = args['params']
+    metric = params.get('metric', None)
+    metric_str = ''
+    remove = args['remove']
+    op = 'replace'
+
+    if metric:
+        metric_str = ' metric %s' % metric
+
+    cmd_show = "sudo ip route show exact %s %s" % (params['addr'], metric_str)
+    try:
+        fwglobals.log.debug(cmd_show)
+        output = subprocess.check_output(cmd_show, shell=True)
+    except:
+        return (False, None)
+
+    lines = output.splitlines()
+    next_hop = ''
+    if lines:
+        fwglobals.log.debug('lines:')
+        removed = False
+        for line in lines:
+            fwglobals.log.debug(line)
+            words = line.split('via ')
+            if len(words) > 1:
+                if remove and not removed and re.search(params['via'], words[1]):
+                    removed = True
+                    continue
+
+                next_hop += ' nexthop via ' + words[1]
+
+    if remove:
+        if not next_hop:
+            op = 'del'
+        cmd = "sudo ip route %s %s%s %s" % (op, params['addr'], metric_str, next_hop)
+    else:
+        if not 'pci' in params:
+            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, params['addr'], metric_str, params['via'], next_hop)
+        else:
+            tap = pci_to_tap(params['pci'])
+            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, params['addr'], metric_str, params['via'], tap, next_hop)
+
+    try:
+        fwglobals.log.debug(cmd)
+        output = subprocess.check_output(cmd, shell=True)
+    except:
+        return (False, None)
+
+    return (True, None)
+
 def add_static_route(args):
     """Add static route.
 
@@ -1431,19 +1482,10 @@ def add_static_route(args):
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     params = args['params']
-    fwglobals.log.debug('remove is %s', args['remove'])
     op = 'del' if args['remove'] else 'add'
-    metric = params.get('metric', None)
-    metric_str = ''
-    if metric:
-        metric_str = ' metric %s' % metric
 
     if params['addr'] != 'default':
-        if not 'pci' in params:
-            cmd = "sudo ip route %s %s via %s%s" % (op, params['addr'], params['via'], metric_str)
-        else:
-            tap = pci_to_tap(params['pci'])
-            cmd = "sudo ip route %s %s via %s dev %s" % (op, params['addr'], params['via'], tap, metric_str)
+        return _create_static_route(args)
     else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
         (old_ip, old_dev) = get_default_route()
         old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
