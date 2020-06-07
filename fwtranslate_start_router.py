@@ -90,12 +90,16 @@ def start_router(params=None):
             iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
             if iface_pci:
                 # Firstly mark 'vmxnet3' interfaces as they need special care:
-                #   1. They should not appear in /etc/vpp/startup.conf
+                #   1. They should not appear in /etc/vpp/startup.conf.
+                #      If they appear in /etc/vpp/startup.conf, vpp will capture
+                #      them with vfio-pci driver, and 'create interface vmxnet3'
+                #      command will fail with 'device in use'.
                 #   2. They require additional VPP call vmxnet3_create on start
                 #      and complement vmxnet3_delete on stop
                 if fwutils.pci_is_vmxnet3(params['pci']):
-                    params['driver'] = 'vmxnet3'
                     pci_list_vmxnet3.append(params['pci'])
+                else:
+                    pci_list.append(params['pci'])
 
                 cmd = {}
                 cmd['cmd'] = {}
@@ -107,15 +111,6 @@ def start_router(params=None):
                 cmd['revert']['params']  = [ "sudo netplan apply" ]
                 cmd['revert']['descr']  = "apply netplan configuration"
                 cmd_list.append(cmd)
-
-            # If device is not vmxnet3 device, add it to list of devices
-            # that will be add to the /etc/vpp/startup.conf.
-            # The vmxnet3 devices should not appear in startup.conf.
-            # Othervise vpp will capture them with vfio-pci driver,
-            # and 'create interface vmxnet3' will fail with 'device in use'.
-            device_driver = params.get('driver')
-            if device_driver is None or device_driver != 'vmxnet3':
-                pci_list.append(params['pci'])
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
