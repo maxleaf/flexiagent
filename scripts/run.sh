@@ -31,6 +31,6 @@ function stop() {
 ip link set dev enp0s3 down
 ip link set dev enp0s8 down
 
-python ../fwagent.py cli -f $SCRIPT_PATH -l 1000
+fwagent cli -f $SCRIPT_PATH -l 1000
 
 stop

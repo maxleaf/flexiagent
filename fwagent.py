@@ -422,20 +422,20 @@ class Fwagent:
         def run(*args):
             slept = 0
             while self.isConnRunning:
-                # Every 30 seconds ensure that connection to management is alive.
+                # Every 50 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field
-                if (slept % 30) == 0:
+                if (slept % 50) == 0:
                     if self.requestReceived:
                         self.requestReceived = False
                     else:
-                        fwglobals.log.debug("connect: no request was received in 30 seconds, drop connection")
+                        fwglobals.log.debug("connect: no request was received in 50 seconds, drop connection")
                         ws.close()
                         fwglobals.log.debug("connect: connection was terminated")
                         break
-                # Every 30 seconds update statistics
-                if (slept % 30) == 0:
+                # Every 50 seconds update statistics
+                if (slept % 50) == 0:
                     if loadsimulator.g.enabled():
                         if loadsimulator.g.started:
                             loadsimulator.g.update_stats()
@@ -472,7 +472,7 @@ class Fwagent:
         pmsg = json.loads(message)
         msg = pmsg['msg']
 
-        reply = self.handle_received_request(msg)
+        reply = self.handle_received_msg(msg)
 
         fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
@@ -501,7 +501,7 @@ class Fwagent:
         if self.ws:
             self.ws.close()
 
-    def handle_received_request(self, msg):
+    def _handle_received_request(self, msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -513,21 +513,46 @@ class Fwagent:
         :returns: None.
         """
         print_message = fwglobals.g.cfg.DEBUG
+
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
+            fwglobals.log.debug("_handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
 
         self.requestReceived = True
 
         reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
 
         if not 'entity' in reply and 'entity' in msg:
-            reply.update({'entity':msg['entity']+'Reply'})
+            reply.update({'entity': msg['entity'] + 'Reply'})
         if not 'message' in reply:
             reply.update({'message': 'success'})
 
         if print_message:
-            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+            fwglobals.log.debug("_handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+        return reply
+
+    def handle_received_msg(self, msg):
+        """Handles standalone or aggregated message. Standalone message
+        represents one single API request, like 'add-interface'. Aggregated
+        message represents JSON list of API requests.
+
+        :param msg:  Message instance.
+
+        :returns: None.
+        """
+        if type(msg) is list:
+            executed_list = []
+            for request in msg:
+                reply = self._handle_received_request(request)
+                if reply['ok'] == 1:
+                    request['message'] = request['message'].replace('add-', 'remove-')
+                    executed_list.append(request)
+                else:
+                    for executed_req in executed_list:
+                        self._handle_received_request(executed_req)
+        else:
+            reply = self._handle_received_request(msg)
+
         return reply
 
     def inject_requests(self, filename, ignore_errors=False):
@@ -535,19 +560,24 @@ class Fwagent:
         thus simulating receiving requests over network from the flexiManage.
         This function is used for Unit Testing.
 
-        :param script_fname:  name of the JSON file, were from to load request.
+        :param filename:      name of the JSON file, were from to load requests.
 
         :param ignore_errors: if False, failure to inject some of the loaded
-                              request will cause this function to return, so
-                              rest of loaded requests will be ignored.
-
+                              requests will cause this function to return, so
+                              rest of loaded requests will be not executed.
         :returns: N/A.
         """
         with open(filename, 'r') as f:
             requests = json.loads(f.read())
-            for (idx, req) in enumerate(requests):
-                reply = self.handle_received_request(req)
-                if reply['ok'] == 0 and ignore_errors == False:
+            if type(requests) is list:   # Take care of file with list of requests
+                for (idx, req) in enumerate(requests):
+                    reply = self._handle_received_request(req)
+                    if reply['ok'] == 0 and ignore_errors == False:
+                        raise Exception('failed to inject request #%d in %s: %s' % \
+                                        ((idx+1), filename, reply['message']))
+            else:   # Take care of file with single request
+                reply = self._handle_received_request(requests)
+                if reply['ok'] == 0:
                     raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))
 
@@ -668,6 +698,8 @@ def show(agent_info, router_info):
             fwutils.print_router_config()
         elif router_info == 'request_db':
             fwutils.print_router_config(full=True)
+        elif router_info == 'multilink-policy':
+            fwutils.print_multilink_policy_config()
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -965,14 +997,14 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
     :param api:                 The fwagent function to be executed,
                                 e.g. 'inject_requests(requests.json)'.
                                 If provided, no prompt loop will be run.
-    :param script_fname:        Shortcut for --api=inject_requests(<script_fname>)
+    :param script_fname:        Shortcat for --api==inject_requests(<script_fname>)
                                 command. Is kept for backward compatibility.
     :returns: None.
     """
     fwglobals.log.info("started in cli mode (clean_request_db=%s, linger=%s, api=%s)" % \
                         (str(clean_request_db), str(linger), str(api)))
 
-    # Preserve historical 'fwagent cli -f' option, as it requires less typing :)
+    # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
     if script_fname:
         # Convert relative path into absolute, as daemon fwagent might have
@@ -1039,7 +1071,7 @@ if __name__ == '__main__':
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db'],
+    parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db', 'multilink-policy'],
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version'],
                         help="show various agent parameters")
