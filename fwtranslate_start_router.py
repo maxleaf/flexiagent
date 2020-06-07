@@ -34,37 +34,6 @@ import fwutils
 #      "entity": "agent",
 #      "message": "start-router",
 #      "params": {
-#        "interfaces": [
-#           {
-#               "name":"0000:00:08.00",
-#               "addr":"10.0.0.4/24"
-#           },
-#           {
-#               "name":"0000:00:09.00",
-#               "addr":"192.168.56.101/24",
-#               "routing":"ospf"
-#           }
-#        ],
-#        "routes": [
-#           {
-#             "addr": "default",
-#             "via": "10.0.0.10"
-#           },
-#           {
-#             "addr": "9.9.9.9",
-#             "via": "192.168.56.102",
-#             "pci":"0000:00:09.00"
-#           }
-#        ]
-#      }
-#    }
-#
-#    OR
-#
-#    {
-#      "entity": "agent",
-#      "message": "start-router",
-#      "params": {
 #        "pci": [
 #           "0000:00:08.00",
 #           "0000:00:09.00"
@@ -113,12 +82,25 @@ def start_router(params=None):
     #   sudo ip addr flush dev enp0s8
     # The interfaces to be removed are stored within 'add-interface' requests
     # in the configuration database.
-    pci_list = []
+    pci_list         = []
+    pci_list_vmxnet3 = []
     for key in fwglobals.g.router_api.db_requests.db:
         if re.match('add-interface', key):
             (_, params) = fwglobals.g.router_api.db_requests.fetch_request(key)
             iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
             if iface_pci:
+                # Firstly mark 'vmxnet3' interfaces as they need special care:
+                #   1. They should not appear in /etc/vpp/startup.conf.
+                #      If they appear in /etc/vpp/startup.conf, vpp will capture
+                #      them with vfio-pci driver, and 'create interface vmxnet3'
+                #      command will fail with 'device in use'.
+                #   2. They require additional VPP call vmxnet3_create on start
+                #      and complement vmxnet3_delete on stop
+                if fwutils.pci_is_vmxnet3(params['pci']):
+                    pci_list_vmxnet3.append(params['pci'])
+                else:
+                    pci_list.append(params['pci'])
+
                 cmd = {}
                 cmd['cmd'] = {}
                 cmd['cmd']['name']    = "exec"
@@ -129,15 +111,6 @@ def start_router(params=None):
                 cmd['revert']['params']  = [ "sudo netplan apply" ]
                 cmd['revert']['descr']  = "apply netplan configuration"
                 cmd_list.append(cmd)
-
-            # If device is not vmxnet3 device, add it to list of devices
-            # that will be add to the /etc/vpp/startup.conf.
-            # The vmxnet3 devices should not appear in startup.conf.
-            # Othervise vpp will capture them with vfio-pci driver,
-            # and 'create interface vmxnet3' will fail with 'device in use'.
-            device_driver = params.get('driver')
-            if device_driver is None or device_driver != 'vmxnet3':
-                pci_list.append(params['pci'])
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
@@ -229,6 +202,25 @@ def start_router(params=None):
     cmd['cmd']['params']  = [ 'sudo netplan apply' ]
     cmd['cmd']['descr']   = "netplan apply"
     cmd_list.append(cmd)
+
+    # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
+    # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
+    # Note we do it here and not on 'add-interface' as 'modify-interface' is translated
+    # into 'remove-interface' and 'add-interface', so we want to avoid deletion
+    # and creation interface on every 'modify-interface'. There is no sense to do
+    # that and it causes problems in FIB, when default route interface is deleted.
+    for pci in pci_list_vmxnet3:
+        pci_bytes = fwutils.pci_str_to_bytes(pci)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "vmxnet3_create"
+        cmd['cmd']['descr']   = "create vmxnet3 interface for %s" % pci
+        cmd['cmd']['params']  = { 'pci_addr':pci_bytes }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "vmxnet3_delete"
+        cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':pci } ] }
+        cmd_list.append(cmd)
 
     return cmd_list
 

@@ -20,8 +20,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
-
 import fwglobals
 import fwtranslate_revert
 import fwutils
@@ -57,51 +57,24 @@ def add_route(params):
      """
     cmd_list = []
 
-    metric = params.get('metric', None)
-    metric_str = ''
-    if metric:
-        metric_str = ' metric %s' % metric
+    add_params = {
+        'module': 'fwutils',
+        'func': 'add_static_route',
+        'args': {'params': params, 'remove': False}
+    }
 
-    if params['addr'] != 'default':
-        if not 'pci' in params:
-            add_cmd = [ "sudo ip route add %s via %s%s" % (params['addr'], params['via'], metric_str) ]
-            del_cmd = [ "sudo ip route del %s via %s%s" % (params['addr'], params['via'], metric_str) ]
-        else:
-            add_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                        "sudo ip route add %s via %s dev DEV-STUB%s" % (params['addr'], params['via'], metric_str) ]
-            del_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                        "sudo ip route del %s via %s dev DEV-STUB%s" % (params['addr'], params['via'], metric_str) ]
-    else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
-        (old_ip, old_dev) = fwutils.get_default_route()
-        old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
-        new_ip = params['via']
-        if not 'pci' in params:
-            if old_via == "":
-                add_cmd = [ "sudo ip route add default via %s" % (new_ip) ]
-                del_cmd = [ "sudo ip route del default via %s" % (new_ip) ]
-            else:
-                add_cmd = [ "sudo ip route del default via %s; sudo ip route add default via %s" % (old_via, new_ip) ]
-                del_cmd = [ "sudo ip route del default via %s; sudo ip route add default via %s" % (new_ip, old_via) ]
-        else:
-            if old_via == "":
-                add_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                            "sudo ip route add default via %s dev DEV-STUB" % (new_ip) ]
-                del_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                            "sudo ip route del default via %s dev DEV-STUB" % (new_ip) ]
-            else:
-                add_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                            "sudo ip route del default via %s; sudo ip route add default via %s dev DEV-STUB" % (old_via, new_ip) ]
-                del_cmd = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':params['pci'] } ]},
-                            "sudo ip route del default via %s dev DEV-STUB; sudo ip route add default via %s" % (new_ip, old_via) ]
+    del_params = copy.deepcopy(add_params)
+    del_params['args']['remove'] = True
+
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['name']      = "python"
     cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('pci')))
-    cmd['cmd']['params']    = add_cmd
+    cmd['cmd']['params']    = add_params
     cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
+    cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('pci')))
-    cmd['revert']['params'] = del_cmd
+    cmd['revert']['params'] = del_params
     cmd_list.append(cmd)
     return cmd_list
 
@@ -116,4 +89,8 @@ def get_request_key(params):
         key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['pci'])
     else:
         key = 'add-route:%s:%s' % (params['addr'], params['via'])
+
+    if 'metric' in params.keys():
+        key += ':' + params['metric']
+
     return key
