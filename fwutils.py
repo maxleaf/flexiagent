@@ -1226,6 +1226,20 @@ def add_remove_netplan_interface(params):
 
     return (True, None)
 
+def get_dhcp_netplan_interface(nicname):
+    fname = '/etc/netplan/01-network-manager-all.yaml'
+
+    with open(fname, 'r') as stream:
+        config = yaml.safe_load(stream)
+    ethernets = config['network']['ethernets']
+
+    if nicname in ethernets:
+        interface = ethernets[nicname]
+        if 'dhcp4' in interface:
+            return interface['dhcp4']
+
+    return 'false'
+
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)

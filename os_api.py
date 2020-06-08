@@ -73,13 +73,16 @@ class OS_DECODERS:
                             'IPv4':'',
                             'IPv4Mask':'', 
                             'IPv6':'',
-                            'IPv6Mask':''
+                            'IPv6Mask':'',
+                            'dhcp':''
                         }
+                daddr['dhcp'] = fwutils.get_dhcp_netplan_interface(nicname)
                 for addr in addrs:
                     addr_af_name = fwutils.af_to_name(addr.family)
                     daddr[addr_af_name] = addr.address.split('%')[0]
                     if addr.netmask != None:
                         daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
                 out.append(daddr)
         return (out,1)
     def execd(self, handle):
