@@ -186,7 +186,7 @@ def add_interface(params):
 
     # Enable DHCP client.
     # Run 'set dhcp client intfc GigabitEthernet0/3/0'
-    if 'mode' in params and params['mode'].lower() == 'dhcp':
+    if 'dhcp' in params and params['dhcp'].lower() == 'yes':
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name'] = "exec"
