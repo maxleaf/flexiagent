@@ -262,13 +262,6 @@ class Fwglobals:
         self.apps_api   = FwApps(self.APP_REC_DB_FILE)
         self.policy_api = FwPolicies()
 
-        # Ensure networking is initialized on Linux on VMWare.
-        # Otherwise code in fwtranslate_start_router.py:start_router does not
-        # detect vmxnet3 interfaces and add them to /etc/vpp/startup.conf,
-        # as a result vpp captures them on boot up and vmxnet3_create() API
-        # fails with -71 error.
-        time.sleep(1)
-
         self.router_api.restore_vpp_if_needed()
 
     def finalize(self):
