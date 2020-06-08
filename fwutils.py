@@ -37,7 +37,6 @@ import fwglobals
 import fwstats
 import shutil
 import sys
-import time
 import yaml
 from netaddr import IPNetwork, IPAddress
 
@@ -373,6 +372,7 @@ def pci_str_to_bytes(pci_str):
 # To do that we convert firstly the pci into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
+
 def pci_to_vpp_sw_if_index(pci):
     """Convert PCI address into VPP sw_if_index.
 
@@ -380,7 +380,6 @@ def pci_to_vpp_sw_if_index(pci):
 
     :returns: sw_if_index.
     """
-
     vpp_if_name = pci_to_vpp_if_name(pci)
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, str(vpp_if_name)))
     if vpp_if_name is None:
@@ -388,8 +387,8 @@ def pci_to_vpp_sw_if_index(pci):
 
     sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
     for sw_if in sw_ifs:
-        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces 
-            return  sw_if.sw_if_index
+        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
+            return sw_if.sw_if_index
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
     return None
 
@@ -543,30 +542,6 @@ def _sub_file(fname, smap):
         return {'message':'File substituted', 'ok':1}
     else:
         return {'message':'File does not exist', 'ok':0}
-
-# This function should be replaced with VPP Python API binding
-# called directly by translator when upgraded to the latest VPP from the 19.01.
-def vpp_enable_tap_inject():
-    """Runs 'vppctl enable tap-inject' and checks the output.
-    If output is 'Connection refused' retry few times.
-
-    :returns:  ("", 1) on success, (<error>, 0) on failure
-    """
-    timeout = 30  # Seconds
-    waited  = 0
-    try:
-        while waited < timeout:
-            out = subprocess.check_output(['vppctl', 'enable', 'tap-inject'])
-            if len(out) == 0:
-                return ("", 1)
-            elif not re.search("Connection refused", out):
-                return (out, 0)
-            else:
-                time.sleep(3)
-                waited += 3
-        return (out, 0)
-    except Exception as e:
-        return (str(e), 0)
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
@@ -1402,12 +1377,9 @@ def vpp_multilink_update_policy_rule(params):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-
     op = 'del' if params['remove'] else 'add'
     policy_id = params['policy_id']
-    labels = params['labels']
-    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
-    ids = ','.join(map(str, ids_list))
+    links = params['links']
     fallback = ''
     order = ''
 
@@ -1419,11 +1391,24 @@ def vpp_multilink_update_policy_rule(params):
 
     acl_id = params.get('acl_id', None)
     if acl_id is None:
-        vppctl_cmd = 'fwabf policy %s id %d action %s %s labels %s' % (op, policy_id, fallback, order, ids)
+        vppctl_cmd = 'fwabf policy %s id %d action %s %s' % (op, policy_id, fallback, order)
     else:
-        vppctl_cmd = 'fwabf policy %s id %d acl %d action %s %s labels %s' % (op, policy_id, acl_id, fallback, order, ids)
+        vppctl_cmd = 'fwabf policy %s id %d acl %d action %s %s' % (op, policy_id, acl_id, fallback, order)
 
-        fwglobals.log.debug("vppctl " + vppctl_cmd)
+    group_id = 1
+    for link in links:
+        order = ''
+        if re.match(link['order'], 'load-balancing'):
+            order = 'random'
+
+        labels = link['pathlabels']
+        ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
+        ids = ','.join(map(str, ids_list))
+
+        vppctl_cmd += ' group %u %s labels %s' % (group_id, order, ids)
+        group_id = group_id + 1
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
@@ -1444,9 +1429,8 @@ def vpp_multilink_attach_policy_rule(params):
     op = 'del' if params['remove'] else 'add'
     ip_version = 'ip6' if params['is_ipv6'] else 'ip4'
     policy_id = params['policy_id']
-    sw_if_index = params['sw_if_index']
+    int_name = params['int_name']
     priority = params['priority']
-    int_name = vpp_sw_if_index_to_name(sw_if_index)
 
     vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
 
@@ -1508,3 +1492,100 @@ def wan_ip_was_changed():
         return hash
 
     return ''
+
+def _create_static_route(args):
+    params = args['params']
+    metric = params.get('metric', None)
+    metric_str = ''
+    remove = args['remove']
+    op = 'replace'
+
+    if metric:
+        metric_str = ' metric %s' % metric
+
+    cmd_show = "sudo ip route show exact %s %s" % (params['addr'], metric_str)
+    try:
+        output = subprocess.check_output(cmd_show, shell=True)
+    except:
+        return (False, None)
+
+    lines = output.splitlines()
+    next_hop = ''
+    if lines:
+        removed = False
+        for line in lines:
+            words = line.split('via ')
+            if len(words) > 1:
+                if remove and not removed and re.search(params['via'], words[1]):
+                    removed = True
+                    continue
+
+                next_hop += ' nexthop via ' + words[1]
+
+    if remove:
+        if not next_hop:
+            op = 'del'
+        cmd = "sudo ip route %s %s%s %s" % (op, params['addr'], metric_str, next_hop)
+    else:
+        if not 'pci' in params:
+            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, params['addr'], metric_str, params['via'], next_hop)
+        else:
+            tap = pci_to_tap(params['pci'])
+            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, params['addr'], metric_str, params['via'], tap, next_hop)
+
+    try:
+        fwglobals.log.debug(cmd)
+        output = subprocess.check_output(cmd, shell=True)
+    except:
+        return (False, None)
+
+    return (True, None)
+
+def add_static_route(args):
+    """Add static route.
+
+    :param params: params - rule parameters:
+                        sw_if_index -  Interface index.
+                        policy_id   - the policy id (two byte integer)
+                        remove      - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    params = args['params']
+    op = 'del' if args['remove'] else 'add'
+
+    if params['addr'] != 'default':
+        return _create_static_route(args)
+    else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
+        (old_ip, old_dev) = get_default_route()
+        old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
+        new_ip = params['via']
+        if not 'pci' in params:
+            if old_via == "":
+                cmd = "sudo ip route %s default via %s" % (op, new_ip)
+            else:
+                if not args['remove']:
+                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
+                          (old_via, new_ip)
+                else:
+                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
+                          (new_ip, old_via)
+        else:
+            tap = pci_to_tap(params['pci'])
+            if old_via == "":
+                cmd = "sudo ip route %s default via %s dev %s" % (op, new_ip, tap)
+            else:
+                if not args['remove']:
+                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s dev %s" % \
+                          (old_via, new_ip, tap)
+                else:
+                    cmd = "sudo ip route del default via %s dev %s; sudo ip route add default via %s" % \
+                          (new_ip, tap, old_via)
+
+    try:
+        fwglobals.log.debug(cmd)
+        output = subprocess.check_output(cmd, shell=True)
+    except:
+        return (False, None)
+
+    return (True, None)

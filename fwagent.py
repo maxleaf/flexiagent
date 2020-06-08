@@ -422,20 +422,20 @@ class Fwagent:
         def run(*args):
             slept = 0
             while self.isConnRunning:
-                # Every 30 seconds ensure that connection to management is alive.
+                # Every 50 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field
-                if (slept % 30) == 0:
+                if (slept % 50) == 0:
                     if self.requestReceived:
                         self.requestReceived = False
                     else:
-                        fwglobals.log.debug("connect: no request was received in 30 seconds, drop connection")
+                        fwglobals.log.debug("connect: no request was received in 50 seconds, drop connection")
                         ws.close()
                         fwglobals.log.debug("connect: connection was terminated")
                         break
-                # Every 30 seconds update statistics
-                if (slept % 30) == 0:
+                # Every 50 seconds update statistics
+                if (slept % 50) == 0:
                     if loadsimulator.g.enabled():
                         if loadsimulator.g.started:
                             loadsimulator.g.update_stats()
@@ -541,8 +541,15 @@ class Fwagent:
         :returns: None.
         """
         if type(msg) is list:
+            executed_list = []
             for request in msg:
                 reply = self._handle_received_request(request)
+                if reply['ok'] == 1:
+                    request['message'] = request['message'].replace('add-', 'remove-')
+                    executed_list.append(request)
+                else:
+                    for executed_req in executed_list:
+                        self._handle_received_request(executed_req)
         else:
             reply = self._handle_received_request(msg)
 

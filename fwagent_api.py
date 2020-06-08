@@ -36,11 +36,7 @@ fwagent_api = {
     'get-device-os-routes': '_get_device_os_routes',
     'handle-request':       '_handle_request',
     'get-router-config':    '_get_router_config',
-    'upgrade-device-sw':    '_upgrade_device_sw',
-    'add-app-info':         '_add_app_info',
-    'remove-app-info':      '_remove_app_info',
-    'add-policy-info':      '_add_policy_info',
-    'remove-policy-info':   '_remove_policy_info'
+    'upgrade-device-sw':    '_upgrade_device_sw'
 }
 
 class FWAGENT_API:
