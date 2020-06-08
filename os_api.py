@@ -74,9 +74,11 @@ class OS_DECODERS:
                             'IPv4Mask':'', 
                             'IPv6':'',
                             'IPv6Mask':'',
-                            'dhcp':''
+                            'dhcp':'',
+                            'gateway':''
                         }
                 daddr['dhcp'] = fwutils.get_dhcp_netplan_interface(nicname)
+                daddr['gateway'] = fwutils.get_gateway(nicname)
                 for addr in addrs:
                     addr_af_name = fwutils.af_to_name(addr.family)
                     daddr[addr_af_name] = addr.address.split('%')[0]

@@ -159,6 +159,25 @@ def get_default_route():
     except:
         return ("", "")
 
+def get_gateway(nicname):
+    """Get gateway.
+
+    :returns: Gateway ip address.
+    """
+    try:
+        dgw = os.popen('ip route list match default').read()
+    except:
+        return ''
+
+    routes = dgw.splitlines()
+    for route in routes:
+        rip = route.split('default via ')[1].split(' ')[0]
+        rdev = route.split(' dev ')[1].split(' ')[0]
+        if re.match(nicname, rdev):
+            return rip
+
+    return ''
+
 def get_interface_address(iface):
     """Get interface IP address.
 
