@@ -30,13 +30,14 @@ import fwstats
 import fwutils
 
 fwagent_api = {
-    'get-device-info':      '_get_device_info',
-    'get-device-stats':     '_get_device_stats',
-    'get-device-logs':      '_get_device_logs',
-    'get-device-os-routes': '_get_device_os_routes',
-    'handle-request':       '_handle_request',
-    'get-router-config':    '_get_router_config',
-    'upgrade-device-sw':    '_upgrade_device_sw'
+    'get-device-info':          '_get_device_info',
+    'get-device-stats':         '_get_device_stats',
+    'get-device-logs':          '_get_device_logs',
+    'get-device-packet-traces': '_get_device_packet_traces',
+    'get-device-os-routes':     '_get_device_os_routes',
+    'handle-request':           '_handle_request',
+    'get-router-config':        '_get_router_config',
+    'upgrade-device-sw':        '_upgrade_device_sw'
 }
 
 class FWAGENT_API:
@@ -146,6 +147,19 @@ class FWAGENT_API:
             return {'message': logs, 'ok': 1}
         except:
             raise Exception("_get_device_logs: failed to get device logs: %s" % format(sys.exc_info()[1]))
+
+    def _get_device_packet_traces(self, params):
+        """Get device packet traces.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with logs and status code.
+        """
+        try:
+            traces = fwutils.get_device_packet_traces(params['limit'])
+            return {'message': traces, 'ok': 1}
+        except:
+            raise Exception("_get_device_packet_traces: failed to get device packet traces: %s" % format(sys.exc_info()[1]))
 
     def _get_device_os_routes(self, params):
         """Get device ip routes.
