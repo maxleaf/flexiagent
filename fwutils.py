@@ -1255,9 +1255,12 @@ def get_dhcp_netplan_interface(nicname):
     if nicname in ethernets:
         interface = ethernets[nicname]
         if 'dhcp4' in interface:
-            return interface['dhcp4']
+            if re.match('yes', interface['dhcp4']):
+                return 'yes'
+            if re.match('true', interface['dhcp4']):
+                return 'yes'
 
-    return 'false'
+    return 'no'
 
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
