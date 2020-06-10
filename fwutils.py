@@ -67,19 +67,21 @@ def get_device_logs(file, num_of_lines):
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
-def get_device_packet_traces(num_of_packets):
+def get_device_packet_traces(num_of_packets, timeout):
     """Get device packet traces.
 
-    :param num_of_lines:    Number of lines.
+    :param num_of_packets:    Number of lines.
 
     :returns: Return list.
     """
     try:
-        cmd = "tail -{} {}".format(num_of_lines, file)
+        cmd = "sudo vppctl clear trace"
+        subprocess.check_output(cmd, shell=True)
+        cmd = 'sudo vppctl trace add dpdk-input {}'.format(num_of_packets)
+        subprocess.check_output(cmd, shell=True)
+        time.sleep(timeout)
+        cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
         res = subprocess.check_output(cmd, shell=True).splitlines()
-
-        # On zero matching, res is a list with a single empty
-        # string which we do not want to return to the caller
         return res if res != [''] else []
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
