@@ -69,7 +69,7 @@ import fwutils
 #    07. sudo systemctl restart frr
 #
 def _change_netplan_conf(pci, cmd_list):
-    args = {'is_add': 1, 'pci': pci, 'fname':'/etc/netplan/01-network-manager-all.yaml'}
+    args = {'is_add': 1, 'pci': pci}
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"

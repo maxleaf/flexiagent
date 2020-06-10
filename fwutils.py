@@ -1224,7 +1224,15 @@ def _get_interface_address(pci):
 def add_remove_netplan_interface(params):
     pci = params['pci']
     is_add = params['is_add']
-    fname = params['fname']
+
+    fname1 = '/etc/netplan/01-network-manager-all.yaml'
+    fname2 = '/etc/netplan/50-cloud-init.yaml'
+
+    if os.path.exists(fname1):
+        fname = fname1
+
+    if os.path.exists(fname2):
+        fname = fname2
 
     try:
         with open(fname, 'r') as stream:
@@ -1234,7 +1242,7 @@ def add_remove_netplan_interface(params):
         if is_add == 1:
             ethernets[tap_name] = {'dhcp4': True}
         else:
-            del ethernets[tap_name]
+            ethernets[tap_name] = {'dhcp4': False}
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
