@@ -158,7 +158,7 @@ def add_interface(params):
     # "if [ -z "$(ip addr | grep \'inet %s\')" ]" ensures that address was not configured yet by netplan.
     # Otherwise we will get "RTNETLINK answers: File exists" error.
     #
-    if 'mode' not in params or params['mode'].lower() == 'static':
+    if 'dhcp' not in params or params['dhcp'].lower() == 'no':
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']   = "exec"

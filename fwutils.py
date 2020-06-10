@@ -1506,14 +1506,10 @@ def get_interface_gateway(ip):
 
 def wan_ip_was_changed():
     res = ''
-    router_was_started = vpp_does_run()
     wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
 
     for wan in wan_list:
-        if router_was_started:
-            name = pci_to_linux_iface(wan['pci'])
-        else:
-            name = pci_to_tap(wan['pci'])
+        name = pci_to_linux_iface(wan['pci'])
 
         if name is None:
             return ''
