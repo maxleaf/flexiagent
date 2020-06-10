@@ -156,7 +156,7 @@ class FWAGENT_API:
         :returns: Dictionary with logs and status code.
         """
         try:
-            traces = fwutils.get_device_packet_traces(params['limit'])
+            traces = fwutils.get_device_packet_traces(params['packets'], params['timeout'])
             return {'message': traces, 'ok': 1}
         except:
             raise Exception("_get_device_packet_traces: failed to get device packet traces: %s" % format(sys.exc_info()[1]))
