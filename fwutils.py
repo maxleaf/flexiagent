@@ -1246,7 +1246,14 @@ def add_remove_netplan_interface(params):
     return (True, None)
 
 def get_dhcp_netplan_interface(nicname):
-    fname = '/etc/netplan/01-network-manager-all.yaml'
+    fname1 = '/etc/netplan/01-network-manager-all.yaml'
+    fname2 = '/etc/netplan/50-cloud-init.yaml'
+
+    if os.path.exists(fname1):
+        fname = fname1
+
+    if os.path.exists(fname2):
+        fname = fname2
 
     with open(fname, 'r') as stream:
         config = yaml.safe_load(stream)
