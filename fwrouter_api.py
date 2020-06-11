@@ -1171,11 +1171,6 @@ class FWROUTER_API:
         else:  # list
             params.remove(substs_element)
 
-    def get_default_route_address(self):
-        for key, request in self.db_requests.db.items():
-            if re.search('add-route:default', key):
-                return request['params']['via']
-
     def get_pci_lan_interfaces(self):
         interfaces = []
         for key, request in self.db_requests.db.items():
