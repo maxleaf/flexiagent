@@ -1516,3 +1516,44 @@ def add_static_route(args):
         return (False, None)
 
     return (True, None)
+
+
+def install_openvpn_server(params):
+    """Install Open VPN server on host.
+    In general, policy rules instruct VPP to route packets to specific interface,
+    which is marked with multilink label that noted in policy rule.
+
+    :param params: params - open vpn parameters:
+        policy-id - the policy id (two byte integer)
+        labels    - labels of interfaces to be used for packet forwarding
+        remove    - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    cmd = 'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -'
+    cmd += '; echo "deb http://build.openvpn.net/debian/openvpn/stable bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list'
+    cmd += '; sudo apt-get update && apt-get install -y openvpn'
+    cmd += '; sudo rm -rf /etc/openvpn/server/easy-rsa'
+    # cmd += "; mkdir -p /etc/openvpn/server/easy-rsa/"
+    # cmd += '; { wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | sudo tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1'
+    # cmd += '; sudo chown -R root:root /etc/openvpn/server/easy-rsa/'    
+    # cmd += '; sudo sh /etc/openvpn/server/easy-rsa/easyrsa init-pki'
+    # cmd += '; sudo sh /etc/openvpn/server/easy-rsa/easyrsa --batch build-ca nopass'
+    # cmd += '; EASYRSA_CERT_EXPIRE=3650 sudo sh /etc/openvpn/server/easy-rsa/easyrsa build-server-full server nopass'
+    # cmd += '; cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server'
+    # cmd += '; openvpn --genkey --secret /etc/openvpn/server/tc.key'
+#     cmd += "; echo '-----BEGIN DH PARAMETERS-----\
+# MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
+# +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
+# 87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\
+# YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
+# 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
+# ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\
+# -----END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem"
+
+    output = subprocess.check_output(cmd, shell=True)
+
+    fwglobals.log.debug("test= " + output)
+    
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.

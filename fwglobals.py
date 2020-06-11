@@ -34,6 +34,7 @@ from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications_api import FwApps
 from fwpolicies_api import FwPolicies
+from fwvpn_api import FwVPN
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
@@ -41,6 +42,7 @@ modules = {
     'fwpolicy_api': __import__('fwpolicies_api'),
     'fwrouter_api': __import__('fwrouter_api'),
     'os_api':       __import__('os_api'),
+    'fwvpn_api':    __import__('fwvpn_api')
 }
 
 request_handlers = {
@@ -69,6 +71,12 @@ request_handlers = {
     # Policy API
     'add-policy-info':              '_call_policy_api',
     'remove-policy-info':           '_call_policy_api',
+
+    # Vpn API
+    'install-vpn-server':           '_call_vpn_api',
+    'remove-vpn-server':            '_call_vpn_api',
+    'upgrade-vpn-server':           '_call_vpn_api',
+    'configure-vpn-server':         '_call_vpn_api',
 
     # Router API
     'start-router':                 '_call_router_api',
@@ -260,6 +268,7 @@ class Fwglobals:
         self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
         self.apps_api   = FwApps(self.APP_REC_DB_FILE)
+        self.vpn_api = FwVPN()
         self.policy_api = FwPolicies()
 
         self.router_api.restore_vpp_if_needed()
@@ -288,6 +297,9 @@ class Fwglobals:
 
     def _call_agent_api(self, req, params):
         return self.agent_api.call(req, params)
+
+    def _call_vpn_api(self, req, params):
+        return self.vpn_api.call(req, params)
 
     def _call_apps_api(self, req, params):
         return self.apps_api.call(req, params)
@@ -337,7 +349,7 @@ class Fwglobals:
 
         try:
             handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+            assert handler, 'fwglobals: %s request is not supported' % req
 
             handler_func = getattr(self, handler)
             assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler, req)
