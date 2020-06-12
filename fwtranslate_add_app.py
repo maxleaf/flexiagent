@@ -79,10 +79,11 @@ def add_acl_rule(rule, rules):
      :returns: None.
      """
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
-    ip_prefix = None
-    ip_bytes = None
-    proto = None
-    port_from = port_to = None
+    ip_prefix = 0
+    ip_bytes = '\x00\x00\x00\x00'
+    proto = 0
+    port_from = 0
+    port_to = 65535
 
     protocol = rule.get('protocol', None)
     if protocol:
