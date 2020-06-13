@@ -255,6 +255,8 @@ def add_policy(params):
     lan_pci_list = fwglobals.g.router_api.get_pci_lan_interfaces()
     loopback_ip_list = fwglobals.g.router_api.get_ip_tunnel_interfaces()
 
+    policy_acl_ids = set()
+
     for rule in params['rules']:
         priority = rule['priority']
         fallback = rule['action']['fallback']
@@ -277,11 +279,15 @@ def add_policy(params):
             service_class = app.get('serviceClass', None)
             importance = app.get('importance', None)
 
-            acl_id_list = fwglobals.g.apps_api.acl_id_list_get(id, category, service_class, importance)
-            for acl_id in acl_id_list:
+            rule_acl_ids = fwglobals.g.apps_api.acl_ids_get(id, category, service_class, importance)
+
+            for acl_id in rule_acl_ids:
+                if acl_id in policy_acl_ids:
+                    continue
                 policy_id = _generate_policy_id()
                 _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list)
                 _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+                policy_acl_ids.add(acl_id)
 
         else:
             policy_id = _generate_policy_id()
