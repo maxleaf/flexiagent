@@ -212,6 +212,7 @@ class Fwglobals:
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
+        self.ROUTER_OPEN_VPN_LOG_FILE     = '/var/log/openvpn/ovpn.log'
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
         self.VPP_CONFIG_FILE_BACKUP = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
