@@ -65,6 +65,7 @@ class FwVPN:
         :returns: Dictionary with information and status code.
         """
         fwutils.install_openvpn_server(params)
+        fwutils.configure_openvpn_server(params)
 
         reply = {'ok': 1}
         return reply
@@ -88,6 +89,8 @@ class FwVPN:
 
         :returns: Dictionary with information and status code.
         """
+
+        fwutils.configure_openvpn_server(params)
 
         reply = {'ok': 1}
         return reply

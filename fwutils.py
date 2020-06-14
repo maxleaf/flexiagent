@@ -1524,36 +1524,125 @@ def install_openvpn_server(params):
     which is marked with multilink label that noted in policy rule.
 
     :param params: params - open vpn parameters:
-        policy-id - the policy id (two byte integer)
-        labels    - labels of interfaces to be used for packet forwarding
-        remove    - True to remove rule, False to add.
+        version - the version to installed
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
-    cmd = 'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -'
-    cmd += '; echo "deb http://build.openvpn.net/debian/openvpn/stable bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list'
-    cmd += '; sudo apt-get update && apt-get install -y openvpn'
-    cmd += '; sudo rm -rf /etc/openvpn/server/easy-rsa'
-    # cmd += "; mkdir -p /etc/openvpn/server/easy-rsa/"
-    # cmd += '; { wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | sudo tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1'
-    # cmd += '; sudo chown -R root:root /etc/openvpn/server/easy-rsa/'    
-    # cmd += '; sudo sh /etc/openvpn/server/easy-rsa/easyrsa init-pki'
-    # cmd += '; sudo sh /etc/openvpn/server/easy-rsa/easyrsa --batch build-ca nopass'
-    # cmd += '; EASYRSA_CERT_EXPIRE=3650 sudo sh /etc/openvpn/server/easy-rsa/easyrsa build-server-full server nopass'
-    # cmd += '; cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server'
-    # cmd += '; openvpn --genkey --secret /etc/openvpn/server/tc.key'
-#     cmd += "; echo '-----BEGIN DH PARAMETERS-----\
-# MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
-# +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
-# 87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\
-# YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
-# 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
-# ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\
-# -----END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem"
+    if (params['version']):
+        # version = params['version']
+        version = 'stable'
+    else:
+        version = 'stable'
 
-    output = subprocess.check_output(cmd, shell=True)
+    os.system('wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -')
+    os.system('echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version)
+    os.system('apt-get update && apt-get install -y openvpn')
+    os.system('rm -rf /etc/openvpn/server/easy-rsa')
+    os.system('mkdir -p /etc/openvpn/server/easy-rsa/')
+    os.system('{ wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1')
+    os.system('chown -R root:root /etc/openvpn/server/easy-rsa/')
+    os.system('sh /etc/openvpn/server/easy-rsa/easyrsa init-pki')    
+    os.system('sh /etc/openvpn/server/easy-rsa/easyrsa --batch build-ca nopass')
+    os.system('EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-server-full server nopass')
+    os.system('EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-client-full client1 nopass')
+    os.system('cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/client1.crt ./pki/private/client1.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server')
+    os.system('openvpn --genkey --secret /etc/openvpn/server/tc.key')
+    os.system("echo '-----BEGIN DH PARAMETERS-----\n\
+MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
++8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
+87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\
+YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
+7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
+ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
+-----END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem")
+    os.system('rm -rf ./pki')
 
-    fwglobals.log.debug("test= " + output)
+    fwglobals.log.debug("Installation done!")
+    print("Installation done!")
     
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def configure_openvpn_server(params):
+    """Configure Open VPN server on host.
+
+    :param params: params - open vpn parameters:
+        deviceWANIp - the device WAN ip
+        remoteClientIp    - 
+        routeAllOverVpn    - false to use split tunnel
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    # TODO: check if installed- if not install before
+    # TODO: check if running- if yes, stop before    
+    configure_server_file(params)
+    configure_client_file(params)
+
+    # TODO: check if need to restart openvpn service
+    
+    fwglobals.log.debug("configuration done!")
+    print("Configuration done!")
+    
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def configure_client_file(params): 
+    os.system(' > /etc/openvpn/client/client.conf')
+    os.system('echo "dev tun\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "proto udp\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "remote %s\n" >> /etc/openvpn/client/client.conf' % params['deviceWANIp'])
+    os.system('echo "resolv-retry infinite\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "auth-user-pass\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "nobind\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "persist-key\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "persist-tun\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "remote-cert-tls server\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "auth SHA512\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "cipher AES-256-CBC\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "# ignore-unknown-option block-outside-dns\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "# block-outside-dns\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "verb 3\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "ca /etc/openvpn/server/ca.crt\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "cert /etc/openvpn/server/client1.crt\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "key /etc/openvpn/server/client1.key\n" >> /etc/openvpn/client/client.conf')
+    os.system('echo "tls-crypt /etc/openvpn/server/tc.key\n" >> /etc/openvpn/client/client.conf')
+
+def configure_server_file(params):
+    os.system(' > /etc/openvpn/server/server.conf')
+    os.system('echo "local %s\n" >> /etc/openvpn/server/server.conf' % params['deviceWANIp'])
+    os.system('echo "port 1194\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "proto udp\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "dev tun\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "ca ca.crt\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "cert server.crt\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "key server.key\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "dh dh.pem\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "auth SHA512\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "tls-crypt tc.key\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "topology subnet\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "log /var/log/openvpn/ovpn.log\n" >> /etc/openvpn/server/server.conf')
+
+    ip = IPNetwork(params['remoteClientIp'])
+    os.system('echo "server %s %s\n" >> /etc/openvpn/server/server.conf' % (ip.ip, ip.netmask))
+
+    if params['routeAllOverVpn'] is True:
+        os.system('echo "push \\"redirect-gateway def1 bypass-dhcp\\"" >> /etc/openvpn/server/server.conf')
+    else:
+        os.system('echo "push "route 172.16.0.0 255.255.255.0"" >> /etc/openvpn/server/server.conf' % params['remoteClientIp'])
+        
+    os.system('echo "\nifconfig-pool-persist ipp.txt\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "keepalive 10 120\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "cipher AES-256-CBC\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "user nobody\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "group nogroup\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "persist-key\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "persist-tun\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "status openvpn-status.log\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "verb 3\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "client-cert-not-required\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "client-config-dir /etc/openvpn/client\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "username-as-common-name\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "reneg-sec 43200\n" >> /etc/openvpn/server/server.conf')
+    os.system('echo "duplicate-cn\n" >> /etc/openvpn/server/server.conf')
+    # os.system('echo "Explicit-exit-notify\n" >> /etc/openvpn/server/server.conf')
