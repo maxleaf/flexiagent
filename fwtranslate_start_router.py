@@ -137,7 +137,7 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
 
-    # Enable NAT in vpp configuration file
+    # # Enable NAT in vpp configuration file
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -157,10 +157,10 @@ def start_router(params=None):
     }
     cmd_list.append(cmd)
 
-    # Create commands that start vpp and configure it with addresses
-    #   sudo systemtctl start vpp
-    #   <connect to python bindings of vpp and than run the rest>
-    #   sudo vppctl enable tap-inject
+    #  Create commands that start vpp and configure it with addresses
+    #  sudo systemtctl start vpp
+    #  <connect to python bindings of vpp and than run the rest>
+    #  sudo vppctl enable tap-inject
     cmd = {}
     cmd['cmd'] = {}                     # vfio-pci related stuff is needed for vmxnet3 interfaces
     cmd['cmd']['name']    = "exec"
@@ -197,6 +197,7 @@ def start_router(params=None):
     cmd['cmd']['params']  = { 'enable':1 }
     cmd_list.append(cmd)
     cmd = {}
+
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
@@ -242,3 +243,4 @@ def get_request_key(*params):
      :returns: A key.
      """
     return 'start-router'
+
