@@ -24,9 +24,9 @@ import fwutils
 import fwglobals
 
 fwvpn_api = {
-    'install-vpn-server':      '_install_vpn_server',
+    'install-vpn-server':      '_install_vpn_server',          
     'remove-vpn-server':       '_remove_vpn_server',
-    'configure-vpn-server':    '_configure_vpn_server',
+    'config-vpn-server':    '_config_vpn_server',
     'upgrade-vpn-server':      '_upgrade_vpn_server'        
 }
 
@@ -65,9 +65,15 @@ class FwVPN:
         :returns: Dictionary with information and status code.
         """
         fwutils.install_openvpn_server(params)
-        fwutils.configure_openvpn_server(params)
+        startResponse = fwutils.configure_openvpn_server(params)
 
-        reply = {'ok': 1}
+        if (startResponse[0] == True):
+            reply = {'ok': 1}
+        else:
+            reply = {'ok': 0, 'message': startResponse[1]}
+        # print("configRes=%s!" % configRes)
+
+        # reply = {'ok': 1}
         return reply
 
     def _remove_vpn_server(self, params):
@@ -77,12 +83,12 @@ class FwVPN:
 
         :returns: Dictionary with information and status code.
         """
-        # fwutils.vpp_multilink_update_policy_rule(params)
+        fwutils.remove_openvpn_server()
 
         reply = {'ok': 1}
         return reply
 
-    def _configure_vpn_server(self, params):
+    def _config_vpn_server(self, params):
         """Configure VPN server.
 
         :param params: Parameters from flexiManage.

@@ -1556,7 +1556,6 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
     os.system('rm -rf ./pki')
 
     fwglobals.log.debug("Installation done!")
-    print("Installation done!")
     
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
@@ -1569,77 +1568,175 @@ def configure_openvpn_server(params):
         routeAllOverVpn    - false to use split tunnel
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-
-    # TODO: check if installed- if not install before
-    # TODO: check if running- if yes, stop before    
+    """    
+            
     configure_server_file(params)
     configure_client_file(params)
 
-    # TODO: check if need to restart openvpn service
-    
-    fwglobals.log.debug("configuration done!")
-    print("Configuration done!")
-    
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+    # Start the vpn server
+    try:
+        cmd = 'sudo killall openvpn; sudo openvpn --config /etc/openvpn/server/server.conf --daemon'
+        output = subprocess.check_output(cmd, shell=True)
+        fwglobals.log.debug("openvpn server is running!") 
+        return (True, None)
+    except:
+        msg = "failed to start openvpn service. you can see more details in the log file"
+        fwglobals.log.error(msg)
+        return (False, msg)   
 
-def configure_client_file(params): 
-    os.system(' > /etc/openvpn/client/client.conf')
-    os.system('echo "dev tun\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "proto udp\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "remote %s\n" >> /etc/openvpn/client/client.conf' % params['deviceWANIp'])
-    os.system('echo "resolv-retry infinite\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "auth-user-pass\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "nobind\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "persist-key\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "persist-tun\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "remote-cert-tls server\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "auth SHA512\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "cipher AES-256-CBC\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "# ignore-unknown-option block-outside-dns\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "# block-outside-dns\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "verb 3\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "ca /etc/openvpn/server/ca.crt\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "cert /etc/openvpn/server/client1.crt\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "key /etc/openvpn/server/client1.key\n" >> /etc/openvpn/client/client.conf')
-    os.system('echo "tls-crypt /etc/openvpn/server/tc.key\n" >> /etc/openvpn/client/client.conf')
+def remove_openvpn_server():
+    """Remove Open VPN server on host.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    try:
+        cmd = 'sudo killall openvpn; sudo service openvpn stop; sudo apt-get remove -y openvpn;'
+        output = subprocess.check_output(cmd, shell=True)
+        fwglobals.log.debug("openvpn server uninstalled!") 
+        return (True, None)
+    except:
+        msg = "failed to uninstaled openvpn service."
+        fwglobals.log.error(msg)
+        return (False, msg)   
 
 def configure_server_file(params):
-    os.system(' > /etc/openvpn/server/server.conf')
-    os.system('echo "local %s\n" >> /etc/openvpn/server/server.conf' % params['deviceWANIp'])
-    os.system('echo "port 1194\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "proto udp\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "dev tun\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "ca ca.crt\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "cert server.crt\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "key server.key\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "dh dh.pem\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "auth SHA512\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "tls-crypt tc.key\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "topology subnet\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "log /var/log/openvpn/ovpn.log\n" >> /etc/openvpn/server/server.conf')
+    
+    destFile = '/etc/openvpn/server/server.conf'
 
+    # Clean the file
+    os.system(' > %s' % destFile)
+
+    # Which local IP address should OpenVPN listen on
+    os.system('echo "local %s\n" >> %s' % (params['deviceWANIp'], destFile))
+
+    # Which TCP/UDP port should OpenVPN listen on?
+    os.system('echo "port 1194\n" >> %s' % destFile)
+
+    # TCP or UDP server?
+    os.system('echo "proto udp\n" >> %s' % destFile)
+
+    # "dev tun" will create a routed IP tunnel
+    os.system('echo "dev tun\n" >> %s' % destFile)
+
+    # SSL/TLS root certificate
+    os.system('echo "ca /etc/openvpn/server/ca.crt\n" >> %s' % destFile)
+    os.system('echo "cert /etc/openvpn/server/server.crt\n" >> %s' % destFile)
+    os.system('echo "key /etc/openvpn/server/server.key\n" >> %s' % destFile)
+
+    # Diffie hellman parameters.
+    os.system('echo "dh /etc/openvpn/server/dh.pem\n" >> %s' % destFile)
+
+    # Select a cryptographic cipher.
+    os.system('echo "auth SHA512\n" >> %s' % destFile)
+    
+    # The server and each client must have a copy of this key
+    os.system('echo "tls-crypt /etc/openvpn/server/tc.key\n" >> %s' % destFile)
+
+    # Network topology
+    os.system('echo "topology subnet\n" >> %s' % destFile)
+
+    os.system('echo "log /var/log/openvpn/ovpn.log\n" >> %s' % destFile)
+
+    # Configure server mode and supply a VPN subnet
+    # for OpenVPN to draw client addresses from.
     ip = IPNetwork(params['remoteClientIp'])
-    os.system('echo "server %s %s\n" >> /etc/openvpn/server/server.conf' % (ip.ip, ip.netmask))
+    os.system('echo "server %s %s\n" >> %s' % (ip.ip, ip.netmask, destFile))
 
+    # Split tunnel
     if params['routeAllOverVpn'] is True:
-        os.system('echo "push \\"redirect-gateway def1 bypass-dhcp\\"" >> /etc/openvpn/server/server.conf')
+        # this directive will configure all clients to redirect their default
+        # network gateway through the VPN
+        os.system('echo "push \\"redirect-gateway def1 bypass-dhcp\\"" >> %s' % destFile)        
     else:
-        os.system('echo "push "route 172.16.0.0 255.255.255.0"" >> /etc/openvpn/server/server.conf' % params['remoteClientIp'])
+        os.system('echo "push "route 172.16.0.0 255.255.255.0"" >> %s' % (params['remoteClientIp'], destFile))
         
-    os.system('echo "\nifconfig-pool-persist ipp.txt\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "keepalive 10 120\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "cipher AES-256-CBC\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "user nobody\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "group nogroup\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "persist-key\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "persist-tun\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "status openvpn-status.log\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "verb 3\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "client-cert-not-required\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "client-config-dir /etc/openvpn/client\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "username-as-common-name\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "reneg-sec 43200\n" >> /etc/openvpn/server/server.conf')
-    os.system('echo "duplicate-cn\n" >> /etc/openvpn/server/server.conf')
-    # os.system('echo "Explicit-exit-notify\n" >> /etc/openvpn/server/server.conf')
+    # Maintain a record of client <-> virtual IP address associations in this file
+    os.system('echo "\nifconfig-pool-persist ipp.txt\n" >> %s' % destFile)
+
+    os.system('echo "keepalive 10 120\n" >> %s' % destFile)
+    
+    # Select a cryptographic cipher.
+    os.system('echo "cipher AES-256-CBC\n" >> %s' % destFile)
+    os.system('echo "user nobody\n" >> %s' % destFile)
+    os.system('echo "group nogroup\n" >> %s' % destFile)
+    
+    # The persist options will try to avoid ccessing certain resources on restart
+    # that may no longer be accessible because of the privilege downgrade.
+    os.system('echo "persist-key\n" >> %s' % destFile)
+    os.system('echo "persist-tun\n" >> %s' % destFile)
+
+    # Output a short status file showing current connections, truncated
+    # and rewritten every minute.
+    os.system('echo "status openvpn-status.log\n" >> %s' % destFile)
+
+    # Set the appropriate level of log file verbosity.
+    os.system('echo "verb 3\n" >> %s' % destFile)
+
+    os.system('echo "plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so openvpn\n" >> %s' % destFile)
+    os.system('echo "client-cert-not-required\n" >> %s' % destFile)
+    os.system('echo "client-config-dir /etc/openvpn/client\n" >> %s' % destFile)
+    os.system('echo "username-as-common-name\n" >> %s' % destFile)
+    os.system('echo "reneg-sec 43200\n" >> %s' % destFile)
+    os.system('echo "duplicate-cn\n" >> %s' % destFile)
+    os.system('echo "client-to-client\n" >> %s' % destFile)
+    os.system('echo "# Explicit-exit-notify\n" >> %s' % destFile)
+
+
+def configure_client_file(params): 
+
+    destFile = '/etc/openvpn/client/client.conf'
+
+    os.system(' > %s' % destFile)
+    os.system('echo "dev tun\n" >> %s' % destFile)
+    os.system('echo "proto udp\n" >> %s' % destFile)
+    os.system('echo "remote %s\n" >> %s' % (params['deviceWANIp'], destFile))
+    os.system('echo "resolv-retry infinite\n" >> %s' % destFile)
+    os.system('echo "# auth-user-pass\n" >> %s' % destFile)
+    os.system('echo "nobind\n" >> %s' % destFile)
+    os.system('echo "persist-key\n" >> %s' % destFile)
+    os.system('echo "persist-tun\n" >> %s' % destFile)
+    os.system('echo "remote-cert-tls server\n" >> %s' % destFile)
+    os.system('echo "auth SHA512\n" >> %s' % destFile)
+    os.system('echo "cipher AES-256-CBC\n" >> %s' % destFile)
+    os.system('echo "# ignore-unknown-option block-outside-dns\n" >> %s' % destFile)
+    os.system('echo "# block-outside-dns\n" >> %s' % destFile)
+    os.system('echo "verb 3\n" >> %s' % destFile)
+
+    # os.system('echo "ca /etc/openvpn/server/ca.crt\n" >> %s' % destFile)
+    # os.system('echo "cert /etc/openvpn/server/client1.crt\n" >> %s' % destFile)
+    # os.system('echo "key /etc/openvpn/server/client1.key\n" >> %s' % destFile)
+    os.system('echo "tls-crypt /etc/openvpn/server/tc.key\n" >> %s' % destFile)
+    os.system('echo "tls-client\n" >> %s' % destFile)
+
+    # cmd = "cat %s \
+    # <(echo -e '<ca>') \
+    # /etc/openvpn/server/ca.crt \
+    # <(echo -e '</ca>\n<cert>') \
+    # /etc/openvpn/server/client1.crt \
+    # <(echo -e '</cert>\n<key>') \
+    # /etc/openvpn/server/client1.key \
+    # <(echo -e '</key>\n<tls-auth>') \
+    # /etc/openvpn/server/tc.key \
+    # <(echo -e '</tls-auth>') > /etc/openvpn/client/client1.ovpn" % destFile
+    
+    os.system("echo '<ca>\n' >> %s" % destFile)
+    os.system('cat /etc/openvpn/server/ca.crt >> %s' % destFile)
+    os.system("echo '</ca>\n<cert>' >> %s" % destFile)
+    os.system('cat /etc/openvpn/server/client1.crt >> %s' % destFile)
+    os.system("echo '</cert>\n<key>' >> %s" % destFile)
+    os.system('cat /etc/openvpn/server/client1.key >> %s' % destFile)
+    os.system("echo '</key>\n<tls-crypt>' >> %s" % destFile)
+    os.system('cat /etc/openvpn/server/tc.key >> %s' % destFile)
+    os.system("echo '</tls-crypt>' >> %s" % destFile)
+    # os.system("echo '<key>$(cat /etc/openvpn/server/client1.key)</key>\n' >> %s" % destFile)
+    # os.system("echo '<tls-crypt>$(cat /etc/openvpn/server/tc.key)</tls-crypt>\n' >> %s" % destFile)
+    # os.system("cat")
+    # os.system("echo '' >> %s" % destFile)
+    # os.system("echo '</cert>\n<key>' >> %s" % destFile)
+    # os.system("echo '</key>' >> %s" % destFile)
+    
+
+    # os.system("(echo -e '') /etc/openvpn/server/client1.crt >> %s" % destFile)
+    # os.system("(echo -e '</cert>\n<key>') /etc/openvpn/server/client1.key >> %s" % destFile)
+    # os.system("(echo -e '</key>') >> %s" % destFile)      
