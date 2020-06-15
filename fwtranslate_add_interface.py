@@ -239,7 +239,6 @@ def add_interface(params):
     #   'nat44 add interface address GigabitEthernet0/9/0'
     #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
     # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-#    if 'type' not in params or params['type'].lower() == 'wan':
     if 'type' not in params or params['type'].lower() == 'wan':
         cmd = {}
         cmd['cmd'] = {}
