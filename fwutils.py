@@ -82,7 +82,8 @@ def get_device_packet_traces(num_of_packets, timeout):
         time.sleep(timeout)
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
         res = subprocess.check_output(cmd, shell=True).splitlines()
-        return res if res != [''] else []
+        # skip first line (contains unnecessary information header)
+        return res[1:] if res != [''] else []
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
