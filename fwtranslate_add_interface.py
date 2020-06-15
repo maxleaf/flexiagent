@@ -187,20 +187,6 @@ def add_interface(params):
     # Enable DHCP client.
     # Run 'set dhcp client intfc GigabitEthernet0/3/0'
     if 'dhcp' in params and params['dhcp'].lower() == 'yes':
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name'] = "exec"
-        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_vpp_if_name', 'arg':iface_pci } ]},
-                                 "sudo vppctl set dhcp client intfc DEV-STUB"]
-        cmd['cmd']['descr']  = "enable DHCP client for interface %s (%s)" % (iface_pci, iface_addr)
-        cmd['cmd']['descr'] = "enable dhcp client"
-        cmd['revert'] = {}
-        cmd['revert']['name'] = "exec"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_vpp_if_name', 'arg':iface_pci } ]},
-                                 "sudo vppctl set dhcp client del intfc DEV-STUB"]
-        cmd['revert']['descr'] = "disable DHCP client for interface %s (%s)" % (iface_pci, iface_addr)
-        cmd_list.append(cmd)
-
         _change_netplan_conf(iface_pci, cmd_list)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
@@ -239,7 +225,7 @@ def add_interface(params):
     #   'nat44 add interface address GigabitEthernet0/9/0'
     #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
     # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-    if 'type' not in params or params['type'].lower() == 'wan':
+    if False:
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_add_del_interface_addr"
