@@ -133,12 +133,16 @@ class FWAGENT_API:
 
         :returns: Dictionary with logs and status code.
         """
+        dl_map = {
+    	    'fwagent': fwglobals.g.ROUTER_LOG_FILE,
+    	    'syslog': fwglobals.g.SYSLOG_FILE,
+            'dhcp': fwglobals.g.DHCP_LOG_FILE,
+            'vpp': fwglobals.g.VPP_LOG_FILE,
+            'ospf': fwglobals.g.OSPF_LOG_FILE,
+            'open-vpn': fwglobals.g.ROUTER_OPEN_VPN_LOG_FILE
+	    }
+        file = dl_map.get(params['filter'], '')
         try:
-            if params['filter'] == 'open-vpn':
-                file = fwglobals.g.ROUTER_OPEN_VPN_LOG_FILE
-            else:
-                file = fwglobals.g.ROUTER_LOG_FILE
-                                    
             logs = fwutils.get_device_logs(file, params['lines'])
             return {'message': logs, 'ok': 1}
         except:

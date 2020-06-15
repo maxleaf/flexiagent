@@ -275,6 +275,8 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     if 'multilink' in iface_params and 'labels' in iface_params['multilink']:
         labels = iface_params['multilink']['labels']
         if len(labels) > 0:
+            # next_hop is remote end of tunnel, which is XOR(local_end, 0.0.0.1)
+            next_hop = str(IPNetwork(addr).ip ^ IPAddress("0.0.0.1"))
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "python"
@@ -283,7 +285,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                             'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': False }
+                            'args'  : { 'labels': labels, 'next_hop': next_hop, 'remove': False }
             }
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
@@ -292,7 +294,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                             'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels': labels, 'is_dia': False, 'addr': addr, 'remove': True }
+                            'args'  : { 'labels': labels, 'next_hop': next_hop, 'remove': True }
             }
             cmd_list.append(cmd)
 

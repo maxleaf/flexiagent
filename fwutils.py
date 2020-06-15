@@ -59,7 +59,7 @@ def get_device_logs(file, num_of_lines):
     """
     try:
         cmd = "tail -{} {}".format(num_of_lines, file)
-        res = subprocess.check_output(cmd, shell=True).split('\n')
+        res = subprocess.check_output(cmd, shell=True).splitlines()
 
         # On zero matching, res is a list with a single empty
         # string which we do not want to return to the caller
@@ -1296,15 +1296,12 @@ def vpp_multilink_update_labels(params):
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
 
-    op = 'del' if params['remove'] else 'add'
-
-    if params['is_dia']:
-        next_hop = fwglobals.g.router_api.get_default_route_address()
+    if params.get('next_hop'):
+        next_hop = params['next_hop']
     else:
-        network = IPNetwork(params['addr'])
-        for ip in network:
-            if ip.value != network.value:
-                next_hop = str(ip)
+        return (False, "'next_hop' was not found in params")
+
+    op = 'del' if params['remove'] else 'add'
 
     vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
 

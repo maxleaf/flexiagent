@@ -169,7 +169,11 @@ def add_interface(params):
             cmd['cmd']['params']  = {
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels': labels, 'is_dia': True, 'dev': iface_pci, 'remove': False }
+                            'args'  : { 'labels':   labels,
+                                        'next_hop': params.get('gateway'),
+                                        'dev':      iface_pci,
+                                        'remove':   False
+                                      }
             }
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
@@ -177,7 +181,11 @@ def add_interface(params):
             cmd['revert']['params'] = {
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels': labels, 'is_dia': True, 'dev': iface_pci, 'remove': True }
+                            'args'  : { 'labels':   labels,
+                                        'next_hop': params.get('gateway'),
+                                        'dev':      iface_pci,
+                                        'remove':   True
+                                      }
             }
             cmd_list.append(cmd)
 
