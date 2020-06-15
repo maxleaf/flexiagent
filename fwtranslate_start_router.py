@@ -191,6 +191,12 @@ def start_router(params=None):
     cmd['cmd']['descr']   = "enable tap-inject"
     cmd_list.append(cmd)
     cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
+    cmd['cmd']['descr']   = "enable NAT forwarding"
+    cmd['cmd']['params']  = { 'enable':1 }
+    cmd_list.append(cmd)
+    cmd = {}
 
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
