@@ -788,8 +788,8 @@ class FWROUTER_API:
 
             self._call_aggregated(requests)
             # Try to ping gateway to renew the neighbor in Linux
-            # Delay 10 seconds to make sure Linux interfaces initialized
-            time.sleep(10)
+            # Delay 5 seconds to make sure Linux interfaces initialized
+            time.sleep(5)
             for interface in interfaces:
                 if 'type' in interface and interface['type'].lower() == 'wan' and interface.get('gateway') != None:
                     try:
