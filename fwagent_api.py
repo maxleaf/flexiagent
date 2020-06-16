@@ -87,6 +87,7 @@ class FWAGENT_API:
                 "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
                 }
             info['network']['routes'] = [ default_route ]
+            info['reconfig'] = fwutils.wan_ip_was_changed()
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))
