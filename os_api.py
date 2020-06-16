@@ -62,28 +62,32 @@ class OS_DECODERS:
         :returns: Array of interface descriptions.
         """
         out = []
+        pciaddr = ''
+        driver = ''
         for nicname, addrs in inp.items():
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] != "":
-                daddr = {
-                            'name':nicname, 
-                            'pciaddr':pciaddr[0], 
-                            'driver':pciaddr[1], 
-                            'MAC':'', 
-                            'IPv4':'',
-                            'IPv4Mask':'', 
-                            'IPv6':'',
-                            'IPv6Mask':'',
-                            'dhcp':'',
-                            'gateway':''
-                        }
-                daddr['dhcp'] = fwutils.get_dhcp_netplan_interface(nicname)
-                daddr['gateway'] = fwutils.get_gateway(nicname)
-                for addr in addrs:
-                    addr_af_name = fwutils.af_to_name(addr.family)
-                    daddr[addr_af_name] = addr.address.split('%')[0]
-                    if addr.netmask != None:
-                        daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+            pci = fwutils.linux_to_pci_addr(nicname)
+            if pci[0] != "":
+                pciaddr = pci[0]
+                driver = pci[1]
+            daddr = {
+                        'name':nicname,
+                        'pciaddr':pciaddr,
+                        'driver':driver,
+                        'MAC':'',
+                        'IPv4':'',
+                        'IPv4Mask':'',
+                        'IPv6':'',
+                        'IPv6Mask':'',
+                        'dhcp':'',
+                        'gateway':''
+                    }
+            daddr['dhcp'] = fwutils.get_dhcp_netplan_interface(nicname)
+            daddr['gateway'] = fwutils.get_gateway(nicname)
+            for addr in addrs:
+                addr_af_name = fwutils.af_to_name(addr.family)
+                daddr[addr_af_name] = addr.address.split('%')[0]
+                if addr.netmask != None:
+                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
                 out.append(daddr)
         return (out,1)
