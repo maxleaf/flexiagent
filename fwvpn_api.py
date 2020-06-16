@@ -65,15 +65,13 @@ class FwVPN:
         :returns: Dictionary with information and status code.
         """
         fwutils.install_openvpn_server(params)
-        startResponse = fwutils.configure_openvpn_server(params)
+        # startResponse = fwutils.configure_openvpn_server(params)
 
-        if (startResponse[0] == True):
-            reply = {'ok': 1}
-        else:
-            reply = {'ok': 0, 'message': startResponse[1]}
-        # print("configRes=%s!" % configRes)
-
-        # reply = {'ok': 1}
+        # if (startResponse[0] == True):
+        #     reply = {'ok': 1}
+        # else:
+        #     reply = {'ok': 0, 'message': startResponse[1]}
+        reply = {'ok': 1}
         return reply
 
     def _remove_vpn_server(self, params):
