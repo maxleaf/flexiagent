@@ -64,8 +64,11 @@ class OS_DECODERS:
         out = []
         pciaddr = ''
         driver = ''
+        vpp_run = fwutils.vpp_does_run()
         for nicname, addrs in inp.items():
             pci = fwutils.linux_to_pci_addr(nicname)
+            if not vpp_run and pci[0] == "":
+                continue
             if pci[0] != "":
                 pciaddr = pci[0]
                 driver = pci[1]
