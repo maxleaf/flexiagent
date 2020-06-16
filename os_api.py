@@ -62,21 +62,15 @@ class OS_DECODERS:
         :returns: Array of interface descriptions.
         """
         out = []
-        pciaddr = ''
-        driver = ''
-        vpp_run = fwutils.vpp_does_run()
 
         for nicname, addrs in inp.items():
-            pci = fwutils.linux_to_pci_addr(nicname)
-            if not vpp_run and pci[0] == "":
+            pciaddr = fwutils.linux_to_pci_addr(nicname)
+            if pciaddr[0] == "":
                 continue
-            if pci[0] != "":
-                pciaddr = pci[0]
-                driver = pci[1]
             daddr = {
                         'name':nicname,
-                        'pciaddr':pciaddr,
-                        'driver':driver,
+                        'pciaddr':pciaddr[0],
+                        'driver':pciaddr[1],
                         'MAC':'',
                         'IPv4':'',
                         'IPv4Mask':'',

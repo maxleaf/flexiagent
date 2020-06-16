@@ -240,6 +240,7 @@ def linux_to_pci_addr(linuxif):
     :returns: PCI address.
     """
     NETWORK_BASE_CLASS = "02"
+    vpp_run = vpp_does_run()
     lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
     for line in lines:
         vals = line.decode().split("\t", 1)
@@ -249,7 +250,10 @@ def linux_to_pci_addr(linuxif):
                 slot = vals[1]
             if vals[0] == 'Class:':
                 if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    interface = pci_to_linux_iface(slot)
+                    if vpp_run:
+                        interface = pci_to_tap(slot)
+                    else:
+                        interface = pci_to_linux_iface(slot)
                     if interface == linuxif:
                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
                         return (pci_addr_full(slot), "" if driver=='driver' else driver)
