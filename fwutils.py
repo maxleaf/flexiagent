@@ -165,7 +165,7 @@ def get_gateway(nicname):
     :returns: Gateway ip address.
     """
     try:
-        dgw = os.popen('ip route list match default').read()
+        dgw = os.popen('ip route list match default | grep via').read()
     except:
         return ''
 
@@ -195,7 +195,7 @@ def get_interface_address(iface):
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    raise None
+    return None
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -1509,28 +1509,30 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def wan_ip_was_changed():
+def get_reconfig_hash():
     res = ''
     wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
+    vpp_run = vpp_does_run()
 
     for wan in wan_list:
         name = pci_to_linux_iface(wan['pci'])
 
-        if name is None:
+        if name is None and vpp_run:
             name = pci_to_tap(wan['pci'])
-            if name is None:
-                return ''
+
+        if name is None:
+            return ''
 
         addr = get_interface_address(name)
 
         if addr is None:
-            return ''
-
-        if not re.match(addr, wan['addr']):
-            res = res + addr
+            res += 'None,'
+        else:
+            if not re.match(addr, wan['addr']):
+                res += addr + ','
 
     if res:
-        fwglobals.log.info('wan_ip_was_changed: res %s' % res)
+        fwglobals.log.info('reconfig_hash_get: %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash
 
