@@ -1528,7 +1528,7 @@ def get_reconfig_hash():
         if addr is None:
             res += 'None,'
         else:
-            if not re.match(addr, wan['addr']):
+            if not re.search(addr, wan['addr']):
                 res += addr + ','
 
     if res:
