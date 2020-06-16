@@ -65,6 +65,7 @@ class OS_DECODERS:
         pciaddr = ''
         driver = ''
         vpp_run = fwutils.vpp_does_run()
+
         for nicname, addrs in inp.items():
             pci = fwutils.linux_to_pci_addr(nicname)
             if not vpp_run and pci[0] == "":
@@ -92,8 +93,9 @@ class OS_DECODERS:
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-                out.append(daddr)
+            out.append(daddr)
         return (out,1)
+
     def execd(self, handle):
         """Read from a descriptor.
 
