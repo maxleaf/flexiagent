@@ -1517,7 +1517,9 @@ def wan_ip_was_changed():
         name = pci_to_linux_iface(wan['pci'])
 
         if name is None:
-            return ''
+            name = pci_to_tap(wan['pci'])
+            if name is None:
+                return ''
 
         addr = get_interface_address(name)
 
@@ -1528,6 +1530,7 @@ def wan_ip_was_changed():
             res = res + addr
 
     if res:
+        fwglobals.log.info('wan_ip_was_changed: res %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash
 
