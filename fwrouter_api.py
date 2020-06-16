@@ -797,7 +797,7 @@ class FWROUTER_API:
                         output = subprocess.check_output(cmd, shell=True)
                         fwglobals.log.debug("_handle_modify_device_request: ping result: %s" % output)
                     except:
-                        fwglobals.log.debug("_handle_modify_device_request: ping %s failed" % interface['gateway'])
+                        fwglobals.log.error("_handle_modify_device_request: ping %s failed" % interface['gateway'])
 
             if should_restart_router == True:
                 self._start_router("start-router", {})
