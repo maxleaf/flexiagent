@@ -1519,13 +1519,12 @@ def wan_ip_was_changed():
         if name is None:
             return ''
 
-        fwglobals.log.debug(name)
         addr = get_interface_address(name)
 
         if addr is None:
             return ''
 
-        if addr is not wan['addr']:
+        if not re.match(addr, wan['addr']):
             res = res + addr
 
     if res:
