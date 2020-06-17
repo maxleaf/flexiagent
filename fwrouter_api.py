@@ -1215,6 +1215,6 @@ class FWROUTER_API:
         for key, request in self.db_requests.db.items():
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
-                    wan_list.append({'addr': request['params']['addr'], 'pci': request['params']['pci']})
+                    wan_list.append(request['params'])
 
         return wan_list

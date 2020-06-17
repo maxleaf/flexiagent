@@ -195,7 +195,7 @@ def get_interface_address(iface):
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    return None
+    return ''
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -1528,12 +1528,12 @@ def get_reconfig_hash():
             return ''
 
         addr = get_interface_address(name)
+        if not re.search(addr, wan['addr']):
+            res += 'addr:' + addr + ','
 
-        if addr is None:
-            res += 'None,'
-        else:
-            if not re.search(addr, wan['addr']):
-                res += addr + ','
+        gw = get_gateway(name)
+        if not re.match(gw, wan['gateway']):
+            res += 'gw:' + gw + ','
 
     if res:
         fwglobals.log.info('reconfig_hash_get: %s' % res)
