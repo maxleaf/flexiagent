@@ -787,11 +787,6 @@ class FWROUTER_API:
                 self._stop_router("stop-router", {})
 
             self._call_aggregated(requests)
-            for interface in interfaces:
-                if 'type' in interface and interface['type'].lower() == 'wan' and interface.get('gateway') != None:
-                    cmd = 'ping -c 3 %s' % interface['gateway']
-                    output = subprocess.check_output(cmd, shell=True)
-                    fwglobals.log.debug("_handle_modify_device_request: ping result: %s" % output)
 
             if should_restart_router == True:
                 self._start_router("start-router", {})
