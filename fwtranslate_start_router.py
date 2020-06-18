@@ -197,15 +197,10 @@ def start_router(params=None):
     cmd['cmd']['params']  = { 'enable':1 }
     cmd_list.append(cmd)
     cmd = {}
-
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
     cmd['cmd']['descr'] = "punt ip brodcast"
-    cmd['revert'] = {}
-    cmd['revert']['name'] = 'exec'
-    cmd['revert']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via drop"]
-    cmd['revert']['descr'] = "drop ip broadcast"
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
