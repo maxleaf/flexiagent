@@ -1233,14 +1233,7 @@ def add_remove_netplan_interface(params):
     gw = params['gw']
     config_section = {}
 
-    fname1 = '/etc/netplan/01-network-manager-all.yaml'
-    fname2 = '/etc/netplan/50-cloud-init.yaml'
-
-    if os.path.exists(fname1):
-        fname = fname1
-
-    if os.path.exists(fname2):
-        fname = fname2
+    fname = '/etc/netplan/100-flexiwan.yaml'
 
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
@@ -1250,21 +1243,37 @@ def add_remove_netplan_interface(params):
             config_section['gateway4'] = gw
 
     try:
+        if not os.path.exists(fname):
+            config = dict()
+            config['network'] = {'version': 2}
+            with open(fname, 'w+') as stream:
+                yaml.safe_dump(config, stream, default_flow_style=False)
+
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
-        ethernets = config['network']['ethernets']
+            network = config['network']
+
+        if 'ethernets' not in network:
+            network['ethernets'] = {}
+
+        ethernets = network['ethernets']
+
         tap_name = pci_to_tap(pci)
         if is_add == 1:
-            del ethernets[tap_name]
+            if tap_name in ethernets:
+                del ethernets[tap_name]
             ethernets[tap_name] = config_section
         else:
-            ethernets[tap_name] = config_section
+            del ethernets[tap_name]
+
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
         subprocess.check_output("sudo netplan apply", shell=True)
-    except:
-        err = "add_remove_netplan_interface failed: pci: %s, file: %s" % (pci, fname)
+    except Exception as e:
+        err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
+              % (pci, fname, str(e))
+        fwglobals.log.error(err)
         return (False, None)
 
     return (True, None)
@@ -1273,13 +1282,18 @@ def get_dhcp_netplan_interface(nicname):
     for fname in glob.glob("/etc/netplan/*.yaml"):
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
-        ethernets = config['network']['ethernets']
 
-        if nicname in ethernets:
-            interface = ethernets[nicname]
-            if 'dhcp4' in interface:
-                if interface['dhcp4'] == True:
-                    return 'yes'
+        if 'network' in config:
+            network = config['network']
+
+            if 'ethernets' in network:
+                ethernets = network['ethernets']
+
+                if nicname in ethernets:
+                    interface = ethernets[nicname]
+                    if 'dhcp4' in interface:
+                        if interface['dhcp4'] == True:
+                            return 'yes'
     return 'no'
 
 def reset_dhcpd():
