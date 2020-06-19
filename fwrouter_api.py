@@ -641,9 +641,6 @@ class FWROUTER_API:
                 if 'interfaces' in params:
                     fwglobals.g.handle_request('add-interface', params['interfaces'])
                     del params['interfaces']
-                if 'routes' in params:
-                    fwglobals.g.handle_request('add-route', params['routes'])
-                    del params['routes']
                 if bool(params) == False:
                     params = None
             except Exception as e:
@@ -793,25 +790,6 @@ class FWROUTER_API:
         except Exception as e:
                 fwglobals.log.excep("_modify_device: %s" % str(e))
                 raise e
-
-        # Modifying interfaces might result in removal of static routes,
-        # which can affect the agent's ability to reconnect to the MGMT
-        # (if default route or any other route the agent uses to connect to
-        # the MGMT was removed). In order to overcome this, we try to restore
-        # the lost routes. Since this is a best effort solution, we don't return
-        # error if we fail to restore a route.
-        changed_ips = map(lambda interface: interface['addr'], interfaces)
-        if len(changed_ips) > 0:
-            for key in self.db_requests.db:
-                try:
-                    if re.match('add-route', key):
-                        next_hop_ip = self.db_requests.db[key]['params']['via']
-                        if(any([fwutils.is_ip_in_subnet(next_hop_ip, subnet) for subnet in changed_ips])):
-                            fwglobals.log.info('restoring static route: ' + str(key))
-                            self._apply_db_request(key)
-                except Exception as e:
-                    fwglobals.log.excep("_modify_device: failed to restore static routes %s" % str(e))
-                    pass
 
         return {'ok':1}
 
