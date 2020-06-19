@@ -20,7 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-
+import glob
 import hashlib
 import inspect
 import json
@@ -1270,24 +1270,16 @@ def add_remove_netplan_interface(params):
     return (True, None)
 
 def get_dhcp_netplan_interface(nicname):
-    fname1 = '/etc/netplan/01-network-manager-all.yaml'
-    fname2 = '/etc/netplan/50-cloud-init.yaml'
+    for fname in glob.glob("/etc/netplan/*.yaml"):
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+        ethernets = config['network']['ethernets']
 
-    if os.path.exists(fname1):
-        fname = fname1
-
-    if os.path.exists(fname2):
-        fname = fname2
-
-    with open(fname, 'r') as stream:
-        config = yaml.safe_load(stream)
-    ethernets = config['network']['ethernets']
-
-    if nicname in ethernets:
-        interface = ethernets[nicname]
-        if 'dhcp4' in interface:
-            if interface['dhcp4'] == True:
-                return 'yes'
+        if nicname in ethernets:
+            interface = ethernets[nicname]
+            if 'dhcp4' in interface:
+                if interface['dhcp4'] == True:
+                    return 'yes'
     return 'no'
 
 def reset_dhcpd():
