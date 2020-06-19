@@ -761,6 +761,8 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
+    if os.path.exists(fwglobals.g.NETPLAN_FILE):
+        os.remove(fwglobals.g.NETPLAN_FILE)
 
     reset_dhcpd()
 
@@ -1233,7 +1235,7 @@ def add_remove_netplan_interface(params):
     gw = params['gw']
     config_section = {}
 
-    fname = '/etc/netplan/100-flexiwan.yaml'
+    fname = fwglobals.g.NETPLAN_FILE
 
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
