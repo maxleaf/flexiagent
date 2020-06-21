@@ -1325,7 +1325,9 @@ def vpp_multilink_update_labels(params):
     if params.get('next_hop'):
         next_hop = params['next_hop']
     else:
-        return (False, "'next_hop' was not found in params")
+        next_hop = fwglobals.g.router_api.get_default_route_address()
+    if not next_hop:
+        return (False, "'next_hop' was not found in params and there is no default gateway")
 
     op = 'del' if params['remove'] else 'add'
 

@@ -37,7 +37,8 @@ fwagent_api = {
     'get-device-os-routes':     '_get_device_os_routes',
     'handle-request':           '_handle_request',
     'get-router-config':        '_get_router_config',
-    'upgrade-device-sw':        '_upgrade_device_sw'
+    'upgrade-device-sw':        '_upgrade_device_sw',
+    'reset-device':             '_reset_device_soft'
 }
 
 class FWAGENT_API:
@@ -203,6 +204,19 @@ class FWAGENT_API:
         configs = fwutils.get_router_config()
         reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
+
+    def _reset_device_soft(self, params):
+        """Soft reset device configuration.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
+
+        # VPP must be stopped before resetting the configuration
+        fwglobals.g.handle_request('stop-router')
+        fwutils.reset_router_config()
+        return {'ok': 1, 'message': {}}
 
     def _handle_request(self, params):
         """Handle a request from request_handlers of fwglobals.
