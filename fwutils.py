@@ -67,6 +67,32 @@ def get_device_logs(file, num_of_lines):
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
+def get_device_packet_traces(num_of_packets, timeout):
+    """Get device packet traces.
+
+    :param num_of_packets:    Number of lines.
+    :param timeout:           Timeout to wait for trace to complete.
+
+    :returns: Array of traces.
+    """
+    try:
+        cmd = 'sudo vppctl clear trace'
+        subprocess.check_output(cmd, shell=True)
+        cmd = 'sudo vppctl show vmxnet3'
+        shif_vmxnet3 = subprocess.check_output(cmd, shell=True)
+        if shif_vmxnet3 is '':
+            cmd = 'sudo vppctl trace add dpdk-input {}'.format(num_of_packets)
+        else:
+            cmd = 'sudo vppctl trace add vmxnet3-input {}'.format(num_of_packets)
+        subprocess.check_output(cmd, shell=True)
+        time.sleep(timeout)
+        cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
+        res = subprocess.check_output(cmd, shell=True).splitlines()
+        # skip first line (contains unnecessary information header)
+        return res[1:] if res != [''] else []
+    except (OSError, subprocess.CalledProcessError) as err:
+        raise err
+
 def get_agent_version(fname):
     """Get agent version.
 

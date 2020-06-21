@@ -58,6 +58,7 @@ request_handlers = {
     'get-device-info':              '_call_agent_api',
     'get-device-stats':             '_call_agent_api',
     'get-device-logs':              '_call_agent_api',
+    'get-device-packet-traces':     '_call_agent_api',
     'get-device-os-routes':         '_call_agent_api',
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
