@@ -76,8 +76,7 @@ request_handlers = {
     'install-vpn-server':           '_call_vpn_api',
     'remove-vpn-server':            '_call_vpn_api',
     'config-vpn-server':            '_call_vpn_api',
-    'upgrade-vpn-server':           '_call_vpn_api',
-    'configure-vpn-server':         '_call_vpn_api',
+    'upgrade-vpn-server':           '_call_vpn_api',    
 
     # Router API
     'start-router':                 '_call_router_api',
@@ -96,6 +95,7 @@ request_handlers = {
     'remove-application':           '_call_router_api',
     'add-multilink-policy':        '_call_router_api',
     'remove-multilink-policy':     '_call_router_api',
+    'install-application':         '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s

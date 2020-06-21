@@ -51,7 +51,8 @@ fwrouter_modules = {
     'fwtranslate_add_tunnel':      __import__('fwtranslate_add_tunnel'),
     'fwtranslate_add_dhcp_config': __import__('fwtranslate_add_dhcp_config'),
     'fwtranslate_add_app':         __import__('fwtranslate_add_app'),
-    'fwtranslate_add_policy':      __import__('fwtranslate_add_policy')
+    'fwtranslate_add_policy':      __import__('fwtranslate_add_policy'),
+    'fwtranslate_install_application':  __import__('fwtranslate_install_application')
 }
 
 fwrouter_translators = {
@@ -69,6 +70,9 @@ fwrouter_translators = {
     'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
     'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
     'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
+    
+    'install-application':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
+    'uninstall-application':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-application'},
 }
 
 class FWROUTER_API:
@@ -218,6 +222,9 @@ class FWROUTER_API:
         if re.match('remove-tunnel|add-tunnel', req):
             return self._handle_add_remove_tunnel(req, params)
 
+        if re.match('install-application', req):
+            return self._handle_install_uninstall_application(req, params)
+
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,
@@ -344,6 +351,28 @@ class FWROUTER_API:
         """
         self._call_simple('remove-multilink-policy', {})
         return self._call_simple(req, params)
+    
+    def _handle_install_uninstall_application(self, req, params):
+        """Handle install-application and uninstall-application.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        remove_requests = []
+        add_requests = []
+
+        for key, request in self.db_requests.db.items():
+            if re.search('install-application', key):
+                add_requests.append({'install-application': request['params']})
+                remove_requests.append({'uninstall-application': request['params']})
+
+        self._call_aggregated(remove_requests)
+
+        self._call_simple(req, params)
+
+        return self._call_aggregated(add_requests)
 
     def _handle_add_remove_tunnel(self, req, params):
         """Handle add-tunnel and remove-tunnel.
