@@ -174,7 +174,7 @@ class FwApps:
         reply = {'ok': 1}
         return reply
 
-    def acl_id_list_get(self, name, category, serviceClass, importance):
+    def acl_ids_get(self, name, category, serviceClass, importance):
         """Get ACL id.
 
         :param name: Application name.
@@ -182,7 +182,7 @@ class FwApps:
         :param serviceClass: Application serviceClass.
         :param importance: Application importance.
 
-        :returns: ACL ids list.
+        :returns: ACL ids set.
         """
         acl_ids = set()
         sets = []
@@ -203,4 +203,4 @@ class FwApps:
         if sets:
             acl_ids = set.intersection(*sets)
 
-        return list(acl_ids)
+        return acl_ids

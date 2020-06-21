@@ -61,11 +61,37 @@ def get_device_logs(file, num_of_lines):
     """
     try:
         cmd = "tail -{} {}".format(num_of_lines, file)
-        res = subprocess.check_output(cmd, shell=True).split('\n')
+        res = subprocess.check_output(cmd, shell=True).splitlines()
 
         # On zero matching, res is a list with a single empty
         # string which we do not want to return to the caller
         return res if res != [''] else []
+    except (OSError, subprocess.CalledProcessError) as err:
+        raise err
+
+def get_device_packet_traces(num_of_packets, timeout):
+    """Get device packet traces.
+
+    :param num_of_packets:    Number of lines.
+    :param timeout:           Timeout to wait for trace to complete.
+
+    :returns: Array of traces.
+    """
+    try:
+        cmd = 'sudo vppctl clear trace'
+        subprocess.check_output(cmd, shell=True)
+        cmd = 'sudo vppctl show vmxnet3'
+        shif_vmxnet3 = subprocess.check_output(cmd, shell=True)
+        if shif_vmxnet3 is '':
+            cmd = 'sudo vppctl trace add dpdk-input {}'.format(num_of_packets)
+        else:
+            cmd = 'sudo vppctl trace add vmxnet3-input {}'.format(num_of_packets)
+        subprocess.check_output(cmd, shell=True)
+        time.sleep(timeout)
+        cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
+        res = subprocess.check_output(cmd, shell=True).splitlines()
+        # skip first line (contains unnecessary information header)
+        return res[1:] if res != [''] else []
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
@@ -1415,7 +1441,9 @@ def vpp_multilink_update_labels(params):
     if params.get('next_hop'):
         next_hop = params['next_hop']
     else:
-        return (False, "'next_hop' was not found in params")
+        next_hop = fwglobals.g.router_api.get_default_route_address()
+    if not next_hop:
+        return (False, "'next_hop' was not found in params and there is no default gateway")
 
     op = 'del' if params['remove'] else 'add'
 

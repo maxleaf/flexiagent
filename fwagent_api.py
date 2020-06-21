@@ -30,13 +30,15 @@ import fwstats
 import fwutils
 
 fwagent_api = {
-    'get-device-info':      '_get_device_info',
-    'get-device-stats':     '_get_device_stats',
-    'get-device-logs':      '_get_device_logs',
-    'get-device-os-routes': '_get_device_os_routes',
-    'handle-request':       '_handle_request',
-    'get-router-config':    '_get_router_config',
-    'upgrade-device-sw':    '_upgrade_device_sw'
+    'get-device-info':          '_get_device_info',
+    'get-device-stats':         '_get_device_stats',
+    'get-device-logs':          '_get_device_logs',
+    'get-device-packet-traces': '_get_device_packet_traces',
+    'get-device-os-routes':     '_get_device_os_routes',
+    'handle-request':           '_handle_request',
+    'get-router-config':        '_get_router_config',
+    'upgrade-device-sw':        '_upgrade_device_sw',
+    'reset-device':             '_reset_device_soft'
 }
 
 class FWAGENT_API:
@@ -134,11 +136,32 @@ class FWAGENT_API:
 
         :returns: Dictionary with logs and status code.
         """
+        dl_map = {
+    	    'fwagent': fwglobals.g.ROUTER_LOG_FILE,
+    	    'syslog': fwglobals.g.SYSLOG_FILE,
+            'dhcp': fwglobals.g.DHCP_LOG_FILE,
+            'vpp': fwglobals.g.VPP_LOG_FILE,
+            'ospf': fwglobals.g.OSPF_LOG_FILE,
+	    }
+        file = dl_map.get(params['filter'], '')
         try:
-            logs = fwutils.get_device_logs(fwglobals.g.ROUTER_LOG_FILE, params['lines'])
+            logs = fwutils.get_device_logs(file, params['lines'])
             return {'message': logs, 'ok': 1}
         except:
             raise Exception("_get_device_logs: failed to get device logs: %s" % format(sys.exc_info()[1]))
+
+    def _get_device_packet_traces(self, params):
+        """Get device packet traces.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with logs and status code.
+        """
+        try:
+            traces = fwutils.get_device_packet_traces(params['packets'], params['timeout'])
+            return {'message': traces, 'ok': 1}
+        except:
+            raise Exception("_get_device_packet_traces: failed to get device packet traces: %s" % format(sys.exc_info()[1]))
 
     def _get_device_os_routes(self, params):
         """Get device ip routes.
@@ -182,6 +205,19 @@ class FWAGENT_API:
         configs = fwutils.get_router_config()
         reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
+
+    def _reset_device_soft(self, params):
+        """Soft reset device configuration.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
+
+        # VPP must be stopped before resetting the configuration
+        fwglobals.g.handle_request('stop-router')
+        fwutils.reset_router_config()
+        return {'ok': 1, 'message': {}}
 
     def _handle_request(self, params):
         """Handle a request from request_handlers of fwglobals.

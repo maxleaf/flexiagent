@@ -784,6 +784,17 @@ class FWROUTER_API:
                 self._stop_router("stop-router", {})
 
             self._call_aggregated(requests)
+            # Try to ping gateway to renew the neighbor in Linux
+            # Delay 5 seconds to make sure Linux interfaces initialized
+            time.sleep(5)
+            for interface in interfaces:
+                if 'type' in interface and interface['type'].lower() == 'wan' and interface.get('gateway') != None:
+                    try:
+                        cmd = 'ping -c 3 %s' % interface['gateway']
+                        output = subprocess.check_output(cmd, shell=True)
+                        fwglobals.log.debug("_handle_modify_device_request: ping result: %s" % output)
+                    except Exception as e:
+                        fwglobals.log.debug("_handle_modify_device_request: ping %s failed: %s " % (interface['gateway'], str(e)))
 
             if should_restart_router == True:
                 self._start_router("start-router", {})
@@ -1150,6 +1161,11 @@ class FWROUTER_API:
         else:  # list
             params.remove(substs_element)
 
+    def get_default_route_address(self):
+        for key, request in self.db_requests.db.items():
+            if re.search('add-route:default', key):
+                return request['params']['via']
+
     def get_pci_lan_interfaces(self):
         interfaces = []
         for key, request in self.db_requests.db.items():
@@ -1184,7 +1200,12 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
-                        return request['params']['pci'], request['params']['gateway']
+                        # If gateway not exist in interface configuration, use default
+                        # This is needed when upgrading from version 1.1.52 to 1.2.X
+                        if not request['params']['gateway']:
+                            return request['params']['pci'], self.get_default_route_address()
+                        else:
+                            return request['params']['pci'], request['params']['gateway']
 
         return None
 

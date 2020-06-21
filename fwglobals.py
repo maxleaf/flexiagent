@@ -58,9 +58,11 @@ request_handlers = {
     'get-device-info':              '_call_agent_api',
     'get-device-stats':             '_call_agent_api',
     'get-device-logs':              '_call_agent_api',
+    'get-device-packet-traces':     '_call_agent_api',
     'get-device-os-routes':         '_call_agent_api',
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
+    'reset-device':                 '_call_agent_api',
 
     # Applications API
     'add-app-info':                 '_call_apps_api',
@@ -204,6 +206,10 @@ class Fwglobals:
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
+        self.SYSLOG_FILE         = '/var/log/syslog'
+        self.DHCP_LOG_FILE     = '/var/log/dhcpd.log'
+        self.VPP_LOG_FILE     = '/var/log/vpp/vpp.log'
+        self.OSPF_LOG_FILE     = '/var/log/frr/ospfd.log'
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
         self.VPP_CONFIG_FILE_BACKUP = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
