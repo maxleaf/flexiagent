@@ -1266,6 +1266,7 @@ def add_remove_netplan_interface(params):
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
     else:
+        config_section['dhcp4'] = False
         config_section['addresses'] = [ip]
         if gw:
             config_section['gateway4'] = gw
