@@ -68,6 +68,12 @@ import fwutils
 #    07. sudo systemctl restart frr
 #
 def _change_netplan_conf(pci, dhcp, ip, gw, cmd_list):
+    """Generate commands to change Netplan config file.
+
+     :param params:        Parameters from flexiManage.
+
+     :returns: List of commands.
+     """
     args = {'is_add': 1, 'pci': pci, 'dhcp': dhcp, 'ip': ip, 'gw': gw}
     cmd = {}
     cmd['cmd'] = {}
@@ -90,6 +96,35 @@ def _change_netplan_conf(pci, dhcp, ip, gw, cmd_list):
 
     cmd_list.append(cmd)
 
+
+def _set_dhcp_detect(pci, cmd_list):
+    """Generate commands to set DHCP detect ib VPP.
+
+     :param params:        Parameters from flexiManage.
+
+     :returns: List of commands.
+     """
+    add_params = {
+        'module': 'fwutils',
+        'func': 'vpp_set_dhcp_detect',
+        'args': {'pci': pci, 'remove': False}
+    }
+
+    del_params = copy.deepcopy(add_params)
+    del_params['args']['remove'] = True
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "Enable DHCP detect"
+    cmd['cmd']['params']    = add_params
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "Disable DHCP detect"
+    cmd['revert']['params'] = del_params
+    cmd_list.append(cmd)
+
+    return cmd_list
 
 def add_interface(params):
     """Generate commands to configure interface in Linux and VPP
@@ -115,6 +150,8 @@ def add_interface(params):
 
     # Add interface section into Netplan configuration file
     _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, params['gateway'], cmd_list)
+    if 'dhcp' in params and params['dhcp'].lower() == 'yes':
+        _set_dhcp_detect(iface_pci, cmd_list)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
     if 'multilink' in params and 'labels' in params['multilink']:

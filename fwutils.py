@@ -1687,3 +1687,29 @@ def add_static_route(args):
         return (False, None)
 
     return (True, None)
+
+def vpp_set_dhcp_detect(params):
+    """Enable/disable DHCP detect feature.
+
+    :param params: params:
+                        pci     -  Interface PCI.
+                        remove  - True to remove rule, False to add.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    op = ''
+    if params['remove']:
+        op = 'del'
+
+    sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+    int_name = vpp_sw_if_index_to_name(sw_if_index)
+
+    vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
