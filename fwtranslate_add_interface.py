@@ -149,8 +149,9 @@ def add_interface(params):
     ######################################################################
 
     # Add interface section into Netplan configuration file
-    _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, params['gateway'], cmd_list)
-    if 'dhcp' in params and params['dhcp'].lower() == 'yes':
+    gw = params.get('gateway', None)
+    _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, gw, cmd_list)
+    if params['dhcp'].lower() == 'yes':
         _set_dhcp_detect(iface_pci, cmd_list)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
