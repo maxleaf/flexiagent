@@ -70,9 +70,8 @@ fwrouter_translators = {
     'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
     'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
     'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
-    
-    'install-application':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
-    'uninstall-application':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-application'},
+    'install-vpn-application':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
+    'uninstall-vpn-application':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-application'},
 }
 
 class FWROUTER_API:
@@ -225,6 +224,9 @@ class FWROUTER_API:
         if re.match('install-application', req):
             return self._handle_install_uninstall_application(req, params)
 
+        if (req == 'modify-vpn-server'):            
+            return self._handle_modify_application(req, params)
+
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
         # To handle that we split that kinds of requests into multiple simple requests,
@@ -352,6 +354,32 @@ class FWROUTER_API:
         self._call_simple('remove-multilink-policy', {})
         return self._call_simple(req, params)
     
+    def _handle_modify_application(self, req, params):
+        """Handle modify application.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+
+        try:
+            if params:
+                # update to server vpn file
+                fwutils.configure_openvpn_server(params)
+
+                # update new params in the database 
+                (request, oldParams) = self.db_requests.fetch_request('install-application')
+
+                cmd_list = self.db_requests.fetch_cmd_list('install-application')  
+
+                self._update_db_requests(False, 'install-application', request, params, cmd_list)
+
+        except Exception as e:
+            return {'ok':0}
+        
+        return {'ok':1}
+
     def _handle_install_uninstall_application(self, req, params):
         """Handle install-application and uninstall-application.
 

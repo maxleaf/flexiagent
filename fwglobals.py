@@ -95,7 +95,9 @@ request_handlers = {
     'remove-application':           '_call_router_api',
     'add-multilink-policy':        '_call_router_api',
     'remove-multilink-policy':     '_call_router_api',
-    'install-application':         '_call_router_api',
+    'install-vpn-application':         '_call_router_api',
+    'uninstall-vpn-application':         '_call_router_api',
+    'modify-vpn-server':            '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s

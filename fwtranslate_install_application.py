@@ -108,52 +108,10 @@ def install_application(params):
     cmd['revert']['descr'] = "remove application (name=%s)" % (params['name'])
     cmd['revert']['params'] = {
         'module': 'fwutils',
-        'func': 'remove_openvpn_server',
-        'args': {
-            'name': params['name'], 'remove': True
-        }
+        'func': 'remove_openvpn_server'
     }
 
-    print(cmd)
-
     cmd_list.append(cmd)
-
-    # for rule in params['rules']:
-    #     priority = rule['priority']
-    #     fallback = rule['action']['fallback']
-    #     order = rule['action']['order']
-    #     links = rule['action']['links']
-
-    #     classification = rule['classification']
-    #     app = classification.get('application', None)
-    #     prefix = classification.get('prefix', None)
-
-    #     if prefix:
-    #         _add_acl(prefix, cmd_list, 'acl_index')
-    #         policy_id = _generate_policy_id()
-    #         _add_policy_rule_from_cache_key(policy_id, links, 'acl_index', fallback, order, cmd_list)
-    #         _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
-
-    #     elif app:
-    #         id = app.get('appId', None)
-    #         category = app.get('category', None)
-    #         service_class = app.get('serviceClass', None)
-    #         importance = app.get('importance', None)
-
-    #         rule_acl_ids = fwglobals.g.apps_api.acl_ids_get(id, category, service_class, importance)
-
-    #         for acl_id in rule_acl_ids:
-    #             if acl_id in policy_acl_ids:
-    #                 continue
-    #             policy_id = _generate_policy_id()
-    #             _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list)
-    #             _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
-    #             policy_acl_ids.add(acl_id)
-
-    #     else:
-    #         policy_id = _generate_policy_id()
-    #         _add_policy_rule(policy_id, links, None, fallback, order, cmd_list)
-    #         _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
 
     return cmd_list
 
