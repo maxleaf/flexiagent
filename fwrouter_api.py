@@ -1161,11 +1161,6 @@ class FWROUTER_API:
         else:  # list
             params.remove(substs_element)
 
-    def get_default_route_address(self):
-        for key, request in self.db_requests.db.items():
-            if re.search('add-route:default', key):
-                return request['params']['via']
-
     def get_pci_lan_interfaces(self):
         interfaces = []
         for key, request in self.db_requests.db.items():
@@ -1200,12 +1195,15 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
+                        pci = request['params']['pci']
+                        gw = request['params']['gateway']
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
                         if not request['params']['gateway']:
-                            return request['params']['pci'], self.get_default_route_address()
+                            tap = pci_to_tap(pci)
+                            return pci, fwutils.get_gateway(tap)
                         else:
-                            return request['params']['pci'], request['params']['gateway']
+                            return pci, gw
 
         return None
 
