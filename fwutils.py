@@ -1298,7 +1298,7 @@ def add_remove_netplan_interface(params):
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-        subprocess.check_output("sudo ip route del default; sudo netplan apply", shell=True)
+        subprocess.check_output("sudo ip route flush 0/0; sudo netplan apply", shell=True)
     except Exception as e:
         err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname, str(e))
