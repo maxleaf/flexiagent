@@ -157,7 +157,7 @@ def add_interface(params):
         _set_dhcp_detect(iface_pci, cmd_list)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
-    if 'multilink' in params and 'labels' in params['multilink']:
+    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
         labels = params['multilink']['labels']
         if len(labels) > 0:
             cmd = {}
@@ -168,7 +168,7 @@ def add_interface(params):
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
-                                        'next_hop': params.get('gateway'),
+                                        'next_hop': gw,
                                         'dev':      iface_pci,
                                         'remove':   False
                                       }
@@ -180,7 +180,7 @@ def add_interface(params):
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
-                                        'next_hop': params.get('gateway'),
+                                        'next_hop': gw,
                                         'dev':      iface_pci,
                                         'remove':   True
                                       }
