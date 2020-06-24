@@ -1567,16 +1567,23 @@ def install_openvpn_server(params):
         'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
         'echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version,
         'apt-get update && apt-get install -y openvpn',
-        'rm -rf /etc/openvpn/server/easy-rsa',
-        'mkdir -p /etc/openvpn/server/easy-rsa/',
-        '{ wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1',
-        'chown -R root:root /etc/openvpn/server/easy-rsa/',
-        'sh /etc/openvpn/server/easy-rsa/easyrsa init-pki',
-        'sh /etc/openvpn/server/easy-rsa/easyrsa --batch build-ca nopass',
-        'EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-server-full server nopass',
+        # 'rm -rf /etc/openvpn/server/easy-rsa',
+        # 'mkdir -p /etc/openvpn/server/easy-rsa/',
+        # '{ wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1',
+        # 'chown -R root:root /etc/openvpn/server/easy-rsa/',
+        # 'sh /etc/openvpn/server/easy-rsa/easyrsa init-pki',
+        # 'sh /etc/openvpn/server/easy-rsa/easyrsa --batch build-ca nopass',
+        # 'EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-server-full server nopass',
         # 'EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-client-full client1 nopass',
         # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/client1.crt ./pki/private/client1.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
-        'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
+        # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
+        
+
+        'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
+        'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
+        'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
+        'echo "%s" > /etc/openvpn/server/server.crt' % params['serverCrt'],
+        
         'openvpn --genkey --secret /etc/openvpn/server/tc.key',
         "echo '-----BEGIN DH PARAMETERS-----\n\
 MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
@@ -1589,7 +1596,10 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
         'rm -rf ./pki'
     ]
 
+    print("test")
+
     for command in commands:
+        print("command %s" % command)
         ret = os.system(command)      
         if ret:
             print('err: ' + ret)
@@ -1717,7 +1727,11 @@ def configure_server_file(params):
         # Set the appropriate level of log file verbosity.
         'echo "verb 3" >> %s' % destFile,
 
-        'echo "plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so /tmp/script.sh" >> %s' % destFile,
+        # 'echo "plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-auth-pam.so /tmp/script.sh" >> %s' % destFile,
+        'echo "auth-user-pass-verify /etc/openvpn/server/auth-script.sh via-file" >> %s' % destFile,
+        'echo "tmp-dir /dev/shm" >> %s' % destFile,
+        'echo "script-security 2" >> %s' % destFile,
+
         'echo "client-cert-not-required" >> %s' % destFile,
         'echo "client-config-dir /etc/openvpn/client" >> %s' % destFile,
         'echo "username-as-common-name" >> %s' % destFile,

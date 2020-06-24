@@ -100,7 +100,8 @@ def install_application(params):
         'args': {
             'version': params['version'], 'routeAllOverVpn': params['routeAllOverVpn'],
             'remoteClientIp': params['remoteClientIp'], 'deviceWANIp': params['deviceWANIp'],
-            'remove': False
+            'remove': False, 'caKey': params['caKey'], 'caCrt': params['caCrt'],
+            'serverKey': params['serverKey'], 'serverCrt': params['serverCrt'],
         }
     }
     cmd['revert'] = {}
