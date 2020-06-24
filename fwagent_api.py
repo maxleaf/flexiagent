@@ -82,13 +82,6 @@ class FWAGENT_API:
             # Load network configuration.
             info['network'] = {}
             info['network']['interfaces'] = fwglobals.g.handle_request('interfaces')['message']
-            utils_default_route = fwutils.get_default_route()
-            default_route = {
-                "addr": "default",
-                "via": utils_default_route[0],
-                "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
-                }
-            info['network']['routes'] = [ default_route ]
             info['reconfig'] = fwutils.get_reconfig_hash()
             return {'message': info, 'ok': 1}
         except:
