@@ -24,7 +24,9 @@ import json
 import yaml
 import sys
 import os
+import re
 from shutil import copyfile
+from fwdb_requests import FwDbRequests
 import fwglobals
 import fwstats
 import fwutils
@@ -48,6 +50,11 @@ class FWAGENT_API:
        connection using JSON requests.
        For list of available APIs see the 'fwagent_api' variable.
     """
+    def __init__(self, request_db_file):
+        """Constructor method
+        """
+        self.db_requests = FwDbRequests(request_db_file)    # Database of executed requests
+
     def call(self, req, params):
         """Invokes API specified by the 'req' parameter.
 
@@ -66,6 +73,31 @@ class FWAGENT_API:
         if reply['ok'] == 0:
             raise Exception("fwagent_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
         return reply
+
+    def _prepare_tunnel_info(self, tunnel_ids):
+        tunnel_info = []
+        for key in self.db_requests.db:
+            try:
+                if re.match('add-tunnel', key):
+                    (req, entry) = self.db_requests.fetch_request(key)
+                    tunnel_id = entry["tunnel-id"]
+                    if tunnel_id in tunnel_ids:
+                        local_sa = entry["ipsec"]["local-sa"]
+                        remote_sa = entry["ipsec"]["remote-sa"]
+                        tunnel_info.append({
+                            "id": str(tunnel_id),
+                            "key1": local_sa["crypto-key"],
+                            "key2": local_sa["integr-key"],
+                            "key3": remote_sa["crypto-key"],
+                            "key4": remote_sa["integr-key"]
+                        })
+
+            except Exception as e:
+                fwglobals.log.excep("failed to create tunnel information %s" % str(e))
+                raise e
+        
+        return tunnel_info
+        
 
     def _get_device_info(self, params):
         """Get device information.
@@ -89,6 +121,10 @@ class FWAGENT_API:
                 "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
                 }
             info['network']['routes'] = [ default_route ]
+            # Load tunnel info, if requested by the management
+            if params and params['tunnels']:
+                info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
+                
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))
