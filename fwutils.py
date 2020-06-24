@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import inspect
 import json
 import os
@@ -333,6 +334,9 @@ def pci_to_vpp_if_name(pci):
 
     :returns: VPP interface name.
     """
+    if not pci:
+        raise Exception("'pci' is None")
+
     # vpp_api.cli() throw exception in vpp 19.01 (and work with vpp 19.04)
     # hw = fwglobals.g.router_api.vpp_api.cli("show hardware")
     hw = _vppctl_read('show hardware-interfaces')
@@ -1156,7 +1160,6 @@ def vpp_startup_conf_add_devices(params):
             config['dpdk'].append(config_param)
 
     fwtool_vpp_startupconf_dict.dump(config, filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_devices(params):
     filename = params['vpp_config_filename']
@@ -1172,7 +1175,6 @@ def vpp_startup_conf_remove_devices(params):
         config['dpdk'].append('ELEMENT_TO_BE_REMOVED')  # Need this to avoid empty list section before dump(), as yaml goes crazy with empty list sections
 
     fwtool_vpp_startupconf_dict.dump(config, filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_add_nat(params):
     filename = params['vpp_config_filename']
@@ -1184,7 +1186,6 @@ def vpp_startup_conf_add_nat(params):
     config['nat'].append('user hash buckets 1024')
     config['nat'].append('max translations per user 10000')
     fwtool_vpp_startupconf_dict.dump(config, filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_nat(params):
     filename = params['vpp_config_filename']
@@ -1192,7 +1193,6 @@ def vpp_startup_conf_remove_nat(params):
     if config.get('nat'):
         del config['nat']
     fwtool_vpp_startupconf_dict.dump(config, filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def _get_interface_address(pci):
     """ Get interface ip address from commands DB.
@@ -1288,9 +1288,9 @@ def modify_dhcpd(params):
     try:
         output = subprocess.check_output(exec_string, shell=True)
     except:
-        return (False, None)
+        return False
 
-    return (True, None)
+    return True
 
 def vpp_multilink_update_labels(params):
     """Updates VPP with flexiwan multilink labels.
@@ -1339,7 +1339,7 @@ def vpp_multilink_update_labels(params):
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+    return (True, None)
 
 
 def vpp_multilink_update_policy_rule(params):
@@ -1395,7 +1395,7 @@ def vpp_multilink_update_policy_rule(params):
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+    return (True, None)
 
 def vpp_multilink_attach_policy_rule(params):
     """Attach VPP with flexiwan policy rules.
@@ -1421,7 +1421,7 @@ def vpp_multilink_attach_policy_rule(params):
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+    return (True, None)
 
 def get_interface_sw_if_index(ip):
     """Convert interface src IP address into gateway VPP sw_if_index.
@@ -1459,7 +1459,7 @@ def _create_static_route(args):
     try:
         output = subprocess.check_output(cmd_show, shell=True)
     except:
-        return (False, None)
+        return False
 
     lines = output.splitlines()
     next_hop = ''
@@ -1489,9 +1489,9 @@ def _create_static_route(args):
         fwglobals.log.debug(cmd)
         output = subprocess.check_output(cmd, shell=True)
     except:
-        return (False, None)
+        return False
 
-    return (True, None)
+    return True
 
 def add_static_route(args):
     """Add static route.
@@ -1536,8 +1536,111 @@ def add_static_route(args):
 
     try:
         fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
+        subprocess.check_output(cmd, shell=True)
     except:
-        return (False, None)
+        return False
 
-    return (True, None)
+    return True
+
+
+# Today (May-2019) message aggregation is not well defined in protocol between
+# device and server. It uses several types of aggregations:
+#   1. 'start-router' aggregation: requests are embedded into 'params' field on some request
+#   2. 'add-interface' aggregation: 'params' field is list of 'interface params'
+#   3. 'list' aggregation: the high level message is a list of requests
+# As protocol is not well defined on this matter, for now we assume
+# that 'list' is used for FWROUTER_API requests only (add-/remove-/modify-),
+# so it should be handled as atomic operation and should be reverted in case of
+# failure of one of the requests in opposite order - from the last succeeded
+# request to the first, when the whole operation is considered to be failed.
+# Convert both type of aggregations into same format:
+# {
+#   'message': 'aggregated-router-api',
+#   'params' : {
+#                'requests': <list of aggregated requests>,
+#                'original': <original message>
+#              }
+# }
+# The 'original' is needed for configuration hash feature - every received
+# message is used for signing router configuration to enable database sync
+# between device and server. Once the protocol is fixed, there will be no more
+# need in this proprietary format.
+#
+def fix_aggregated_message_format(msg):
+
+    requests = []
+
+    # 'list' aggregation
+    if type(msg) == list:
+        return {
+            'message': 'aggregated-router-api',
+            'params' : {
+                'requests': msg,
+                'original': msg
+            }
+        }
+
+    # 'start-router' aggregation
+    # 'start-router' might include interfaces and routes. Move them into list.
+    if msg['message'] == 'start-router' and 'params' in msg:
+
+        start_router_params = copy.deepcopy(msg['params'])  # We are going to modify params, so preserve original message
+        if 'interfaces' in start_router_params:
+            for iface_params in start_router_params['interfaces']:
+                requests.append(
+                    {
+                        'message': 'add-interface',
+                        'params' : iface_params
+                    })
+            del start_router_params['interfaces']
+        if 'routes' in start_router_params:
+            for route_params in start_router_params['routes']:
+                requests.append(
+                    {
+                        'message': 'add-route',
+                        'params' : route_params
+                    })
+            del start_router_params['routes']
+
+        if len(requests) > 0:
+            if bool(start_router_params):  # If there are params after deletions above - use them
+                requests.append(
+                    {
+                        'message': 'start-router',
+                        'params' : start_router_params
+                    })
+            else:
+                requests.append(
+                    {
+                        'message': 'start-router'
+                    })
+            return {
+                'message': 'aggregated-router-api',
+                'params' : {
+                    'requests': requests,
+                    'original': msg
+                }
+            }
+
+    # 'add-X' aggregation
+    # 'add-interface'/'remove-interface' can have actually a list of interfaces.
+    # This is done by setting 'params' as a list of interface params, where
+    # every element represents parameters of some interface.
+    if re.match('add-|remove-', msg['message']) and type(msg['params']) is list:
+
+        for params in msg['params']:
+            requests.append(
+                {
+                    'message': msg['message'],
+                    'params' : params
+                })
+
+        return {
+            'message': 'aggregated-router-api',
+            'params' : {
+                'requests': requests,
+                'original': msg
+            }
+        }
+
+    return msg  # No conversion is needed

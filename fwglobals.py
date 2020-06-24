@@ -54,7 +54,6 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'handle-request':               '_call_agent_api',
     'get-device-info':              '_call_agent_api',
     'get-device-stats':             '_call_agent_api',
     'get-device-logs':              '_call_agent_api',
@@ -73,9 +72,9 @@ request_handlers = {
     'remove-policy-info':           '_call_policy_api',
 
     # Router API
+    'aggregated-router-api':        '_call_router_api',
     'start-router':                 '_call_router_api',
     'stop-router':                  '_call_router_api',
-    'reset-router':                 '_call_router_api',
     'add-interface':                '_call_router_api',
     'remove-interface':             '_call_router_api',
     'add-route':                    '_call_router_api',
@@ -144,7 +143,8 @@ request_handlers = {
     'vxlan_add_del_tunnel':         '_call_vpp_api',
 
     # Python API
-    'python':                       '_call_python_api'
+    'python':                       '_call_python_api',
+    'python-kwargs':                '_call_python_kwargs_api'
 }
 
 global g_initialized
@@ -302,7 +302,10 @@ class Fwglobals:
         return self.policy_api.call(req, params)
 
     def _call_router_api(self, req, params):
-        return self.router_api.call(req, params)
+        if req == 'aggregated-router-api':
+            return self.router_api.call_aggregated(params['requests'])
+        else:
+            return self.router_api.call(req, params)
 
     def _call_os_api(self, req, params):
         return self.os_api.call_simple(req, params)
@@ -311,18 +314,60 @@ class Fwglobals:
         return self.router_api.vpp_api.call_simple(req, params, result)
 
     def _call_python_api(self, req, params):
-        module = __import__(params['module'])
-        func   = getattr(module, params['func'])
-        args   = params.get('args')
+        func = self._call_python_api_get_func(req, params)
+        args = params.get('args')
         if args:
-            ok, ret = func(args)
+            ret = func(args)
         else:
-            ok, ret = func()
+            ret = func()
+        (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
             log.error('_call_python_api: %s(%s) failed: %s' % \
-                    (params['func'], json.dumps(args), ret))
-        reply = {'ok':ok, 'message':ret}
+                    (params['func'], json.dumps(args), val))
+        reply = {'ok':ok, 'message':val}
         return reply
+
+    def _call_python_kwargs_api(self, req, params):
+        func = self._call_python_api_get_func(req, params)
+        ret = func(**params['args'])
+        (ok, val) = self._call_python_api_parse_result(ret)
+        if not ok:
+            log.error('_call_python_kwargs_api: %s(%s) failed: %s' % \
+                    (params['func'], json.dumps(params['args']), val))
+        reply = {'ok':ok, 'message':val}
+        return reply
+
+    def _call_python_api_get_func(self, req, params):
+        if 'module' in params:
+            func = getattr(__import__(params['module']), params['func'])
+        elif 'object' in params:
+            if params['object'] == 'fwglobals.g':
+                func = getattr(self, params['func'])
+            elif params['object'] == 'fwglobals.g.router_api':
+                func = getattr(self.router_api, params['func'])
+            else:
+                raise Exception("object '%s' is not supported" % (params['object']))
+        else:
+            raise Exception("neither 'module' nor 'object' was provided for '%s'" % (params['func']))
+        return func
+
+    def _call_python_api_parse_result(self, ret):
+        val = None
+        if ret is None:
+            ok  = 1
+        elif type(ret) == tuple:
+            ok  = ret[0]
+            val = ret[1]
+        elif type(ret) == dict:
+            ok  = ret.get('ok', 0)
+            val = ret.get('ret')
+        elif type(ret) == bool:
+            ok = 1 if ret else 0
+        else:
+            ok = 0
+            val = '_call_python_api_parse_result: unsupported type of return: %s' % type(ret)
+        return (ok, val)
+
 
     # result - how to store result of command.
     #          It is dict of {<attr> , <cache>, <cache key>}.

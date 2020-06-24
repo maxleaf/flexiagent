@@ -35,7 +35,6 @@ fwagent_api = {
     'get-device-logs':          '_get_device_logs',
     'get-device-packet-traces': '_get_device_packet_traces',
     'get-device-os-routes':     '_get_device_os_routes',
-    'handle-request':           '_handle_request',
     'get-router-config':        '_get_router_config',
     'upgrade-device-sw':        '_upgrade_device_sw',
     'reset-device':             '_reset_device_soft'
@@ -212,21 +211,8 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
-
-        # VPP must be stopped before resetting the configuration
-        fwglobals.g.handle_request('stop-router')
+        if fwglobals.g.router_api.router_started:
+            fwglobals.g.handle_request('stop-router')   # Stop VPP if it runs
         fwutils.reset_router_config()
         return {'ok': 1, 'message': {}}
 
-    def _handle_request(self, params):
-        """Handle a request from request_handlers of fwglobals.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with status and error message.
-        """
-        try:
-            reply = fwglobals.g.handle_request(params['request'], params.get('params'))
-            return reply
-        except Exception as e:
-            return {'ok': 0, 'message': str(e)}

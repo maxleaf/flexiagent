@@ -7,6 +7,7 @@
       {
         "pci":"0000:00:08.00",
         "addr":"10.0.0.4/24",
+        "gateway": "10.0.0.10",
         "type":"wan",
         "multilink": {
             "labels": [
@@ -29,8 +30,8 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "8.8.1.1",
-    "dst": "8.8.1.2",
+    "src": "10.0.0.4",
+    "dst": "20.0.0.4",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {
@@ -61,11 +62,387 @@
 }
 ,
 {
+  "entity": "agent",
+  "message": "add-application",
+  "params": {
+    "applications": [
+      {
+        "name": "echo",
+        "id": "1",
+        "category": "management",
+        "serviceClass": "oam",
+        "importance": "medium",
+        "description": "Echo Protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "7"
+          },
+          {
+            "protocol": "udp",
+            "ports": "7"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "daytime",
+        "id": "3",
+        "category": "management",
+        "serviceClass": "network-control",
+        "importance": "medium",
+        "description": "Daytime Protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "13"
+          },
+          {
+            "protocol": "udp",
+            "ports": "13"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "ssh",
+        "id": "5",
+        "category": "remote_access",
+        "serviceClass": "default",
+        "importance": "high",
+        "description": "Secure Shell (SSH)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "22"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "telnet",
+        "id": "6",
+        "category": "remote_access",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "Telnet protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "22"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "smtp",
+        "id": "7",
+        "category": "email",
+        "serviceClass": "default",
+        "importance": "high",
+        "description": "Simple Mail Transfer Protocol (SMTP)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "25"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "time",
+        "id": "8",
+        "category": "management",
+        "serviceClass": "network-control",
+        "importance": "medium",
+        "description": "Time Protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "37"
+          },
+          {
+            "protocol": "udp",
+            "ports": "37"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "whois",
+        "id": "9",
+        "category": "network",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "WHOIS protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "43"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "dns",
+        "id": "11",
+        "category": "management",
+        "serviceClass": "network-control",
+        "importance": "high",
+        "description": "Domain Name System (DNS)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "53"
+          },
+          {
+            "protocol": "udp",
+            "ports": "53"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "gopher",
+        "id": "12",
+        "category": "file-sharing",
+        "serviceClass": "default",
+        "importance": "low",
+        "description": "Gopher protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "70"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "finger",
+        "id": "13",
+        "category": "management",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "Finger protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "79"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "pop3",
+        "id": "15",
+        "category": "email",
+        "serviceClass": "default",
+        "importance": "high",
+        "description": "Post Office Protocol, version 3 (POP3)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "110"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "nntp",
+        "id": "16",
+        "category": "management",
+        "serviceClass": "network-control",
+        "importance": "medium",
+        "description": "Network News Transfer Protocol (NNTP)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "119"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "imap2",
+        "id": "17",
+        "category": "email",
+        "serviceClass": "default",
+        "importance": "high",
+        "description": "Internet Message Access Protocol (IMAP)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "143"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "xdmcp",
+        "id": "18",
+        "category": "remote_access",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "X Display Manager Control Protocol (XDMCP)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "177"
+          },
+          {
+            "protocol": "udp",
+            "ports": "177"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "https",
+        "id": "20",
+        "category": "internet",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "Hypertext Transfer Protocol over TLS/SSL (HTTPS)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "443"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "snpp",
+        "id": "21",
+        "category": "internet",
+        "serviceClass": "default",
+        "importance": "low",
+        "description": "Simple Network Paging Protocol (SNPP), RFC 1568",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "444"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "active-directory",
+        "id": "22",
+        "category": "auth-service",
+        "serviceClass": "network-control",
+        "importance": "high",
+        "description": "Microsoft-DS (Directory Services) Active Directory, Windows shares",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "445"
+          },
+          {
+            "protocol": "udp",
+            "ports": "445"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "imaps",
+        "id": "31",
+        "category": "email",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "Internet Message Access Protocol over TLS/SSL (IMAPS)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "993"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "pop3s",
+        "id": "32",
+        "category": "email",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "Post Office Protocol 3 over TLS/SSL (POP3S)",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "995"
+          },
+          {
+            "protocol": "udp",
+            "ports": "995"
+          }
+        ],
+        "modified": false
+      }
+    ]
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "add-multilink-policy",
+  "params": {
+    "id": "5ed4127aa81d8258b96b4853",
+    "rules": [
+      {
+        "id": "1",
+        "priority": 0,
+        "classification": {
+          "prefix": {
+            "ip": "8.8.8.8/32",
+            "ports": "",
+            "protocol": ""
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "green" , "blue" ],
+              "order": "load-balance"
+            },
+            {
+              "pathlabels": [ "blue" ],
+              "order": "priority"
+            }
+          ],
+          "order": "load-balance",
+          "fallback": "by-destination"
+        }
+      },
+      {
+        "id": "2",
+        "priority": 1,
+        "classification": {
+          "application": {
+            "importance": "low"
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "black" ],
+              "order": "priority"
+            }
+          ],
+          "order": "priority",
+          "fallback": "by-destination"
+        }
+      }
+    ]
+  }
+}
+,
+{
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "8.8.1.1",
-    "dst": "8.8.1.3",
+    "src": "10.0.0.4",
+    "dst": "30.0.0.4",
     "tunnel-id": 2,
     "ipsec": {
       "local-sa": {
@@ -97,25 +474,8 @@
 ,
 {
   "entity":  "agent",
-  "message": "add-multilink-policy",
-  "params": {
-    "policy-id": 1,
-    "rules": [
-      {
-        "rule-id": 1,
-        "priority":  "not-supported-yet",
-        "class": {
-          "application": "not-supported-yet"
-          "lan-src":     "not-supported-yet"
-        },
-        "action": {
-          "link": {"label": "black"},
-          "on-multi-match": "not-supported-yet",
-          "on-no-match":    "not-supported-yet"
-        }
-      }
-    ]
-  }
+  "message": "remove-tunnel",
+  "params": { "tunnel-id": 1 }
 }
 ,
 {
@@ -129,20 +489,6 @@
 {
   "entity":  "agent",
   "message": "remove-tunnel",
-  "params": {
-    "src": "8.8.1.1",
-    "dst": "8.8.1.2",
-    "tunnel-id": 1
-  }
-}
-,
-{
-  "entity":  "agent",
-  "message": "remove-tunnel",
-  "params": {
-    "src": "8.8.1.1",
-    "dst": "8.8.1.3",
-    "tunnel-id": 2
-  }
+  "params": { "tunnel-id": 2 }
 }
 ]

@@ -68,8 +68,11 @@ class TestFwagent:
         out = subprocess.check_output(cmd, shell=True)
         ok = False if re.search('Error|error|"ok"[ ]+:[ ]+0', out) else True
         if not ok and print_output_on_error:
-            print("'%s' failed!" % cmd)
+            print("TestFwagent::cli: FAILURE REPORT START")
+            print("TestFwagent::cli: command: '%s'" % cmd)
+            print("TestFwagent::cli: output:")
             print(out)
+            print("TestFwagent::cli: FAILURE REPORT END")
         return (ok, out)
 
     def show(self, args):
@@ -103,8 +106,10 @@ def vpp_is_configured(config_entities, print_error=True):
     for (e, amount) in config_entities:
         if e == 'interfaces':
             # Count number of interfaces that are UP
-            cmd = r"sudo vppctl sh int addr | grep -E '^[^ ]+ \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
+            cmd = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
             if not _check_command_output(cmd, 'UP interfaces'):
+                out = subprocess.check_output(r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)'", shell=True).rstrip()
+                print("ERROR:\n" + out)
                 return False
         if e == 'tunnels':
             # Count number of existing tunnel
@@ -113,8 +118,11 @@ def vpp_is_configured(config_entities, print_error=True):
             if not _check_command_output(cmd, 'tunnels', print_error=False):
                 cmd = "sudo vppctl show vxlan tunnel | grep src | wc -l"
                 if not _check_command_output(cmd, 'tunnels', print_error):
+                    out_ipsec = subprocess.check_output("sudo vppctl sh ipsec gre tunnel", shell=True).rstrip()
+                    out_vxlan = subprocess.check_output("sudo vppctl show vxlan tunnel", shell=True).rstrip()
+                    print("ERROR:\n" + out_ipsec + "\n" + out_vxlan)
                     return False
-    return True 
+    return True
 
 
 def wait_vpp_to_start(timeout=1000000):

@@ -472,7 +472,7 @@ class Fwagent:
         pmsg = json.loads(message)
         msg = pmsg['msg']
 
-        reply = self.handle_received_msg(msg)
+        reply = self.handle_received_request(msg)
 
         fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
@@ -501,7 +501,7 @@ class Fwagent:
         if self.ws:
             self.ws.close()
 
-    def _handle_received_request(self, msg):
+    def handle_received_request(self, msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -513,6 +513,11 @@ class Fwagent:
         :returns: None.
         """
         print_message = fwglobals.g.cfg.DEBUG
+
+        # Aggregation is not well defined in today protocol (May-2019),
+        # so align all kind of aggregations to the common request format
+        # expected by the agent framework.
+        msg = fwutils.fix_aggregated_message_format(msg)
 
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
@@ -528,31 +533,7 @@ class Fwagent:
             reply.update({'message': 'success'})
 
         if print_message:
-            fwglobals.log.debug("_handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
-        return reply
-
-    def handle_received_msg(self, msg):
-        """Handles standalone or aggregated message. Standalone message
-        represents one single API request, like 'add-interface'. Aggregated
-        message represents JSON list of API requests.
-
-        :param msg:  Message instance.
-
-        :returns: None.
-        """
-        if type(msg) is list:
-            executed_list = []
-            for request in msg:
-                reply = self._handle_received_request(request)
-                if reply['ok'] == 1:
-                    request['message'] = request['message'].replace('add-', 'remove-')
-                    executed_list.append(request)
-                else:
-                    for executed_req in executed_list:
-                        self._handle_received_request(executed_req)
-        else:
-            reply = self._handle_received_request(msg)
-
+            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
         return reply
 
     def inject_requests(self, filename, ignore_errors=False):
@@ -571,12 +552,12 @@ class Fwagent:
             requests = json.loads(f.read())
             if type(requests) is list:   # Take care of file with list of requests
                 for (idx, req) in enumerate(requests):
-                    reply = self._handle_received_request(req)
+                    reply = self.handle_received_request(req)
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
             else:   # Take care of file with single request
-                reply = self._handle_received_request(requests)
+                reply = self.handle_received_request(requests)
                 if reply['ok'] == 0:
                     raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))

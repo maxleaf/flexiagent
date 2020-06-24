@@ -77,6 +77,16 @@ def start_router(params=None):
      """
     cmd_list = []
 
+    # Initialize some stuff before router start
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "fwtranslate_add_tunnel.init_tunnels()"
+    cmd['cmd']['params']  = {
+                    'module': 'fwtranslate_add_tunnel',
+                    'func'  : 'init_tunnels'
+    }
+
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
     #   sudo ip addr flush dev enp0s8
@@ -222,6 +232,35 @@ def start_router(params=None):
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':pci } ] }
         cmd_list.append(cmd)
+
+    # Once VPP started, apply configuration to it.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "FWROUTER_API::_on_apply_router_config()"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_apply_router_config'
+    }
+    cmd_list.append(cmd)
+
+    # Finalize some stuff after VPP start / before VPP stops.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "fwrouter_api._on_start_router()"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_start_router'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "fwrouter_api._on_stop_router()"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_stop_router'
+    }
+    cmd_list.append(cmd)
 
     return cmd_list
 
