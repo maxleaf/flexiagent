@@ -1563,10 +1563,29 @@ def install_openvpn_server(params):
     else:
         version = 'stable'
 
+    with open ('/etc/openvpn/server/auth-script.sh', 'w') as rsh:
+        rsh.write('''\
+#!/bin/bash
+
+username=$(head -n 1 $1)
+password=$(cat $1 | head -2 | tail -1)
+
+url="http://local.vpnflexiwan.com:5000/api/auth/token"
+
+response=$(curl -H "Authorization: Bearer ${password}" --insecure --write-out '%{http_code}' --silent --output /dev/null $url)
+
+if [[ "$response" -ne 200 ]] ; then
+  exit 1
+else
+  exit 0
+fi
+''')
+
     commands = [
         'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
         'echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version,
         'apt-get update && apt-get install -y openvpn',
+        'chmod +x /etc/openvpn/server/auth-script.sh',
         # 'rm -rf /etc/openvpn/server/easy-rsa',
         # 'mkdir -p /etc/openvpn/server/easy-rsa/',
         # '{ wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1',
@@ -1595,7 +1614,7 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
         # 'echo "%s" > /etc/openvpn/server/dh.pem' % params['dhKey'],
 
         'rm -rf ./pki'
-    ]    
+    ]
 
     for command in commands:        
         ret = os.system(command)      
