@@ -26,7 +26,6 @@ import sys
 import os
 import re
 from shutil import copyfile
-from fwdb_requests import FwDbRequests
 import fwglobals
 import fwstats
 import fwutils
@@ -50,11 +49,6 @@ class FWAGENT_API:
        connection using JSON requests.
        For list of available APIs see the 'fwagent_api' variable.
     """
-    def __init__(self, request_db_file):
-        """Constructor method
-        """
-        self.db_requests = FwDbRequests(request_db_file)    # Database of executed requests
-
     def call(self, req, params):
         """Invokes API specified by the 'req' parameter.
 
@@ -75,15 +69,18 @@ class FWAGENT_API:
         return reply
 
     def _prepare_tunnel_info(self, tunnel_ids):
+        db_requests = fwglobals.g.router_api.db_requests
         tunnel_info = []
-        for key in self.db_requests.db:
+        for key in db_requests.db:
             try:
                 if re.match('add-tunnel', key):
-                    (req, entry) = self.db_requests.fetch_request(key)
-                    tunnel_id = entry["tunnel-id"]
+                    (req, params) = db_requests.fetch_request(key)
+                    tunnel_id = params["tunnel-id"]
                     if tunnel_id in tunnel_ids:
-                        local_sa = entry["ipsec"]["local-sa"]
-                        remote_sa = entry["ipsec"]["remote-sa"]
+                        local_sa = params["ipsec"]["local-sa"]
+                        remote_sa = params["ipsec"]["remote-sa"]
+                        # key1-key4 are the crypto keys stored in
+                        # the management for each tunnel
                         tunnel_info.append({
                             "id": str(tunnel_id),
                             "key1": local_sa["crypto-key"],

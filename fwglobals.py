@@ -262,7 +262,7 @@ class Fwglobals:
 
         :returns: None.
         """
-        self.agent_api  = FWAGENT_API(self.SQLITE_DB_FILE)
+        self.agent_api  = FWAGENT_API()
         self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
         self.apps_api   = FwApps(self.APP_REC_DB_FILE)
