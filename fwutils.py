@@ -1577,14 +1577,7 @@ def install_openvpn_server(params):
         # 'EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-client-full client1 nopass',
         # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/client1.crt ./pki/private/client1.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
         # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
-        
-
-        'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
-        'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
-        'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
-        'echo "%s" > /etc/openvpn/server/server.crt' % params['serverCrt'],
-        
-        'openvpn --genkey --secret /etc/openvpn/server/tc.key',
+        # 'openvpn --genkey --secret /etc/openvpn/server/tc.key',        
         "echo '-----BEGIN DH PARAMETERS-----\n\
 MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
 +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
@@ -1593,13 +1586,18 @@ YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
 ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
 -----END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem",
+
+        'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
+        'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
+        'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
+        'echo "%s" > /etc/openvpn/server/server.crt' % params['serverCrt'],
+        'echo "%s" > /etc/openvpn/server/tc.key' % params['tlsKey'],
+        # 'echo "%s" > /etc/openvpn/server/dh.pem' % params['dhKey'],
+
         'rm -rf ./pki'
-    ]
+    ]    
 
-    print("test")
-
-    for command in commands:
-        print("command %s" % command)
+    for command in commands:        
         ret = os.system(command)      
         if ret:
             print('err: ' + ret)
@@ -1705,7 +1703,7 @@ def configure_server_file(params):
         'echo "server %s %s" >> %s' % (ip.ip, ip.netmask, destFile),
 
         # Maintain a record of client <-> virtual IP address associations in this file
-        'echo "ifconfig-pool-persist ipp.txt" >> %s' % destFile,
+        'echo "ifconfig-pool-persist /etc/openvpn/server/ipp.txt" >> %s' % destFile,
 
         'echo "keepalive 10 120" >> %s' % destFile,
 
@@ -1722,7 +1720,7 @@ def configure_server_file(params):
         
         # Output a short status file showing current connections, truncated
         # and rewritten every minute.
-        'echo "status openvpn-status.log" >> %s' % destFile,
+        'echo "status /etc/openvpn/server/openvpn-status.log" >> %s' % destFile,
 
         # Set the appropriate level of log file verbosity.
         'echo "verb 3" >> %s' % destFile,

@@ -102,6 +102,7 @@ def install_application(params):
             'remoteClientIp': params['remoteClientIp'], 'deviceWANIp': params['deviceWANIp'],
             'remove': False, 'caKey': params['caKey'], 'caCrt': params['caCrt'],
             'serverKey': params['serverKey'], 'serverCrt': params['serverCrt'],
+            'tlsKey': params['tlsKey'], # 'dhKey': params['dhKey']
         }
     }
     cmd['revert'] = {}
