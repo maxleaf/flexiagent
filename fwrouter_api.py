@@ -71,7 +71,7 @@ fwrouter_translators = {
     'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
     'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
     'install-vpn-application':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
-    'uninstall-vpn-application':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-application'},
+    'uninstall-vpn-application':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-vpn-application'},
 }
 
 class FWROUTER_API:
