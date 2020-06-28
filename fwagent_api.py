@@ -24,6 +24,7 @@ import json
 import yaml
 import sys
 import os
+import re
 from shutil import copyfile
 import fwglobals
 import fwstats
@@ -67,6 +68,34 @@ class FWAGENT_API:
             raise Exception("fwagent_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
         return reply
 
+    def _prepare_tunnel_info(self, tunnel_ids):
+        db_requests = fwglobals.g.router_api.db_requests
+        tunnel_info = []
+        for key in db_requests.db:
+            try:
+                if re.match('add-tunnel', key):
+                    (req, params) = db_requests.fetch_request(key)
+                    tunnel_id = params["tunnel-id"]
+                    if tunnel_id in tunnel_ids:
+                        local_sa = params["ipsec"]["local-sa"]
+                        remote_sa = params["ipsec"]["remote-sa"]
+                        # key1-key4 are the crypto keys stored in
+                        # the management for each tunnel
+                        tunnel_info.append({
+                            "id": str(tunnel_id),
+                            "key1": local_sa["crypto-key"],
+                            "key2": local_sa["integr-key"],
+                            "key3": remote_sa["crypto-key"],
+                            "key4": remote_sa["integr-key"]
+                        })
+
+            except Exception as e:
+                fwglobals.log.excep("failed to create tunnel information %s" % str(e))
+                raise e
+        
+        return tunnel_info
+        
+
     def _get_device_info(self, params):
         """Get device information.
 
@@ -89,6 +118,10 @@ class FWAGENT_API:
                 "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
                 }
             info['network']['routes'] = [ default_route ]
+            # Load tunnel info, if requested by the management
+            if params and params['tunnels']:
+                info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
+                
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))
