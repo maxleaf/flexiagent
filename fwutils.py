@@ -1570,7 +1570,7 @@ def install_openvpn_server(params):
 username=$(head -n 1 $1)
 password=$(cat $1 | head -2 | tail -1)
 
-url="http://local.vpnflexiwan.com:5000/api/auth/token"
+url="http://local.vpnflexiwan.com:5000/api/auth/token?username=${username}"
 
 response=$(curl -H "Authorization: Bearer ${password}" --insecure --write-out '%{http_code}' --silent --output /dev/null $url)
 
@@ -1641,7 +1641,7 @@ def configure_openvpn_server(params):
 
     # Start the vpn server
     try:
-        cmd = 'sudo killall openvpn; sudo openvpn --config /etc/openvpn/server/server.conf --daemon'
+        cmd = 'sudo killall openvpn && sudo openvpn --config /etc/openvpn/server/server.conf --daemon'
         output = subprocess.check_output(cmd, shell=True)
         fwglobals.log.debug("openvpn server is running!") 
         return (True, None)
