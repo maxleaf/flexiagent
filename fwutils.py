@@ -1557,11 +1557,11 @@ def add_static_route(args):
 # {
 #   'message': 'aggregated-router-api',
 #   'params' : {
-#                'requests': <list of aggregated requests>,
-#                'original': <original message>
+#                'requests':     <list of aggregated requests>,
+#                'original_msg': <original message>
 #              }
 # }
-# The 'original' is needed for configuration hash feature - every received
+# The 'original_msg' is needed for configuration hash feature - every received
 # message is used for signing router configuration to enable database sync
 # between device and server. Once the protocol is fixed, there will be no more
 # need in this proprietary format.
@@ -1575,8 +1575,8 @@ def fix_aggregated_message_format(msg):
         return {
             'message': 'aggregated-router-api',
             'params' : {
-                'requests': msg,
-                'original': msg
+                'requests':     msg,
+                'original_msg': msg
             }
         }
 
@@ -1617,8 +1617,8 @@ def fix_aggregated_message_format(msg):
             return {
                 'message': 'aggregated-router-api',
                 'params' : {
-                    'requests': requests,
-                    'original': msg
+                    'requests':     requests,
+                    'original_msg': msg
                 }
             }
 
@@ -1638,8 +1638,8 @@ def fix_aggregated_message_format(msg):
         return {
             'message': 'aggregated-router-api',
             'params' : {
-                'requests': requests,
-                'original': msg
+                'requests':     requests,
+                'original_msg': msg
             }
         }
 

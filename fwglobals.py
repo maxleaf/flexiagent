@@ -62,6 +62,7 @@ request_handlers = {
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
     'reset-device':                 '_call_agent_api',
+    'sync-device':                  '_call_agent_api',
 
     # Applications API
     'add-app-info':                 '_call_apps_api',
@@ -402,6 +403,28 @@ class Fwglobals:
                     myCmd = 'sudo vppctl api trace save error.api'
                     os.system(myCmd)
                     raise Exception(reply['message'])
+
+            # On router configuration request, e.g. add-interface,
+            # remove-tunnel, modify-device, etc. update the configuration database
+            # signature. This is needed to assists the database synchronization
+            # feature that keeps the configuration set by user on the flexiManage
+            # in sync with the one stored on the flexiEdge device.
+            # Note we do that here, as at this point wej handle configuration
+            # request that was received from flexiManage and that was not
+            # generated locally.
+            #
+            if reply['ok'] == 1 and handler_func == '_call_router_api':
+                if req == 'aggregated-router-api':
+                    msg = params['original_msg']
+                else:
+                    if params:
+                        msg = { 'message': req, 'params': params }
+                    else:
+                        msg = { 'message': req }
+                self.router_api.db_requests.update_signature(msg)
+
+                # Add the updated signatire to the reply, so server could be quite
+                reply['router-cfg-hash'] = self.router_api.db_requests.get_signature()
 
             return reply
 

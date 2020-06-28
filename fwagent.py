@@ -719,12 +719,15 @@ class FwagentDaemon(object):
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, tb):
         # The three arguments to `__exit__` describe the exception
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
+
+        traceback.print_tb(tb)
+
         self.stop(stop_vpp=False)  # Don't stop VPP on fwagent exit to keep it routing packets. To stop is use 'fwagent stop'
         fwglobals.log.debug("FwagentDaemon: exited")
 

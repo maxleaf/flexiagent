@@ -20,6 +20,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import hashlib
+import json
 import os
 import re
 import yaml
@@ -38,6 +40,9 @@ class FwDbRequests:
         """
         self.db_filename = db_file
         self.db = SqliteDict(db_file, autocommit=True)
+
+        if self.db.get('signature') is None:
+            self.db['signature'] = ""
 
     def __enter__(self):
         return self
@@ -61,6 +66,7 @@ class FwDbRequests:
         """
         for key in self.db:
             self.remove(key)
+        self.reset_signature()
 
     def add(self, key, req, params, cmd_list, executed):
         """Add key-value into DB.
@@ -130,3 +136,40 @@ class FwDbRequests:
         """
         res = True if key in self.db else False  
         return res
+
+    def update_signature(self, request):
+        """Updates the database signature.
+        This function assists the database synchronization feature that keeps
+        the configuration set by user on the flexiManage in sync with the one
+        stored on the flexiEdge device.
+            The initial signature of the database is empty string. Than on every
+        successfully handled request it is updated according following formula:
+                signature = sha1(signature + request)
+        where both signature and delta are strings.
+
+        :param request: the last successfully handled router configuration
+                        request, e.g. add-interface, remove-tunnel, modify-device,
+                        etc. As configuration database signature should reflect
+                        the latest configuration, it should be updated with this
+                        request.
+        """
+        current = self.db['signature']
+        if request:
+            delta       = json.dumps(request, separators=(',', ''), sort_keys=True)
+            hash_object = hashlib.sha1(current + delta)
+            new         = hash_object.hexdigest()
+        else:
+            delta = ""
+            new   = ""
+        self.db['signature'] = new
+
+        fwglobals.log.debug("fwdb_requests: sha1: new=%s, current=%s, delta=%s" %
+                            (str(new), str(current), str(delta)))
+
+    def get_signature(self):
+        fwglobals.log.debug("fwdb_requests: get signature: " + self.db['signature'])
+        return self.db['signature']
+
+    def reset_signature(self):
+        fwglobals.log.debug("fwdb_requests: reset signature")
+        self.db['signature'] = ""

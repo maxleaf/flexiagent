@@ -37,7 +37,8 @@ fwagent_api = {
     'get-device-os-routes':     '_get_device_os_routes',
     'get-router-config':        '_get_router_config',
     'upgrade-device-sw':        '_upgrade_device_sw',
-    'reset-device':             '_reset_device_soft'
+    'reset-device':             '_reset_device_soft',
+    'sync-device':              '_sync_device',
 }
 
 class FWAGENT_API:
@@ -100,6 +101,10 @@ class FWAGENT_API:
         :returns: Dictionary with statistics.
         """
         reply = fwstats.get_stats()
+
+        # Add router configuration hash to assist database synchronization feature
+        reply['router-cfg-hash'] = fwglobals.g.router_api.db_requests.get_signature()
+
         return reply
 
     def _upgrade_device_sw(self, params):
@@ -204,7 +209,7 @@ class FWAGENT_API:
         reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
 
-    def _reset_device_soft(self, params):
+    def _reset_device_soft(self, params=None):
         """Soft reset device configuration.
 
         :param params: Parameters from flexiManage.
@@ -212,7 +217,45 @@ class FWAGENT_API:
         :returns: Dictionary with status code.
         """
         if fwglobals.g.router_api.router_started:
-            fwglobals.g.handle_request('stop-router')   # Stop VPP if it runs
+            fwglobals.g.router_api.call('stop-router')   # Stop VPP if it runs
         fwutils.reset_router_config()
-        return {'ok': 1, 'message': {}}
+        return {'ok': 1}
 
+    def _sync_device(self, params):
+        """Synchronize VPP state to the configuration stored on flexiManage.
+        The synchronization can be full or partial. The last is not supported yet.
+        In full case all interfaces, tunnels, routes, etc, that do not appear
+        in the received from server configuration are removed, all entities
+        that do appear in server version but do not appear on device are added
+        and all entities that appear in both but are different are modified.
+        The same entities are ignored.
+
+        :param params: Parameters from flexiManage - 'add-X' requests.
+
+        :returns: Dictionary with status code.
+        """
+        fwglobals.log.info("FWAGENT_API: _sync_device started")
+
+        remote_signature = params['router-cfg-hash']
+        local_signature  = fwglobals.g.router_api.db_requests.get_signature()
+        if remote_signature == local_signature:
+            fwglobals.log.info(
+                "FWAGENT_API: _sync_device: no need to sync: received=stored=%s finished" %
+                local_signature)
+            return {'ok': 1}
+
+        # Below is the temporary rude implementation:
+        # soft reset device and load received configuration.
+        # Later we will implement more elegant solution described above :)
+        restart_router = fwglobals.g.router_api.router_started
+        self._reset_device_soft()
+        for request in params['requests']:
+            reply = fwglobals.g.router_api.call(request['msg'], request.get('params'))
+            if reply['ok'] == 0:
+                raise Exception("FWAGENT_API: _sync_device failed (%s)" % str(reply.get('message')))
+        if restart_router:
+            fwglobals.g.router_api.call('start-router')
+        fwglobals.g.router_api.db_requests.reset_signature()
+
+        fwglobals.log.info("FWAGENT_API: _sync_device finished")
+        return {'ok': 1}

@@ -167,8 +167,7 @@ class FWROUTER_API:
                 db_app_rec.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
-
-            fwglobals.g.handle_request('start-router', None)
+            self.call('start-router')
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
             self._set_router_failure("failed to restore vpp configuration")

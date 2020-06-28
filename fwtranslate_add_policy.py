@@ -263,13 +263,9 @@ def add_policy(params):
     cmd['cmd']['name']   = "python-kwargs"
     cmd['cmd']['descr']  = "remove-multilink-policy"
     cmd['cmd']['params'] = {
-                            'object': 'fwglobals.g',
-                            'func'  : 'handle_request',
-                            'args'  : {
-                                'req'   : 'remove-multilink-policy',
-                                'params': None,
-                                'result': None
-                            }
+                            'object': 'fwglobals.g.router_api',
+                            'func'  : 'call',
+                            'args'  : { 'req' : 'remove-multilink-policy' }
                            }
     cmd_list.append(cmd)
 
