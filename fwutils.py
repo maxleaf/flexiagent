@@ -1269,7 +1269,7 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
-metric = 100
+metric = 200
 
 def add_remove_netplan_interface(params):
     pci = params['pci']
@@ -1285,12 +1285,13 @@ def add_remove_netplan_interface(params):
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
         config_section['dhcp4-overrides'] = {'route-metric': metric}
-        metric += 1
     else:
         config_section['dhcp4'] = False
         config_section['addresses'] = [ip]
         if gw is not None and gw:
-            config_section['gateway4'] = gw
+            config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
+
+    metric += 1
 
     try:
         with open(fname, 'r') as stream:
