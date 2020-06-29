@@ -1625,6 +1625,18 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
     fwglobals.log.debug("Openvpn installed successfully")
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
+
+def openvpn_pid():
+    """Get pid of OpenVpn process.
+
+    :returns:           process identifier.
+    """
+    try:
+        pid = subprocess.check_output(['pidof', 'openvpn'])
+    except:
+        pid = None
+    return pid
+
 def configure_openvpn_server(params):
     """Configure Open VPN server on host.
 
@@ -1640,9 +1652,14 @@ def configure_openvpn_server(params):
     configure_client_file(params)
 
     # Start the vpn server
-    try:
-        output = subprocess.check_output('sudo openvpn --config /etc/openvpn/server/server.conf --daemon', shell=True)
+    try:        
+        vpnIsRun = True if openvpn_pid() else False
 
+        if (vpnIsRun):
+            os.system('sudo killall openvpn')
+            time.sleep(5)  # 5 sec
+        
+        output = os.system('sudo openvpn --config /etc/openvpn/server/server.conf --daemon')
         fwglobals.log.debug("openvpn server is running!") 
         return (True, None)
     except:
@@ -1662,6 +1679,11 @@ def remove_openvpn_server():
         'rm -rf /etc/openvpn/server/*',
         'rm -rf /etc/openvpn/client/*'
     ]
+
+    vpnIsRun = True if openvpn_pid() else False
+
+    if (vpnIsRun):
+        commands.append('killall openvpn')
 
     try:
         for command in commands:
