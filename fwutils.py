@@ -1269,6 +1269,8 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
+metric = 100
+
 def add_remove_netplan_interface(params):
     pci = params['pci']
     is_add = params['is_add']
@@ -1276,11 +1278,14 @@ def add_remove_netplan_interface(params):
     ip = params['ip']
     gw = params['gw']
     config_section = {}
+    global metric
 
     fname = fwglobals.g.NETPLAN_FILE
 
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
+        config_section['dhcp4-overrides'] = {'route-metric': metric}
+        metric += 1
     else:
         config_section['dhcp4'] = False
         config_section['addresses'] = [ip]
