@@ -501,7 +501,7 @@ class Fwagent:
         if self.ws:
             self.ws.close()
 
-    def handle_received_request(self, msg):
+    def handle_received_request(self, received_msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -517,15 +517,15 @@ class Fwagent:
         # Aggregation is not well defined in today protocol (May-2019),
         # so align all kind of aggregations to the common request format
         # expected by the agent framework.
-        msg = fwutils.fix_aggregated_message_format(msg)
+        msg = fwutils.fix_aggregated_message_format(received_msg)
 
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("_handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
+            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
 
         self.requestReceived = True
 
-        reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
+        reply = fwglobals.g.handle_request(msg['message'], msg.get('params'), received_msg=received_msg)
 
         if not 'entity' in reply and 'entity' in msg:
             reply.update({'entity': msg['entity'] + 'Reply'})

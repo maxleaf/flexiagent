@@ -378,21 +378,23 @@ class Fwglobals:
     #          For example, it might contain pattern for grep to be run
     #          on command output.
     #
-    def handle_request(self, req, params=None, result=None):
+    def handle_request(self, req, params=None, result=None, received_msg=None):
         """Handle request.
 
-        :param params:    Parameters from flexiManage.
-        :param result:    Place for result.
+        :param req:          Request from flexiManage, e.g. 'start-router'
+        :param params:       Parameters from flexiManage.
+        :param result:       Place for result.
+        :param received_msg: The original message received from flexiManage.
 
         :returns: Dictionary with error string and status code.
         """
 
         try:
-            handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+            handler_name = request_handlers.get(req)
+            assert handler_name, 'fwglobals: "%s" request is not supported' % req
 
-            handler_func = getattr(self, handler)
-            assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler, req)
+            handler_func = getattr(self, handler_name)
+            assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler_name, req)
 
             if result is None:
                 reply = handler_func(req, params)
@@ -409,20 +411,13 @@ class Fwglobals:
             # signature. This is needed to assists the database synchronization
             # feature that keeps the configuration set by user on the flexiManage
             # in sync with the one stored on the flexiEdge device.
-            # Note we do that here, as at this point wej handle configuration
+            # Note we do that here, as at this point we handle configuration
             # request that was received from flexiManage and that was not
             # generated locally.
             #
-            if reply['ok'] == 1 and handler == '_call_router_api':
-                if req == 'aggregated-router-api':
-                    msg = params['original_msg']
-                else:
-                    if params:
-                        msg = { 'message': req, 'params': params }
-                    else:
-                        msg = { 'message': req }
-                self.router_api.db_requests.update_signature(msg)
-
+            if reply['ok'] == 1 and handler_name == '_call_router_api':
+                # Update the configuration signature
+                self.router_api.db_requests.update_signature(received_msg)
                 # Add the updated signatire to the reply, so server could be quite
                 reply['router-cfg-hash'] = self.router_api.db_requests.get_signature()
 

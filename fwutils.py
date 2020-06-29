@@ -1576,13 +1576,11 @@ def fix_aggregated_message_format(msg):
 
     # 'list' aggregation
     if type(msg) == list:
-        return {
-            'message': 'aggregated-router-api',
-            'params' : {
-                'requests':     msg,
-                'original_msg': msg
+        return  \
+            {
+                'message': 'aggregated-router-api',
+                'params' : { 'requests': msg }
             }
-        }
 
     # 'start-router' aggregation
     # 'start-router' might include interfaces and routes. Move them into list.
@@ -1618,13 +1616,11 @@ def fix_aggregated_message_format(msg):
                     {
                         'message': 'start-router'
                     })
-            return {
-                'message': 'aggregated-router-api',
-                'params' : {
-                    'requests':     requests,
-                    'original_msg': msg
+            return \
+                {
+                    'message': 'aggregated-router-api',
+                    'params' : { 'requests': requests }
                 }
-            }
 
     # 'add-X' aggregation
     # 'add-interface'/'remove-interface' can have actually a list of interfaces.
@@ -1639,12 +1635,10 @@ def fix_aggregated_message_format(msg):
                     'params' : params
                 })
 
-        return {
-            'message': 'aggregated-router-api',
-            'params' : {
-                'requests':     requests,
-                'original_msg': msg
+        return \
+            {
+                'message': 'aggregated-router-api',
+                'params' : { 'requests': requests }
             }
-        }
 
     return msg  # No conversion is needed
