@@ -472,7 +472,7 @@ class Fwagent:
         pmsg = json.loads(message)
         msg = pmsg['msg']
 
-        reply = self.handle_received_request(msg)
+        (reply, msg) = self.handle_received_request(msg)
 
         fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
@@ -510,7 +510,8 @@ class Fwagent:
 
         :param msg:  Message instance.
 
-        :returns: None.
+        :returns: (reply, msg), where reply is reply to be sent back to server,
+                  msg is normalized received message.
         """
         print_message = fwglobals.g.cfg.DEBUG
 
@@ -534,7 +535,7 @@ class Fwagent:
 
         if print_message:
             fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
-        return reply
+        return (reply, msg)
 
     def inject_requests(self, filename, ignore_errors=False):
         """Injects requests loaded from within 'file' JSON file,
@@ -552,13 +553,13 @@ class Fwagent:
             requests = json.loads(f.read())
             if type(requests) is list:   # Take care of file with list of requests
                 for (idx, req) in enumerate(requests):
-                    reply = self.handle_received_request(req)
+                    (reply, unused_msg) = self.handle_received_request(req)
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
                 return None
             else:   # Take care of file with single request
-                reply = self.handle_received_request(requests)
+                (reply, unused_msg) = self.handle_received_request(requests)
                 if reply['ok'] == 0:
                     raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))

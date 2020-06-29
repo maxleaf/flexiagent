@@ -243,7 +243,7 @@ class FWROUTER_API:
         for (idx, req) in enumerate(requests):
             try:
                 fwglobals.log.debug("call_aggregated: executing request %s" % (json.dumps(req)))
-                self._call_simple(req['message'], req.get('params'))
+                self.call(req['message'], req.get('params'))
             except Exception as e:
                 # Revert previously succeeded simple requests
                 fwglobals.log.error("call_aggregated: failed to execute %s. reverting previous requests..." % json.dumps(req))
