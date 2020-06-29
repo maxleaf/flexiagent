@@ -204,6 +204,19 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'add_netplan_file',
+        'args'  : {}
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "exec"
+    cmd['revert']['params'] = ['sudo rm %s' % fwglobals.g.NETPLAN_FILE]
+    cmd['revert']['descr'] = "remove %s" % fwglobals.g.NETPLAN_FILE
+    cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
     cmd['cmd']['name']    = 'exec'
     cmd['cmd']['params']  = [ 'sudo netplan apply' ]
     cmd['cmd']['descr']   = "netplan apply"

@@ -1253,6 +1253,17 @@ def _get_interface_address(pci):
 
     return None
 
+def add_netplan_file():
+    fname = fwglobals.g.NETPLAN_FILE
+
+    if not os.path.exists(fname):
+        config = dict()
+        config['network'] = {'version': 2}
+        with open(fname, 'w+') as stream:
+            yaml.safe_dump(config, stream, default_flow_style=False)
+
+    return (True, None)
+
 def add_remove_netplan_interface(params):
     pci = params['pci']
     is_add = params['is_add']
@@ -1272,12 +1283,6 @@ def add_remove_netplan_interface(params):
             config_section['gateway4'] = gw
 
     try:
-        if not os.path.exists(fname):
-            config = dict()
-            config['network'] = {'version': 2}
-            with open(fname, 'w+') as stream:
-                yaml.safe_dump(config, stream, default_flow_style=False)
-
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
             network = config['network']
