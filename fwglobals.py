@@ -413,7 +413,7 @@ class Fwglobals:
             # request that was received from flexiManage and that was not
             # generated locally.
             #
-            if reply['ok'] == 1 and handler_func == '_call_router_api':
+            if reply['ok'] == 1 and handler == '_call_router_api':
                 if req == 'aggregated-router-api':
                     msg = params['original_msg']
                 else:

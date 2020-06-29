@@ -238,10 +238,11 @@ class FWAGENT_API:
 
         remote_signature = params['router-cfg-hash']
         local_signature  = fwglobals.g.router_api.db_requests.get_signature()
+        fwglobals.log.debug(
+            "FWAGENT_API: _sync_device: cfg signature: received=%s, stored=%s" %
+            (remote_signature, local_signature))
         if remote_signature == local_signature:
-            fwglobals.log.info(
-                "FWAGENT_API: _sync_device: no need to sync: received=stored=%s finished" %
-                local_signature)
+            fwglobals.log.info("FWAGENT_API: _sync_device: no need to sync")
             return {'ok': 1}
 
         # Below is the temporary rude implementation:
@@ -250,7 +251,7 @@ class FWAGENT_API:
         restart_router = fwglobals.g.router_api.router_started
         self._reset_device_soft()
         for request in params['requests']:
-            reply = fwglobals.g.router_api.call(request['msg'], request.get('params'))
+            reply = fwglobals.g.router_api.call(request['message'], request.get('params'))
             if reply['ok'] == 0:
                 raise Exception("FWAGENT_API: _sync_device failed (%s)" % str(reply.get('message')))
         if restart_router:

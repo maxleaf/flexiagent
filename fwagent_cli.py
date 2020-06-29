@@ -111,25 +111,31 @@ class FwagentCli:
                 elif api_str == '\x1b[A' or api_str == '\x1b[B':
                     print('ARROWS ARE NOT SUPPORTED YET ;)')
                 else:
-                    self.execute(api_str)
+                    ret = self.execute(api_str)
+                    if ret['succeeded']:
+                        fwglobals.log.info(self.prompt + 'SUCCESS')
+                    else:
+                        fwglobals.log.info(self.prompt + 'FAILURE')
+                        fwglobals.log.error(self.prompt + ret['error'])
             except Exception as e:
-                print(self.prompt + str(e))
+                print(self.prompt + 'FAILURE: ' + str(e))
 
     def execute(self, api_str):
         try:
             (api_name, api_args) = parse_api_str(api_str)
             if self.daemon:
                 rpc_api_func = getattr(self.daemon, 'api')
-                rpc_api_func(api_name, api_args)
+                ret = rpc_api_func(api_name, api_args)
             elif self.agent:
                 api_func = getattr(self.agent, api_name)
-                api_func(**api_args)
-            fwglobals.log.info(self.prompt + 'SUCCESS')
+                ret = api_func(**api_args)
+            return { 'succeeded': True, 'return-value': ret }
+
         except FwagentCliErrorParser as e:
-            fwglobals.log.error(self.prompt + 'FAILED to parse api call: %s' % str(e))
-            fwglobals.log.error(self.prompt + 'type "help" to see available commands')
+            return { 'succeeded': False, 'error': 'failed to parse api call: %s\n' % str(e) +
+                                                  'Type "help" to see available commands' }
         except Exception as e:
-            fwglobals.log.error(self.prompt + 'FAILED: ' + str(e))
+            return { 'succeeded': False, 'error': str(e) }
 
 def parse_api_str(api_str):
     """Parse 'inject_requests(<requests.json>, ingore_errors)' string into

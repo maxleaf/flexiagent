@@ -556,11 +556,13 @@ class Fwagent:
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
+                return None
             else:   # Take care of file with single request
                 reply = self.handle_received_request(requests)
                 if reply['ok'] == 0:
                     raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))
+                return reply
 
 def version():
     """Handles 'fwagent version' command.
@@ -1001,7 +1003,19 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
     import fwagent_cli
     with fwagent_cli.FwagentCli(agent_linger=linger) as cli:
         if api:
-            cli.execute(api)
+            ret = cli.execute(api)
+
+            # We return dictionary with serialized return value of the invoked API,
+            # so cli output can be parsed by invoker to extract the returned object.
+            #
+            if ret['succeeded']:
+                if ret['return-value']:
+                    ret_val = json.dumps(ret['return-value'])
+                else:
+                    ret_val = json.dumps({'ok': 1})
+            else:
+                ret_val = json.dumps({'ok': 0, 'error': ret['error']})
+            fwglobals.log.info('return-value-start ' + ret_val + ' return-value-end')
         else:
             cli.run_loop()
     if clean_request_db:

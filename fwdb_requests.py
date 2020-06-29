@@ -167,9 +167,9 @@ class FwDbRequests:
                             (str(new), str(current), str(delta)))
 
     def get_signature(self):
-        fwglobals.log.debug("fwdb_requests: get signature: " + self.db['signature'])
         return self.db['signature']
 
     def reset_signature(self):
-        fwglobals.log.debug("fwdb_requests: reset signature")
-        self.db['signature'] = ""
+        if self.db.get('signature') and len(self.db['signature']) > 0:
+            fwglobals.log.debug("fwdb_requests: reset signature")
+            self.db['signature'] = ""
