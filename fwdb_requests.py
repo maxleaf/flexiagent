@@ -153,16 +153,12 @@ class FwDbRequests:
                         the latest configuration, it should be updated with this
                         request.
         """
-        current = self.db['signature']
-        if request:
-            delta       = json.dumps(request, separators=(',', ''), sort_keys=True)
-            hash_object = hashlib.sha1(current + delta)
-            new         = hash_object.hexdigest()
-        else:
-            delta = ""
-            new   = ""
-        self.db['signature'] = new
+        current     = self.db['signature']
+        delta       = json.dumps(request, separators=(',', ''), sort_keys=True)
+        hash_object = hashlib.sha1(current + delta)
+        new         = hash_object.hexdigest()
 
+        self.db['signature'] = new
         fwglobals.log.debug("fwdb_requests: sha1: new=%s, current=%s, delta=%s" %
                             (str(new), str(current), str(delta)))
 
@@ -170,6 +166,8 @@ class FwDbRequests:
         return self.db['signature']
 
     def reset_signature(self):
-        if self.db.get('signature') and len(self.db['signature']) > 0:
+        if not 'signature' in self.db:
+            self.db['signature'] = ""
+        if len(self.db['signature']) > 0:
             fwglobals.log.debug("fwdb_requests: reset signature")
             self.db['signature'] = ""

@@ -830,6 +830,10 @@ def print_router_config(full=False):
         print("")
 
     with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
+
+        if 'signature' in db_requests.db and len(db_requests.db['signature']) > 0:
+            print("signature: %s\n" % db_requests.db['signature'])
+
         if 'start-router' in db_requests.db:
             print("======== START COMMAND =======")
             _print_config_request(db_requests, 'start-router', full)
