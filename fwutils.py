@@ -1641,8 +1641,8 @@ def configure_openvpn_server(params):
 
     # Start the vpn server
     try:
-        cmd = 'sudo killall openvpn && sudo openvpn --config /etc/openvpn/server/server.conf --daemon'
-        output = subprocess.check_output(cmd, shell=True)
+        output = subprocess.check_output('sudo openvpn --config /etc/openvpn/server/server.conf --daemon', shell=True)
+
         fwglobals.log.debug("openvpn server is running!") 
         return (True, None)
     except:

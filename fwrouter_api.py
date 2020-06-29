@@ -221,10 +221,10 @@ class FWROUTER_API:
         if re.match('remove-tunnel|add-tunnel', req):
             return self._handle_add_remove_tunnel(req, params)
 
-        if re.match('install-application', req):
+        if re.match('install-vpn-application|uninstall-vpn-application', req):
             return self._handle_install_uninstall_application(req, params)
 
-        if (req == 'modify-vpn-server'):            
+        if (req == 'modify-vpn-server'): 
             return self._handle_modify_application(req, params)
 
         # Router configuration requests might unite multiple requests of same type
@@ -364,16 +364,15 @@ class FWROUTER_API:
         """
 
         try:
-            if params:
-                # update to server vpn file
-                fwutils.configure_openvpn_server(params)
+            modify_requests = []
 
-                # update new params in the database 
-                (request, oldParams) = self.db_requests.fetch_request('install-application')
+            if params:                
+                # Remove policy only if it exists in the database
+                if self._get_request_params_from_db('uninstall-vpn-application', params):                    
+                    modify_requests.append({'uninstall-vpn-application': params})
+                modify_requests.append({'install-vpn-application': params})
 
-                cmd_list = self.db_requests.fetch_cmd_list('install-application')  
-
-                self._update_db_requests(False, 'install-application', request, params, cmd_list)
+                self._call_aggregated(modify_requests)
 
         except Exception as e:
             return {'ok':0}
@@ -388,19 +387,8 @@ class FWROUTER_API:
 
         :returns: Status code.
         """
-        remove_requests = []
-        add_requests = []
 
-        for key, request in self.db_requests.db.items():
-            if re.search('install-application', key):
-                add_requests.append({'install-application': request['params']})
-                remove_requests.append({'uninstall-application': request['params']})
-
-        self._call_aggregated(remove_requests)
-
-        self._call_simple(req, params)
-
-        return self._call_aggregated(add_requests)
+        return self._call_simple(req, params)
 
     def _handle_add_remove_tunnel(self, req, params):
         """Handle add-tunnel and remove-tunnel.
