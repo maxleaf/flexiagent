@@ -90,28 +90,41 @@ def install_application(params):
     """
     cmd_list = []
 
+    app_type = params['type']
+
+    cmd_params = {}
+    cmd_revert_params = {}
+    cmd_params['module'] = 'fwutils'
+    cmd_revert_params['module'] = 'fwutils'
+        
+    if (app_type == 'open-vpn'):
+        cmd_params['func'] = 'install_openvpn_server'
+        cmd_params['args'] = {
+            'version': params['config']['version'],
+            'routeAllOverVpn': params['config']['routeAllOverVpn'],
+            'remoteClientIp': params['config']['remoteClientIp'],
+            'deviceWANIp': params['config']['deviceWANIp'],
+            'remove': False,
+            'caKey': params['config']['caKey'],
+            'caCrt': params['config']['caCrt'],
+            'serverKey': params['config']['serverKey'],
+            'serverCrt': params['config']['serverCrt'],
+            'tlsKey': params['config']['tlsKey']
+             # 'dhKey': params['dhKey']
+        }
+
+        cmd_revert_params['func'] = 'remove_openvpn_server'    
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
     cmd['cmd']['descr'] = "install application (name=%s)" % (params['name'])
-    cmd['cmd']['params'] = {
-        'module': 'fwutils',
-        'func': 'install_openvpn_server',
-        'args': {
-            'version': params['version'], 'routeAllOverVpn': params['routeAllOverVpn'],
-            'remoteClientIp': params['remoteClientIp'], 'deviceWANIp': params['deviceWANIp'],
-            'remove': False, 'caKey': params['caKey'], 'caCrt': params['caCrt'],
-            'serverKey': params['serverKey'], 'serverCrt': params['serverCrt'],
-            'tlsKey': params['tlsKey'], # 'dhKey': params['dhKey']
-        }
-    }
+    cmd['cmd']['params'] = cmd_params    
+
     cmd['revert'] = {}
     cmd['revert']['name'] = "python"
     cmd['revert']['descr'] = "remove application (name=%s)" % (params['name'])
-    cmd['revert']['params'] = {
-        'module': 'fwutils',
-        'func': 'remove_openvpn_server'
-    }
+    cmd['revert']['params'] = cmd_revert_params
 
     cmd_list.append(cmd)
 
@@ -124,4 +137,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'install-application'
+    return 'install-service-%s' % params['type']

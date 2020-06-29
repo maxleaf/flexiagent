@@ -74,11 +74,11 @@ request_handlers = {
     'add-policy-info':              '_call_policy_api',
     'remove-policy-info':           '_call_policy_api',
 
-    # Vpn API
-    'install-vpn-server':           '_call_vpn_api',
-    'remove-vpn-server':            '_call_vpn_api',
-    'config-vpn-server':            '_call_vpn_api',
-    'upgrade-vpn-server':           '_call_vpn_api',    
+    # # Vpn API
+    # 'install-vpn-server':           '_call_vpn_api',
+    # 'remove-vpn-server':            '_call_vpn_api',
+    # 'config-vpn-server':            '_call_vpn_api',
+    # 'upgrade-vpn-server':           '_call_vpn_api',    
 
     # Router API
     'start-router':                 '_call_router_api',
@@ -97,9 +97,10 @@ request_handlers = {
     'remove-application':           '_call_router_api',
     'add-multilink-policy':        '_call_router_api',
     'remove-multilink-policy':     '_call_router_api',
-    'install-vpn-application':         '_call_router_api',
-    'uninstall-vpn-application':         '_call_router_api',
-    'modify-vpn-server':            '_call_router_api',
+    'install-service':         '_call_router_api',
+    'uninstall-service':         '_call_router_api',
+    'modify-service':            '_call_router_api',
+    'upgrade-service':            '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s

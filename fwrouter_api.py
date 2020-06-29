@@ -70,8 +70,8 @@ fwrouter_translators = {
     'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
     'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
     'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
-    'install-vpn-application':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
-    'uninstall-vpn-application':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-vpn-application'},
+    'install-service':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
+    'uninstall-service':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-service'},
 }
 
 class FWROUTER_API:
@@ -221,10 +221,10 @@ class FWROUTER_API:
         if re.match('remove-tunnel|add-tunnel', req):
             return self._handle_add_remove_tunnel(req, params)
 
-        if re.match('install-vpn-application|uninstall-vpn-application', req):
+        if re.match('install-service|uninstall-service', req):
             return self._handle_install_uninstall_application(req, params)
 
-        if (req == 'modify-vpn-server'): 
+        if (req == 'modify-service'): 
             return self._handle_modify_application(req, params)
 
         # Router configuration requests might unite multiple requests of same type
@@ -367,10 +367,10 @@ class FWROUTER_API:
             modify_requests = []
 
             if params:                
-                # Remove policy only if it exists in the database
-                if self._get_request_params_from_db('uninstall-vpn-application', params):                    
-                    modify_requests.append({'uninstall-vpn-application': params})
-                modify_requests.append({'install-vpn-application': params})
+                if self._get_request_params_from_db('uninstall-service', params):                    
+                    modify_requests.append({'uninstall-service': params})
+                modify_requests.append({'install-service': params})
+
 
                 self._call_aggregated(modify_requests)
 
