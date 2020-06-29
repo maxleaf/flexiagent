@@ -314,9 +314,39 @@ def pci_is_vmxnet3(pci):
         return False
     return True
 
-
 # 'pci_to_vpp_if_name' function maps interface referenced by pci, eg. '0000:00:08.00'
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
+# We use the interface cache mapping, if doesn't exist we rebuild the cache
+def pci_to_vpp_if_name(pci):
+    """Convert PCI address into VPP interface name.
+
+    :param pci:      PCI address.
+
+    :returns: VPP interface name.
+    """
+    vpp_if_name = fwglobals.g.PCI_TO_VPP_IF_NAME_MAP.get(pci)
+    if vpp_if_name: return vpp_if_name
+    else: return _build_pci_to_vpp_if_name_maps(pci, None)
+
+# 'vpp_if_name_to_pci' function maps interface name, eg. 'GigabitEthernet0/8/0'
+# into the pci of that interface, eg. '0000:00:08.00'.
+# We use the interface cache mapping, if doesn't exist we rebuild the cache
+def vpp_if_name_to_pci(vpp_if_name):
+    """Convert PCI address into VPP interface name.
+
+    :param vpp_if_name:      VPP interface name.
+
+    :returns: PCI address.
+    """
+    pci = fwglobals.g.VPP_IF_NAME_TO_PCI_MAP.get(vpp_if_name)
+    if pci: return pci
+    else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
+
+# '_build_pci_to_vpp_if_name_maps' function build the local caches of
+# pci to vpp_if_name and vise vera
+# if pci provided, return the name found for this pci,
+# else, if name provided, return the pci for this name,
+# else, return None
 # To do that we dump all hardware interfaces, split the dump into list by empty line,
 # and search list for interface that includes the pci name.
 # The dumps brings following table:
@@ -326,42 +356,43 @@ def pci_is_vmxnet3(pci):
 #   ...
 #   pci: device 8086:100e subsystem 8086:001e address 0000:00:08.00 numa 0
 #
-def pci_to_vpp_if_name(pci):
-    """Convert PCI address into VPP interface name.
+def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
+    shif = _vppctl_read('show hardware-interfaces')
+    shif_vmxnet3 = _vppctl_read('show vmxnet3')
+    if shif == None or shif_vmxnet3 == None:
+        fwglobals.log.debug("_build_pci_to_vpp_if_name_maps: Error reading interface info")
+    data = shif.splitlines()
+    datav = shif_vmxnet3.splitlines()
+    for intf in _get_group_delimiter(data, r"^\w.*?\d"):
+        # Contains data for a given interface
+        ifdata = ''.join(intf)
+        (k,v) = _parse_vppname_map(ifdata,
+            valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
+            keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
+        if k and v:
+            fwglobals.g.PCI_TO_VPP_IF_NAME_MAP[pci_addr_full(k)] = v
+            fwglobals.g.VPP_IF_NAME_TO_PCI_MAP[v] = pci_addr_full(k)
+    for intf in _get_group_delimiter(datav, r"^Interface:\s\w.*?\d"):
+        # Contains data for a given interface
+        ifdata = '\n'.join(intf)
+        (k,v) = _parse_vppname_map(ifdata,
+            valregex=r"^Interface:\s(\w[^\s]+)\s+",
+            keyregex=r"\s+PCI\sAddress:\s(.*)")
+        if k and v:
+            fwglobals.g.PCI_TO_VPP_IF_NAME_MAP[pci_addr_full(k)] = v
+            fwglobals.g.VPP_IF_NAME_TO_PCI_MAP[v] = pci_addr_full(k)
 
-    :param pci:      PCI address.
+    if pci:
+        vpp_if_name = fwglobals.g.PCI_TO_VPP_IF_NAME_MAP.get(pci)
+        if vpp_if_name: return vpp_if_name
+    elif vpp_if_name:
+        pci = fwglobals.g.VPP_IF_NAME_TO_PCI_MAP.get(vpp_if_name)
+        if pci: return pci
+    else: return None
 
-    :returns: VPP interface name.
-    """
-    # vpp_api.cli() throw exception in vpp 19.01 (and work with vpp 19.04)
-    # hw = fwglobals.g.router_api.vpp_api.cli("show hardware")
-    hw = _vppctl_read('show hardware-interfaces')
-    if hw is None:
-        raise Exception("pci_to_vpp_if_name: failed to fetch hardware info from VPP")
-    for hw_if in re.split(r'\n\s*\n+', hw):
-        if re.search(pci, hw_if):
-            # In the interface description find line that has word at the beginning.
-            # This word is interface name. All the rest of lines start with spaces.
-            for line in hw_if.splitlines():
-                match = re.match(r'([^\s]+)', line)
-                if match:
-                    vpp_if_name = match.group(1)
-                    break
-            return vpp_if_name
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): not found in 'sh hard'" % (pci))
-
-    # If no hardware interfaces were found, try vmxnet3 interfaces
-    pci_bytes = pci_str_to_bytes(pci)
-    hw_1 = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
-    for hw_if in hw_1:
-        if hw_if.pci_addr == pci_bytes:
-            vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
-            return vpp_if_name
-
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw_1)))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, shif_vmxnet3))
     return None
-
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
 #    struct

@@ -603,6 +603,15 @@ def version():
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
+def cache():
+    """Handles 'fwagent cache' command.
+
+    :returns: None.
+    """
+    fwglobals.log.info("Showing agent cache...")
+    (map1, map2) = daemon_rpc('cache')
+    fwglobals.log.info("PCI to VPP interface name cache\n%s\nVPP interface name to PCI cache\n%s\n" % (map1, map2))
+
 def reset(soft):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
@@ -845,6 +854,13 @@ class FwagentDaemon(object):
         self.stop()
         self.start()
 
+    def cache(self):
+        """Show Agent cache.
+
+        :returns: cache maps.
+        """
+        return (fwglobals.g.PCI_TO_VPP_IF_NAME_MAP, fwglobals.g.VPP_IF_NAME_TO_PCI_MAP)
+
     def main(self):
         """Implementation of the main daemon loop.
         The main daemon loop keeps Fwagent registered and connected to flexiManage.
@@ -1033,6 +1049,7 @@ if __name__ == '__main__':
 
     command_funcs = {
                     'version':lambda args: version(),
+                    'cache': lambda args: cache(),
                     'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
                     'start': lambda args: start(start_router=args.start_router),
@@ -1075,6 +1092,7 @@ if __name__ == '__main__':
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version'],
                         help="show various agent parameters")
+    parser_cache = subparsers.add_parser('cache', help='Local cache data')
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
