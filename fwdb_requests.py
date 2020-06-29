@@ -154,7 +154,7 @@ class FwDbRequests:
                         request.
         """
         current     = self.db['signature']
-        delta       = json.dumps(request, separators=(',', ''), sort_keys=True)
+        delta       = json.dumps(request, separators=(',', ':'), sort_keys=True)
         hash_object = hashlib.sha1(current + delta)
         new         = hash_object.hexdigest()
 
@@ -171,3 +171,4 @@ class FwDbRequests:
         if len(self.db['signature']) > 0:
             fwglobals.log.debug("fwdb_requests: reset signature")
             self.db['signature'] = ""
+
