@@ -1253,14 +1253,19 @@ def _get_interface_address(pci):
 
     return None
 
-def add_netplan_file():
+def add_del_netplan_file(params):
+    is_add = params['is_add']
     fname = fwglobals.g.NETPLAN_FILE
 
-    if not os.path.exists(fname):
-        config = dict()
-        config['network'] = {'version': 2}
-        with open(fname, 'w+') as stream:
-            yaml.safe_dump(config, stream, default_flow_style=False)
+    if is_add:
+        if not os.path.exists(fname):
+            config = dict()
+            config['network'] = {'version': 2}
+            with open(fname, 'w+') as stream:
+                yaml.safe_dump(config, stream, default_flow_style=False)
+    else:
+        if os.path.exists(fname):
+            os.remove(fname)
 
     return (True, None)
 
