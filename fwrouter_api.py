@@ -362,7 +362,12 @@ class FWROUTER_API:
             # reject request immediately as it can't be fulfilled.
             # Permit configuration requests only ('add-XXX' & 'remove-XXX')
             # in order to enable management to fix configuration.
-            if self._test_router_failure() and not re.match('add-|remove-',  req):
+            # As well permit 'start-router' and reset 'XXX-router' requests
+            # to enable trial to recover from failed state.
+            #
+            if self._test_router_failure() and \
+               not re.match('add-|remove-',  req) and \
+               not re.search('-router',  req):
                 raise Exception("device failed, can't fulfill requests")
 
             router_was_started = fwutils.vpp_does_run()
