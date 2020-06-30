@@ -197,8 +197,8 @@ def get_gateway(nicname):
 
     routes = dgw.splitlines()
     for route in routes:
-        rip = route.split('default via ')[1].split(' ')[0]
-        rdev = route.split(' dev ')[1].split(' ')[0]
+        rip = route.split('via ')[1].split(' ')[0]
+        rdev = route.split('dev ')[1].split(' ')[0]
         if re.match(nicname, rdev):
             return rip
 
