@@ -224,7 +224,7 @@ class FWROUTER_API:
         if re.match('install-service|uninstall-service', req):
             return self._handle_install_uninstall_application(req, params)
 
-        if (req == 'modify-service'): 
+        if req == 'modify-service' or req == 'upgrade-service': 
             return self._handle_modify_application(req, params)
 
         # Router configuration requests might unite multiple requests of same type
@@ -367,11 +367,7 @@ class FWROUTER_API:
             modify_requests = []
 
             if params:                
-                if self._get_request_params_from_db('uninstall-service', params):                    
-                    modify_requests.append({'uninstall-service': params})
                 modify_requests.append({'install-service': params})
-
-
                 self._call_aggregated(modify_requests)
 
         except Exception as e:
