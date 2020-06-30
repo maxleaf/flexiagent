@@ -1269,6 +1269,52 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
+def _convert_default_routes_multipath(metric):
+    metric_str = ''
+
+    if metric:
+        metric_str = 'metric %s' % metric
+
+    cmd_show = "sudo ip route show default %s proto dhcp" % (metric_str)
+    try:
+        dhcp_routes = os.popen(cmd_show).read()
+    except:
+        return (False, None)
+
+    cmd_show = "sudo ip route show default %s proto static" % (metric_str)
+    try:
+        static_routes = os.popen(cmd_show).read()
+    except:
+        return (False, None)
+
+    dhcp_lines = dhcp_routes.splitlines()
+    static_lines = static_routes.splitlines()
+    routes = dhcp_lines + static_lines
+    routes_count = len(routes)
+
+    if routes_count < 2:
+        return (True, None)
+
+    rips = []
+    for route in routes:
+        rips.append(route.split('via ')[1].split(' ')[0])
+
+    cmd = ''
+    for rip in rips:
+        cmd += "sudo ip route del default %s via %s;" % (metric_str, rip)
+
+    cmd += "sudo ip route add default %s" % (metric_str)
+    for rip in rips:
+        cmd += ' nexthop via %s' % rip
+
+    try:
+        fwglobals.log.debug(cmd)
+        subprocess.check_output(cmd, shell=True)
+    except:
+        return (False, None)
+
+    return (True, None)
+
 def add_remove_netplan_interface(params):
     pci = params['pci']
     is_add = params['is_add']
@@ -1310,7 +1356,14 @@ def add_remove_netplan_interface(params):
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-        subprocess.check_output("sudo ip route flush 0/0; sudo netplan apply", shell=True)
+        cmd = 'sudo ip route flush 0/0;sudo netplan apply;'
+        fwglobals.log.debug(cmd)
+        subprocess.check_output(cmd, shell=True)
+
+        if re.match('yes', dhcp):
+            time.sleep(10)
+
+        _convert_default_routes_multipath(metric)
     except Exception as e:
         err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname, str(e))

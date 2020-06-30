@@ -153,9 +153,9 @@ def add_interface(params):
     # Add interface section into Netplan configuration file
     gw = params.get('gateway', None)
     metric = params.get('metric', 200)
-    _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, gw, metric, cmd_list)
     if params['dhcp'].lower() == 'yes':
         _set_dhcp_detect(iface_pci, cmd_list)
+    _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, gw, metric, cmd_list)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
     if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
