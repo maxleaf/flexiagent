@@ -1269,16 +1269,14 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
-metric = 200
-
 def add_remove_netplan_interface(params):
     pci = params['pci']
     is_add = params['is_add']
     dhcp = params['dhcp']
     ip = params['ip']
     gw = params['gw']
+    metric = params['metric']
     config_section = {}
-    global metric
 
     fname = fwglobals.g.NETPLAN_FILE
 
@@ -1290,8 +1288,6 @@ def add_remove_netplan_interface(params):
         config_section['addresses'] = [ip]
         if gw is not None and gw:
             config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
-
-    metric += 1
 
     try:
         with open(fname, 'r') as stream:

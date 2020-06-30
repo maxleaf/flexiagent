@@ -67,14 +67,14 @@ import fwutils
 #
 #    07. sudo systemctl restart frr
 #
-def _change_netplan_conf(pci, dhcp, ip, gw, cmd_list):
+def _change_netplan_conf(pci, dhcp, ip, gw, metric, cmd_list):
     """Generate commands to change Netplan config file.
 
      :param params:        Parameters from flexiManage.
 
      :returns: List of commands.
      """
-    args = {'is_add': 1, 'pci': pci, 'dhcp': dhcp, 'ip': ip, 'gw': gw}
+    args = {'is_add': 1, 'pci': pci, 'dhcp': dhcp, 'ip': ip, 'gw': gw, 'metric': metric}
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
@@ -152,7 +152,8 @@ def add_interface(params):
 
     # Add interface section into Netplan configuration file
     gw = params.get('gateway', None)
-    _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, gw, cmd_list)
+    metric = params.get('metric', 200)
+    _change_netplan_conf(iface_pci, params['dhcp'], iface_addr, gw, metric, cmd_list)
     if params['dhcp'].lower() == 'yes':
         _set_dhcp_detect(iface_pci, cmd_list)
 
