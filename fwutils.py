@@ -1359,7 +1359,6 @@ def add_remove_netplan_interface(params):
         cmd = 'sudo ip route flush 0/0;sudo netplan apply;'
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
-
         if re.match('yes', dhcp):
             time.sleep(10)
 

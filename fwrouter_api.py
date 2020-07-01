@@ -1196,15 +1196,15 @@ class FWROUTER_API:
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
                         pci = request['params']['pci']
-                        gw = request['params']['gateway']
+                        gw = request['params'].get('gateway')
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
-                        if not request['params']['gateway']:
+                        if not gw:
                             tap = pci_to_tap(pci)
                             return pci, fwutils.get_gateway(tap)
+
                         else:
                             return pci, gw
-
         return None
 
     def get_wan_interface_addr_pci(self):
