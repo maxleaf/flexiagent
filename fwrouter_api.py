@@ -1224,9 +1224,8 @@ class FWROUTER_API:
                     if re.search(ip, request['params']['addr']):
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
-                        if not request['params']['gateway']:
-                            return request['params']['pci'], self.get_default_route_address()
-                        else:
+                        if request['params'].get('gateway'):
                             return request['params']['pci'], request['params']['gateway']
-
-        return None
+                        else:
+                            return request['params']['pci'], self.get_default_route_address()
+        return (None, None)
