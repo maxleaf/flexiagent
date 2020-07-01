@@ -93,7 +93,7 @@ def add_interface(params):
 
     # Add interface section into Netplan configuration file
     gw = params.get('gateway', None)
-    metric = params.get('metric', 200)
+    metric = str(params.get('metric', 0))
 
     # enable DHCP packets detection in VPP
     if params['dhcp'] == 'yes':

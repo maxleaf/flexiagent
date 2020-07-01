@@ -1307,8 +1307,11 @@ def add_remove_netplan_interface(params):
     dhcp = params['dhcp']
     ip = params['ip']
     gw = params['gw']
-    metric = params['metric']
     config_section = {}
+    if params['metric']:
+        metric = int(params['metric'])
+    else:
+        metric = 0
 
     fname = fwglobals.g.NETPLAN_FILE
 
