@@ -1296,8 +1296,8 @@ def _convert_default_routes_multipath(metric):
     try:
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
-    except:
-        return (False, None)
+    except Exception as e:
+        return (False, str(e))
 
     return (True, None)
 
