@@ -225,9 +225,11 @@ class Fwglobals:
         self.WS_STATUS_CODE_NOT_APPROVED = 403
         self.WS_STATUS_DEVICE_CHANGE     = 900
         self.WS_STATUS_LOCAL_ERROR       = 999
-        # Cache to save PCI to VPP names, assuming names and PCI are unique and not changed during operation
-        self.PCI_TO_VPP_IF_NAME_MAP         = {}
-        self.VPP_IF_NAME_TO_PCI_MAP         = {}
+        # Cache to save various global data
+        self.AGENT_CACHE = {}
+        # PCI to VPP names, assuming names and PCI are unique and not changed during operation
+        self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
+        self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -238,6 +240,12 @@ class Fwglobals:
             if re.match("WS_STATUS_", a):
                 self.ws_reconnect_status_codes.append(getattr(self, a))
 
+    def get_cache_data(self, key):
+        """get the cache data for a given key
+
+        :returns: data for a given key, None if key does not exist
+        """
+        return self.AGENT_CACHE.get(key)
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.

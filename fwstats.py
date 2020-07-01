@@ -65,6 +65,7 @@ def update_stats():
         if prev_stats['ok'] == 1:
             if_bytes = {}
             tunnel_bytes = {}
+            tunnel_stats = tunnel_stats_get()
             for intf, counts in stats['last'].items():
                 if (intf.startswith('ipsec-gre') or
                     intf.startswith('loop')): continue
@@ -81,9 +82,11 @@ def update_stats():
                             'tx_pkts': tx_pkts
                         }
                     if (intf.startswith('vxlan_tunnel')):
-                        vxlan_num = int(intf[12:])
-                        tunnel_num = vxlan_num/2
-                        tunnel_bytes[tunnel_num] = calc_stats
+                        vxlan_id = int(intf[12:])
+                        tunnel_id = vxlan_id/2
+                        t_stats = tunnel_stats.get(tunnel_id)
+                        if t_stats:
+                            t_stats.update(calc_stats)
                     else:
                         # For other interfaces try to get pci index
                         pci = fwutils.vpp_if_name_to_pci(intf)
@@ -91,12 +94,6 @@ def update_stats():
                             if_bytes[pci] = calc_stats
 
             stats['bytes'] = if_bytes
-            tunnel_stats = tunnel_stats_get()
-            # update tunnel stats with packets and bytes count
-            for tnum, tstats in tunnel_stats.items():
-                tbytes = tunnel_bytes.get(tnum)
-                if tbytes:
-                    tstats.update(tbytes)
             stats['tunnel_stats'] = tunnel_stats
             stats['period'] = stats['time'] - prev_stats['time']
             stats['running'] = True if fwutils.vpp_does_run() else False

@@ -324,7 +324,7 @@ def pci_to_vpp_if_name(pci):
 
     :returns: VPP interface name.
     """
-    vpp_if_name = fwglobals.g.PCI_TO_VPP_IF_NAME_MAP.get(pci)
+    vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
     if vpp_if_name: return vpp_if_name
     else: return _build_pci_to_vpp_if_name_maps(pci, None)
 
@@ -338,7 +338,7 @@ def vpp_if_name_to_pci(vpp_if_name):
 
     :returns: PCI address.
     """
-    pci = fwglobals.g.VPP_IF_NAME_TO_PCI_MAP.get(vpp_if_name)
+    pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
     if pci: return pci
     else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
 
@@ -358,11 +358,9 @@ def vpp_if_name_to_pci(vpp_if_name):
 #
 def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
     shif = _vppctl_read('show hardware-interfaces')
-    shif_vmxnet3 = _vppctl_read('show vmxnet3')
-    if shif == None or shif_vmxnet3 == None:
+    if shif == None:
         fwglobals.log.debug("_build_pci_to_vpp_if_name_maps: Error reading interface info")
     data = shif.splitlines()
-    datav = shif_vmxnet3.splitlines()
     for intf in _get_group_delimiter(data, r"^\w.*?\d"):
         # Contains data for a given interface
         ifdata = ''.join(intf)
@@ -370,28 +368,25 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
-            fwglobals.g.PCI_TO_VPP_IF_NAME_MAP[pci_addr_full(k)] = v
-            fwglobals.g.VPP_IF_NAME_TO_PCI_MAP[v] = pci_addr_full(k)
-    for intf in _get_group_delimiter(datav, r"^Interface:\s\w.*?\d"):
-        # Contains data for a given interface
-        ifdata = '\n'.join(intf)
-        (k,v) = _parse_vppname_map(ifdata,
-            valregex=r"^Interface:\s(\w[^\s]+)\s+",
-            keyregex=r"\s+PCI\sAddress:\s(.*)")
-        if k and v:
-            fwglobals.g.PCI_TO_VPP_IF_NAME_MAP[pci_addr_full(k)] = v
-            fwglobals.g.VPP_IF_NAME_TO_PCI_MAP[v] = pci_addr_full(k)
+            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_addr_full(k)
+
+    vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
+    for hw_if in vmxnet3hw:
+        vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
+        pci_addr = pci_bytes_to_str(hw_if.pci_addr)
+        fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[vpp_if_name] = pci_addr
 
     if pci:
-        vpp_if_name = fwglobals.g.PCI_TO_VPP_IF_NAME_MAP.get(pci)
+        vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        pci = fwglobals.g.VPP_IF_NAME_TO_PCI_MAP.get(vpp_if_name)
+        pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
         if pci: return pci
-    else: return None
 
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
-    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, shif_vmxnet3))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
     return None
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
@@ -417,6 +412,21 @@ def pci_str_to_bytes(pci_str):
     function = int(list[3], 16)
     bytes = ((domain & 0xffff) << 16) | ((bus & 0xff) << 8) | ((slot & 0x1f) <<3 ) | (function & 0x7)
     return socket.htonl(bytes)   # vl_api_vmxnet3_create_t_handler converts parameters by ntoh for some reason (vpp\src\plugins\vmxnet3\vmxnet3_api.c)
+
+# 'pci_str_to_bytes' converts pci bytes into full string "0000:0b:00.0"
+def pci_bytes_to_str(pci_bytes):
+    """Converts PCI bytes to PCI full string.
+
+    :param pci_str:      PCI bytes.
+
+    :returns: PCI full string.
+    """
+    bytes = socket.ntohl(pci_bytes)
+    domain   = (bytes >> 16)
+    bus      = (bytes >> 8) & 0xff
+    slot     = (bytes >> 3) & 0x1f
+    function = (bytes) & 0x7
+    return "%04x:%02x:%02x.%02x" % (domain, bus, slot, function)
 
 # 'pci_to_vpp_sw_if_index' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into index of this interface in VPP, eg. 1.
