@@ -185,7 +185,7 @@ def get_default_route():
     except:
         return ("", "")
 
-def get_gateway(nicname):
+def get_linux_interface_gateway(if_name):
     """Get gateway.
 
     :returns: Gateway ip address.
@@ -199,7 +199,7 @@ def get_gateway(nicname):
     for route in routes:
         rip = route.split('via ')[1].split(' ')[0]
         rdev = route.split('dev ')[1].split(' ')[0]
-        if re.match(nicname, rdev):
+        if re.match(if_name, rdev):
             return rip
 
     return ''
@@ -1507,7 +1507,7 @@ def vpp_multilink_update_labels(params):
         next_hop = params['next_hop']
     else:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop = get_gateway(tap)
+        next_hop = get_linux_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not found in params and there is no default gateway")
 
@@ -1645,7 +1645,7 @@ def get_reconfig_hash():
         if not re.search(addr, wan['addr']):
             res += 'addr:' + addr + ','
 
-        gw = get_gateway(name)
+        gw = get_linux_interface_gateway(name)
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
