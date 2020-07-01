@@ -1790,6 +1790,15 @@ def configure_server_file(params):
     else:
         commands.append('echo "push "route 172.16.0.0 255.255.255.0"" >> %s' % (params['remoteClientIp'], destFile))
 
+    # DNS options
+    if 'dnsIp' in params and isinstance(params['dnsIp'], list):        
+        for ip in params['dnsIp']:            
+            commands.append('echo "push \\"dhcp-option DNS %s\\"" >> %s' % (ip, destFile))
+    
+    if 'dnsName' in params and isinstance(params['dnsName'], list):
+        for name in params['dnsName']: 
+            commands.append('echo "push \\"dhcp-option DOMAIN %s\\"" >> %s' % (name, destFile))
+
     for command in commands:
         ret = os.system(command)      
         if ret:

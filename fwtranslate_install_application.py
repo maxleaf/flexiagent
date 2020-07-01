@@ -109,7 +109,9 @@ def install_application(params):
             'caCrt': params['config']['caCrt'],
             'serverKey': params['config']['serverKey'],
             'serverCrt': params['config']['serverCrt'],
-            'tlsKey': params['config']['tlsKey']
+            'tlsKey': params['config']['tlsKey'],
+            'dnsIp': params['config']['dnsIp'],
+            'dnsName': params['config']['dnsName']
              # 'dhKey': params['dhKey']
         }
 
