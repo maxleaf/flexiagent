@@ -504,20 +504,6 @@ def vpp_sw_if_index_to_name(sw_if_index):
 
     return name
 
-
-def vpp_intf_name_to_ip(name):
-    cmd = "sudo vppctl show int addr"
-    out = subprocess.check_output(cmd, shell=True).rstrip(' \t\r\n\0')
-    lines = out.splitlines()
-    for line in lines:
-        if re.search(name, line):
-            index = lines.index(line)
-            addr_line = lines[index+1]
-            words = addr_line.split(' ')
-            return words[3]
-
-    return None
-
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
 # To do that we dump all interfaces from VPP, find the one with the provided index,
