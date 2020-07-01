@@ -48,253 +48,268 @@ FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION = 0x4
 FW_EXIT_CODE_ERROR_ABORTED_BY_USER                    = 0x8
 
 hard_checkers = [
-    { 'hard_check_sse42'              : [ True , 'critical' , 'support in SSE 4.2 is required' ] },
-    { 'hard_check_ram'                : [ 4 ,    'critical' , 'at least 4GB RAM is required' ] },
-    { 'hard_check_cpu_number'         : [ 2,     'critical' , 'at least 2 logical CPU-s are required' ] },
-    { 'hard_check_nic_number'         : [ 2,     'critical' , 'at least 2 Network Interfaces are required' ] },
-    { 'hard_check_nic_drivers'        : [ True , 'optional' , 'supported network cards' ] },
-    { 'hard_check_kernel_io_modules'  : [ True , 'optional' , 'kernel has i/o modules' ] },
-    { 'hard_check_wan_connectivity'   : [ True , 'optional' , 'WAN connectivity is required' ] },
-    { 'hard_check_default_route_connectivity' : [ True, 'optional' ,  'default route should have WAN connectivity' ] }
+	{ 'hard_check_sse42'              : [ True , 'critical' , 'support in SSE 4.2 is required' ] },
+	{ 'hard_check_ram'                : [ 4 ,    'critical' , 'at least 4GB RAM is required' ] },
+	{ 'hard_check_cpu_number'         : [ 2,     'critical' , 'at least 2 logical CPU-s are required' ] },
+	{ 'hard_check_nic_number'         : [ 2,     'critical' , 'at least 2 Network Interfaces are required' ] },
+	{ 'hard_check_nic_drivers'        : [ True , 'optional' , 'supported network cards' ] },
+	{ 'hard_check_kernel_io_modules'  : [ True , 'optional' , 'kernel has i/o modules' ] },
+	{ 'hard_check_wan_connectivity'   : [ True , 'optional' , 'WAN connectivity is required' ] },
+	{ 'hard_check_default_route_connectivity' : [ True, 'optional' ,  'default route should have WAN connectivity' ] }
 ]
 
 soft_checkers = [
-    { 'soft_check_uuid'               : { 'severity': 'critical' }},
-    { 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
-    { 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
-    { 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
-    { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
-    { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
-    { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
-    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
-    { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
-    { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }}
+	{ 'soft_check_uuid'               : { 'severity': 'critical' }},
+	{ 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
+	{ 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
+	{ 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
+	{ 'soft_check_resolvconf'         : { 'severity': 'optional' }},
+	{ 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
+	{ 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
+	{ 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
+	{ 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }}
 ]
 
 class TXT_COLOR:
-    BG_SUCCESS          = '\x1b[30;42m'  # Green
-    BG_FAILURE_CRITICAL = '\x1b[30;41m'  # Red
-    BG_FAILURE_OPTIONAL = '\x1b[30;43m'  # Yellow
-    FG_SUCCESS          = '\x1b[32m'       # Green
-    FG_FAILURE_CRITICAL = '\x1b[31m'       # Red
-    FG_FAILURE_OPTIONAL = '\x1b[33m'       # Yellow
-    FG_BOLD             = '\x1b[1m'
-    FG_UNDERLINE        = '\x1b[4m'
-    END                 = '\x1b[0m'
+	BG_SUCCESS          = '\x1b[30;42m'  # Green
+	BG_FAILURE_CRITICAL = '\x1b[30;41m'  # Red
+	BG_FAILURE_OPTIONAL = '\x1b[30;43m'  # Yellow
+	FG_SUCCESS          = '\x1b[32m'       # Green
+	FG_FAILURE_CRITICAL = '\x1b[31m'       # Red
+	FG_FAILURE_OPTIONAL = '\x1b[33m'       # Yellow
+	FG_BOLD             = '\x1b[1m'
+	FG_UNDERLINE        = '\x1b[4m'
+	END                 = '\x1b[0m'
 
 def checker_name_to_description(checker_name):
-    """Convert checker name into description.
+	"""Convert checker name into description.
 
-    :param checker_name:         Checker name.
+	:param checker_name:         Checker name.
 
-    :returns: Description.
-    """
-    return ' '.join(checker_name.split('_')[1:])
+	:returns: Description.
+	"""
+	return ' '.join(checker_name.split('_')[1:])
 
 def report_checker_result(succeeded, severity, checker_name, description=None):
-    """Report checker results.
+	"""Report checker results.
 
-    :param succeeded:       Success status.
-    :param severity:        Severity level.
-    :param checker_name:    Checker name.
-    :param description:     Description.
+	:param succeeded:       Success status.
+	:param severity:        Severity level.
+	:param checker_name:    Checker name.
+	:param description:     Description.
 
-    :returns: None.
-    """
-    if not description:
-        description = checker_name_to_description(checker_name)
-    if succeeded:
-        status   = TXT_COLOR.FG_SUCCESS + ' PASSED ' + TXT_COLOR.END
-    else:
-        if severity == 'optional':
-            status   = TXT_COLOR.BG_FAILURE_OPTIONAL + ' FAILED ' + TXT_COLOR.END
-        else:
-            status   = TXT_COLOR.BG_FAILURE_CRITICAL + ' FAILED ' + TXT_COLOR.END
-    print('%s: %s : %s' % (status, severity.upper(), description))
+	:returns: None.
+	"""
+	if not description:
+		description = checker_name_to_description(checker_name)
+	if succeeded:
+		status   = TXT_COLOR.FG_SUCCESS + ' PASSED ' + TXT_COLOR.END
+	else:
+		if severity == 'optional':
+			status   = TXT_COLOR.BG_FAILURE_OPTIONAL + ' FAILED ' + TXT_COLOR.END
+		else:
+			status   = TXT_COLOR.BG_FAILURE_CRITICAL + ' FAILED ' + TXT_COLOR.END
+	print('%s: %s : %s' % (status, severity.upper(), description))
 
 def check_hard_configuration(checker, check_only):
-    """Check hard configuration.
+	"""Check hard configuration.
 
-    :param checker:         Checker name.
-    :param check_only:      Check only mode.
+	:param checker:         Checker name.
+	:param check_only:      Check only mode.
 
-    :returns: 'True' if succeeded.
-    """
-    succeeded = True
-    for element in hard_checkers:
-        (checker_name, checker_params) = element.items()[0]
+	:returns: 'True' if succeeded.
+	"""
+	succeeded = True
+	for element in hard_checkers:
+		(checker_name, checker_params) = element.items()[0]
 
-        # Don't run connectivity checkers in check only mode,
-        # as every check waits 5 seconds for ping response on every found interface.
-        # That might suspend agent start too long, making user experience bad.
-        if 'connectivity' in checker_name and check_only:
-            continue
+		# Don't run connectivity checkers in check only mode,
+		# as every check waits 5 seconds for ping response on every found interface.
+		# That might suspend agent start too long, making user experience bad.
+		if 'connectivity' in checker_name and check_only:
+			continue
 
-        checker_func = getattr(checker, checker_name)
-        args         = checker_params[0]
-        severity     = checker_params[1]
-        description  = checker_params[2]
-        result = checker_func(args)
-        if not result and severity == 'critical':
-            succeeded = False
-        report_checker_result(result, severity, checker_name, description)
-    return succeeded
+		checker_func = getattr(checker, checker_name)
+		args         = checker_params[0]
+		severity     = checker_params[1]
+		description  = checker_params[2]
+		result = checker_func(args)
+		if not result and severity == 'critical':
+			succeeded = False
+		report_checker_result(result, severity, checker_name, description)
+	return succeeded
 
 def check_soft_configuration(checker, fix=False, quite=False):
-    """Check hard configuration.
+	"""Check hard configuration.
 
-    :param checker:         Checker name.
-    :param fix:             Fix problem.
-    :param quite:           Do not prompt user.
+	:param checker:         Checker name.
+	:param fix:             Fix problem.
+	:param quite:           Do not prompt user.
 
-    :returns: 'True' if succeeded.
-    """
-    succeeded = True
-    for element in soft_checkers:
+	:returns: 'True' if succeeded.
+	"""
+	succeeded = True
+	for element in soft_checkers:
 
-        (checker_name, checker_params) = element.items()[0]
-        prompt = checker_name_to_description(checker_name) + ': '
+		(checker_name, checker_params) = element.items()[0]
+		prompt = checker_name_to_description(checker_name) + ': '
 
-        checker_func = getattr(checker, checker_name)
-        severity     = checker_params['severity']
-        result       = checker_func(fix=False, prompt=prompt)
-        report_checker_result(result, severity, checker_name)
+		checker_func = getattr(checker, checker_name)
+		severity     = checker_params['severity']
+		result       = checker_func(fix=False, prompt=prompt)
+		report_checker_result(result, severity, checker_name)
 
-        go_and_fix = fix
-        if go_and_fix:
-            # No need to fix if result is OK.
-            if result:
-                go_and_fix = False
+		go_and_fix = fix
+		if go_and_fix:
+			# No need to fix if result is OK.
+			if result:
+				go_and_fix = False
 
-            interactive = '' if not 'interactive' in checker_params \
-                             else checker_params['interactive']
+			interactive = '' if not 'interactive' in checker_params \
+							 else checker_params['interactive']
 
-            # If parameter is adjustable and interactive mode was chosen,
-            # fix the parameter even if result is OK. This is to provide
-            # user with ability to change default configuration.
-            if result and not quite and interactive == 'optional':
-                go_and_fix = True
+			# If parameter is adjustable and interactive mode was chosen,
+			# fix the parameter even if result is OK. This is to provide
+			# user with ability to change default configuration.
+			if result and not quite and interactive == 'optional':
+				go_and_fix = True
 
-            # Don't fix if silent was specified but user interaction is required
-            if not result and quite and interactive == 'must':
-               go_and_fix = False
+			# Don't fix if silent was specified but user interaction is required
+			if not result and quite and interactive == 'must':
+			   go_and_fix = False
 
-        if not go_and_fix:
-            if not result and severity == 'critical':
-                succeeded = False
-            continue
+		if not go_and_fix:
+			if not result and severity == 'critical':
+				succeeded = False
+			continue
 
-        if quite:
-            result = checker_func(fix=True, silently=True, prompt=prompt)
-            report_checker_result(result, severity, checker_name)
-        else:
-            while True:
-                choice = raw_input(prompt + "configure? [y/N/q]: ")
-                if choice == 'y' or choice == 'Y':
-                    result = checker_func(fix=True, silently=False, prompt=prompt)
-                    report_checker_result(result, severity, checker_name)
-                    break
-                elif choice == 'n' or choice == 'N' or choice == '':
-                    break
-                elif choice == 'q' or choice == 'Q':
-                    exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
-        if not result and severity == 'critical':
-            succeeded = False
-    return succeeded
+		if quite:
+			result = checker_func(fix=True, silently=True, prompt=prompt)
+			report_checker_result(result, severity, checker_name)
+		else:
+			while True:
+				choice = raw_input(prompt + "configure? [y/n/q]: ")
+				if choice == 'y' or choice == 'Y':
+					result = checker_func(fix=True, silently=False, prompt=prompt)
+					report_checker_result(result, severity, checker_name)
+					break
+				elif choice == 'n' or choice == 'N' or choice == '':
+					break
+				elif choice == 'q' or choice == 'Q':
+					exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
+		if not result and severity == 'critical':
+			succeeded = False
+	return succeeded
 
 def main(args):
-    """Checker entry point.
+	"""Checker entry point.
 
-    :param args:            Command line arguments.
+	:param args:            Command line arguments.
 
-    :returns: Bitmask with status codes.
-    """
-    (flavor, version, _) = platform.linux_distribution()
-    module_name = (flavor + version.replace('.', '')).lower()
-    module = importlib.import_module(module_name)
-    with module.Checker(args.debug) as checker:
+	:returns: Bitmask with status codes.
+	"""
+	(flavor, version, _) = platform.linux_distribution()
+	module_name = (flavor + version.replace('.', '')).lower()
+	module = importlib.import_module(module_name)
+	with module.Checker(args.debug) as checker:
 
-        # Check hardware requirements
-        # -----------------------------------------
-        hard_status_code = FW_EXIT_CODE_OK
-        if not args.soft_only:
-            if not args.hard_only:
-                print('\n=== hard configuration ====')
-            success = check_hard_configuration(checker, args.check_only)
-            hard_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_UNMET_HARDWARE_REQUIREMENTS
-            if args.hard_only:
-                return hard_status_code
+		# Check hardware requirements
+		# -----------------------------------------
+		hard_status_code = FW_EXIT_CODE_OK
+		if not args.soft_only:
+			if not args.hard_only:
+				print('\n=== hard configuration ====')
+			success = check_hard_configuration(checker, args.check_only)
+			hard_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_UNMET_HARDWARE_REQUIREMENTS
+			if args.hard_only:
+				return hard_status_code
 
-        # Check software and configure it if needed
-        # -----------------------------------------
-        if not (args.hard_only or args.soft_only):
-            print('\n=== soft configuration ====')
-        if args.check_only:
-            success = check_soft_configuration(checker, fix=False)
-            soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_UNMET_SYSTEM_REQUIREMENTS
-            if not success:
-                print('')
-                print("===================================================================================")
-                print("! system checker errors, run 'fwsystem_checker' with no flags to fix configuration!")
-                print("===================================================================================")
-                print('')
-            return (soft_status_code | hard_status_code)
+		# Check software and configure it if needed
+		# -----------------------------------------
+		if not (args.hard_only or args.soft_only):
+			print('\n=== soft configuration ====')
+		if args.check_only:
+			success = check_soft_configuration(checker, fix=False)
+			soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_UNMET_SYSTEM_REQUIREMENTS
+			if not success:
+				print('')
+				print("===================================================================================")
+				print("! system checker errors, run 'fwsystem_checker' with no flags to fix configuration!")
+				print("===================================================================================")
+				print('')
+			return (soft_status_code | hard_status_code)
 
-        if args.quite:
-            # In silent mode just go and configure needed stuff
-            success = check_soft_configuration(checker, fix=True, quite=True)
-            soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
-            return  (soft_status_code | hard_status_code)
+		if args.quite:
+			# In silent mode just go and configure needed stuff
+			success = check_soft_configuration(checker, fix=True, quite=True)
+			soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
+			return  (soft_status_code | hard_status_code)
 
-        # Firstly show to user needed configuration adjustments.
-        # The start intercation with user.
-        check_soft_configuration(checker, fix=False)
-        choice = 'x'
-        while not (choice == '' or choice == '0' or choice == '1'):
-            choice = raw_input(
-                            "\n" +
-                            "\t[0] - quit and use fixed parameters\n" +
-                            "\t 1  - quit\n" +
-                            "\t 2  - check system configuration\n" +
-                            "\t 3  - configure system silently\n" +
-                            "\t 4  - configure system interactively\n" +
-                            "\t-------------------------------------\n" +
-                            "Choose: ")
-            if choice == '2':
-            	print('')
-                success = check_soft_configuration(checker, fix=False)
-            elif choice == '3':
-            	print('')
-                success = check_soft_configuration(checker, fix=True, quite=True)
-            elif choice == '4':
-            	print('')
-                success = check_soft_configuration(checker, fix=True, quite=False)
-            else:
-                success = True
+		# Firstly show to user needed configuration adjustments.
+		# Then start intercation with user.
+		check_soft_configuration(checker, fix=False)
+		choice = 'x'
+		while not (choice == '' or choice == '0' or choice == '1'):
+			choice = raw_input(
+							"\n" +
+							"\t[0] - quit and use fixed parameters\n" +
+							"\t 1  - quit\n" +
+							"\t 2  - check system configuration\n" +
+							"\t 3  - configure system silently\n" +
+							"\t 4  - configure system interactively\n" +
+							"\t-------------------------------------\n" +
+							"Choose: ")
+			if choice == '2':
+				print('')
+				success = check_soft_configuration(checker, fix=False)
+			elif choice == '3':
+				print('')
+				success = check_soft_configuration(checker, fix=True, quite=True)
+			elif choice == '4':
+				print('')
+				success = check_soft_configuration(checker, fix=True, quite=False)
+			else:
+				success = True
 
-        if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-            os.system("sudo systemctl restart flexiwan-router")
+		if choice == '0' or choice == '':
+			if success == True:
+				if checker.reboot_needed == True:
+					rebootSys = 'x'
+					while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
+						rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
+												"Would you like to reboot now (y/n)?")
+						if rebootSys == 'y' or rebootSys == 'Y':
+							checker.save_config()
+							print ("Rebooting...")
+							os.system('reboot now')
 
-        soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
-        return (soft_status_code | hard_status_code)
+			# Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
+			print ("Please wait..")
+			os.system("sudo systemctl restart flexiwan-router")
+			print ("Done.")
+		
+		soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
+		return (soft_status_code | hard_status_code)
 
 if __name__ == '__main__':
-    import argparse
-    global arg
+	import argparse
+	global arg
 
-    parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
-    parser.add_argument('-c', '--check_only', action='store_true',
-                        help="check configuration and exit")
-    parser.add_argument('-q', '--quite', action='store_true',
-                        help="adjust system configuration silently")
-    parser.add_argument('-r', '--hard_only', action='store_true',
-                        help="check hard configuration only")
-    parser.add_argument('-s', '--soft_only', action='store_true',
-                        help="check soft configuration only")
-    parser.add_argument('-d', '--debug', action='store_true',
-                        help="don't clean temporary files and enable debug prints")
-    args = parser.parse_args()
-    res = main(args)
-    ####### For now (Dec-2019) don't block installation and agent start on failure
-    # exit(res)
-    exit(FW_EXIT_CODE_OK)
+	parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
+	parser.add_argument('-c', '--check_only', action='store_true',
+						help="check configuration and exit")
+	parser.add_argument('-q', '--quite', action='store_true',
+						help="adjust system configuration silently")
+	parser.add_argument('-r', '--hard_only', action='store_true',
+						help="check hard configuration only")
+	parser.add_argument('-s', '--soft_only', action='store_true',
+						help="check soft configuration only")
+	parser.add_argument('-d', '--debug', action='store_true',
+						help="don't clean temporary files and enable debug prints")
+	args = parser.parse_args()
+	res = main(args)
+	####### For now (Dec-2019) don't block installation and agent start on failure
+	# exit(res)
+	exit(FW_EXIT_CODE_OK)
