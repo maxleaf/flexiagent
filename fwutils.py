@@ -1357,7 +1357,7 @@ def add_remove_netplan_interface(params):
 
     return (True, None)
 
-def get_dhcp_netplan_interface(nicname):
+def get_dhcp_netplan_interface(if_name):
     for fname in glob.glob("/etc/netplan/*.yaml"):
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
@@ -1368,8 +1368,8 @@ def get_dhcp_netplan_interface(nicname):
             if 'ethernets' in network:
                 ethernets = network['ethernets']
 
-                if nicname in ethernets:
-                    interface = ethernets[nicname]
+                if if_name in ethernets:
+                    interface = ethernets[if_name]
                     if 'dhcp4' in interface:
                         if interface['dhcp4'] == True:
                             return 'yes'
