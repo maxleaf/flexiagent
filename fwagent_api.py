@@ -24,19 +24,22 @@ import json
 import yaml
 import sys
 import os
+import re
 from shutil import copyfile
 import fwglobals
 import fwstats
 import fwutils
 
 fwagent_api = {
-    'get-device-info':      '_get_device_info',
-    'get-device-stats':     '_get_device_stats',
-    'get-device-logs':      '_get_device_logs',
-    'get-device-os-routes': '_get_device_os_routes',
-    'handle-request':       '_handle_request',
-    'get-router-config':    '_get_router_config',
-    'upgrade-device-sw':    '_upgrade_device_sw'
+    'get-device-info':          '_get_device_info',
+    'get-device-stats':         '_get_device_stats',
+    'get-device-logs':          '_get_device_logs',
+    'get-device-packet-traces': '_get_device_packet_traces',
+    'get-device-os-routes':     '_get_device_os_routes',
+    'handle-request':           '_handle_request',
+    'get-router-config':        '_get_router_config',
+    'upgrade-device-sw':        '_upgrade_device_sw',
+    'reset-device':             '_reset_device_soft'
 }
 
 class FWAGENT_API:
@@ -65,6 +68,34 @@ class FWAGENT_API:
             raise Exception("fwagent_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
         return reply
 
+    def _prepare_tunnel_info(self, tunnel_ids):
+        db_requests = fwglobals.g.router_api.db_requests
+        tunnel_info = []
+        for key in db_requests.db:
+            try:
+                if re.match('add-tunnel', key):
+                    (req, params) = db_requests.fetch_request(key)
+                    tunnel_id = params["tunnel-id"]
+                    if tunnel_id in tunnel_ids:
+                        local_sa = params["ipsec"]["local-sa"]
+                        remote_sa = params["ipsec"]["remote-sa"]
+                        # key1-key4 are the crypto keys stored in
+                        # the management for each tunnel
+                        tunnel_info.append({
+                            "id": str(tunnel_id),
+                            "key1": local_sa["crypto-key"],
+                            "key2": local_sa["integr-key"],
+                            "key3": remote_sa["crypto-key"],
+                            "key4": remote_sa["integr-key"]
+                        })
+
+            except Exception as e:
+                fwglobals.log.excep("failed to create tunnel information %s" % str(e))
+                raise e
+        
+        return tunnel_info
+        
+
     def _get_device_info(self, params):
         """Get device information.
 
@@ -80,13 +111,11 @@ class FWAGENT_API:
             # Load network configuration.
             info['network'] = {}
             info['network']['interfaces'] = fwglobals.g.handle_request('interfaces')['message']
-            utils_default_route = fwutils.get_default_route()
-            default_route = {
-                "addr": "default",
-                "via": utils_default_route[0],
-                "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
-                }
-            info['network']['routes'] = [ default_route ]
+            info['reconfig'] = fwutils.get_reconfig_hash()
+            # Load tunnel info, if requested by the management
+            if params and params['tunnels']:
+                info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
+                
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))
@@ -133,11 +162,32 @@ class FWAGENT_API:
 
         :returns: Dictionary with logs and status code.
         """
+        dl_map = {
+    	    'fwagent': fwglobals.g.ROUTER_LOG_FILE,
+    	    'syslog': fwglobals.g.SYSLOG_FILE,
+            'dhcp': fwglobals.g.DHCP_LOG_FILE,
+            'vpp': fwglobals.g.VPP_LOG_FILE,
+            'ospf': fwglobals.g.OSPF_LOG_FILE,
+	    }
+        file = dl_map.get(params['filter'], '')
         try:
-            logs = fwutils.get_device_logs(fwglobals.g.ROUTER_LOG_FILE, params['lines'])
+            logs = fwutils.get_device_logs(file, params['lines'])
             return {'message': logs, 'ok': 1}
         except:
             raise Exception("_get_device_logs: failed to get device logs: %s" % format(sys.exc_info()[1]))
+
+    def _get_device_packet_traces(self, params):
+        """Get device packet traces.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with logs and status code.
+        """
+        try:
+            traces = fwutils.get_device_packet_traces(params['packets'], params['timeout'])
+            return {'message': traces, 'ok': 1}
+        except:
+            raise Exception("_get_device_packet_traces: failed to get device packet traces: %s" % format(sys.exc_info()[1]))
 
     def _get_device_os_routes(self, params):
         """Get device ip routes.
@@ -181,6 +231,19 @@ class FWAGENT_API:
         configs = fwutils.get_router_config()
         reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
+
+    def _reset_device_soft(self, params):
+        """Soft reset device configuration.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
+
+        # VPP must be stopped before resetting the configuration
+        fwglobals.g.handle_request('stop-router')
+        fwutils.reset_router_config()
+        return {'ok': 1, 'message': {}}
 
     def _handle_request(self, params):
         """Handle a request from request_handlers of fwglobals.
