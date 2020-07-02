@@ -197,10 +197,33 @@ def start_router(params=None):
     cmd['cmd']['params']  = { 'enable':1 }
     cmd_list.append(cmd)
     cmd = {}
-
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "exec"
+    cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
+    cmd['cmd']['descr'] = "punt ip brodcast"
+    cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "create %s" % fwglobals.g.NETPLAN_FILE
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'add_del_netplan_file',
+        'args'  : {'is_add': 1}
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "remove %s" % fwglobals.g.NETPLAN_FILE
+    cmd['revert']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'add_del_netplan_file',
+        'args'  : {'is_add': 0}
+    }
+    cmd_list.append(cmd)
+    cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = 'exec'
-    cmd['cmd']['params']  = [ 'sudo netplan apply' ]
+    cmd['cmd']['params']  = [ 'sudo ip route flush 0/0;sudo netplan apply' ]
     cmd['cmd']['descr']   = "netplan apply"
     cmd_list.append(cmd)
 

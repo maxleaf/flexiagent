@@ -20,6 +20,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import glob
+import hashlib
 import inspect
 import json
 import os
@@ -183,6 +185,25 @@ def get_default_route():
     except:
         return ("", "")
 
+def get_linux_interface_gateway(if_name):
+    """Get gateway.
+
+    :returns: Gateway ip address.
+    """
+    try:
+        dgw = os.popen('ip route list match default | grep via').read()
+    except:
+        return ''
+
+    routes = dgw.splitlines()
+    for route in routes:
+        rip = route.split('via ')[1].split(' ')[0]
+        rdev = route.split('dev ')[1].split(' ')[0]
+        if re.match(if_name, rdev):
+            return rip
+
+    return ''
+
 def get_interface_address(iface):
     """Get interface IP address.
 
@@ -190,13 +211,17 @@ def get_interface_address(iface):
 
     :returns: IP address.
     """
-    addresses = psutil.net_if_addrs()[iface]
+    interfaces = psutil.net_if_addrs()
+    if iface not in interfaces:
+        return None
+
+    addresses = interfaces[iface]
     for addr in addresses:
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    raise Exception("get_interface_address(%s): no IPv4 address was found" % iface)
+    return ''
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -241,6 +266,7 @@ def linux_to_pci_addr(linuxif):
     :returns: PCI address.
     """
     NETWORK_BASE_CLASS = "02"
+    vpp_run = vpp_does_run()
     lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
     for line in lines:
         vals = line.decode().split("\t", 1)
@@ -250,7 +276,10 @@ def linux_to_pci_addr(linuxif):
                 slot = vals[1]
             if vals[0] == 'Class:':
                 if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    interface = pci_to_linux_iface(slot)
+                    if vpp_run:
+                        interface = pci_to_tap(slot)
+                    else:
+                        interface = pci_to_linux_iface(slot)
                     if interface == linuxif:
                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
                         return (pci_addr_full(slot), "" if driver=='driver' else driver)
@@ -785,6 +814,8 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
+    if os.path.exists(fwglobals.g.NETPLAN_FILE):
+        os.remove(fwglobals.g.NETPLAN_FILE)
 
     reset_dhcpd()
 
@@ -1249,6 +1280,95 @@ def _get_interface_address(pci):
 
     return None
 
+def add_del_netplan_file(params):
+    is_add = params['is_add']
+    fname = fwglobals.g.NETPLAN_FILE
+
+    if is_add:
+        if not os.path.exists(fname):
+            config = dict()
+            config['network'] = {'version': 2}
+            with open(fname, 'w+') as stream:
+                yaml.safe_dump(config, stream, default_flow_style=False)
+    else:
+        if os.path.exists(fname):
+            os.remove(fname)
+
+    return (True, None)
+
+def add_remove_netplan_interface(params):
+    pci = params['pci']
+    is_add = params['is_add']
+    dhcp = params['dhcp']
+    ip = params['ip']
+    gw = params['gw']
+    config_section = {}
+    if params['metric']:
+        metric = int(params['metric'])
+    else:
+        metric = 0
+
+    fname = fwglobals.g.NETPLAN_FILE
+
+    if re.match('yes', dhcp):
+        config_section['dhcp4'] = True
+        config_section['dhcp4-overrides'] = {'route-metric': metric}
+    else:
+        config_section['dhcp4'] = False
+        config_section['addresses'] = [ip]
+        if gw is not None and gw:
+            config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
+
+    try:
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+            network = config['network']
+
+        if 'ethernets' not in network:
+            network['ethernets'] = {}
+
+        ethernets = network['ethernets']
+
+        tap_name = pci_to_tap(pci)
+        if is_add == 1:
+            if tap_name in ethernets:
+                del ethernets[tap_name]
+            ethernets[tap_name] = config_section
+        else:
+            del ethernets[tap_name]
+
+        with open(fname, 'w') as stream:
+            yaml.safe_dump(config, stream)
+
+        cmd = 'sudo ip route flush 0/0;sudo netplan apply;'
+        fwglobals.log.debug(cmd)
+        subprocess.check_output(cmd, shell=True)
+    except Exception as e:
+        err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
+              % (pci, fname, str(e))
+        fwglobals.log.error(err)
+        return (False, None)
+
+    return (True, None)
+
+def get_dhcp_netplan_interface(if_name):
+    for fname in glob.glob("/etc/netplan/*.yaml"):
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+
+        if 'network' in config:
+            network = config['network']
+
+            if 'ethernets' in network:
+                ethernets = network['ethernets']
+
+                if if_name in ethernets:
+                    interface = ethernets[if_name]
+                    if 'dhcp4' in interface:
+                        if interface['dhcp4'] == True:
+                            return 'yes'
+    return 'no'
+
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
@@ -1366,7 +1486,8 @@ def vpp_multilink_update_labels(params):
     if params.get('next_hop'):
         next_hop = params['next_hop']
     else:
-        next_hop = fwglobals.g.router_api.get_default_route_address()
+        tap = vpp_if_name_to_tap(vpp_if_name)
+        next_hop = get_linux_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not found in params and there is no default gateway")
 
@@ -1486,8 +1607,51 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def _create_static_route(args):
+def get_reconfig_hash():
+    res = ''
+    wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
+    vpp_run = vpp_does_run()
+
+    for wan in wan_list:
+        name = pci_to_linux_iface(wan['pci'])
+
+        if name is None and vpp_run:
+            name = pci_to_tap(wan['pci'])
+
+        if name is None:
+            return ''
+
+        addr = get_interface_address(name)
+        if not re.search(addr, wan['addr']):
+            res += 'addr:' + addr + ','
+
+        gw = get_linux_interface_gateway(name)
+        if not re.match(gw, wan['gateway']):
+            res += 'gw:' + gw + ','
+
+    if res:
+        fwglobals.log.info('reconfig_hash_get: %s' % res)
+        hash = hashlib.md5(res).hexdigest()
+        return hash
+
+    return ''
+
+def add_static_route(args):
+    """Add static route.
+
+    :param params: params:
+                        addr    - Destination network.
+                        via     - Gateway address.
+                        metric  - Metric.
+                        remove  - True to remove route.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
     params = args['params']
+
+    if params['addr'] == 'default':
+        return (True, None)
+
     metric = params.get('metric', None)
     metric_str = ''
     remove = args['remove']
@@ -1534,51 +1698,29 @@ def _create_static_route(args):
 
     return (True, None)
 
-def add_static_route(args):
-    """Add static route.
+def vpp_set_dhcp_detect(params):
+    """Enable/disable DHCP detect feature.
 
-    :param params: params - rule parameters:
-                        sw_if_index -  Interface index.
-                        policy_id   - the policy id (two byte integer)
-                        remove      - True to remove rule, False to add.
+    :param params: params:
+                        pci     -  Interface PCI.
+                        remove  - True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    params = args['params']
-    op = 'del' if args['remove'] else 'add'
+    op = ''
+    if params['remove']:
+        op = 'del'
 
-    if params['addr'] != 'default':
-        return _create_static_route(args)
-    else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
-        (old_ip, old_dev) = get_default_route()
-        old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
-        new_ip = params['via']
-        if not 'pci' in params:
-            if old_via == "":
-                cmd = "sudo ip route %s default via %s" % (op, new_ip)
-            else:
-                if not args['remove']:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
-                          (old_via, new_ip)
-                else:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
-                          (new_ip, old_via)
-        else:
-            tap = pci_to_tap(params['pci'])
-            if old_via == "":
-                cmd = "sudo ip route %s default via %s dev %s" % (op, new_ip, tap)
-            else:
-                if not args['remove']:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s dev %s" % \
-                          (old_via, new_ip, tap)
-                else:
-                    cmd = "sudo ip route del default via %s dev %s; sudo ip route add default via %s" % \
-                          (new_ip, tap, old_via)
+    sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+    int_name = vpp_sw_if_index_to_name(sw_if_index)
 
-    try:
-        fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
-    except:
-        return (False, None)
+    vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)
 
-    return (True, None)
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+

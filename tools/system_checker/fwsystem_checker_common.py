@@ -325,9 +325,6 @@ class Checker:
             default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
-            if len(default_routes) > 1:
-                print(prompt + "only one default route is allowed, found %d" % len(default_routes))
-                return False  # Return here and do not throw exception as we propose no way to fix that. Replace with exception on demand :)
             return True
         except Exception as e:
             print(prompt + str(e))
