@@ -343,9 +343,39 @@ def pci_is_vmxnet3(pci):
         return False
     return True
 
-
 # 'pci_to_vpp_if_name' function maps interface referenced by pci, eg. '0000:00:08.00'
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
+# We use the interface cache mapping, if doesn't exist we rebuild the cache
+def pci_to_vpp_if_name(pci):
+    """Convert PCI address into VPP interface name.
+
+    :param pci:      PCI address.
+
+    :returns: VPP interface name.
+    """
+    vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+    if vpp_if_name: return vpp_if_name
+    else: return _build_pci_to_vpp_if_name_maps(pci, None)
+
+# 'vpp_if_name_to_pci' function maps interface name, eg. 'GigabitEthernet0/8/0'
+# into the pci of that interface, eg. '0000:00:08.00'.
+# We use the interface cache mapping, if doesn't exist we rebuild the cache
+def vpp_if_name_to_pci(vpp_if_name):
+    """Convert PCI address into VPP interface name.
+
+    :param vpp_if_name:      VPP interface name.
+
+    :returns: PCI address.
+    """
+    pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
+    if pci: return pci
+    else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
+
+# '_build_pci_to_vpp_if_name_maps' function build the local caches of
+# pci to vpp_if_name and vise vera
+# if pci provided, return the name found for this pci,
+# else, if name provided, return the pci for this name,
+# else, return None
 # To do that we dump all hardware interfaces, split the dump into list by empty line,
 # and search list for interface that includes the pci name.
 # The dumps brings following table:
@@ -355,42 +385,38 @@ def pci_is_vmxnet3(pci):
 #   ...
 #   pci: device 8086:100e subsystem 8086:001e address 0000:00:08.00 numa 0
 #
-def pci_to_vpp_if_name(pci):
-    """Convert PCI address into VPP interface name.
+def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
+    shif = _vppctl_read('show hardware-interfaces')
+    if shif == None:
+        fwglobals.log.debug("_build_pci_to_vpp_if_name_maps: Error reading interface info")
+    data = shif.splitlines()
+    for intf in _get_group_delimiter(data, r"^\w.*?\d"):
+        # Contains data for a given interface
+        ifdata = ''.join(intf)
+        (k,v) = _parse_vppname_map(ifdata,
+            valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
+            keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
+        if k and v:
+            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_addr_full(k)
 
-    :param pci:      PCI address.
+    vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
+    for hw_if in vmxnet3hw:
+        vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
+        pci_addr = pci_bytes_to_str(hw_if.pci_addr)
+        fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[vpp_if_name] = pci_addr
 
-    :returns: VPP interface name.
-    """
-    # vpp_api.cli() throw exception in vpp 19.01 (and work with vpp 19.04)
-    # hw = fwglobals.g.router_api.vpp_api.cli("show hardware")
-    hw = _vppctl_read('show hardware-interfaces')
-    if hw is None:
-        raise Exception("pci_to_vpp_if_name: failed to fetch hardware info from VPP")
-    for hw_if in re.split(r'\n\s*\n+', hw):
-        if re.search(pci, hw_if):
-            # In the interface description find line that has word at the beginning.
-            # This word is interface name. All the rest of lines start with spaces.
-            for line in hw_if.splitlines():
-                match = re.match(r'([^\s]+)', line)
-                if match:
-                    vpp_if_name = match.group(1)
-                    break
-            return vpp_if_name
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): not found in 'sh hard'" % (pci))
+    if pci:
+        vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+        if vpp_if_name: return vpp_if_name
+    elif vpp_if_name:
+        pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
+        if pci: return pci
 
-    # If no hardware interfaces were found, try vmxnet3 interfaces
-    pci_bytes = pci_str_to_bytes(pci)
-    hw_1 = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
-    for hw_if in hw_1:
-        if hw_if.pci_addr == pci_bytes:
-            vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
-            return vpp_if_name
-
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw_1)))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
     return None
-
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
 #    struct
@@ -415,6 +441,21 @@ def pci_str_to_bytes(pci_str):
     function = int(list[3], 16)
     bytes = ((domain & 0xffff) << 16) | ((bus & 0xff) << 8) | ((slot & 0x1f) <<3 ) | (function & 0x7)
     return socket.htonl(bytes)   # vl_api_vmxnet3_create_t_handler converts parameters by ntoh for some reason (vpp\src\plugins\vmxnet3\vmxnet3_api.c)
+
+# 'pci_str_to_bytes' converts pci bytes into full string "0000:0b:00.0"
+def pci_bytes_to_str(pci_bytes):
+    """Converts PCI bytes to PCI full string.
+
+    :param pci_str:      PCI bytes.
+
+    :returns: PCI full string.
+    """
+    bytes = socket.ntohl(pci_bytes)
+    domain   = (bytes >> 16)
+    bus      = (bytes >> 8) & 0xff
+    slot     = (bytes >> 3) & 0x1f
+    function = (bytes) & 0x7
+    return "%04x:%02x:%02x.%02x" % (domain, bus, slot, function)
 
 # 'pci_to_vpp_sw_if_index' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into index of this interface in VPP, eg. 1.
@@ -1682,3 +1723,4 @@ def vpp_set_dhcp_detect(params):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+

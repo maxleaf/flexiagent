@@ -56,6 +56,7 @@ import fwstats
 import fwutils
 from fwlog import Fwlog
 import loadsimulator
+import pprint
 
 # Global signal handler for clean exit
 def global_signal_handler(signum, frame):
@@ -691,6 +692,11 @@ def show(agent_info, router_info):
     if agent_info:
         if agent_info == 'version':
             fwglobals.log.info('Agent version: %s' % fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE), to_syslog=False)
+        if agent_info == 'cache':
+            fwglobals.log.info("Agent cache...")
+            cache = daemon_rpc('cache')
+            fwglobals.log.info(pprint.pformat(cache, indent=1))
+
     if router_info:
         if router_info == 'state':
             fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
@@ -844,6 +850,13 @@ class FwagentDaemon(object):
         fwglobals.log.debug("FwagentDaemon: reset")
         self.stop()
         self.start()
+
+    def cache(self):
+        """Show Agent cache.
+
+        :returns: cache maps.
+        """
+        return (fwglobals.g.AGENT_CACHE)
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -1073,7 +1086,7 @@ if __name__ == '__main__':
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
     parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db', 'multilink-policy'],
                         help="show various router parameters")
-    parser_show.add_argument('--agent', choices=['version'],
+    parser_show.add_argument('--agent', choices=['version', 'cache'],
                         help="show various agent parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
