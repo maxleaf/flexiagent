@@ -1587,21 +1587,21 @@ def install_openvpn_server(params):
         # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/client1.crt ./pki/private/client1.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
         # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
         # 'openvpn --genkey --secret /etc/openvpn/server/tc.key',        
-        "echo '-----BEGIN DH PARAMETERS-----\n\
-MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
-+8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
-87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\
-YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
-7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
-ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
------END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem",
+#         "echo '-----BEGIN DH PARAMETERS-----\n\
+# MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
+# +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
+# 87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\
+# YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
+# 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
+# ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
+# -----END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem",
         # 'openssl dhparam -out /etc/openvpn/server/dh.pem 2048',
         'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
         'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
         'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
         'echo "%s" > /etc/openvpn/server/server.crt' % params['serverCrt'],
         'echo "%s" > /etc/openvpn/server/tc.key' % params['tlsKey'],
-        # 'echo "%s" > /etc/openvpn/server/dh.pem' % params['dhKey'],
+        'echo "%s" > /etc/openvpn/server/dh.pem' % params['dhKey'],
 
         'rm -rf ./pki'
     ]

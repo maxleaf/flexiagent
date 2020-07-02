@@ -111,8 +111,8 @@ def install_application(params):
             'serverCrt': params['config']['serverCrt'],
             'tlsKey': params['config']['tlsKey'],
             'dnsIp': params['config']['dnsIp'],
-            'dnsName': params['config']['dnsName']
-             # 'dhKey': params['dhKey']
+            'dnsName': params['config']['dnsName'],
+            'dhKey': params['config']['dhKey']
         }
 
         cmd_revert_params['func'] = 'remove_openvpn_server'    
