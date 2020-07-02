@@ -37,6 +37,7 @@ import fwglobals
 import fwstats
 import shutil
 import sys
+import traceback
 import yaml
 from netaddr import IPNetwork, IPAddress
 
@@ -353,6 +354,7 @@ def pci_to_vpp_if_name(pci):
 
     :returns: VPP interface name.
     """
+    pci = pci_addr_full(pci)
     vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
     if vpp_if_name: return vpp_if_name
     else: return _build_pci_to_vpp_if_name_maps(pci, None)
@@ -416,6 +418,7 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
 
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
+    fwglobals.log.debug(traceback.extract_stack())
     return None
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
