@@ -1563,29 +1563,19 @@ def install_openvpn_server(params):
     else:
         version = 'stable'
 
-    with open ('/etc/openvpn/server/auth-script.sh', 'w') as rsh:
-        rsh.write('''\
-#!/bin/bash
+    dir = os.path.dirname(os.path.realpath(__file__))    
 
-username=$(head -n 1 $1)
-password=$(cat $1 | head -2 | tail -1)
-
-url="http://local.vpnflexiwan.com:5000/api/auth/token?username=${username}"
-
-response=$(curl -H "Authorization: Bearer ${password}" --insecure --write-out '%{http_code}' --silent --output /dev/null $url)
-
-if [[ "$response" -ne 200 ]] ; then
-  exit 1
-else
-  exit 0
-fi
-''')
+    shutil.copyfile('{}/vpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
+    shutil.copyfile('{}/vpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
+    shutil.copyfile('{}/vpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
 
     commands = [
         'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
         'echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version,
         'apt-get update && apt-get install -y openvpn',
         'chmod +x /etc/openvpn/server/auth-script.sh',
+        'chmod +x /etc/openvpn/server/up-script.sh',
+        'chmod +x /etc/openvpn/server/down-script.sh',
         # 'rm -rf /etc/openvpn/server/easy-rsa',
         # 'mkdir -p /etc/openvpn/server/easy-rsa/',
         # '{ wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1',
@@ -1676,7 +1666,6 @@ def remove_openvpn_server():
     """
 
     commands = [
-        'service openvpn stop',
         'apt-get remove -y openvpn',
         'rm -rf /etc/openvpn/server/*',
         'rm -rf /etc/openvpn/client/*'
@@ -1685,7 +1674,7 @@ def remove_openvpn_server():
     vpnIsRun = True if openvpn_pid() else False
 
     if (vpnIsRun):
-        commands.append('killall openvpn')
+        commands.insert(0, 'killall openvpn')
 
     try:
         for command in commands:
@@ -1753,8 +1742,8 @@ def configure_server_file(params):
         # Select a cryptographic cipher.
         'echo "cipher AES-256-CBC" >> %s' % destFile,
         
-        'echo "user nobody" >> %s' % destFile,
-        'echo "group nogroup" >> %s' % destFile,
+        #'echo "user nobody" >> %s' % destFile,
+        #'echo "group nogroup" >> %s' % destFile,
 
         # The persist options will try to avoid ccessing certain resources on restart
         # that may no longer be accessible because of the privilege downgrade.
@@ -1780,6 +1769,8 @@ def configure_server_file(params):
         'echo "duplicate-cn" >> %s' % destFile,
         'echo "client-to-client" >> %s' % destFile,
         'echo "explicit-exit-notify" >> %s' % destFile,
+        'echo "up /etc/openvpn/server/up-script.sh" >> %s' % destFile,
+        'echo "down /etc/openvpn/server/down-script.sh" >> %s' % destFile        
     ]
 
     # Split tunnel

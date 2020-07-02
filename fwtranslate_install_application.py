@@ -96,7 +96,7 @@ def install_application(params):
     cmd_revert_params = {}
     cmd_params['module'] = 'fwutils'
     cmd_revert_params['module'] = 'fwutils'
-        
+
     if (app_type == 'open-vpn'):
         cmd_params['func'] = 'install_openvpn_server'
         cmd_params['args'] = {
@@ -129,6 +129,15 @@ def install_application(params):
     cmd['revert']['params'] = cmd_revert_params
 
     cmd_list.append(cmd)
+
+    if (app_type == 'open-vpn'):
+        # Need to update the frr with the new interface
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = 'exec'
+        cmd['cmd']['params']  = [ 'sudo systemctl restart frr; if [ -z "$(pgrep frr)" ]; then exit 1; fi' ]
+        cmd['cmd']['descr']   = "restart frr"
+        cmd_list.append(cmd)
 
     return cmd_list
 
