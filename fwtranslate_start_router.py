@@ -223,7 +223,7 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = 'exec'
-    cmd['cmd']['params']  = [ 'sudo netplan apply' ]
+    cmd['cmd']['params']  = [ 'sudo ip route flush 0/0;qsudo netplan apply' ]
     cmd['cmd']['descr']   = "netplan apply"
     cmd_list.append(cmd)
 
