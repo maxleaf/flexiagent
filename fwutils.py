@@ -1645,8 +1645,22 @@ def get_reconfig_hash():
 
     return ''
 
-def _create_static_route(args):
+def add_static_route(args):
+    """Add static route.
+
+    :param params: params:
+                        addr    - Destination network.
+                        via     - Gateway address.
+                        metric  - Metric.
+                        remove  - True to remove route.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
     params = args['params']
+
+    if params['addr'] == 'default':
+        return (True, None)
+
     metric = params.get('metric', None)
     metric_str = ''
     remove = args['remove']
@@ -1684,55 +1698,6 @@ def _create_static_route(args):
         else:
             tap = pci_to_tap(params['pci'])
             cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, params['addr'], metric_str, params['via'], tap, next_hop)
-
-    try:
-        fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
-    except:
-        return (False, None)
-
-    return (True, None)
-
-def add_static_route(args):
-    """Add static route.
-
-    :param params: params - rule parameters:
-                        sw_if_index -  Interface index.
-                        policy_id   - the policy id (two byte integer)
-                        remove      - True to remove rule, False to add.
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-    params = args['params']
-    op = 'del' if args['remove'] else 'add'
-
-    if params['addr'] != 'default':
-        return _create_static_route(args)
-    else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
-        (old_ip, old_dev) = get_default_route()
-        old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
-        new_ip = params['via']
-        if not 'pci' in params:
-            if old_via == "":
-                cmd = "sudo ip route %s default via %s" % (op, new_ip)
-            else:
-                if not args['remove']:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
-                          (old_via, new_ip)
-                else:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
-                          (new_ip, old_via)
-        else:
-            tap = pci_to_tap(params['pci'])
-            if old_via == "":
-                cmd = "sudo ip route %s default via %s dev %s" % (op, new_ip, tap)
-            else:
-                if not args['remove']:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s dev %s" % \
-                          (old_via, new_ip, tap)
-                else:
-                    cmd = "sudo ip route del default via %s dev %s; sudo ip route add default via %s" % \
-                          (new_ip, tap, old_via)
 
     try:
         fwglobals.log.debug(cmd)
