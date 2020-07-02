@@ -1265,13 +1265,13 @@ def _convert_default_routes_multipath(metric):
     try:
         dhcp_routes = os.popen(cmd_show).read()
     except:
-        return (False, None)
+        return False
 
     cmd_show = "sudo ip route show default %s proto static" % (metric_str)
     try:
         static_routes = os.popen(cmd_show).read()
     except:
-        return (False, None)
+        return False
 
     dhcp_lines = dhcp_routes.splitlines()
     static_lines = static_routes.splitlines()
@@ -1279,7 +1279,7 @@ def _convert_default_routes_multipath(metric):
     routes_count = len(routes)
 
     if routes_count < 2:
-        return (True, None)
+        return True
 
     rips = []
     for route in routes:
@@ -1296,8 +1296,36 @@ def _convert_default_routes_multipath(metric):
     try:
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
-    except Exception as e:
-        return (False, str(e))
+    except Exception:
+        return False
+
+    return True
+
+def _convert_all_routes():
+    cmd_show = "sudo ip route show default"
+    try:
+        routes_str = os.popen(cmd_show).read()
+    except:
+        return (False, None)
+
+    routes = routes_str.splitlines()
+
+    metrics = {}
+    for route in routes:
+        parts = route.split('metric ')
+        metric = 0
+        if len(parts) > 1:
+            metric = int(parts[1])
+        if metric in metrics:
+            metrics[metric] += 1
+        else:
+            metrics[metric] = 1
+
+    for metric, count in metrics.items():
+        if count > 1:
+            ret = _convert_default_routes_multipath(metric)
+            if not ret:
+                return (False, None)
 
     return (True, None)
 
@@ -1345,7 +1373,7 @@ def add_remove_netplan_interface(params):
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-        cmd = 'sudo ip route flush 0/0;sudo netplan apply;'
+        cmd = 'sudo ip route flush 0/0;sudo netplan apply'
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
         if re.match('yes', dhcp):
