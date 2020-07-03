@@ -311,6 +311,28 @@ class Checker:
             print(prompt + str(e))
             return False
 
+    def _get_duplicate_metric(self):
+        cmd_show = "sudo ip route show default"
+        try:
+            routes_str = os.popen(cmd_show).read()
+        except:
+            return (False, None)
+
+        routes = routes_str.splitlines()
+
+        metrics = {}
+        for route in routes:
+            parts = route.split('metric ')
+            metric = 0
+            if len(parts) > 1:
+                metric = int(parts[1])
+            if metric in metrics:
+                return metric
+            else:
+                metrics[metric] = 1
+
+        return None
+
     def soft_check_default_route(self, fix=False, silently=False, prompt=''):
         """Check if default route is present.
 
@@ -325,6 +347,10 @@ class Checker:
             default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
+            # Find all default routes and ensure that there are no duplicate metrics
+            metric = self._get_duplicate_metric()
+            if metric is not None:
+                raise Exception("default routes with duplicate metric %u were found" % metric)
             return True
         except Exception as e:
             print(prompt + str(e))
