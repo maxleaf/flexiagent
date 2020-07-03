@@ -1349,7 +1349,7 @@ def add_remove_netplan_interface(params):
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-        cmd = 'sudo ip route flush 0/0;sudo netplan apply;'
+        cmd = 'sudo netplan apply'
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
     except Exception as e:
