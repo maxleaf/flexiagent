@@ -194,16 +194,21 @@ def get_linux_interface_gateway(if_name):
     try:
         dgw = os.popen('ip route list match default | grep via').read()
     except:
-        return ''
+        return '', ''
+
+    metric = ''
 
     routes = dgw.splitlines()
     for route in routes:
         rip = route.split('via ')[1].split(' ')[0]
         rdev = route.split('dev ')[1].split(' ')[0]
+        metric_str = route.split('metric ')
+        if len(metric_str) > 1:
+            metric = route.split('metric ')[1].split(' ')[0]
         if re.match(if_name, rdev):
-            return rip
+            return rip, metric
 
-    return ''
+    return '', ''
 
 def get_interface_address(iface):
     """Get interface IP address.
@@ -277,10 +282,11 @@ def linux_to_pci_addr(linuxif):
                 slot = vals[1]
             if vals[0] == 'Class:':
                 if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    if vpp_run:
+                    interface = pci_to_linux_iface(slot)
+                    if not interface and vpp_run:
                         interface = pci_to_tap(slot)
-                    else:
-                        interface = pci_to_linux_iface(slot)
+                    if not interface:
+                        continue
                     if interface == linuxif:
                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
                         return (pci_addr_full(slot), "" if driver=='driver' else driver)
@@ -1490,7 +1496,7 @@ def vpp_multilink_update_labels(params):
         next_hop = params['next_hop']
     else:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop = get_linux_interface_gateway(tap)
+        next_hop, metric = get_linux_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not found in params and there is no default gateway")
 
@@ -1628,7 +1634,7 @@ def get_reconfig_hash():
         if not re.search(addr, wan['addr']):
             res += 'addr:' + addr + ','
 
-        gw = get_linux_interface_gateway(name)
+        gw, metric = get_linux_interface_gateway(name)
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 

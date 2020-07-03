@@ -1201,7 +1201,8 @@ class FWROUTER_API:
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
                         if not gw:
                             tap = pci_to_tap(pci)
-                            return pci, fwutils.get_linux_interface_gateway(tap)
+                            rip, metric = fwutils.get_linux_interface_gateway(tap)
+                            return pci, rip
 
                         else:
                             return pci, gw
