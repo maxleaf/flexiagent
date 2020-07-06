@@ -29,6 +29,7 @@ import subprocess
 import sys
 import uuid
 import yaml
+import shutil
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -679,7 +680,6 @@ class Checker:
         :param prompt:          User prompt prefix.
 
         :returns: 'True' if check is successful and 'False' otherwise.
-        :returns 'FW_EXIT_CODE_OK_NEED_REBOOT' if values were changed by user and system needs to reboot
         """
         # This function does the following:
         # 1. sets "main-core", "corelist-worrkers" and "workers" in "cpu" section in /etc/vpp/startup.conf
@@ -925,12 +925,77 @@ class Checker:
             write_file.write(update_line + '\n')
         write_file.close()
         read_file.close()
-        os.system ("sudo cp %s %s" %( grub_write_file, grub_read_file))
-        os.system ("rm %s" % (grub_write_file))
+        shutil.copyfile (grub_write_file, grub_read_file)
+        os.remove (grub_write_file)
         if add_grub_line == True:
             os.system ("sudo update-grub")
             self.reboot_needed = True
         return True
 
+    def soft_check_worker_cpu_power_saving(self, fix=False, silently=False, prompt=''):
+        """Set power saving on worker threads: add none-polling time (delay) to core work
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        # This function does the following:
+        # 1. Ask the user if to emable power saving mode
+        # 2. If so, set poll-sleep-usec parameter in startup.conf's unix 
+        #    section to some TBD value.
+
+        if not fix or silently:
+            return True
+
+        enable_ps_mode  = False
+        usec_rest       = 100
+        conf            = self.vpp_configuration
+        conf_param      = None
+        if conf and conf.get('unix'):
+            for param in conf['unix']:
+                if 'poll-sleep-usec' in param:
+                    usec = int(param.split(' ')[1])
+                    conf_param = param
+                    break
+
+        while True:
+            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on worker CPUs (y/N/q)?")        
+            if str_ps_mode == 'Y' or str_ps_mode == 'y':
+                enable_ps_mode = True
+                break
+            elif str_ps_mode == 'N' or str_ps_mode == 'n' or str_ps_mode == '':
+                enable_ps_mode = False
+                break
+            else:
+                return True  #nothing to do
+
+        if enable_ps_mode == True:
+            if usec == usec_rest:
+                return True   #nothing to do    
+
+            if conf_param:
+                conf['unix'].remove(conf_param)
+                conf_param = 'poll-sleep-usec %d' % usec
+                conf['unix'].append(conf_param)
+                self.vpp_config_modified = True
+            return True
+
+            if not conf:
+                conf = {}
+            if conf.get('unix') is None:
+                conf['unix'] = []
+            conf['unix'].append({ 'poll-sleep-usec' : usec_rest })
+            self.vpp_config_modified = True
+            return True
+
+        if enable_ps_mode == False:
+            if conf_param:
+                conf['unix'].remove(conf_param)
+                self.vpp_config_modified = True
+                return True
+
+        return True         
 
         
