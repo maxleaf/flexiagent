@@ -52,7 +52,7 @@ fwrouter_modules = {
     'fwtranslate_add_dhcp_config': __import__('fwtranslate_add_dhcp_config'),
     'fwtranslate_add_app':         __import__('fwtranslate_add_app'),
     'fwtranslate_add_policy':      __import__('fwtranslate_add_policy'),
-    'fwtranslate_install_application':  __import__('fwtranslate_install_application')
+    'fwtranslate_add_service':  __import__('fwtranslate_add_service')
 }
 
 fwrouter_translators = {
@@ -68,10 +68,10 @@ fwrouter_translators = {
     'remove-dhcp-config':         {'module':'fwtranslate_revert',          'api':'revert',            'src': 'add-dhcp-config'},
     'add-application':            {'module':'fwtranslate_add_app',         'api':'add_app',           'key_func':'get_request_key'},
     'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
-    'add-multilink-policy':      {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
-    'remove-multilink-policy':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
-    'install-service':     {'module':'fwtranslate_install_application', 'api': 'install_application',   'key_func':'get_request_key'},
-    'uninstall-service':   {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'install-service'},
+    'add-multilink-policy':       {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
+    'remove-multilink-policy':    {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
+    'add-service':                {'module':'fwtranslate_add_service',     'api': 'add_service',      'key_func':'get_request_key'},
+    'remove-service':             {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-service'},
 }
 
 class FWROUTER_API:
@@ -221,11 +221,11 @@ class FWROUTER_API:
         if re.match('remove-tunnel|add-tunnel', req):
             return self._handle_add_remove_tunnel(req, params)
 
-        if re.match('install-service|uninstall-service', req):
-            return self._handle_install_uninstall_application(req, params)
+        if req == 'upgrade-service':
+            return self._handle_upgrade_service(req, params)
 
-        if req == 'modify-service' or req == 'upgrade-service': 
-            return self._handle_modify_application(req, params)
+        if req == 'modify-service':
+            return self._handle_modify_service(req, params)
 
         # Router configuration requests might unite multiple requests of same type
         # arranged into list, e.g. 'add-interface' : [ {iface1}, {iface2}, ...].
@@ -353,8 +353,21 @@ class FWROUTER_API:
         """
         self._call_simple('remove-multilink-policy', {})
         return self._call_simple(req, params)
+
+    def _handle_upgrade_service(self, req, params):
+        """Handle upgrade application.
+
+        :param req:             Request name.
+        :param params:          Request parameters.
+
+        :returns: Status code.
+        """
+        requests = []
+        requests.append({'uninstall-service': request['params']})
+        requests.append({'install-service': request['params']})
+        return self._call_aggregated(requests)
     
-    def _handle_modify_application(self, req, params):
+    def _handle_modify_service(self, req, updatedParams):
         """Handle modify application.
 
         :param req:             Request name.
@@ -364,27 +377,18 @@ class FWROUTER_API:
         """
 
         try:
-            modify_requests = []
+            print("770")
+            # update the configurations files
+            fwutils.configure_openvpn_server(updatedParams['config'])
 
-            if params:                
-                modify_requests.append({'install-service': params})
-                self._call_aggregated(modify_requests)
-
+            # update local db with updated configurations
+            key = self._extract_request_key('remove-service', updatedParams)
+            (req, _) = self.db_requests.fetch_request(key)
+            (cmd_list,_,_) = self._translate(req, updatedParams)
+            self.db_requests.update(key, 'add-service', updatedParams, cmd_list, executed=True)
+            return {'ok':1}
         except Exception as e:
             return {'ok':0}
-        
-        return {'ok':1}
-
-    def _handle_install_uninstall_application(self, req, params):
-        """Handle install-application and uninstall-application.
-
-        :param req:             Request name.
-        :param params:          Request parameters.
-
-        :returns: Status code.
-        """
-
-        return self._call_simple(req, params)
 
     def _handle_add_remove_tunnel(self, req, params):
         """Handle add-tunnel and remove-tunnel.

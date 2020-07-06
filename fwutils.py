@@ -808,7 +808,7 @@ def get_router_config(full=False):
             if re.match('add-multilink-policy', key):
                 cfg.append(_dump_config_request(db_requests, key, full))
         for key in db_requests.db:
-            if re.match('install-service', key):
+            if re.match('add-service', key):
                 cfg.append(_dump_config_request(db_requests, key, full))
         return cfg if len(cfg) > 0 else None
 
@@ -1576,26 +1576,7 @@ def install_openvpn_server(params):
         'chmod +x /etc/openvpn/server/auth-script.sh',
         'chmod +x /etc/openvpn/server/up-script.sh',
         'chmod +x /etc/openvpn/server/down-script.sh',
-        # 'rm -rf /etc/openvpn/server/easy-rsa',
-        # 'mkdir -p /etc/openvpn/server/easy-rsa/',
-        # '{ wget -qO- https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz 2>/dev/null || curl -sL https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz ; } | tar xz -C /etc/openvpn/server/easy-rsa/ --strip-components 1',
-        # 'chown -R root:root /etc/openvpn/server/easy-rsa/',
-        # 'sh /etc/openvpn/server/easy-rsa/easyrsa init-pki',
-        # 'sh /etc/openvpn/server/easy-rsa/easyrsa --batch build-ca nopass',
-        # 'EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-server-full server nopass',
-        # 'EASYRSA_CERT_EXPIRE=3650 sh /etc/openvpn/server/easy-rsa/easyrsa build-client-full client1 nopass',
-        # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/client1.crt ./pki/private/client1.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
-        # 'cp ./pki/ca.crt ./pki/private/ca.key ./pki/issued/server.crt ./pki/private/server.key /etc/openvpn/server',
-        # 'openvpn --genkey --secret /etc/openvpn/server/tc.key',        
-#         "echo '-----BEGIN DH PARAMETERS-----\n\
-# MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz\
-# +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a\
-# 87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7\
-# YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi\
-# 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD\
-# ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==\n\
-# -----END DH PARAMETERS-----' > /etc/openvpn/server/dh.pem",
-        # 'openssl dhparam -out /etc/openvpn/server/dh.pem 2048',
+
         'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
         'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
         'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
@@ -1639,7 +1620,7 @@ def configure_openvpn_server(params):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """    
-            
+
     configure_server_file(params)
     configure_client_file(params)
 
@@ -1690,7 +1671,7 @@ def remove_openvpn_server():
     return (True, None) 
 
 def configure_server_file(params):
-    
+
     destFile = '/etc/openvpn/server/server.conf'
     ip = IPNetwork(params['remoteClientIp'])
 
@@ -1779,13 +1760,13 @@ def configure_server_file(params):
         # network gateway through the VPN
         commands.append('echo "push \\"redirect-gateway def1 bypass-dhcp\\"" >> %s' % destFile)        
     else:
-        commands.append('echo "push "route 172.16.0.0 255.255.255.0"" >> %s' % (params['remoteClientIp'], destFile))
+        commands.append('echo "push \\"route 172.16.0.0 255.255.255.0\\"" >> %s' % (destFile))
 
     # DNS options
-    if 'dnsIp' in params and isinstance(params['dnsIp'], list):        
+    if 'dnsIp' in params and isinstance(params['dnsIp'], list):
         for ip in params['dnsIp']:            
             commands.append('echo "push \\"dhcp-option DNS %s\\"" >> %s' % (ip, destFile))
-    
+
     if 'dnsName' in params and isinstance(params['dnsName'], list):
         for name in params['dnsName']: 
             commands.append('echo "push \\"dhcp-option DOMAIN %s\\"" >> %s' % (name, destFile))

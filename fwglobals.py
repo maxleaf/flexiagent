@@ -34,15 +34,13 @@ from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications_api import FwApps
 from fwpolicies_api import FwPolicies
-from fwvpn_api import FwVPN
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
     'fwapps_api':   __import__('fwapplications_api'),
     'fwpolicy_api': __import__('fwpolicies_api'),
     'fwrouter_api': __import__('fwrouter_api'),
-    'os_api':       __import__('os_api'),
-    'fwvpn_api':    __import__('fwvpn_api')
+    'os_api':       __import__('os_api')    
 }
 
 request_handlers = {
@@ -74,12 +72,6 @@ request_handlers = {
     'add-policy-info':              '_call_policy_api',
     'remove-policy-info':           '_call_policy_api',
 
-    # # Vpn API
-    # 'install-vpn-server':           '_call_vpn_api',
-    # 'remove-vpn-server':            '_call_vpn_api',
-    # 'config-vpn-server':            '_call_vpn_api',
-    # 'upgrade-vpn-server':           '_call_vpn_api',    
-
     # Router API
     'start-router':                 '_call_router_api',
     'stop-router':                  '_call_router_api',
@@ -95,12 +87,12 @@ request_handlers = {
     'remove-dhcp-config':           '_call_router_api',
     'add-application':              '_call_router_api',
     'remove-application':           '_call_router_api',
-    'add-multilink-policy':        '_call_router_api',
-    'remove-multilink-policy':     '_call_router_api',
-    'install-service':         '_call_router_api',
-    'uninstall-service':         '_call_router_api',
-    'modify-service':            '_call_router_api',
-    'upgrade-service':            '_call_router_api',
+    'add-multilink-policy':         '_call_router_api',
+    'remove-multilink-policy':      '_call_router_api',
+    'add-service':                  '_call_router_api',
+    'remove-service':               '_call_router_api',
+    'modify-service':               '_call_router_api',
+    'upgrade-service':              '_call_router_api',
 
     ##############################################################
     # INTERNAL API-s
@@ -279,7 +271,6 @@ class Fwglobals:
         self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
         self.apps_api   = FwApps(self.APP_REC_DB_FILE)
-        self.vpn_api = FwVPN()
         self.policy_api = FwPolicies()
 
         self.router_api.restore_vpp_if_needed()
@@ -308,9 +299,6 @@ class Fwglobals:
 
     def _call_agent_api(self, req, params):
         return self.agent_api.call(req, params)
-
-    def _call_vpn_api(self, req, params):
-        return self.vpn_api.call(req, params)
 
     def _call_apps_api(self, req, params):
         return self.apps_api.call(req, params)

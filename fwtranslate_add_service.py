@@ -30,13 +30,13 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
-# install-application
+# add-service
 # --------------------------------------
 # Translates request:
 #
 # {
 #     "entity": "agent",
-#     "message": "install-application",
+#     "message": "add-service",
 #     "params": {
 #         "id": "5edf9e2e4b53582cb4a713e8",
 #         "name": "Open VPN",
@@ -64,24 +64,24 @@ def _generate_id(ret):
 sa_index = 0
 
 
-def _generate_application_id():
-    """Generate application identifier.
+def _generate_service_id():
+    """Generate service identifier.
 
-    :returns: New application identifier.
+    :returns: New service identifier.
     """
     global sa_index
-    application_index = _generate_id(sa_index)
-    return copy.deepcopy(application_index)
+    service_index = _generate_id(sa_index)
+    return copy.deepcopy(service_index)
 
 
-def reset_application_id():
-    """Reset application identifier.
+def reset_service_id():
+    """Reset service identifier.
     """
     global sa_index
     sa_index = 0
 
 
-def install_application(params):
+def add_service(params):
     """Generate commands ...
 
      :param params:        Parameters from flexiManage.
@@ -93,8 +93,9 @@ def install_application(params):
     app_type = params['type']
 
     cmd_params = {}
-    cmd_revert_params = {}
     cmd_params['module'] = 'fwutils'
+
+    cmd_revert_params = {}
     cmd_revert_params['module'] = 'fwutils'
 
     if (app_type == 'open-vpn'):
@@ -142,10 +143,10 @@ def install_application(params):
     return cmd_list
 
 def get_request_key(params):
-    """Return application key.
+    """Return service key.
 
      :param params:        Parameters from flexiManage.
 
      :returns: A key.
      """
-    return 'install-service-%s' % params['type']
+    return 'add-service-%s' % params['type']
