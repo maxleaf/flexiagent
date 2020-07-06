@@ -59,17 +59,19 @@ hard_checkers = [
 ]
 
 soft_checkers = [
-	{ 'soft_check_uuid'               : { 'severity': 'critical' }},
-	{ 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
-	{ 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
-	{ 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
-	{ 'soft_check_resolvconf'         : { 'severity': 'optional' }},
-	{ 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
-	{ 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
-	{ 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
-	{ 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }}
+    { 'soft_check_uuid'               : { 'severity': 'critical' }},
+    { 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
+    { 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
+    { 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
+    { 'soft_check_default_routes_metric'         : { 'severity': 'critical' , 'interactive': 'optional' }},
+    { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
+    { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
+    { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
+    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
+    { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
+    { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+    { 'soft_check_worker_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
 ]
 
 class TXT_COLOR:
