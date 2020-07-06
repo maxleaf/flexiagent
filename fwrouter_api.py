@@ -363,8 +363,8 @@ class FWROUTER_API:
         :returns: Status code.
         """
         requests = []
-        requests.append({'uninstall-service': request['params']})
-        requests.append({'install-service': request['params']})
+        requests.append({'remove-service': params})
+        requests.append({'add-service': params})
         return self._call_aggregated(requests)
     
     def _handle_modify_service(self, req, updatedParams):
