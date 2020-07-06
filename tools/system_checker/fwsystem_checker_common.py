@@ -1025,7 +1025,7 @@ class Checker:
             return True
 
         enable_ps_mode  = False
-        usec_rest       = 100
+        usec_rest       = 300
         usec            = 0
         conf            = self.vpp_configuration
         conf_param      = None
