@@ -62,26 +62,35 @@ class OS_DECODERS:
         :returns: Array of interface descriptions.
         """
         out = []
+
         for nicname, addrs in inp.items():
             pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] != "":
-                daddr = {
-                            'name':nicname, 
-                            'pciaddr':pciaddr[0], 
-                            'driver':pciaddr[1], 
-                            'MAC':'', 
-                            'IPv4':'',
-                            'IPv4Mask':'', 
-                            'IPv6':'',
-                            'IPv6Mask':''
-                        }
-                for addr in addrs:
-                    addr_af_name = fwutils.af_to_name(addr.family)
-                    daddr[addr_af_name] = addr.address.split('%')[0]
-                    if addr.netmask != None:
-                        daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-                out.append(daddr)
+            if pciaddr[0] == "":
+                continue
+            daddr = {
+                        'name':nicname,
+                        'pciaddr':pciaddr[0],
+                        'driver':pciaddr[1],
+                        'MAC':'',
+                        'IPv4':'',
+                        'IPv4Mask':'',
+                        'IPv6':'',
+                        'IPv6Mask':'',
+                        'dhcp':'',
+                        'gateway':'',
+                        'metric': '',
+                    }
+            daddr['dhcp'] = fwutils.get_dhcp_netplan_interface(nicname)
+            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
+            for addr in addrs:
+                addr_af_name = fwutils.af_to_name(addr.family)
+                daddr[addr_af_name] = addr.address.split('%')[0]
+                if addr.netmask != None:
+                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
+            out.append(daddr)
         return (out,1)
+
     def execd(self, handle):
         """Read from a descriptor.
 

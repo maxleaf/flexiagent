@@ -641,9 +641,6 @@ class FWROUTER_API:
                 if 'interfaces' in params:
                     fwglobals.g.handle_request('add-interface', params['interfaces'])
                     del params['interfaces']
-                if 'routes' in params:
-                    fwglobals.g.handle_request('add-route', params['routes'])
-                    del params['routes']
                 if bool(params) == False:
                     params = None
             except Exception as e:
@@ -804,25 +801,6 @@ class FWROUTER_API:
         except Exception as e:
                 fwglobals.log.excep("_modify_device: %s" % str(e))
                 raise e
-
-        # Modifying interfaces might result in removal of static routes,
-        # which can affect the agent's ability to reconnect to the MGMT
-        # (if default route or any other route the agent uses to connect to
-        # the MGMT was removed). In order to overcome this, we try to restore
-        # the lost routes. Since this is a best effort solution, we don't return
-        # error if we fail to restore a route.
-        changed_ips = map(lambda interface: interface['addr'], interfaces)
-        if len(changed_ips) > 0:
-            for key in self.db_requests.db:
-                try:
-                    if re.match('add-route', key):
-                        next_hop_ip = self.db_requests.db[key]['params']['via']
-                        if(any([fwutils.is_ip_in_subnet(next_hop_ip, subnet) for subnet in changed_ips])):
-                            fwglobals.log.info('restoring static route: ' + str(key))
-                            self._apply_db_request(key)
-                except Exception as e:
-                    fwglobals.log.excep("_modify_device: failed to restore static routes %s" % str(e))
-                    pass
 
         return {'ok':1}
 
@@ -1183,11 +1161,6 @@ class FWROUTER_API:
         else:  # list
             params.remove(substs_element)
 
-    def get_default_route_address(self):
-        for key, request in self.db_requests.db.items():
-            if re.search('add-route:default', key):
-                return request['params']['via']
-
     def get_pci_lan_interfaces(self):
         interfaces = []
         for key, request in self.db_requests.db.items():
@@ -1222,11 +1195,24 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
+                        pci = request['params']['pci']
+                        gw = request['params'].get('gateway')
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
-                        if not request['params']['gateway']:
-                            return request['params']['pci'], self.get_default_route_address()
-                        else:
-                            return request['params']['pci'], request['params']['gateway']
+                        if not gw:
+                            tap = pci_to_tap(pci)
+                            rip, metric = fwutils.get_linux_interface_gateway(tap)
+                            return pci, rip
 
+                        else:
+                            return pci, gw
         return None
+
+    def get_wan_interface_addr_pci(self):
+        wan_list = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('wan', request['params']['type'], re.IGNORECASE):
+                    wan_list.append(request['params'])
+
+        return wan_list

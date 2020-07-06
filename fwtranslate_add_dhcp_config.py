@@ -57,25 +57,6 @@ def _change_dhcpd_conf(params, cmd_list):
     cmd_list.append(cmd)
 
 
-def _punt_ip_broadcast(cmd_list):
-    """Add ip route to punt ip broadcast.
-
-    :param cmd_list:            List of commands.
-
-    :returns: None.
-    """
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
-    cmd['cmd']['descr'] = "punt ip brodcast"
-    cmd['revert'] = {}
-    cmd['revert']['name'] = 'exec'
-    cmd['revert']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via drop"]
-    cmd['revert']['descr'] = "drop ip broadcast"
-    cmd_list.append(cmd)
-
-
 def _restart_dhcp_server(cmd_list):
     """Restart DHCP server.
 
@@ -105,7 +86,6 @@ def add_dhcp_config(params):
     cmd_list = []
 
     _change_dhcpd_conf(params, cmd_list)
-    _punt_ip_broadcast(cmd_list)
     _restart_dhcp_server(cmd_list)
 
     return cmd_list
