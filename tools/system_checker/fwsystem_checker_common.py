@@ -814,10 +814,10 @@ class Checker:
    
         if conf.get('dpdk') is None:
             conf['dpdk'] = []
-            self.add_dict_to_dpdk(input_cores)
+            self._add_dict_to_dpdk(input_cores)
             self.vpp_config_modified = True
             if self.vpp_config_modified == True:
-                return self.update_grub_file(input_cores)
+                return self._update_grub_file(input_cores)
             else:
                 return True
 
@@ -880,7 +880,7 @@ class Checker:
                             num_of_rx_queues_param = 'num-rx-queues 0'
                             element['dev default'].append(num_of_rx_queues_param)   
             self.vpp_config_modified = True 
-            return self.update_grub_file(input_cores)
+            return self._update_grub_file(input_cores)
 
         # in case multi core configured
         if input_cores != 0:
@@ -920,15 +920,15 @@ class Checker:
                                 element['dev default'].append(num_of_rx_queues_param)
                                 self.vpp_config_modified = True   
                     if dict_found == False:
-                        self.add_dict_to_dpdk(input_cores)
+                        self._add_dict_to_dpdk(input_cores)
                         self.vpp_config_modified = True 
 
             if self.vpp_config_modified == True:
-                return self.update_grub_file(input_cores)
+                return self._update_grub_file(input_cores)
             else:
                 return True
 
-    def add_dict_to_dpdk(self, num_of_cores):
+    def _add_dict_to_dpdk(self, num_of_cores):
         """ The configuration file is "translated" to a kind of yaml file.
         conf is the main dictioanry, containing key:value elements.
         dpdk is a key in this dictionary, with a list as a value.
@@ -963,7 +963,7 @@ class Checker:
                     element['dev default'].append('num-rx-queues %d' % (num_of_cores))
         return True
 
-    def update_grub_file(self, num_of_workers):
+    def _update_grub_file(self, num_of_workers):
         """Update /etc/default/grub to work with more then 1 core.
 
         :param num_of_workers:  num of cores to handle incoming traffic
@@ -1007,8 +1007,8 @@ class Checker:
             self.reboot_needed = True
         return True
 
-    def soft_check_worker_cpu_power_saving(self, fix=False, silently=False, prompt=''):
-        """Set power saving on worker threads: add none-polling time (delay) to core work
+    def soft_check_cpu_power_saving(self, fix=False, silently=False, prompt=''):
+        """Set power saving on main core: add delay to polling frequancy to main core loop
 
         :param fix:             Fix problem.
         :param silently:        Do not prompt user.
@@ -1026,6 +1026,7 @@ class Checker:
 
         enable_ps_mode  = False
         usec_rest       = 100
+        usec            = 0
         conf            = self.vpp_configuration
         conf_param      = None
         if conf and conf.get('unix'):
@@ -1036,7 +1037,7 @@ class Checker:
                     break
 
         while True:
-            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on worker CPUs (y/N/q)?")        
+            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")        
             if str_ps_mode == 'Y' or str_ps_mode == 'y':
                 enable_ps_mode = True
                 break
@@ -1052,9 +1053,14 @@ class Checker:
 
             if conf_param:
                 conf['unix'].remove(conf_param)
-                conf_param = 'poll-sleep-usec %d' % usec
+                conf_param = 'poll-sleep-usec %d' % usec_rest
                 conf['unix'].append(conf_param)
                 self.vpp_config_modified = True
+            else:
+                conf_param = 'poll-sleep-usec %d' % usec_rest
+                conf['unix'].append(conf_param)
+                self.vpp_config_modified = True
+
             return True
 
             if not conf:
