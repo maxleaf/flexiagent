@@ -143,8 +143,7 @@ request_handlers = {
     'vxlan_add_del_tunnel':         '_call_vpp_api',
 
     # Python API
-    'python':                       '_call_python_api',
-    'python-kwargs':                '_call_python_kwargs_api'
+    'python':                       '_call_python_api'
 }
 
 global g_initialized
@@ -329,23 +328,14 @@ class Fwglobals:
         func = self._call_python_api_get_func(req, params)
         args = params.get('args')
         if args:
-            ret = func(args)
+            ret = func(**args)
         else:
             ret = func()
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
+            args_str = json.dumps(args) if args else ""
             log.error('_call_python_api: %s(%s) failed: %s' % \
-                    (params['func'], json.dumps(args), val))
-        reply = {'ok':ok, 'message':val}
-        return reply
-
-    def _call_python_kwargs_api(self, req, params):
-        func = self._call_python_api_get_func(req, params)
-        ret = func(**params['args'])
-        (ok, val) = self._call_python_api_parse_result(ret)
-        if not ok:
-            log.error('_call_python_kwargs_api: %s(%s) failed: %s' % \
-                    (params['func'], json.dumps(params['args']), val))
+                    (params['func'], args_str, val))
         reply = {'ok':ok, 'message':val}
         return reply
 

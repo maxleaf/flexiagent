@@ -260,7 +260,7 @@ def add_policy(params):
 
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python-kwargs"
+    cmd['cmd']['name']   = "python"
     cmd['cmd']['descr']  = "remove-multilink-policy"
     cmd['cmd']['params'] = {
                             'object': 'fwglobals.g',

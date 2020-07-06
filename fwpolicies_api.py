@@ -62,7 +62,9 @@ class FwPolicies:
 
         :returns: Dictionary with information and status code.
         """
-        fwutils.vpp_multilink_update_policy_rule(params)
+        fwutils.vpp_multilink_update_policy_rule(
+            params['links'], params['policy_id'], params['fallback'],
+            params['order'], params['remove'], acl_id=params.get('acl_id'))
 
         reply = {'ok': 1}
         return reply
@@ -74,7 +76,9 @@ class FwPolicies:
 
         :returns: Dictionary with information and status code.
         """
-        fwutils.vpp_multilink_update_policy_rule(params)
+        fwutils.vpp_multilink_update_policy_rule(
+            params['links'], params['policy_id'], params['fallback'],
+            params['order'], params['remove'], acl_id=params.get('acl_id'))
 
         reply = {'ok': 1}
         return reply

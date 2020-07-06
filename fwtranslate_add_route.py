@@ -57,24 +57,35 @@ def add_route(params):
      """
     cmd_list = []
 
-    add_params = {
-        'module': 'fwutils',
-        'func': 'add_static_route',
-        'args': {'params': params, 'remove': False}
-    }
-
-    del_params = copy.deepcopy(add_params)
-    del_params['args']['remove'] = True
-
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "python"
     cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('pci')))
-    cmd['cmd']['params']    = add_params
+    cmd['cmd']['params']    = {
+                                'module': 'fwutils',
+                                'func':   'add_static_route',
+                                'args':   {
+                                    'addr':   params['addr'],
+                                    'via':    params['via'],
+                                    'metric': params.get['metric'],
+                                    'remove': False,
+                                    'pci':    params.get('pci')
+                                }
+                              }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('pci')))
-    cmd['revert']['params'] = del_params
+    cmd['revert']['params'] = {
+                                'module': 'fwutils',
+                                'func':   'add_static_route',
+                                'args':   {
+                                    'addr':   params['addr'],
+                                    'via':    params['via'],
+                                    'metric': params.get['metric'],
+                                    'remove': True,
+                                    'pci':    params.get('pci')
+                                }
+                              }
     cmd_list.append(cmd)
     return cmd_list
 

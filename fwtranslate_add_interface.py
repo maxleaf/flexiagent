@@ -133,7 +133,7 @@ def add_interface(params):
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
     cmd['revert'] = {}
-    cmd['revert']['name']   = 'python'
+    cmd['revert']['name']   = "python"
     cmd['revert']['params'] = {
                 'module': 'fwutils',
                 'func': 'add_remove_netplan_interface',

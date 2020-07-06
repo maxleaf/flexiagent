@@ -1225,51 +1225,45 @@ def vpp_startup_conf_update(filename, path, param, val, add, filename_backup=Non
     # Dump dictionary back into file
     fwtool_vpp_startupconf_dict.dump(conf, filename)
 
-def vpp_startup_conf_add_devices(params):
-    filename = params['vpp_config_filename']
-    config   = fwtool_vpp_startupconf_dict.load(filename)
-
+def vpp_startup_conf_add_devices(vpp_config_filename, devices):
+    config = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
     if not config.get('dpdk'):
         config['dpdk'] = []
-    for dev in params['devices']:
+    for dev in devices:
         config_param = 'dev %s' % dev
         if not config_param in config['dpdk']:
             config['dpdk'].append(config_param)
 
-    fwtool_vpp_startupconf_dict.dump(config, filename)
+    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
 
-def vpp_startup_conf_remove_devices(params):
-    filename = params['vpp_config_filename']
-    config   = fwtool_vpp_startupconf_dict.load(filename)
-
+def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
+    config = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
     if not config.get('dpdk'):
         return
-    for dev in params['devices']:
+    for dev in devices:
         config_param = 'dev %s' % dev
         if config_param in config['dpdk']:
             config['dpdk'].remove(config_param)
     if len(config['dpdk']) == 0:
         config['dpdk'].append('ELEMENT_TO_BE_REMOVED')  # Need this to avoid empty list section before dump(), as yaml goes crazy with empty list sections
 
-    fwtool_vpp_startupconf_dict.dump(config, filename)
+    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
 
-def vpp_startup_conf_add_nat(params):
-    filename = params['vpp_config_filename']
-    config   = fwtool_vpp_startupconf_dict.load(filename)
+def vpp_startup_conf_add_nat(vpp_config_filename):
+    config   = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
     config['nat'] = []
     config['nat'].append('endpoint-dependent')
     config['nat'].append('translation hash buckets 1048576')
     config['nat'].append('translation hash memory 268435456')
     config['nat'].append('user hash buckets 1024')
     config['nat'].append('max translations per user 10000')
-    fwtool_vpp_startupconf_dict.dump(config, filename)
+    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
 
-def vpp_startup_conf_remove_nat(params):
-    filename = params['vpp_config_filename']
-    config   = fwtool_vpp_startupconf_dict.load(filename)
+def vpp_startup_conf_remove_nat(vpp_config_filename):
+    config   = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
     if config.get('nat'):
         del config['nat']
-    fwtool_vpp_startupconf_dict.dump(config, filename)
+    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
 
 def _get_interface_address(pci):
     """ Get interface ip address from commands DB.
@@ -1285,10 +1279,8 @@ def _get_interface_address(pci):
 
     return None
 
-def add_del_netplan_file(params):
-    is_add = params['is_add']
+def add_del_netplan_file(is_add):
     fname = fwglobals.g.NETPLAN_FILE
-
     if is_add:
         if not os.path.exists(fname):
             config = dict()
@@ -1298,20 +1290,13 @@ def add_del_netplan_file(params):
     else:
         if os.path.exists(fname):
             os.remove(fname)
+    return True
 
-    return (True, None)
+def add_remove_netplan_interface(is_add, pci, dhcp, ip, gw, metric):
 
-def add_remove_netplan_interface(params):
-    pci = params['pci']
-    is_add = params['is_add']
-    dhcp = params['dhcp']
-    ip = params['ip']
-    gw = params['gw']
     config_section = {}
-    if params['metric']:
-        metric = int(params['metric'])
-    else:
-        metric = 0
+
+    metric = int(metric) if metric else 0
 
     fname = fwglobals.g.NETPLAN_FILE
 
@@ -1352,7 +1337,7 @@ def add_remove_netplan_interface(params):
         err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname, str(e))
         fwglobals.log.error(err)
-        return (False, None)
+        return (False, err)
 
     return (True, None)
 
@@ -1387,7 +1372,7 @@ def reset_dhcpd():
 
     return True
 
-def modify_dhcpd(params):
+def modify_dhcpd(is_add, params):
     """Modify /etc/dhcp/dhcpd configuration file.
 
     :param params:   Parameters from flexiManage.
@@ -1399,7 +1384,6 @@ def modify_dhcpd(params):
     range_end = params['params'].get('range_end', '')
     dns = params['params'].get('dns', {})
     mac_assign = params['params'].get('mac_assign', {})
-    is_add = params['params']['is_add']
 
     address = IPNetwork(_get_interface_address(pci))
     router = str(address.ip)
@@ -1453,12 +1437,12 @@ def modify_dhcpd(params):
 
     try:
         output = subprocess.check_output(exec_string, shell=True)
-    except:
-        return False
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
     return True
 
-def vpp_multilink_update_labels(params):
+def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_index=None):
     """Updates VPP with flexiwan multilink labels.
     These labels are used for Multi-Link feature: user can mark interfaces
     or tunnels with labels and than add policy to choose interface/tunnel by
@@ -1477,26 +1461,23 @@ def vpp_multilink_update_labels(params):
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
-    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(
-            params['labels'], remove=params['remove'])
+    ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels, remove)
     ids = ','.join(map(str, ids_list))
 
-    if 'dev' in params:
-        vpp_if_name = pci_to_vpp_if_name(params['dev'])
-    elif 'sw_if_index' in params:
-        vpp_if_name = vpp_sw_if_index_to_name(params['sw_if_index'])
+    if dev:
+        vpp_if_name = pci_to_vpp_if_name(dev)
+    elif sw_if_index:
+        vpp_if_name = vpp_sw_if_index_to_name(sw_if_index)
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
 
-    if params.get('next_hop'):
-        next_hop = params['next_hop']
-    else:
-        tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop, metric = get_linux_interface_gateway(tap)
     if not next_hop:
-        return (False, "'next_hop' was not found in params and there is no default gateway")
+        tap = vpp_if_name_to_tap(vpp_if_name)
+        next_hop, unused_metric = get_linux_interface_gateway(tap)
+    if not next_hop:
+        return (False, "'next_hop' was not provided and there is no default gateway")
 
-    op = 'del' if params['remove'] else 'add'
+    op = 'del' if remove else 'add'
 
     vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
 
@@ -1509,7 +1490,7 @@ def vpp_multilink_update_labels(params):
     return (True, None)
 
 
-def vpp_multilink_update_policy_rule(params):
+def vpp_multilink_update_policy_rule(links, policy_id, fallback, order, remove, acl_id=None):
     """Updates VPP with flexiwan policy rules.
     In general, policy rules instruct VPP to route packets to specific interface,
     which is marked with multilink label that noted in policy rule.
@@ -1525,19 +1506,16 @@ def vpp_multilink_update_policy_rule(params):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    op = 'del' if params['remove'] else 'add'
-    policy_id = params['policy_id']
-    links = params['links']
+    op = 'del' if remove else 'add'
     fallback = ''
     order = ''
 
-    if re.match(params['fallback'], 'drop'):
+    if re.match(fallback, 'drop'):
         fallback = 'fallback drop'
 
-    if re.match(params['order'], 'load-balancing'):
+    if re.match(order, 'load-balancing'):
         order = 'select_group random'
 
-    acl_id = params.get('acl_id', None)
     if acl_id is None:
         vppctl_cmd = 'fwabf policy %s id %d action %s %s' % (op, policy_id, fallback, order)
     else:
@@ -1564,7 +1542,7 @@ def vpp_multilink_update_policy_rule(params):
 
     return (True, None)
 
-def vpp_multilink_attach_policy_rule(params):
+def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, remove):
     """Attach VPP with flexiwan policy rules.
 
     :param params: params - rule parameters:
@@ -1574,11 +1552,8 @@ def vpp_multilink_attach_policy_rule(params):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    op = 'del' if params['remove'] else 'add'
-    ip_version = 'ip6' if params['is_ipv6'] else 'ip4'
-    policy_id = params['policy_id']
-    int_name = params['int_name']
-    priority = params['priority']
+    op = 'del' if remove else 'add'
+    ip_version = 'ip6' if is_ipv6 else 'ip4'
 
     vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
 
@@ -1641,7 +1616,7 @@ def get_reconfig_hash():
 
     return ''
 
-def add_static_route(args):
+def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 
     :param params: params:
@@ -1649,23 +1624,17 @@ def add_static_route(args):
                         via     - Gateway address.
                         metric  - Metric.
                         remove  - True to remove route.
+                        pci     - Device to be used for outgoing packets.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    params = args['params']
-
-    if params['addr'] == 'default':
+    if addr == 'default':
         return (True, None)
 
-    metric = params.get('metric', None)
-    metric_str = ''
-    remove = args['remove']
-    op = 'replace'
+    metric = ' metric %s' % metric if metric else ''
+    op     = 'replace'
 
-    if metric:
-        metric_str = ' metric %s' % metric
-
-    cmd_show = "sudo ip route show exact %s %s" % (params['addr'], metric_str)
+    cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
     try:
         output = subprocess.check_output(cmd_show, shell=True)
     except:
@@ -1678,7 +1647,7 @@ def add_static_route(args):
         for line in lines:
             words = line.split('via ')
             if len(words) > 1:
-                if remove and not removed and re.search(params['via'], words[1]):
+                if remove and not removed and re.search(via, words[1]):
                     removed = True
                     continue
 
@@ -1687,23 +1656,23 @@ def add_static_route(args):
     if remove:
         if not next_hop:
             op = 'del'
-        cmd = "sudo ip route %s %s%s %s" % (op, params['addr'], metric_str, next_hop)
+        cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
     else:
-        if not 'pci' in params:
-            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, params['addr'], metric_str, params['via'], next_hop)
+        if not pci:
+            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
-            tap = pci_to_tap(params['pci'])
-            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, params['addr'], metric_str, params['via'], tap, next_hop)
+            tap = pci_to_tap(pci)
+            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
         fwglobals.log.debug(cmd)
         output = subprocess.check_output(cmd, shell=True)
-    except:
-        return False
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
     return True
 
-def vpp_set_dhcp_detect(params):
+def vpp_set_dhcp_detect(pci, remove):
     """Enable/disable DHCP detect feature.
 
     :param params: params:
@@ -1712,11 +1681,9 @@ def vpp_set_dhcp_detect(params):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    op = ''
-    if params['remove']:
-        op = 'del'
+    op = 'del' if remove else ''
 
-    sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+    sw_if_index = pci_to_vpp_sw_if_index(pci)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
 
     vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)

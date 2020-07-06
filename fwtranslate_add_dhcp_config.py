@@ -33,27 +33,24 @@ def _change_dhcpd_conf(params, cmd_list):
 
     :returns: None.
     """
-    params['is_add'] = 1
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['params'] = {
-        'module': 'fwutils',
-        'func': 'modify_dhcpd',
-        'args': {'params': params}
-    }
-    revert_params = copy.deepcopy(params)
-    revert_params['is_add'] = 0
+    cmd['cmd']['name']      = "python"
+    cmd['revert']['descr']  = "update dhcpd config file"
+    cmd['cmd']['params']    = {
+                                'module': 'fwutils',
+                                'func':   'modify_dhcpd',
+                                'args':   { 'is_add': 1, 'params': params }
+                              }
     cmd['cmd']['descr'] = "modify dhcpd config file"
     cmd['revert'] = {}
-    cmd['revert']['name'] = 'python'
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "clean dhcpd config file"
     cmd['revert']['params'] = {
-        'module': 'fwutils',
-        'func': 'modify_dhcpd',
-        'args': {'params': revert_params}
-    }
-    cmd['revert']['descr'] = "clean dhcpd config file"
-
+                                'module': 'fwutils',
+                                'func':   'modify_dhcpd',
+                                'args':   { 'is_add': 0, 'params': params }
+                              }
     cmd_list.append(cmd)
 
 
