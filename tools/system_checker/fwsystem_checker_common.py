@@ -325,9 +325,6 @@ class Checker:
             default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
-            if len(default_routes) > 1:
-                print(prompt + "only one default route is allowed, found %d" % len(default_routes))
-                return False  # Return here and do not throw exception as we propose no way to fix that. Replace with exception on demand :)
             return True
         except Exception as e:
             print(prompt + str(e))
@@ -341,6 +338,84 @@ class Checker:
                     try:
                         out = subprocess.check_output('ip route add default via %s' % ip, shell=True).strip()
                         return True
+                    except Exception as e:
+                        print(prompt + str(e))
+                        while True:
+                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            if choice == 'y' or choice == 'Y' or choice == '':
+                                break
+                            elif choice == 'n' or choice == 'N':
+                                return False
+
+    def _get_duplicate_metric(self):
+        output = subprocess.check_output('ip route show default', shell=True).strip()
+        routes = output.splitlines()
+
+        metrics = {}
+        for route in routes:
+            rip = route.split('via ')[1].split(' ')[0]
+            parts = route.split('metric ')
+            metric = 0
+            if len(parts) > 1:
+                metric = int(parts[1])
+            if metric in metrics:
+                metrics[metric].append(rip)
+            else:
+                metrics[metric] = [rip]
+
+        for metric, gws in metrics.items():
+            if len(gws) > 1:
+                return metric, gws
+
+        return None, None
+
+    def _fix_duplicate_metric(self, primary_gw):
+        subprocess.check_output('ip route del default via %s' % primary_gw, shell=True).strip()
+        subprocess.check_output('ip route add default via %s' % primary_gw, shell=True).strip()
+
+        metric, gws = self._get_duplicate_metric()
+        if metric is None:
+            return True
+
+        output = subprocess.check_output('ip route show default metric %u' % metric, shell=True).strip()
+        routes = output.splitlines()
+
+        for route in routes:
+            metric += 100
+            rip = route.split('via ')[1].split(' ')[0]
+            subprocess.check_output('ip route del default via %s' % rip, shell=True).strip()
+            subprocess.check_output('ip route add default via %s metric %u' % (rip, metric), shell=True).strip()
+
+        return True
+
+    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
+        """Check if default routes have duplicate metrics.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        try:
+            # Find all default routes and ensure that there are no duplicate metrics
+            metric, gws = self._get_duplicate_metric()
+            if metric is not None:
+                raise Exception("gateways %s with duplicate metric %u" % (gws, metric))
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            if not fix:
+                return False
+            else:
+                if silently:
+                    metric, gws = self._get_duplicate_metric()
+                    return self._fix_duplicate_metric(gws[0])
+                while True:
+                    metric, gws = self._get_duplicate_metric()
+                    ip = raw_input(prompt + "please choose primary gw, from %s: " % gws)
+                    try:
+                        return self._fix_duplicate_metric(ip)
                     except Exception as e:
                         print(prompt + str(e))
                         while True:
