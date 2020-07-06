@@ -70,10 +70,8 @@ soft_checkers = [
 	{ 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
 	{ 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
 	{ 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }}
-    { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
 	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-    { 'soft_check_worker_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
+    { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
 ]
 
 class TXT_COLOR:
