@@ -377,7 +377,6 @@ class FWROUTER_API:
         """
 
         try:
-            print("770")
             # update the configurations files
             fwutils.configure_openvpn_server(updatedParams['config'])
 
