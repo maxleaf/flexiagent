@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import json
 import os
 import re
 import traceback
@@ -28,8 +29,8 @@ import yaml
 from sqlitedict import SqliteDict
 
 import fwglobals
-from fwrouter_api import fwrouter_modules
-from fwrouter_api import fwrouter_translators
+import fwrouter_api
+import fwutils
 
 
 class FwRouterCfg:
@@ -71,9 +72,9 @@ class FwRouterCfg:
         request parameters 'params'. To do that uses function defined in the
         correspondent translator file, e.g. fwtranslate_add_tunnel.py.
         """
-        src_req      = fwrouter_translators[req].get('src', req)  # 'remove-X' requests use key generator of correspondent 'add-X' requests
-        src_module   = fwrouter_modules.get(fwrouter_translators[src_req]['module'])
-        src_key_func = getattr(src_module, fwrouter_translators[src_req]['key_func'])
+        src_req      = fwrouter_api.fwrouter_translators[req].get('src', req)  # 'remove-X' requests use key generator of correspondent 'add-X' requests
+        src_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
+        src_key_func = getattr(src_module, fwrouter_api.fwrouter_translators[src_req]['key_func'])
         src_req_key  = src_key_func(params)
         return src_req_key
 
@@ -137,7 +138,7 @@ class FwRouterCfg:
         """
         req_key = self._get_request_key(req, params)
         if not req_key in self.db:
-            return None
+            return (None, None)
         return (self.db[req_key].get('cmd_list'), self.db[req_key].get('executed'))
 
     def exists(self, req, params=None):
@@ -192,27 +193,18 @@ class FwRouterCfg:
                         request.update({
                             'cmd_list': self.db[key].get('cmd_list', ""),
                             'executed': self.db[key].get('executed', "")})
-                    if dump_key:
+                    if keys:
                         request.update({'key': key})
                     cfg.append(request)
         return cfg if len(cfg) > 0 else None
 
-    def print(self, types=None, escape=None, full=False):
-        """Prints router configuration onto screen.
+    def dumps(self, types=None, escape=None, full=False):
+        """Dumps router configuration into printable string.
 
         :param types:  list of types of configuration requests to be dumped, e.g. [ 'add-interface' , 'add-tunnel' ]
         :param escape: list of types of configuration requests that should be escaped while dumping
         :param full:   return requests together with translated commands.
         """
-        def _print_msg(msg, full):
-            print("Key:\n   %s" % msg['key'])
-            print("Request:\n   %s" % json.dumps(msg['params'], sort_keys=True, indent=4))
-            if full:
-                print("Commands:\n  %s" % yaml_dump(msg['cmd_list']))
-                print("Executed: %s" % yaml_dump(msg['executed']))
-            print("")
-
-        prev_msg   = { 'message': 'undefined' }
         separators = {
             'start-router':         "======== START COMMAND =======",
             'add-interface':        "========== INTERFACES ========",
@@ -223,16 +215,23 @@ class FwRouterCfg:
             'add-multilink-policy': "=========== POLICIES ========="
         }
 
+        out      = ''
+        prev_msg = { 'message': 'undefined' }
+
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
         for msg in cfg:
-
             # Print separator between sections
             if msg['message'] != prev_msg['message']:
-                print(separators[msg['message']])
+                out += separators[msg['message']] + "\n"
                 prev_msg['message'] = msg['message']
 
             # Print configuration item in section
-            _print_msg(msg, full)
+            out += "Key: %s\n" % msg['key']
+            out += "%s\n" % json.dumps(msg['params'], sort_keys=True, indent=2)
+            if full:
+                out += "Executed: %s\n" % str(msg['executed'])
+                out += "Commands:\n  %s" % fwutils.yaml_dump(msg['cmd_list'])
+        return out
 
     def _get_requests(self, req):
         """Retrives list of configuration requests parameters for requests with
@@ -280,7 +279,7 @@ class FwRouterCfg:
     def get_tunnel_interface_names(self):
         import fwutils
         if_names = []
-        tunnels = self.get_interfaces()
+        tunnels = self.get_tunnels()
         for params in tunnels:
             sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
             if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
@@ -323,7 +322,6 @@ def dump(full=False):
         cfg = router_cfg.dump(full)
     return cfg
 
-
 def print_basic(full=False):
     """Prints basic router configuration onto screen: interfaces, routes,
     tunnels, DHCP, etc. Does not print application identifications and multilink
@@ -332,8 +330,7 @@ def print_basic(full=False):
     :param full: prints requests together with translated commands.
     """
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        router_cfg.print(full=full, escape=['add-application','add-multilink-policy'])
-
+        print(router_cfg.dumps(full=full, escape=['add-application','add-multilink-policy']))
 
 def print_multilink(full=False):
     """Prints router multilink configuration onto screen.
@@ -341,4 +338,4 @@ def print_multilink(full=False):
     :param full: prints requests together with translated commands.
     """
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        router_cfg.print(full=full, types=['add-application','add-multilink-policy'])
+        print(router_cfg.dumps(full=full, types=['add-application','add-multilink-policy']))

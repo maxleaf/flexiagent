@@ -114,15 +114,15 @@ class FwApps:
     def _get_acl_id(self, name):
         return self.app_2_acl[name]
 
-    def add_remove_application(self, add, id, acl_id, category=None, serviceClass=None, importance=None):
+    def add_remove_application(self, add, id, acl_index=None, category=None, serviceClass=None, importance=None):
         """Stores/removes application into/from database.
 
         :returns: Reply.
         """
         if add:
-            self._add_app_db(id, acl_id, category, serviceClass, importance)
+            self._add_app_db(id, acl_index, category, serviceClass, importance)
         else:
-            self._remove_app_db(id, acl_id, category, serviceClass, importance)
+            self._remove_app_db(id, acl_index, category, serviceClass, importance)
 
     def acl_ids_get(self, name, category, serviceClass, importance):
         """Get ACL id.

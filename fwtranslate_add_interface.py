@@ -20,7 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import copy
 import os
 import re
 
@@ -93,10 +92,9 @@ def add_interface(params):
 
     # Add interface section into Netplan configuration file
     gw = params.get('gateway', None)
-    metric = str(params.get('metric', 0))
 
     # enable DHCP packets detection in VPP
-    if params['dhcp'] == 'yes':
+    if params.get('dhcp','') == 'yes':
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']   = "python"
@@ -125,10 +123,10 @@ def add_interface(params):
                 'func': 'add_remove_netplan_interface',
                 'args': { 'is_add': 1,
                           'pci'   : iface_pci,
-                          'dhcp'  : params['dhcp'],
                           'ip'    : iface_addr,
                           'gw'    : gw,
-                          'metric': metric
+                          'metric': params.get('metric'),
+                          'dhcp'  : params.get('dhcp')
                          }
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -140,10 +138,10 @@ def add_interface(params):
                 'args': {
                           'is_add': 0,
                           'pci'   : iface_pci,
-                          'dhcp'  : params['dhcp'],
                           'ip'    : iface_addr,
                           'gw'    : gw,
-                          'metric': metric
+                          'metric': params.get('metric'),
+                          'dhcp'  : params.get('dhcp')
                 }
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"

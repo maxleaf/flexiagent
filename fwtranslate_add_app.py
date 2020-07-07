@@ -169,7 +169,6 @@ def _add_app_info(params, cmd_list, cache_key):
                 'args': {
                     'add':          True,
                     'id':           params['id'],
-                    'acl_id':       params['acl_index'],
                     'category':     params.get('category'),
                     'serviceClass': params.get('serviceClass'),
                     'importance':   params.get('importance')
@@ -185,7 +184,6 @@ def _add_app_info(params, cmd_list, cache_key):
                 'args': {
                     'add':          False,
                     'id':           params['id'],
-                    'acl_id':       params['acl_index'],
                     'category':     params.get('category'),
                     'serviceClass': params.get('serviceClass'),
                     'importance':   params.get('importance')

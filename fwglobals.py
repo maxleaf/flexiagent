@@ -32,16 +32,14 @@ from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
-from fwapplications_api import FwApps
+from fwapplications import FwApps
 from fwrouter_cfg import FwRouterCfg
-from fwpolicies_api import FwPolicies
 
 modules = {
-    'fwagent_api':  __import__('fwagent_api'),
-    'fwapps_api':   __import__('fwapplications_api'),
-    'fwpolicy_api': __import__('fwpolicies_api'),
-    'fwrouter_api': __import__('fwrouter_api'),
-    'os_api':       __import__('os_api'),
+    'fwagent_api':      __import__('fwagent_api'),
+    'fwapplications':   __import__('fwapplications'),
+    'fwrouter_api':     __import__('fwrouter_api'),
+    'os_api':           __import__('os_api'),
 }
 
 request_handlers = {

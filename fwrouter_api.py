@@ -20,7 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import copy
 import os
 import re
 import time
@@ -33,8 +32,8 @@ import subprocess
 import fwglobals
 import fwutils
 
-from fwdb_requests import FwRouterCfg
-from fwapplications_api import FwApps
+from fwrouter_cfg import FwRouterCfg
+from fwapplications import FwApps
 from fwmultilink import FwMultilink
 from vpp_api import VPP_API
 
@@ -671,7 +670,7 @@ class FWROUTER_API:
         if params:
             for interface in params['interfaces']:
                 # Remove interface only if it exists in the database
-                if fwglobals.g.router_cfg.exist('remove-interface', interface):
+                if fwglobals.g.router_cfg.exists('remove-interface', interface):
                     modify_interface_requests.append(
                         {
                             'message': 'remove-interface',
@@ -707,7 +706,7 @@ class FWROUTER_API:
                     remove_route_params = {k:v for k,v in route.items() if k not in ['new_route']}
                     remove_route_params['via'] = remove_route_params.pop('old_route')
                     # Remove route only if it exists in the database
-                    if fwglobals.g.router_cfg.exist('remove-route', remove_route_params):
+                    if fwglobals.g.router_cfg.exists('remove-route', remove_route_params):
                         modify_route_requests.append(
                             {
                                 'message': 'remove-route',
@@ -739,7 +738,7 @@ class FWROUTER_API:
             if 'unassign' in params:
                 for ifc in params['unassign']:
                     # Remove interface only if it exists in the database
-                    if fwglobals.g.router_cfg.exist('remove-interface', ifc):
+                    if fwglobals.g.router_cfg.exists('remove-interface', ifc):
                         modify_router_requests.append(
                             {
                                 'message': 'remove-interface',
@@ -767,7 +766,7 @@ class FWROUTER_API:
         if params:
             for config in params['dhcp_configs']:
                 # Remove dhcp config only if it exists in the database
-                if fwglobals.g.router_cfg.exist('remove-dhcp-config', config):
+                if fwglobals.g.router_cfg.exists('remove-dhcp-config', config):
                     modify_requests.append(
                         {
                             'message': 'remove-dhcp-config',
@@ -794,7 +793,7 @@ class FWROUTER_API:
         if params:
             for policy in params['policies']:
                 # Remove policy only if it exists in the database
-                if fwglobals.g.router_cfg.exist('remove-multilink-policy', policy):
+                if fwglobals.g.router_cfg.exists('remove-multilink-policy', policy):
                     modify_requests.append(
                         {
                             'message': 'remove-multilink-policy',
@@ -820,7 +819,7 @@ class FWROUTER_API:
         if params:
             for app in params['apps']:
                 # Remove app only if it exists in the database
-                if fwglobals.g.router_cfg.exist('remove-application', app):
+                if fwglobals.g.router_cfg.exists('remove-application', app):
                     modify_requests.append(
                         {
                             'message': 'remove-application',
@@ -879,16 +878,16 @@ class FWROUTER_API:
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
         """
-        try:
-            types = [
-                'add-interface',
-                'add-tunnel',
-                'add-application',
-                'add-multilink-policy',
-                'add-route',            # Routes should come after tunnels, as they might use them!
-                'add-dhcp-config'
-            ]
-            messages = fwglobals.g.router_cfg.dump(types=types)
+        types = [
+            'add-interface',
+            'add-tunnel',
+            'add-application',
+            'add-multilink-policy',
+            'add-route',            # Routes should come after tunnels, as they might use them!
+            'add-dhcp-config'
+        ]
+        messages = fwglobals.g.router_cfg.dump(types=types)
+        if messages:
             for msg in messages:
                 fwglobals.g.handle_request(msg['message'], msg.get('params'))
 

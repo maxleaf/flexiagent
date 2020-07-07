@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import glob
 import hashlib
 import inspect
@@ -31,8 +32,6 @@ import subprocess
 import psutil
 import socket
 import re
-import fwapplications_api
-import fwdb_requests
 import fwglobals
 import fwstats
 import shutil
@@ -45,9 +44,9 @@ common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools
 sys.path.append(common_tools)
 import fwtool_vpp_startupconf_dict
 
-from fwdb_requests import FwRouterCfg
-from fwapplications_api import FwApps
-from fwmultilink import FwMultilink
+from fwapplications import FwApps
+from fwrouter_cfg   import FwRouterCfg
+from fwmultilink    import FwMultilink
 
 
 dpdk = __import__('dpdk-devbind')
@@ -1157,7 +1156,7 @@ def add_del_netplan_file(is_add):
             os.remove(fname)
     return True
 
-def add_remove_netplan_interface(is_add, pci, dhcp, ip, gw, metric):
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric='0', dhcp=None):
 
     config_section = {}
 
@@ -1165,7 +1164,7 @@ def add_remove_netplan_interface(is_add, pci, dhcp, ip, gw, metric):
 
     fname = fwglobals.g.NETPLAN_FILE
 
-    if re.match('yes', dhcp):
+    if dhcp and re.match('yes', dhcp):
         config_section['dhcp4'] = True
         config_section['dhcp4-overrides'] = {'route-metric': metric}
     else:
@@ -1559,3 +1558,115 @@ def vpp_set_dhcp_detect(pci, remove):
 
     return True
 
+
+# Today (May-2019) message aggregation is not well defined in protocol between
+# device and server. It uses several types of aggregations:
+#   1. 'start-router' aggregation: requests are embedded into 'params' field on some request
+#   2. 'add-interface' aggregation: 'params' field is list of 'interface params'
+#   3. 'list' aggregation: the high level message is a list of requests
+# As protocol is not well defined on this matter, for now we assume
+# that 'list' is used for FWROUTER_API requests only (add-/remove-/modify-),
+# so it should be handled as atomic operation and should be reverted in case of
+# failure of one of the requests in opposite order - from the last succeeded
+# request to the first, when the whole operation is considered to be failed.
+# Convert both type of aggregations into same format:
+# {
+#   'message': 'aggregated-router-api',
+#   'params' : {
+#                'requests': <list of aggregated requests>,
+#                'original': <original message>
+#              }
+# }
+# The 'original' is needed for configuration hash feature - every received
+# message is used for signing router configuration to enable database sync
+# between device and server. Once the protocol is fixed, there will be no more
+# need in this proprietary format.
+#
+def fix_aggregated_message_format(msg):
+
+    requests = []
+
+    # 'list' aggregation
+    if type(msg) == list:
+
+        # Figure out if 'reconnect' appears in one of aggregated messages.
+        # If it does, place it in the new aggregation header.
+        reconnect = False
+        for request in msg:
+            if 'params' in request and 'reconnect' in request['params']:
+                reconnect = True
+                break
+
+        return {
+            'message': 'aggregated-router-api',
+            'params' : {
+                'requests': msg,
+                'original': msg,
+                'reconnect': reconnect
+            }
+        }
+
+    # 'start-router' aggregation
+    # 'start-router' might include interfaces and routes. Move them into list.
+    if msg['message'] == 'start-router' and 'params' in msg:
+
+        start_router_params = copy.deepcopy(msg['params'])  # We are going to modify params, so preserve original message
+        if 'interfaces' in start_router_params:
+            for iface_params in start_router_params['interfaces']:
+                requests.append(
+                    {
+                        'message': 'add-interface',
+                        'params' : iface_params
+                    })
+            del start_router_params['interfaces']
+        if 'routes' in start_router_params:
+            for route_params in start_router_params['routes']:
+                requests.append(
+                    {
+                        'message': 'add-route',
+                        'params' : route_params
+                    })
+            del start_router_params['routes']
+
+        if len(requests) > 0:
+            if bool(start_router_params):  # If there are params after deletions above - use them
+                requests.append(
+                    {
+                        'message': 'start-router',
+                        'params' : start_router_params
+                    })
+            else:
+                requests.append(
+                    {
+                        'message': 'start-router'
+                    })
+            return {
+                'message': 'aggregated-router-api',
+                'params' : {
+                    'requests': requests,
+                    'original': msg
+                }
+            }
+
+    # 'add-X' aggregation
+    # 'add-interface'/'remove-interface' can have actually a list of interfaces.
+    # This is done by setting 'params' as a list of interface params, where
+    # every element represents parameters of some interface.
+    if re.match('add-|remove-', msg['message']) and type(msg['params']) is list:
+
+        for params in msg['params']:
+            requests.append(
+                {
+                    'message': msg['message'],
+                    'params' : params
+                })
+
+        return {
+            'message': 'aggregated-router-api',
+            'params' : {
+                'requests': requests,
+                'original': msg
+            }
+        }
+
+    return msg  # No conversion is needed

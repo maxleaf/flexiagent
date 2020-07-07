@@ -20,7 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import copy
 import os
 import fwglobals
 import fwtranslate_revert
@@ -67,7 +66,7 @@ def add_route(params):
                                 'args':   {
                                     'addr':   params['addr'],
                                     'via':    params['via'],
-                                    'metric': params.get['metric'],
+                                    'metric': params.get('metric'),
                                     'remove': False,
                                     'pci':    params.get('pci')
                                 }
@@ -81,7 +80,7 @@ def add_route(params):
                                 'args':   {
                                     'addr':   params['addr'],
                                     'via':    params['via'],
-                                    'metric': params.get['metric'],
+                                    'metric': params.get('metric'),
                                     'remove': True,
                                     'pci':    params.get('pci')
                                 }
