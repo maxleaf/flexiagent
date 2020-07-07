@@ -93,6 +93,7 @@ class FWROUTER_API:
         self.router_failure  = False
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
+        self.thread_dhcpc = None
 
     def finalize(self):
         """Destructor method
@@ -136,6 +137,31 @@ class FWROUTER_API:
         while self.router_started:
             time.sleep(1)  # 1 sec
             fwtunnel_stats.tunnel_stats_test()
+
+    def dhcpc_thread(self):
+        """DHCP client thread.
+        Its function is to monitor state of WAN interfaces with DHCP.
+        """
+        while self.router_started:
+            time.sleep(1)  # 1 sec
+            wan_list = self.get_wan_interface_addr_pci()
+            vpp_run = fwutils.vpp_does_run()
+
+            for wan in wan_list:
+                name = fwutils.pci_to_linux_iface(wan['pci'])
+
+                if name is None and vpp_run:
+                    name = fwutils.pci_to_tap(wan['pci'])
+
+                if name is None:
+                    continue
+
+                addr = fwutils.get_interface_address(name)
+                if not addr and vpp_run and wan['dhcp'] == 'yes':
+                    gw = wan['gateway']
+                    cmd = 'sudo dhclient %s; sleep 5; ping -c 3 %s' % (name, gw)
+                    fwglobals.log.debug(cmd)
+                    subprocess.check_output(cmd, shell=True)
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
@@ -608,6 +634,9 @@ class FWROUTER_API:
         if self.thread_tunnel_stats is None:
             self.thread_tunnel_stats = threading.Thread(target=self.tunnel_stats_thread, name='Tunnel Stats Thread')
             self.thread_tunnel_stats.start()
+        if self.thread_dhcpc is None:
+            self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
+            self.thread_dhcpc.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -619,6 +648,10 @@ class FWROUTER_API:
         if self.thread_tunnel_stats:
             self.thread_tunnel_stats.join()
             self.thread_tunnel_stats = None
+
+        if self.thread_dhcpc:
+            self.thread_dhcpc.join()
+            self.thread_dhcpc = None
 
     def _start_router(self, req, params):
         """Start and configure VPP.
