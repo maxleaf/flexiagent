@@ -45,7 +45,7 @@ common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools
 sys.path.append(common_tools)
 import fwtool_vpp_startupconf_dict
 
-from fwdb_requests import FwDbRequests
+from fwdb_requests import FwRouterCfg
 from fwapplications_api import FwApps
 from fwmultilink import FwMultilink
 
@@ -809,8 +809,8 @@ def reset_router_config():
 
      :returns: None.
      """
-    with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
-        db_requests.clean()
+    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
+        router_cfg.clean()
     if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
         os.remove(fwglobals.g.ROUTER_STATE_FILE)
     if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
@@ -844,138 +844,6 @@ def get_router_state():
         state = 'stopped'
     return (state, reason)
 
-def get_router_config(full=False):
-    """Get router configuration.
-
-     :param full:         Return requests together with translated commands.
-
-     :returns: Array of requests from DB.
-     """
-    def _dump_config_request(db_requests, key, full):
-        (request, params) = db_requests.fetch_request(key)
-        if full:
-            return {'message': request, 'params': params, 'cmd_list': db_requests.fetch_cmd_list(key)}
-        else:
-            return {'message': request, 'params': params}
-
-    with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
-        cfg = []
-
-        # Dump start-router request
-        if full and 'start-router' in db_requests.db:
-            cfg.append(_dump_config_request(db_requests, 'start-router', full))
-        # Dump interfaces
-        for key in db_requests.db:
-            if re.match('add-interface', key):
-                cfg.append(_dump_config_request(db_requests, key, full))
-        # Dump routes
-        for key in db_requests.db:
-            if re.match('add-route', key):
-                cfg.append(_dump_config_request(db_requests, key, full))
-        # Dump tunnels
-        for key in db_requests.db:
-            if re.match('add-tunnel', key):
-                cfg.append(_dump_config_request(db_requests, key, full))
-        # Dump dhcp configuration
-        for key in db_requests.db:
-            if re.match('add-dhcp-config', key):
-                cfg.append(_dump_config_request(db_requests, key, full))
-        # Dump applications configuration
-        for key in db_requests.db:
-            if re.match('add-application', key):
-                cfg.append(_dump_config_request(db_requests, key, full))
-        # Dump policy configuration
-        for key in db_requests.db:
-            if re.match('add-multilink-policy', key):
-                cfg.append(_dump_config_request(db_requests, key, full))
-        return cfg if len(cfg) > 0 else None
-
-def print_router_config(full=False):
-    """Print router configuration.
-
-     :param full:         Return requests together with translated commands.
-
-     :returns: None.
-     """
-    def _print_config_request(db_requests, key, full):
-        (_, params) = db_requests.fetch_request(key)
-        print("Key:\n   %s" % key)
-        print("Request:\n   %s" % json.dumps(params, sort_keys=True, indent=4))
-        if full:
-            cmd_list = db_requests.fetch_cmd_list(key)
-            print("Commands:\n  %s" % yaml_dump(cmd_list))
-        print("")
-
-    with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
-        if 'start-router' in db_requests.db:
-            print("======== START COMMAND =======")
-            _print_config_request(db_requests, 'start-router', full)
-
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-interface', key):
-                if not head_line_printed:
-                    print("========= INTERFACES =========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-route', key):
-                if not head_line_printed:
-                    print("=========== ROUTES ===========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-tunnel', key):
-                if not head_line_printed:
-                    print("=========== TUNNELS ==========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-dhcp-config', key):
-                if not head_line_printed:
-                    print("=========== DHCP CONFIG ==========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-
-def print_multilink_policy_config(full=False):
-    """Print multilink policy configuration.
-
-     :param full:         Return requests together with translated commands.
-
-     :returns: None.
-     """
-    def _print_config_request(db_requests, key, full):
-        (_, params) = db_requests.fetch_request(key)
-        print("Key:\n   %s" % key)
-        print("Request:\n   %s" % json.dumps(params, sort_keys=True, indent=4))
-        if full:
-            cmd_list = db_requests.fetch_cmd_list(key)
-            print("Commands:\n  %s" % yaml_dump(cmd_list))
-        print("")
-
-    with FwDbRequests(fwglobals.g.SQLITE_DB_FILE) as db_requests:
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-application', key):
-                if not head_line_printed:
-                    print("=========== APPS ==========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-
-        head_line_printed = False
-        for key in db_requests.db:
-            if re.match('add-multilink-policy', key):
-                if not head_line_printed:
-                    print("=========== POLICIES ==========")
-                    head_line_printed = True
-                _print_config_request(db_requests, key, full)
-#
 def _get_group_delimiter(lines, delimiter):
     """Helper function to iterate through a group lines by delimiter.
 
@@ -1268,15 +1136,12 @@ def vpp_startup_conf_remove_nat(vpp_config_filename):
 def _get_interface_address(pci):
     """ Get interface ip address from commands DB.
     """
-    for key, request in fwglobals.g.router_api.db_requests.db.items():
-
-        if not re.search('add-interface', key):
+    interfaces = fwglobals.g.router_cfg.get_interfaces()
+    for params in interfaces:
+        if params['pci'] != pci:
             continue
-        if request['params']['pci'] != pci:
-            continue
-        addr = request['params']['addr']
+        addr = params['addr']
         return addr
-
     return None
 
 def add_del_netplan_file(is_add):
@@ -1573,7 +1438,7 @@ def get_interface_sw_if_index(ip):
     :returns: sw_if_index.
     """
 
-    pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
+    pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return pci_to_vpp_sw_if_index(pci)
 
 def get_interface_gateway(ip):
@@ -1584,12 +1449,12 @@ def get_interface_gateway(ip):
     :returns: IP address.
     """
 
-    pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
+    pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
 def get_reconfig_hash():
     res = ''
-    wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
+    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
     vpp_run = vpp_does_run()
 
     for wan in wan_list:

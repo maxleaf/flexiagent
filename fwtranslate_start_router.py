@@ -94,33 +94,32 @@ def start_router(params=None):
     # in the configuration database.
     pci_list         = []
     pci_list_vmxnet3 = []
-    for key in fwglobals.g.router_api.db_requests.db:
-        if re.match('add-interface', key):
-            (_, params) = fwglobals.g.router_api.db_requests.fetch_request(key)
-            iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
-            if iface_pci:
-                # Firstly mark 'vmxnet3' interfaces as they need special care:
-                #   1. They should not appear in /etc/vpp/startup.conf.
-                #      If they appear in /etc/vpp/startup.conf, vpp will capture
-                #      them with vfio-pci driver, and 'create interface vmxnet3'
-                #      command will fail with 'device in use'.
-                #   2. They require additional VPP call vmxnet3_create on start
-                #      and complement vmxnet3_delete on stop
-                if fwutils.pci_is_vmxnet3(params['pci']):
-                    pci_list_vmxnet3.append(params['pci'])
-                else:
-                    pci_list.append(params['pci'])
+    interfaces = fwglobals.g.router_cfg.get_interfaces()
+    for params in interfaces:
+        iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
+        if iface_pci:
+            # Firstly mark 'vmxnet3' interfaces as they need special care:
+            #   1. They should not appear in /etc/vpp/startup.conf.
+            #      If they appear in /etc/vpp/startup.conf, vpp will capture
+            #      them with vfio-pci driver, and 'create interface vmxnet3'
+            #      command will fail with 'device in use'.
+            #   2. They require additional VPP call vmxnet3_create on start
+            #      and complement vmxnet3_delete on stop
+            if fwutils.pci_is_vmxnet3(params['pci']):
+                pci_list_vmxnet3.append(params['pci'])
+            else:
+                pci_list.append(params['pci'])
 
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "exec"
-                cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
-                cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
-                cmd['revert'] = {}
-                cmd['revert']['name']    = "exec"
-                cmd['revert']['params']  = [ "sudo netplan apply" ]
-                cmd['revert']['descr']  = "apply netplan configuration"
-                cmd_list.append(cmd)
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
+            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
+            cmd['revert'] = {}
+            cmd['revert']['name']    = "exec"
+            cmd['revert']['params']  = [ "sudo netplan apply" ]
+            cmd['revert']['descr']  = "apply netplan configuration"
+            cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 

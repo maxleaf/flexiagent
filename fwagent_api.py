@@ -27,6 +27,7 @@ import os
 import re
 from shutil import copyfile
 import fwglobals
+import fwrouter_cfg
 import fwstats
 import fwutils
 
@@ -68,32 +69,26 @@ class FWAGENT_API:
         return reply
 
     def _prepare_tunnel_info(self, tunnel_ids):
-        db_requests = fwglobals.g.router_api.db_requests
         tunnel_info = []
-        for key in db_requests.db:
+        tunnels = fwglobals.g.router_cfg.get_tunnels()
+        for params in tunnels:
             try:
-                if re.match('add-tunnel', key):
-                    (req, params) = db_requests.fetch_request(key)
-                    tunnel_id = params["tunnel-id"]
-                    if tunnel_id in tunnel_ids:
-                        local_sa = params["ipsec"]["local-sa"]
-                        remote_sa = params["ipsec"]["remote-sa"]
-                        # key1-key4 are the crypto keys stored in
-                        # the management for each tunnel
-                        tunnel_info.append({
-                            "id": str(tunnel_id),
-                            "key1": local_sa["crypto-key"],
-                            "key2": local_sa["integr-key"],
-                            "key3": remote_sa["crypto-key"],
-                            "key4": remote_sa["integr-key"]
-                        })
+                tunnel_id = params["tunnel-id"]
+                if tunnel_id in tunnel_ids:
+                    # key1-key4 are the crypto keys stored in
+                    # the management for each tunnel
+                    tunnel_info.append({
+                        "id": str(tunnel_id),
+                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
+                        "key2": params["ipsec"]["local-sa"]["integr-key"],
+                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
+                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
+                    })
 
             except Exception as e:
                 fwglobals.log.excep("failed to create tunnel information %s" % str(e))
                 raise e
-        
         return tunnel_info
-        
 
     def _get_device_info(self, params):
         """Get device information.
@@ -227,7 +222,7 @@ class FWAGENT_API:
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwutils.get_router_config()
+        configs = fwrouter_cfg.dump()
         reply = {'ok': 1, 'message': configs if configs != None else {}}
         return reply
 

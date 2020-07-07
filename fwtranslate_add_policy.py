@@ -252,8 +252,8 @@ def add_policy(params):
      :returns: List of commands.
     """
     cmd_list = []
-    lan_pci_list = fwglobals.g.router_api.get_pci_lan_interfaces()
-    loopback_ip_list = fwglobals.g.router_api.get_ip_tunnel_interfaces()
+    lan_pci_list = fwglobals.g.router_cfg.get_lan_interface_names()
+    loopback_ip_list = fwglobals.g.router_cfg.get_tunnel_interface_names()
 
     policy_acl_ids = set()
 

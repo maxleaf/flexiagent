@@ -33,6 +33,7 @@ from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications_api import FwApps
+from fwrouter_cfg import FwRouterCfg
 from fwpolicies_api import FwPolicies
 
 modules = {
@@ -201,7 +202,7 @@ class Fwglobals:
         self.FWAGENT_CONF_FILE   = self.DATA_PATH + 'fwagent_conf.yaml'  # Optional, if not present, defaults are taken
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'
         self.VERSIONS_FILE       = self.DATA_PATH + '.versions.yaml'
-        self.SQLITE_DB_FILE      = self.DATA_PATH + '.requests.sqlite'
+        self.ROUTER_CFG_FILE     = self.DATA_PATH + '.requests.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
@@ -274,9 +275,9 @@ class Fwglobals:
         :returns: None.
         """
         self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
+        self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE)
         self.os_api     = OS_API()
-        self.apps_api   = FwApps(self.APP_REC_DB_FILE)
         self.policy_api = FwPolicies()
 
         self.router_api.restore_vpp_if_needed()
@@ -285,6 +286,7 @@ class Fwglobals:
         """Destructor method
         """
         self.router_api.finalize()
+        self.router_cfg.finalize()
 
     def __str__(self):
         """Get string representation of configuration.
@@ -313,10 +315,7 @@ class Fwglobals:
         return self.policy_api.call(req, params)
 
     def _call_router_api(self, req, params):
-        if req == 'aggregated-router-api':
-            return self.router_api.call_aggregated(params['requests'])
-        else:
-            return self.router_api.call(req, params)
+        return self.router_api.call(req, params)
 
     def _call_os_api(self, req, params):
         return self.os_api.call_simple(req, params)
