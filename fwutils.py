@@ -1355,7 +1355,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     return (True, None)
 
 
-def vpp_multilink_update_policy_rule(links, policy_id, fallback, order, remove, acl_id=None):
+def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl_id=None):
     """Updates VPP with flexiwan policy rules.
     In general, policy rules instruct VPP to route packets to specific interface,
     which is marked with multilink label that noted in policy rule.
@@ -1371,9 +1371,7 @@ def vpp_multilink_update_policy_rule(links, policy_id, fallback, order, remove, 
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    op = 'del' if remove else 'add'
-    fallback = ''
-    order = ''
+    op = 'add' if add else 'del'
 
     if re.match(fallback, 'drop'):
         fallback = 'fallback drop'

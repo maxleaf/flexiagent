@@ -64,14 +64,6 @@ request_handlers = {
     'upgrade-device-sw':            '_call_agent_api',
     'reset-device':                 '_call_agent_api',
 
-    # Applications API
-    'add-app-info':                 '_call_apps_api',
-    'remove-app-info':              '_call_apps_api',
-
-    # Policy API
-    'add-policy-info':              '_call_policy_api',
-    'remove-policy-info':           '_call_policy_api',
-
     # Router API
     'aggregated-router-api':        '_call_router_api',
     'start-router':                 '_call_router_api',
@@ -278,7 +270,7 @@ class Fwglobals:
         self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
         self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE)
         self.os_api     = OS_API()
-        self.policy_api = FwPolicies()
+        self.apps       = FwApps(self.APP_REC_DB_FILE)
 
         self.router_api.restore_vpp_if_needed()
 
@@ -307,12 +299,6 @@ class Fwglobals:
 
     def _call_agent_api(self, req, params):
         return self.agent_api.call(req, params)
-
-    def _call_apps_api(self, req, params):
-        return self.apps_api.call(req, params)
-
-    def _call_policy_api(self, req, params):
-        return self.policy_api.call(req, params)
 
     def _call_router_api(self, req, params):
         return self.router_api.call(req, params)
@@ -346,6 +332,8 @@ class Fwglobals:
                 func = getattr(self, params['func'])
             elif params['object'] == 'fwglobals.g.router_api':
                 func = getattr(self.router_api, params['func'])
+            elif params['object'] == 'fwglobals.g.apps':
+                func = getattr(self.apps, params['func'])
             else:
                 raise Exception("object '%s' is not supported" % (params['object']))
         else:

@@ -114,9 +114,8 @@ def _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list):
     cmd['cmd']['params']  = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'links': links, 'policy_id': policy_id,
-                                'acl_id': acl_id, 'fallback': fallback,
-                                'order': order, 'remove': False }
+                    'args'  : { 'add': True, 'links': links, 'policy_id': policy_id,
+                                'fallback': fallback, 'order': order, 'acl_id': acl_id }
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -124,9 +123,8 @@ def _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list):
     cmd['revert']['params'] = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'links': links, 'policy_id': policy_id,
-                                'acl_id': acl_id, 'fallback': fallback,
-                                'order': order, 'remove': True }
+                    'args'  : { 'add':False, 'links': links, 'policy_id': policy_id,
+                                'fallback': fallback, 'order': order, 'acl_id': acl_id }
     }
     cmd_list.append(cmd)
     return cmd_list
@@ -139,30 +137,27 @@ def _add_policy_rule_from_cache_key(policy_id, links, cache_key, fallback, order
 
      :returns: Updated list of commands.
      """
-
-    add_args = {
-        'substs' : [{'add_param': 'acl_id', 'val_by_key': cache_key}],
-        'links': links,
-        'policy_id': policy_id,
-        'fallback': fallback,
-        'order': order,
-        'remove': False
-    }
-
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "add-policy-info"
+    cmd['cmd']['name']    = "python"
     cmd['cmd']['descr']   = "add policy (id=%d)" % (policy_id)
-    cmd['cmd']['params']  = add_args
-
-    remove_args = copy.deepcopy(add_args)
-    remove_args['remove'] = True
-
+    cmd['cmd']['params']  = {
+                    'module': 'fwutils',
+                    'func':   'vpp_multilink_update_policy_rule',
+                    'args'  : { 'add': True, 'links': links, 'policy_id': policy_id,
+                                'fallback': fallback, 'order': order },
+                    'substs' : [{'add_param': 'acl_id', 'val_by_key': cache_key}]
+    }
     cmd['revert'] = {}
-    cmd['revert']['name']   = "remove-policy-info"
+    cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "remove policy (id=%d)" % (policy_id)
-    cmd['revert']['params'] = remove_args
-
+    cmd['revert']['params'] = {
+                    'module': 'fwutils',
+                    'func':   'vpp_multilink_update_policy_rule',
+                    'args'  : { 'add': False, 'links': links, 'policy_id': policy_id,
+                                'fallback': fallback, 'order': order },
+                    'substs' : [{'add_param': 'acl_id', 'val_by_key': cache_key}]
+    }
     cmd_list.append(cmd)
     return cmd_list
 
@@ -295,7 +290,7 @@ def add_policy(params):
             service_class = app.get('serviceClass', None)
             importance = app.get('importance', None)
 
-            rule_acl_ids = fwglobals.g.apps_api.acl_ids_get(id, category, service_class, importance)
+            rule_acl_ids = fwglobals.g.apps.acl_ids_get(id, category, service_class, importance)
 
             for acl_id in rule_acl_ids:
                 if acl_id in policy_acl_ids:
