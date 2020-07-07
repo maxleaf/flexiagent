@@ -40,6 +40,12 @@ import getopt
 import importlib
 import platform
 import sys
+import shutil
+
+globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
+sys.path.append(globals)
+import fwglobals
+import fwutils
 
 FW_EXIT_CODE_OK = 0
 FW_EXIT_CODE_ERROR_UNMET_HARDWARE_REQUIREMENTS        = 0x1
@@ -205,6 +211,38 @@ def check_soft_configuration(checker, fix=False, quite=False):
             succeeded = False
     return succeeded
 
+def reset_system_to_defaults():
+    """ reset vpp configuration to default
+
+    :returns: 'True' if succeeded.
+    """ 
+    # This function does the following:
+    # 1. Copies the startup.conf.orig over the start.conf and startup.conf.baseline files.
+    # 2. reset /etc/default/grub to a single core configuration
+    # 3. Reboot.
+
+    reboot_needed = False
+    while True:
+        choice = raw_input("Resetting to Factory Defauls. Resetting will reboot the system. Are you sure? [y/N]: ")
+        if choice == 'n' or choice == 'N' or choice == '':
+            return True
+        elif choice == 'y' or choice == 'Y':
+            shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
+            shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
+            reboot_needed = fwutils.update_grub_file(0)
+            break
+    
+    if reboot_needed == True:
+        while True:
+            choice = raw_input("Reboot the system? [Y/n]: ")
+            if choice == 'n' or choice == 'N':
+                return True
+            elif choice == 'y' or choice == 'Y' or choice == '':
+                print ("Rebooting....")
+                os.system('reboot now')
+
+    return True
+
 def main(args):
     """Checker entry point.
 
@@ -261,6 +299,7 @@ def main(args):
                             "\t 2  - check system configuration\n" +
                             "\t 3  - configure system silently\n" +
                             "\t 4  - configure system interactively\n" +
+                            "\t 5  - restore system to factory defaults\n" +
                             "\t-------------------------------------\n" +
                             "Choose: ")
             if choice == '2':
@@ -272,25 +311,29 @@ def main(args):
             elif choice == '4':
             	print('')
                 success = check_soft_configuration(checker, fix=True, quite=False)
+            elif choice == '5':
+                print ('')
+                success = reset_system_to_defaults()
             else:
                 success = True
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-			if success == True:
-				if checker.reboot_needed == True:
-					rebootSys = 'x'
-					while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
-						rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
-												"Would you like to reboot now (y/n)?")
-						if rebootSys == 'y' or rebootSys == 'Y':
-							checker.save_config()
-							print ("Rebooting...")
-							os.system('reboot now')
+	        if success == True:
+	            if checker.reboot_needed == True:
+		            rebootSys = 'x'
+                            while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
+                                rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
+                                                "Would you like to reboot now (Y/n)?")
+                                if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
+                                    checker.save_config()
+                                    print ("Rebooting...")
+                                    os.system('reboot now')
 
-			# Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-			print ("Please wait..")
-			os.system("sudo systemctl restart flexiwan-router")
-			print ("Done.")
+                print ("Please wait..")
+                os.system("sudo systemctl stop flexiwan-router")
+                shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
+                os.system("sudo systemctl start flexiwan-router")
+                print ("Done.")
 		
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
         return (soft_status_code | hard_status_code)
