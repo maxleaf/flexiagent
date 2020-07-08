@@ -354,38 +354,75 @@ class Checker:
 
         metrics = {}
         for route in routes:
+            dev = route.split('dev ')[1].split(' ')[0]
             rip = route.split('via ')[1].split(' ')[0]
             parts = route.split('metric ')
             metric = 0
             if len(parts) > 1:
                 metric = int(parts[1])
             if metric in metrics:
-                metrics[metric].append(rip)
+                metrics[metric].append([dev,rip])
             else:
-                metrics[metric] = [rip]
+                metrics[metric] = [[dev,rip]]
 
         for metric, gws in metrics.items():
             if len(gws) > 1:
-                return metric, gws
+                return metric, metrics
 
         return None, None
 
-    def _fix_duplicate_metric(self, primary_gw):
-        subprocess.check_output('ip route del default via %s' % primary_gw, shell=True).strip()
-        subprocess.check_output('ip route add default via %s' % primary_gw, shell=True).strip()
+    def _add_netplan_interface(self, fname, dev, metric):
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+            network = config['network']
 
-        metric, gws = self._get_duplicate_metric()
+        ethernets = network['ethernets']
+        if dev in ethernets:
+            section = ethernets[dev]
+            if 'dhcp4' in section and section['dhcp4'] == True:
+                section['dhcp4-overrides'] = {'route-metric': metric}
+            else:
+                section['routes'] = [{'to': '0.0.0.0/0',
+                                      'via': section['gateway4'],
+                                      'metric': metric}]
+                del section['gateway4']
+
+        with open(fname, 'w') as stream:
+            yaml.safe_dump(config, stream)
+
+    def _get_netplan_filename(self, dev):
+        for fname in glob.glob("/etc/netplan/*.yaml"):
+            with open(fname, 'r') as stream:
+                config = yaml.safe_load(stream)
+                if 'network' in config:
+                    network = config['network']
+                    if 'ethernets' in network:
+                        ethernets = network['ethernets']
+                        if dev in ethernets:
+                            return fname
+        return None
+
+    def _fix_duplicate_metric(self):
+        metric, metrics = self._get_duplicate_metric()
         if metric is None:
             return True
 
-        output = subprocess.check_output('ip route show default metric %u' % metric, shell=True).strip()
+        fname = self._get_netplan_filename(metrics[metric][0][0])
+        os.system('cp %s %s.fworig' % (fname, fname))
+        os.system('mv %s %s.baseline.yaml' % (fname, fname))
+        fname += '.baseline.yaml'
+
+        output = subprocess.check_output('ip route show default', shell=True).strip()
         routes = output.splitlines()
 
         for route in routes:
             metric += 100
-            rip = route.split('via ')[1].split(' ')[0]
-            subprocess.check_output('ip route del default via %s' % rip, shell=True).strip()
-            subprocess.check_output('ip route add default via %s metric %u' % (rip, metric), shell=True).strip()
+            dev = route.split('dev ')[1].split(' ')[0]
+            self._add_netplan_interface(fname, dev, metric)
+
+        cmd = 'sudo netplan apply'
+        fwglobals.log.debug(cmd)
+        subprocess.check_output(cmd, shell=True)
 
         return True
 
@@ -400,31 +437,16 @@ class Checker:
         """
         try:
             # Find all default routes and ensure that there are no duplicate metrics
-            metric, gws = self._get_duplicate_metric()
+            metric, metrics = self._get_duplicate_metric()
             if metric is not None:
-                raise Exception("gateways %s with duplicate metric %u" % (gws, metric))
+                raise Exception("Multiple default routes with the same metric %u" % metric)
             return True
         except Exception as e:
             print(prompt + str(e))
             if not fix:
                 return False
             else:
-                if silently:
-                    metric, gws = self._get_duplicate_metric()
-                    return self._fix_duplicate_metric(gws[0])
-                while True:
-                    metric, gws = self._get_duplicate_metric()
-                    ip = raw_input(prompt + "please choose primary gw, from %s: " % gws)
-                    try:
-                        return self._fix_duplicate_metric(ip)
-                    except Exception as e:
-                        print(prompt + str(e))
-                        while True:
-                            choice = raw_input(prompt + "repeat? [Y/n]: ")
-                            if choice == 'y' or choice == 'Y' or choice == '':
-                                break
-                            elif choice == 'n' or choice == 'N':
-                                return False
+                return self._fix_duplicate_metric()
 
     def soft_check_netplan_files(self, fix=False, silently=False, prompt=None):
         """Check if netplan config files do not override Flexiwan config.
