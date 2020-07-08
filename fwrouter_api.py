@@ -161,7 +161,10 @@ class FWROUTER_API:
                     gw = wan['gateway']
                     cmd = 'sudo dhclient %s; sleep 5; ping -c 3 %s' % (name, gw)
                     fwglobals.log.debug(cmd)
-                    subprocess.check_output(cmd, shell=True)
+                    try:
+                        subprocess.check_output(cmd, shell=True)
+                    except Exception as e:
+                        fwglobals.log.debug(str(e))
 
     def restore_vpp_if_needed(self):
         """Restore VPP.

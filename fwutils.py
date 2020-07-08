@@ -825,6 +825,7 @@ def reset_router_config():
         db_multilink.clean()
     if os.path.exists(fwglobals.g.NETPLAN_FILE):
         os.remove(fwglobals.g.NETPLAN_FILE)
+        shutil.move(fwglobals.g.NETPLAN_FILE_BACKUP, fwglobals.g.NETPLAN_FILE_ORIG)
 
     reset_dhcpd()
 
@@ -1293,17 +1294,43 @@ def add_del_netplan_file(params):
     is_add = params['is_add']
     fname = fwglobals.g.NETPLAN_FILE
 
+    if not fname:
+        return (True, None)
+
     if is_add:
         if not os.path.exists(fname):
-            config = dict()
-            config['network'] = {'version': 2}
-            with open(fname, 'w+') as stream:
-                yaml.safe_dump(config, stream, default_flow_style=False)
+            os.system('cp %s %s' % (fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE_BACKUP))
+            os.system('mv %s %s' % (fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE))
     else:
         if os.path.exists(fname):
             os.remove(fname)
+            shutil.move(fwglobals.g.NETPLAN_FILE_BACKUP, fwglobals.g.NETPLAN_FILE_ORIG)
 
     return (True, None)
+
+def _get_netplan_filename(dev):
+    for fname in glob.glob("/etc/netplan/*.yaml"):
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+            if 'network' in config:
+                network = config['network']
+                if 'ethernets' in network:
+                    ethernets = network['ethernets']
+                    if dev in ethernets:
+                        return fname
+    return ''
+
+def _set_netplan_filename(filename):
+    if fwglobals.g.NETPLAN_FILE:
+        return
+
+    fwglobals.g.NETPLAN_FILE_ORIG = filename
+    fwglobals.g.NETPLAN_FILE_BACKUP = filename + '.fworig'
+    fwglobals.g.NETPLAN_FILE = filename + '.run.yaml'
+
+    fwglobals.log.info('NETPLAN_FILE_ORIG %s' % fwglobals.g.NETPLAN_FILE_ORIG)
+    fwglobals.log.info('NETPLAN_FILE_BACKUP %s' % fwglobals.g.NETPLAN_FILE_BACKUP)
+    fwglobals.log.info('NETPLAN_FILE %s' % fwglobals.g.NETPLAN_FILE)
 
 def add_remove_netplan_interface(params):
     pci = params['pci']
