@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import glob
 import json
 import os
 import psutil
@@ -424,6 +425,32 @@ class Checker:
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
+
+    def soft_check_netplan_files(self, fix=False, silently=False, prompt=None):
+        """Check if netplan config files do not override Flexiwan config.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        flexiwan_name = '/etc/netplan/999-flexiwan.yaml'
+
+        try:
+            # Find all netplan config file names
+            files = glob.glob("/etc/netplan/*.yaml") +\
+                    glob.glob("/lib/netplan/*.yaml") +\
+                    glob.glob("/run/netplan/*.yaml")
+
+            for fname in files:
+                if os.path.basename(flexiwan_name) < os.path.basename(fname):
+                    raise Exception("%s overrides %s" % (fname, flexiwan_name))
+
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            return False
 
     def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):
         """Check hostname syntax.

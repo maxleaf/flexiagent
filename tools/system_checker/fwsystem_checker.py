@@ -65,6 +65,7 @@ soft_checkers = [
     { 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
     { 'soft_check_default_routes_metric'         : { 'severity': 'critical' , 'interactive': 'optional' }},
     { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
+    { 'soft_check_netplan_files'      : { 'severity': 'critical' , 'interactive': 'optional' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
