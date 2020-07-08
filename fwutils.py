@@ -817,6 +817,8 @@ def reset_router_config():
         os.remove(fwglobals.g.FRR_OSPFD_FILE)
     if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
+    elif os.path.exists(fwglobals.g.VPP_CONFIG_FILE_RESTORE):
+        shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
     with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
@@ -1732,48 +1734,3 @@ def vpp_set_dhcp_detect(params):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
-def update_grub_file(num_of_workers_cores):
-    """Update /etc/default/grub to work with more then 1 core.
-
-    :param num_of_workers_cores:  num of cores to handle incoming traffic
-
-    :returns True if values were changed by user and system needs to reboot or False
-    """
-    # This function does the following:
-    # 1. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/defualt/grub
-    # 2. sudo update-grub
-    if num_of_workers_cores == 0:
-        update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on\"'
-    elif num_of_workers_cores == 1:
-        update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1\"'
-    else:
-        update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d\"' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
-    grub_read_file  = '/etc/default/grub'
-    grub_write_file = '/etc/default/grub.tmp'
-
-    add_grub_line = False
-    read_file  = open(grub_read_file, "r")
-    write_file = open(grub_write_file, "w")
-    for line in read_file:
-        if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
-            if line.startswith("#"):
-                write_file.write(line)
-            else: 
-                line = "# " + line
-                write_file.write(line)
-                add_grub_line = True
-        else:
-            write_file.write(line)
-            add_grub_line = True
-    if add_grub_line == True:
-        write_file.write(update_line + '\n')
-    write_file.close()
-    read_file.close()
-    shutil.copyfile (grub_write_file, grub_read_file)
-    os.remove (grub_write_file)
-    if add_grub_line == True:
-        os.system ("sudo update-grub")
-        return True
-    else:
-        return False

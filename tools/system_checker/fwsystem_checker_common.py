@@ -60,7 +60,7 @@ class Checker:
         self.supported_nics         = None
         self.vpp_configuration      = fwtool_vpp_startupconf_dict.load(self.CFG_VPP_CONF_FILE)
         self.vpp_config_modified    = False
-        self.reboot_needed          = False
+        self.update_grub            = False
 
         supported_nics_filename = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'dpdk_supported_nics.json')
         with open(supported_nics_filename, 'r') as f:
@@ -69,7 +69,8 @@ class Checker:
     def save_config (self):
         if self.vpp_config_modified:
             fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
-            shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
+            self.update_grub_file(False)
+        shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
 
     def __enter__(self):
         return self
@@ -79,7 +80,9 @@ class Checker:
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
-        self.save_config()
+        if self.vpp_config_modified:
+            fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
+            
             
     def hard_check_sse42(self, supported):
         """Check SSE 4.2 support.
@@ -818,7 +821,7 @@ class Checker:
             conf['dpdk'] = []
             self._add_dict_to_dpdk(input_cores)
             self.vpp_config_modified = True
-            self.reboot_needed = fwutils.update_grub_file(input_cores)
+            self.update_grub = True
             return True
 
         # configuration file exist    
@@ -880,7 +883,7 @@ class Checker:
                             num_of_rx_queues_param = 'num-rx-queues 0'
                             element['dev default'].append(num_of_rx_queues_param)   
             self.vpp_config_modified = True
-            self.reboot_needed = fwutils.update_grub_file(input_cores)
+            self.update_grub = True
             return True 
 
 
@@ -926,7 +929,7 @@ class Checker:
                         self.vpp_config_modified = True 
 
             if self.vpp_config_modified == True:
-                self.reboot_needed = fwutils.update_grub_file(input_cores)
+                self.update_grub = True
             return True
 
     def _add_dict_to_dpdk(self, num_of_cores):
@@ -1039,4 +1042,60 @@ class Checker:
 
         return True         
 
-        
+    def update_grub_file(self, reset=False):
+        """Update /etc/default/grub to work with more then 1 core.
+
+        :returns True if values were changed by user and system needs to reboot or False
+        """
+        # This function does the following:
+        # 1. check how many cores to update
+        # 2. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/defualt/grub
+        # 3. sudo update-grub
+        if self.update_grub == False:
+            return
+
+        if reset == True:
+            num_of_workers_cores = 0
+        else:
+            num_of_workers_cores = 0
+            cfg = self.vpp_configuration
+            if cfg and cfg['cpu']:
+                for param in cfg['cpu']:
+                    if 'workers' == param[0:7]:
+                        current_workers_param = param
+                        num_of_workers_cores = int(current_workers_param.split(' ')[1])
+
+        if num_of_workers_cores == 0:
+            update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on\"'
+        elif num_of_workers_cores == 1:
+            update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1\"'
+        else:
+            update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d\"' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
+        grub_read_file  = '/etc/default/grub'
+        grub_write_file = '/etc/default/grub.tmp'
+
+        add_grub_line = False
+        read_file  = open(grub_read_file, "r")
+        write_file = open(grub_write_file, "w")
+        for line in read_file:
+            if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
+                if line.startswith("#"):
+                    write_file.write(line)
+                else: 
+                    line = "# " + line
+                    write_file.write(line)
+                    add_grub_line = True
+            else:
+                write_file.write(line)
+                add_grub_line = True
+        if add_grub_line == True:
+            write_file.write(update_line + '\n')
+        write_file.close()
+        read_file.close()
+        shutil.copyfile (grub_write_file, grub_read_file)
+        os.remove (grub_write_file)
+        if add_grub_line == True:
+            os.system ("sudo update-grub")
+            return True
+        else:
+            return False

@@ -211,7 +211,21 @@ def check_soft_configuration(checker, fix=False, quite=False):
             succeeded = False
     return succeeded
 
-def reset_system_to_defaults():
+def quit_soft_configuration(checker):
+    """ quit system_checker
+    :returns: 'True' if succeeded.
+    """ 
+    # This function quits the system checker
+    # the checker function saves the changes to the configration file.
+    # Howeefer, if the user choose not to save the changes maded, we need to revert
+    # back to the previous configuration
+    checker.vpp_config_modified = False # don't update startup.conf on exit from system_checker
+    checker.update_grub = False
+    return True
+
+
+
+def reset_system_to_defaults(checker):
     """ reset vpp configuration to default
 
     :returns: 'True' if succeeded.
@@ -229,7 +243,9 @@ def reset_system_to_defaults():
         elif choice == 'y' or choice == 'Y':
             shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
             shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
-            reboot_needed = fwutils.update_grub_file(0)
+            checker.update_grub = True
+            checker.update_grub_file(True)
+            reboot_needed = True
             break
     
     if reboot_needed == True:
@@ -302,7 +318,10 @@ def main(args):
                             "\t 5  - restore system to factory defaults\n" +
                             "\t-------------------------------------\n" +
                             "Choose: ")
-            if choice == '2':
+            if choice == '1':
+                print('')
+                success = quit_soft_configuration(checker)
+            elif choice == '2':
             	print('')
                 success = check_soft_configuration(checker, fix=False)
             elif choice == '3':
@@ -313,26 +332,24 @@ def main(args):
                 success = check_soft_configuration(checker, fix=True, quite=False)
             elif choice == '5':
                 print ('')
-                success = reset_system_to_defaults()
+                success = reset_system_to_defaults(checker)
             else:
                 success = True
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
 	        if success == True:
-	            if checker.reboot_needed == True:
-		            rebootSys = 'x'
-                            while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
-                                rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
-                                                "Would you like to reboot now (Y/n)?")
-                                if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
-                                    checker.save_config()
-                                    print ("Rebooting...")
-                                    os.system('reboot now')
+                    checker.save_config()
+                    if checker.update_grub == True:
+		                rebootSys = 'x'
+                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
+                                    rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
+                                                    "Would you like to reboot now (Y/n)?")
+                                    if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
+                                        print ("Rebooting...")
+                                        os.system('reboot now')
 
                 print ("Please wait..")
-                os.system("sudo systemctl stop flexiwan-router")
-                shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
-                os.system("sudo systemctl start flexiwan-router")
+                os.system("sudo systemctl restart flexiwan-router")
                 print ("Done.")
 		
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
