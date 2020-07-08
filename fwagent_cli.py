@@ -59,16 +59,11 @@ class FwagentCli:
         If no agent runs on background, the FwagentCli will create new instance
     of Fwagent and will use it. This instance is  destroyed on FwagentCli exit.
     """
-    def __init__(self, agent_linger=None):
+    def __init__(self):
         """Constructor.
-        :param agent_linger: sleep duration before destroying local instance
-                             of fwagent. It might be used to keep vpp running
-                             for a linger number of seconds, as agent
-                             termination kills the vpp.
         """
         self.daemon       = None
         self.agent        = None
-        self.agent_linger = agent_linger
         self.prompt       = 'fwagent> '
 
         try:
@@ -91,8 +86,6 @@ class FwagentCli:
             # If we used local instance of Fwagent and not daemon, kill it.
             # Otherwise we might hang up in vpp watchdog,
             # if router was started by cli execution.
-            if self.agent_linger:
-                time.sleep(self.agent_linger)
             self.agent.__exit__(exc_type, exc_value, traceback)
 
     def run_loop(self):
@@ -115,9 +108,18 @@ class FwagentCli:
             except Exception as e:
                 print(self.prompt + str(e))
 
-    def execute(self, api_str):
+    def execute(self, api_args):
+        """Executes API provided by user with
+        'fwagent cli --api <api name> [<api arg1>, ...]` command.
+
+         :param api_args: the user input as a list, where the list[0] element
+                          is API name and rest elements are API arguments.
+        """
         try:
-            (api_name, api_args) = parse_api_str(api_str)
+            # Convert list of "<name>=<val>" elements into dictionary
+            api_name = api_args[0]
+            api_args = { arg.split("=")[0] : arg.split("=")[1] for arg in api_args[1:] }
+
             if self.daemon:
                 rpc_api_func = getattr(self.daemon, 'api')
                 rpc_api_func(api_name, api_args)
@@ -130,35 +132,3 @@ class FwagentCli:
             fwglobals.log.error(self.prompt + 'type "help" to see available commands')
         except Exception as e:
             fwglobals.log.error(self.prompt + 'FAILED: ' + str(e))
-
-def parse_api_str(api_str):
-    """Parse 'inject_requests(<requests.json>, ingore_errors)' string into
-    function name and it's parameters in form of dictionary.
-    """
-    match = re.match(r'^[ ]*([^ ()]+)\((.*)\)[ ]*$', api_str)
-    if not match:
-        raise FwagentCliErrorParser('BAD API SYNTAX')
-    api_name = match.group(1)
-    if not api_name in supported_apis:
-        raise FwagentCliErrorParser('NOT SUPPORTED API: ' + api_name)
-    arg_list = match.group(2).split(',')
-    arg_list = [arg.strip() for arg in arg_list]
-    api_args = api_args_parsers[api_name](arg_list)
-    return (api_name, api_args)
-
-def parse_args_inject_requests(arg_list):
-    # inject_requests(<filename>, [ignore_errors])
-    args = {}
-
-    if 'ignore_errors' in arg_list:
-        args['ignore_errors'] = True
-        arg_list.remove('ignore_errors')
-
-    if len(arg_list) == 0:
-        raise FwagentCliErrorParser("no filename was provided")
-    filename = arg_list[0]
-    if (os.path.exists(filename) and os.path.isfile(filename)):
-        args['filename'] = filename
-    else:
-        raise FwagentCliErrorParser("file '%s' not exists" % filename)
-    return args

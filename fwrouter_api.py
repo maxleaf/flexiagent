@@ -480,8 +480,8 @@ class FWROUTER_API:
                 try:
                     self._substitute(cmd_cache, t['revert'].get('params'))
                 except Exception as e:
-                    fwglobals.log.excep("_execute: failed to substitute revert command: %s, %s" % \
-                                (str(e), traceback.format_exc()))
+                    fwglobals.log.excep("_execute: failed to substitute revert command: %s\n%s, %s" % \
+                                (str(t), str(e), traceback.format_exc()))
                     fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
                     self._revert(cmd_list, idx)
                     raise e

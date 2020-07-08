@@ -551,6 +551,9 @@ class Fwagent:
                               rest of loaded requests will be not executed.
         :returns: N/A.
         """
+        fwglobals.log.debug("inject_requests(filename=%s, ignore_errors=%s)" % \
+            (filename, str(ignore_errors)))
+
         with open(filename, 'r') as f:
             requests = json.loads(f.read())
             if type(requests) is list:   # Take care of file with list of requests
@@ -920,17 +923,19 @@ class FwagentDaemon(object):
             else:
                 api_func()
 
-def daemon():
+def daemon(start_loop=True):
     """Handles 'fwagent daemon' command.
     This command runs Fwagent in daemon mode. It creates the wrapping
     FwagentDaemon object that manages the instance of the Fwagent class and
     keeps it registered and connected to flexiManage.
     For more info See documentation on FwagentDaemon class.
 
+    :param start_loop: if True the register-and-connect loop will be started.
+
     :returns: None.
     """
     fwglobals.log.set_target(to_syslog=True, to_terminal=False)
-    fwglobals.log.info("starting in daemon mode")
+    fwglobals.log.info("starting in daemon mode (start_loop=%s)" % str(start))
 
     with FwagentDaemon() as agent_daemon:
 
@@ -938,7 +943,8 @@ def daemon():
 
         # Start the FwagentDaemon main function in separate thread as it is infinite,
         # and we need to get to Pyro4.Daemon.serveSimple() call to run rpc loop.
-        agent_daemon.start()
+        if start_loop:
+            agent_daemon.start()
 
         # Register FwagentDaemon object with Pyro framework and start Pyro request loop:
         # listen for rpc that invoke FwagentDaemon methods
@@ -973,7 +979,7 @@ def daemon_rpc(func, **kwargs):
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
 
-def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
+def cli(clean_request_db=True, api=None, script_fname=None):
     """Handles 'fwagent cli' command.
     This command is not used in production. It assists unit testing.
     The 'fwagent cli' reads function names and their arguments from prompt and
@@ -987,18 +993,17 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
 
     :param clean_request_db:    Clean request database before return.
                                 Effectively this flag resets the router configuration.
-    :param linger:              Sleep duration before return from cli.
-                                It might be used to keep vpp running, if it is
-                                controlled by CLI instance of fwagent.
-    :param api:                 The fwagent function to be executed,
-                                e.g. 'inject_requests(requests.json)'.
+    :param api:                 The fwagent function to be executed in list format,
+                                where the first element is api name, the rest
+                                elements are api arguments.
+                                e.g. [ 'inject_requests', 'requests.json' ].
                                 If provided, no prompt loop will be run.
     :param script_fname:        Shortcat for --api==inject_requests(<script_fname>)
                                 command. Is kept for backward compatibility.
     :returns: None.
     """
-    fwglobals.log.info("started in cli mode (clean_request_db=%s, linger=%s, api=%s)" % \
-                        (str(clean_request_db), str(linger), str(api)))
+    fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s)" % \
+                        (str(clean_request_db), str(api)))
 
     # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
@@ -1006,12 +1011,12 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
         # Convert relative path into absolute, as daemon fwagent might have
         # working directory other than the typed 'fwagent cli -f' command.
         script_fname = os.path.abspath(script_fname)
-        api = 'inject_requests(%s)' % (script_fname)
+        api = ['inject_requests' , 'filename=%s' % script_fname ]
         fwglobals.log.debug(
-            "cli: generate 'api' out of 'script_fname': " + api)
+            "cli: generate 'api' out of 'script_fname': " + str(api))
 
     import fwagent_cli
-    with fwagent_cli.FwagentCli(agent_linger=linger) as cli:
+    with fwagent_cli.FwagentCli() as cli:
         if api:
             cli.execute(api)
         else:
@@ -1032,7 +1037,7 @@ if __name__ == '__main__':
                     'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
                     'start': lambda args: start(start_router=args.start_router),
-                    'daemon': lambda args: daemon(),
+                    'daemon': lambda args: daemon(start_loop=not args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
                     'show': lambda args: show(
                         agent_info=args.agent,
@@ -1040,7 +1045,6 @@ if __name__ == '__main__':
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
-                        linger=float(args.linger),
                         api=args.api)}
 
     parser = argparse.ArgumentParser(
@@ -1063,6 +1067,8 @@ if __name__ == '__main__':
     parser_start.add_argument('-r', '--start_router', action='store_true',
                         help="start router before loop is started")
     parser_daemon = subparsers.add_parser('daemon', help='Run agent in daemon mode: infinite register-connect loop')
+    parser_daemon.add_argument('-d', '--dont_connect', action='store_true',
+                        help="Don't start connection loop on daemon start")
     parser_simulate = subparsers.add_parser('simulate', help='register and connect many fake devices to FlexiWan orchestrator')
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
@@ -1076,10 +1082,11 @@ if __name__ == '__main__':
                         help="File with requests to be executed")
     parser_cli.add_argument('-c', '--clean', action='store_true',
                         help="clean request database on exit")
-    parser_cli.add_argument('-l', '--linger', dest='linger', default=0,
-                        help="number of seconds to wait after completion (is needed for watchdog tests)")
-    parser_cli.add_argument('-i', '--api', dest='api', default=None,
-                        help="fwagent API to be invoked, e.g. '--api stop()'")
+    parser_cli.add_argument('-i', '--api', dest='api', default=None, nargs='+',
+                        help="fwagent API to be invoked with space separated arguments, e.g. '--api inject_requests request.json'")
+                        # If arguments include spaces escape them with slash, e.g. "--api inject_requests my\ request.json"
+                        # or surround argument with single quotes, e.g. "--api inject_requests 'my request.json'"
+                        # Note we don't use circle brackets, e.g. "--api inject_requests(request.json)" to avoid bash confuse
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
