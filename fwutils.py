@@ -819,6 +819,7 @@ def reset_router_config():
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
     elif os.path.exists(fwglobals.g.VPP_CONFIG_FILE_RESTORE):
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
+        shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
     with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
