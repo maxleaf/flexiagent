@@ -371,7 +371,19 @@ class Checker:
 
         return None, None
 
+    def _get_gateways(self):
+        output = subprocess.check_output('ip route show default', shell=True).strip()
+        routes = output.splitlines()
+
+        gws = []
+        for route in routes:
+            rip = route.split('via ')[1].split(' ')[0]
+            gws.append(rip)
+
+        return gws
+
     def _add_netplan_interface(self, fname, dev, metric):
+        print("%s is assigned metric %u" % (dev, metric))
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
             network = config['network']
@@ -382,10 +394,18 @@ class Checker:
             if 'dhcp4' in section and section['dhcp4'] == True:
                 section['dhcp4-overrides'] = {'route-metric': metric}
             else:
-                section['routes'] = [{'to': '0.0.0.0/0',
-                                      'via': section['gateway4'],
-                                      'metric': metric}]
-                del section['gateway4']
+                def_route_existed = False
+                if 'routes' in section:
+                    routes = section['routes']
+                    for route in routes:
+                        if route['to'] == '0.0.0.0/0':
+                            route['metric'] = metric
+                            def_route_existed = True
+                if not def_route_existed and 'gateway4' in section:
+                    section['routes'] = [{'to': '0.0.0.0/0',
+                                          'via': section['gateway4'],
+                                          'metric': metric}]
+                    del section['gateway4']
 
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
@@ -402,7 +422,7 @@ class Checker:
                             return fname
         return None
 
-    def _fix_duplicate_metric(self):
+    def _fix_duplicate_metric(self, primary_gw = None):
         metric, metrics = self._get_duplicate_metric()
         if metric is None:
             return True
@@ -417,12 +437,14 @@ class Checker:
 
         for route in routes:
             metric += 100
+            rip = route.split('via ')[1].split(' ')[0]
             dev = route.split('dev ')[1].split(' ')[0]
-            self._add_netplan_interface(fname, dev, metric)
+            if primary_gw is not None and rip == primary_gw:
+                self._add_netplan_interface(fname, dev, 0)
+            else:
+                self._add_netplan_interface(fname, dev, metric)
 
-        cmd = 'sudo netplan apply'
-        fwglobals.log.debug(cmd)
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_output('sudo netplan apply', shell=True)
 
         return True
 
@@ -446,7 +468,22 @@ class Checker:
             if not fix:
                 return False
             else:
-                return self._fix_duplicate_metric()
+                if silently:
+                    return self._fix_duplicate_metric()
+                while True:
+                    gws = self._get_gateways()
+                    ip = raw_input(prompt + "please choose the gw from %s: " % gws)
+                    try:
+                        return self._fix_duplicate_metric(ip)
+                    except Exception as e:
+                        print(prompt + str(e))
+                        while True:
+                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            if choice == 'y' or choice == 'Y' or choice == '':
+                                break
+                            elif choice == 'n' or choice == 'N':
+                                return False
+
 
     def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):
         """Check hostname syntax.
