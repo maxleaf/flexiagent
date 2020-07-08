@@ -30,20 +30,6 @@ import fwagent
 import fwglobals
 import fwutils
 
-supported_apis = {
-    'inject_requests': "inject_requests(<filename.json>, [ignore_errors])\n" + \
-                       "       <filename.json> - file with list of requests in JSON format\n" +
-                       "       ignore_errors   - If presents, failed requests will not break execution"
-}
-api_args_parsers = {
-    'inject_requests': lambda args: parse_args_inject_requests(args)
-}
-
-class FwagentCliErrorParser(Exception):
-    def __init__(self, message=None):
-        self.message = message if message else 'FwagentCliErrorParser'
-    def __str__(self):
-        return self.message
 
 class FwagentCli:
     """This class implements abstraction of fwagent shell.
@@ -127,8 +113,5 @@ class FwagentCli:
                 api_func = getattr(self.agent, api_name)
                 api_func(**api_args)
             fwglobals.log.info(self.prompt + 'SUCCESS')
-        except FwagentCliErrorParser as e:
-            fwglobals.log.error(self.prompt + 'FAILED to parse api call: %s' % str(e))
-            fwglobals.log.error(self.prompt + 'type "help" to see available commands')
         except Exception as e:
             fwglobals.log.error(self.prompt + 'FAILED: ' + str(e))

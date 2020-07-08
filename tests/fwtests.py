@@ -75,7 +75,7 @@ class TestFwagent:
         #
         cmd = '%s cli %s' % (self.fwagent_py, args)
         out = subprocess.check_output(cmd, shell=True)
-        ok = False if re.search('\bError\b|\berror\b|"ok"[ ]+:[ ]+0', out) else True
+        ok = False if re.search('\bError\b|\berror\b|["\']ok["\'][ ]*:[ ]*0', out) else True
         if not ok and print_output_on_error:
             print("TestFwagent::cli: FAILURE REPORT START")
             print("TestFwagent::cli: command: '%s'" % cmd)

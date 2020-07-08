@@ -329,9 +329,11 @@ class FWROUTER_API:
         try:
             # If device failed, which means it is in not well defined state,
             # reject request immediately as it can't be fulfilled.
+            # Permit 'start-router' to try to get out of failed state.
             # Permit configuration requests only ('add-XXX' & 'remove-XXX')
             # in order to enable management to fix configuration.
-            if self._test_router_failure() and not re.match('add-|remove-',  req):
+            if self._test_router_failure() and not ( \
+                req == 'start-router' or re.match('add-|remove-',  req)):
                 raise Exception("device failed, can't fulfill requests")
 
             router_was_started = fwutils.vpp_does_run()
@@ -382,7 +384,6 @@ class FWROUTER_API:
             fwglobals.log.error(err_str)
             if req == 'start-router' or req == 'stop-router':
                 self._set_router_failure("failed to " + req)
-                fwutils.stop_router()   # Ensure the NIC-s are returned back to Linux
             raise e
 
         return {'ok':1}
@@ -839,12 +840,14 @@ class FWROUTER_API:
 
         :returns: None.
         """
+        fwglobals.log.debug("_set_router_failure(current=%s): '%s'" % \
+            (str(self.router_failure), err_str))
         if not self.router_failure:
             self.router_failure = True
             if not os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
                 with open(fwglobals.g.ROUTER_STATE_FILE, 'w') as f:
                     if fwutils.valid_message_string(err_str):
-                        f.write(err_str)
+                        f.write(err_str + '\n')
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
             fwutils.stop_router()
@@ -887,9 +890,10 @@ class FWROUTER_API:
             'add-dhcp-config'
         ]
         messages = fwglobals.g.router_cfg.dump(types=types)
-        if messages:
-            for msg in messages:
-                fwglobals.g.handle_request(msg['message'], msg.get('params'))
+        for msg in messages:
+            reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
+            if reply.get('ok', 1) == 0:  # Break and return error on faiure of any request
+                return reply
 
 
     # 'substitute' takes parameters in form of list or dictionary and

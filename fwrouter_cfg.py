@@ -196,7 +196,7 @@ class FwRouterCfg:
                     if keys:
                         request.update({'key': key})
                     cfg.append(request)
-        return cfg if len(cfg) > 0 else None
+        return cfg
 
     def dumps(self, types=None, escape=None, full=False):
         """Dumps router configuration into printable string.

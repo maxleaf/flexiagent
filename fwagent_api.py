@@ -223,7 +223,7 @@ class FWAGENT_API:
         :returns: Dictionary with configuration and status code.
         """
         configs = fwrouter_cfg.dump()
-        reply = {'ok': 1, 'message': configs if configs != None else {}}
+        reply = {'ok': 1, 'message': configs if configs else {}}
         return reply
 
     def _reset_device_soft(self, params):
