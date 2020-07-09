@@ -411,27 +411,25 @@ class Checker:
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-    def _fix_duplicate_metric(self, primary_gw = None):
+    def _fix_duplicate_metric(self, primary_gw):
         metric, metrics = self._get_duplicate_metric()
         if metric is None:
             return True
 
-        fname = fwutils.get_netplan_filename(metrics[metric][0][0])
-        os.system('cp %s %s.fworig' % (fname, fname))
-        os.system('mv %s %s.baseline.yaml' % (fname, fname))
-        fname += '.baseline.yaml'
+        files = fwutils.get_netplan_filenames()
+        print (files)
+        metric = 100
+        for fname, devices in files.items():
+            os.system('cp %s %s.fworig' % (fname, fname))
+            os.system('mv %s %s.baseline.yaml' % (fname, fname))
+            fname += '.baseline.yaml'
 
-        output = subprocess.check_output('ip route show default', shell=True).strip()
-        routes = output.splitlines()
-
-        for route in routes:
-            metric += 100
-            rip = route.split('via ')[1].split(' ')[0]
-            dev = route.split('dev ')[1].split(' ')[0]
-            if primary_gw is not None and rip == primary_gw:
-                self._add_netplan_interface(fname, dev, 0)
-            else:
-                self._add_netplan_interface(fname, dev, metric)
+            for dev in devices:
+                if primary_gw is not None and dev[1] == primary_gw:
+                    self._add_netplan_interface(fname, dev[0], 0)
+                else:
+                    self._add_netplan_interface(fname, dev[0], metric)
+                    metric += 100
 
         subprocess.check_output('sudo netplan apply', shell=True)
 
@@ -458,7 +456,8 @@ class Checker:
                 return False
             else:
                 if silently:
-                    return self._fix_duplicate_metric()
+                    gws = self._get_gateways()
+                    return self._fix_duplicate_metric(gws[0])
                 while True:
                     try:
                         print("\nGateways to choose from:")

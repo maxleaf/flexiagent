@@ -1308,11 +1308,21 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
-def get_netplan_filename(dev):
+def get_netplan_filenames():
+    output = subprocess.check_output('ip route show default', shell=True).strip()
+    routes = output.splitlines()
+
+    devices = {}
+    for route in routes:
+        rip = route.split('via ')[1].split(' ')[0]
+        dev = route.split('dev ')[1].split(' ')[0]
+        devices[dev] = rip
+
     files = glob.glob("/etc/netplan/*.yaml") + \
             glob.glob("/lib/netplan/*.yaml") + \
             glob.glob("/run/netplan/*.yaml")
 
+    our_files = {}
     for fname in files:
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
@@ -1320,9 +1330,13 @@ def get_netplan_filename(dev):
                 network = config['network']
                 if 'ethernets' in network:
                     ethernets = network['ethernets']
-                    if dev in ethernets:
-                        return fname
-    return ''
+                    for dev, gw in devices.items():
+                        if dev in ethernets:
+                            if fname in our_files:
+                                our_files[fname].append([dev,gw])
+                            else:
+                                our_files[fname] = [[dev,gw]]
+    return our_files
 
 def _set_netplan_filename(filename):
     if fwglobals.g.NETPLAN_FILE:
