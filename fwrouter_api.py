@@ -145,9 +145,9 @@ class FWROUTER_API:
         time.sleep(10)  # 10 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
+            apply_netplan = False
             wan_list = self.get_wan_interface_addr_pci()
 
-            gws = []
             for wan in wan_list:
                 if wan['dhcp'] == 'no':
                     continue
@@ -155,25 +155,15 @@ class FWROUTER_API:
                 name = fwutils.pci_to_tap(wan['pci'])
                 addr = fwutils.get_interface_address(name)
                 if not addr:
-                    gws.append(wan['gateway'])
-                    cmd = 'sudo dhclient %s' % name
-                    fwglobals.log.debug(cmd)
-                    try:
-                        output = subprocess.check_output(cmd, shell=True)
-                        fwglobals.log.debug("dhcpc_thread: dhclient result: %s" % output)
-                    except Exception as e:
-                        fwglobals.log.debug("dhcpc_thread: dhclient %s failed: %s " % (name, str(e)))
+                    apply_netplan = True
 
-            time.sleep(5)
-
-            for gw in gws:
+            if apply_netplan:
                 try:
-                    cmd = 'ping -c 3 %s' % gw
+                    cmd = 'netplan apply'
                     fwglobals.log.debug(cmd)
-                    output = subprocess.check_output(cmd, shell=True)
-                    fwglobals.log.debug("dhcpc_thread: ping result: %s" % output)
+                    subprocess.check_output(cmd, shell=True)
                 except Exception as e:
-                    fwglobals.log.debug("dhcpc_thread: ping %s failed: %s " % (gw, str(e)))
+                    fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
