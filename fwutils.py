@@ -1299,8 +1299,8 @@ def add_del_netplan_file(params):
 
     if is_add:
         if not os.path.exists(fname):
-            os.system('cp %s %s' % (fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE_BACKUP))
-            os.system('mv %s %s' % (fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE))
+            shutil.copyfile(fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE_BACKUP)
+            shutil.move(fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE)
     else:
         if os.path.exists(fname):
             os.remove(fname)
