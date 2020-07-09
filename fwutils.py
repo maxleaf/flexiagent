@@ -1334,8 +1334,8 @@ def get_netplan_filenames():
     for route in routes:
         rip = route.split('via ')[1].split(' ')[0]
         dev = route.split('dev ')[1].split(' ')[0]
-        pci = linux_to_pci_addr(dev)[0]
-        devices[dev] = [rip, pci]
+
+        devices[dev] = rip
 
     files = glob.glob("/etc/netplan/*.yaml") + \
             glob.glob("/lib/netplan/*.yaml") + \
@@ -1349,12 +1349,17 @@ def get_netplan_filenames():
                 network = config['network']
                 if 'ethernets' in network:
                     ethernets = network['ethernets']
-                    for dev, value in devices.items():
-                        if dev in ethernets:
-                            if fname in our_files:
-                                our_files[fname].append([dev,value])
-                            else:
-                                our_files[fname] = [[dev,value]]
+                    for dev in ethernets:
+                        value = []
+                        if dev in devices:
+                            value.append(devices[dev])
+                        else:
+                            value.append(None)
+                        value.append(linux_to_pci_addr(dev)[0])
+                        if fname in our_files:
+                            our_files[fname].append([dev,value])
+                        else:
+                            our_files[fname] = [[dev,value]]
     return our_files
 
 def _set_netplan_filename(files):
@@ -1374,9 +1379,6 @@ def add_remove_netplan_interface(params):
         metric = int(params['metric'])
     else:
         metric = 0
-
-    if dhcp != 'yes':
-        return (True, None)
 
     fname = fwglobals.g.NETPLAN_FILES[pci] + '.run.yaml'
 

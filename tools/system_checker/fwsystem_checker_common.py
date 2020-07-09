@@ -424,6 +424,8 @@ class Checker:
             fname += '.baseline.yaml'
 
             for dev in devices:
+                if dev[1][0] is None:
+                    continue
                 if primary_gw is not None and dev[1][0] == primary_gw:
                     self._add_netplan_interface(fname, dev[0], 0)
                 else:
