@@ -142,29 +142,38 @@ class FWROUTER_API:
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
+        time.sleep(10)  # 10 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
             wan_list = self.get_wan_interface_addr_pci()
-            vpp_run = fwutils.vpp_does_run()
 
+            gws = []
             for wan in wan_list:
-                name = fwutils.pci_to_linux_iface(wan['pci'])
-
-                if name is None and vpp_run:
-                    name = fwutils.pci_to_tap(wan['pci'])
-
-                if name is None:
+                if wan['dhcp'] == 'no':
                     continue
 
+                name = fwutils.pci_to_tap(wan['pci'])
                 addr = fwutils.get_interface_address(name)
-                if not addr and vpp_run and wan['dhcp'] == 'yes':
-                    gw = wan['gateway']
-                    cmd = 'sudo dhclient %s; sleep 5; ping -c 3 %s' % (name, gw)
+                if not addr:
+                    gws.append(wan['gateway'])
+                    cmd = 'sudo dhclient %s' % name
                     fwglobals.log.debug(cmd)
                     try:
-                        subprocess.check_output(cmd, shell=True)
+                        output = subprocess.check_output(cmd, shell=True)
+                        fwglobals.log.debug("dhcpc_thread: dhclient result: %s" % output)
                     except Exception as e:
-                        fwglobals.log.debug(str(e))
+                        fwglobals.log.debug("dhcpc_thread: dhclient %s failed: %s " % (name, str(e)))
+
+            time.sleep(5)
+
+            for gw in gws:
+                try:
+                    cmd = 'ping -c 3 %s' % gw
+                    fwglobals.log.debug(cmd)
+                    output = subprocess.check_output(cmd, shell=True)
+                    fwglobals.log.debug("dhcpc_thread: ping result: %s" % output)
+                except Exception as e:
+                    fwglobals.log.debug("dhcpc_thread: ping %s failed: %s " % (gw, str(e)))
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
