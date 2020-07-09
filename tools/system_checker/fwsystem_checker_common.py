@@ -417,7 +417,6 @@ class Checker:
             return True
 
         files = fwutils.get_netplan_filenames()
-        print (files)
         metric = 100
         for fname, devices in files.items():
             os.system('cp %s %s.fworig' % (fname, fname))
@@ -425,7 +424,7 @@ class Checker:
             fname += '.baseline.yaml'
 
             for dev in devices:
-                if primary_gw is not None and dev[1] == primary_gw:
+                if primary_gw is not None and dev[1][0] == primary_gw:
                     self._add_netplan_interface(fname, dev[0], 0)
                 else:
                     self._add_netplan_interface(fname, dev[0], metric)

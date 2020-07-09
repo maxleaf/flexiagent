@@ -804,6 +804,35 @@ def disconnect_from_router():
      """
     fwglobals.g.router_api.vpp_api.disconnect()
 
+def _backup_netplan_files():
+    for fname in fwglobals.g.NETPLAN_FILES.values():
+        fname_backup = fname + '.fworig'
+        fname_run = fname + '.run.yaml'
+
+        fwglobals.log.debug('_backup_netplan_files: %s' % fname)
+        fwglobals.log.debug('_backup_netplan_files: %s' % fname_backup)
+        fwglobals.log.debug('_backup_netplan_files: %s' % fname_run)
+
+        if not os.path.exists(fname_run):
+            fwglobals.log.debug('_backup_netplan_files: doing backup...')
+            shutil.copyfile(fname, fname_backup)
+            shutil.move(fname, fname_run)
+
+def _delete_netplan_files():
+    files = glob.glob("/etc/netplan/*.yaml") + \
+            glob.glob("/lib/netplan/*.yaml") + \
+            glob.glob("/run/netplan/*.yaml")
+
+    for fname in files:
+        fwglobals.log.debug('_delete_netplan_files: %s' % fname)
+        if re.search('run', fname):
+            fname_run = fname
+            fname = fname_run.replace('.run.yaml', '')
+            fname_backup = fname + '.fworig'
+
+            os.remove(fname_run)
+            shutil.move(fname_backup, fname)
+
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.
 
@@ -823,9 +852,7 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
-    if os.path.exists(fwglobals.g.NETPLAN_FILE):
-        os.remove(fwglobals.g.NETPLAN_FILE)
-        shutil.move(fwglobals.g.NETPLAN_FILE_BACKUP, fwglobals.g.NETPLAN_FILE_ORIG)
+    _delete_netplan_files()
 
     reset_dhcpd()
 
@@ -1292,19 +1319,10 @@ def _get_interface_address(pci):
 
 def add_del_netplan_file(params):
     is_add = params['is_add']
-    fname = fwglobals.g.NETPLAN_FILE
-
-    if not fname:
-        return (True, None)
-
     if is_add:
-        if not os.path.exists(fname):
-            shutil.copyfile(fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE_BACKUP)
-            shutil.move(fwglobals.g.NETPLAN_FILE_ORIG, fwglobals.g.NETPLAN_FILE)
+        _backup_netplan_files()
     else:
-        if os.path.exists(fname):
-            os.remove(fname)
-            shutil.move(fwglobals.g.NETPLAN_FILE_BACKUP, fwglobals.g.NETPLAN_FILE_ORIG)
+        _delete_netplan_files()
 
     return (True, None)
 
@@ -1316,7 +1334,8 @@ def get_netplan_filenames():
     for route in routes:
         rip = route.split('via ')[1].split(' ')[0]
         dev = route.split('dev ')[1].split(' ')[0]
-        devices[dev] = rip
+        pci = linux_to_pci_addr(dev)[0]
+        devices[dev] = [rip, pci]
 
     files = glob.glob("/etc/netplan/*.yaml") + \
             glob.glob("/lib/netplan/*.yaml") + \
@@ -1330,25 +1349,19 @@ def get_netplan_filenames():
                 network = config['network']
                 if 'ethernets' in network:
                     ethernets = network['ethernets']
-                    for dev, gw in devices.items():
+                    for dev, value in devices.items():
                         if dev in ethernets:
                             if fname in our_files:
-                                our_files[fname].append([dev,gw])
+                                our_files[fname].append([dev,value])
                             else:
-                                our_files[fname] = [[dev,gw]]
+                                our_files[fname] = [[dev,value]]
     return our_files
 
-def _set_netplan_filename(filename):
-    if fwglobals.g.NETPLAN_FILE:
-        return
-
-    fwglobals.g.NETPLAN_FILE_ORIG = filename
-    fwglobals.g.NETPLAN_FILE_BACKUP = filename + '.fworig'
-    fwglobals.g.NETPLAN_FILE = filename + '.run.yaml'
-
-    fwglobals.log.info('NETPLAN_FILE_ORIG %s' % fwglobals.g.NETPLAN_FILE_ORIG)
-    fwglobals.log.info('NETPLAN_FILE_BACKUP %s' % fwglobals.g.NETPLAN_FILE_BACKUP)
-    fwglobals.log.info('NETPLAN_FILE %s' % fwglobals.g.NETPLAN_FILE)
+def _set_netplan_filename(files):
+    for fname, devices in files.items():
+        for dev in devices:
+            fwglobals.g.NETPLAN_FILES[dev[1][1]] = fname
+            fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (dev[0], dev[1][1], fname))
 
 def add_remove_netplan_interface(params):
     pci = params['pci']
@@ -1362,7 +1375,10 @@ def add_remove_netplan_interface(params):
     else:
         metric = 0
 
-    fname = fwglobals.g.NETPLAN_FILE
+    if dhcp != 'yes':
+        return (True, None)
+
+    fname = fwglobals.g.NETPLAN_FILES[pci] + '.run.yaml'
 
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
