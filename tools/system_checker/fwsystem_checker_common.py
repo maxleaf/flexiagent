@@ -38,6 +38,7 @@ import fwtool_vpp_startupconf_dict
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
 import fwglobals
+import fwutils
 
 class Checker:
     """This is Checker class representation.
@@ -410,24 +411,12 @@ class Checker:
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-    def _get_netplan_filename(self, dev):
-        for fname in glob.glob("/etc/netplan/*.yaml"):
-            with open(fname, 'r') as stream:
-                config = yaml.safe_load(stream)
-                if 'network' in config:
-                    network = config['network']
-                    if 'ethernets' in network:
-                        ethernets = network['ethernets']
-                        if dev in ethernets:
-                            return fname
-        return None
-
     def _fix_duplicate_metric(self, primary_gw = None):
         metric, metrics = self._get_duplicate_metric()
         if metric is None:
             return True
 
-        fname = self._get_netplan_filename(metrics[metric][0][0])
+        fname = fwutils.get_netplan_filename(metrics[metric][0][0])
         os.system('cp %s %s.fworig' % (fname, fname))
         os.system('mv %s %s.baseline.yaml' % (fname, fname))
         fname += '.baseline.yaml'

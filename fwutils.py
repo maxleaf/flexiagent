@@ -1308,8 +1308,12 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
-def _get_netplan_filename(dev):
-    for fname in glob.glob("/etc/netplan/*.yaml"):
+def get_netplan_filename(dev):
+    files = glob.glob("/etc/netplan/*.yaml") + \
+            glob.glob("/lib/netplan/*.yaml") + \
+            glob.glob("/run/netplan/*.yaml")
+
+    for fname in files:
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
             if 'network' in config:
