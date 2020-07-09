@@ -101,6 +101,10 @@ def start_router(params=None):
                 else:
                     pci_list.append(params['pci'])
 
+                if not fwglobals.g.NETPLAN_FILE:
+                    fname = fwutils.get_netplan_filename(iface_pci)
+                    fwutils._set_netplan_filename(fname)
+
                 cmd = {}
                 cmd['cmd'] = {}
                 cmd['cmd']['name']    = "exec"
