@@ -1344,6 +1344,8 @@ def get_netplan_filenames():
     our_files = {}
     for fname in files:
         with open(fname, 'r') as stream:
+            if re.search('run', fname):
+                fname = fname.replace('.run.yaml', '')
             config = yaml.safe_load(stream)
             if 'network' in config:
                 network = config['network']
@@ -1365,8 +1367,9 @@ def get_netplan_filenames():
 def _set_netplan_filename(files):
     for fname, devices in files.items():
         for dev in devices:
-            fwglobals.g.NETPLAN_FILES[dev[1][1]] = fname
-            fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (dev[0], dev[1][1], fname))
+            if dev[1][1]:
+                fwglobals.g.NETPLAN_FILES[dev[1][1]] = fname
+                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (dev[0], dev[1][1], fname))
 
 def add_remove_netplan_interface(params):
     pci = params['pci']

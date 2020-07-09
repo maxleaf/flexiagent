@@ -196,6 +196,8 @@ class FWROUTER_API:
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
+                netplan_files = fwutils.get_netplan_filenames()
+                fwutils._set_netplan_filename(netplan_files)
             return False
 
         # Now start router.
