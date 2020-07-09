@@ -460,10 +460,18 @@ class Checker:
                 if silently:
                     return self._fix_duplicate_metric()
                 while True:
-                    gws = self._get_gateways()
-                    ip = raw_input(prompt + "please choose the gw from %s: " % gws)
                     try:
-                        return self._fix_duplicate_metric(ip)
+                        print("\nGateways to choose from:")
+                        gws = self._get_gateways()
+                        id = 1
+                        for gw in gws:
+                            print("         %u  - %s" % (id, gw))
+                            id += 1
+                        id = int(raw_input(prompt + "please choose the gw number: "))
+                        if id > len(gws):
+                            print("Wrong number chosen!")
+                            return False
+                        return self._fix_duplicate_metric(gws[id-1])
                     except Exception as e:
                         print(prompt + str(e))
                         while True:
