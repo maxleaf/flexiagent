@@ -420,16 +420,16 @@ class Checker:
         metric = 100
         for fname, devices in files.items():
             os.system('cp %s %s.fworig' % (fname, fname))
-            os.system('mv %s %s.baseline.yaml' % (fname, fname))
-            fname += '.baseline.yaml'
+            fname_baseline = fname.replace('yaml', 'baseline.yaml')
+            os.system('mv %s %s' % (fname, fname_baseline))
 
             for dev in devices:
                 if dev[1][0] is None:
                     continue
                 if primary_gw is not None and dev[1][0] == primary_gw:
-                    self._add_netplan_interface(fname, dev[0], 0)
+                    self._add_netplan_interface(fname_baseline, dev[0], 0)
                 else:
-                    self._add_netplan_interface(fname, dev[0], metric)
+                    self._add_netplan_interface(fname_baseline, dev[0], metric)
                     metric += 100
 
         subprocess.check_output('sudo netplan apply', shell=True)
