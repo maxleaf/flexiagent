@@ -807,14 +807,10 @@ def disconnect_from_router():
 def _backup_netplan_files():
     for fname in fwglobals.g.NETPLAN_FILES.values():
         fname_backup = fname + '.fworig'
-        fname_run = fname + '.run.yaml'
-
-        fwglobals.log.debug('_backup_netplan_files: %s' % fname)
-        fwglobals.log.debug('_backup_netplan_files: %s' % fname_backup)
-        fwglobals.log.debug('_backup_netplan_files: %s' % fname_run)
+        fname_run = fname.replace('yaml', 'run.yaml')
 
         if not os.path.exists(fname_run):
-            fwglobals.log.debug('_backup_netplan_files: doing backup...')
+            fwglobals.log.debug('_backup_netplan_files: doing backup of %s' % fname)
             shutil.copyfile(fname, fname_backup)
             shutil.move(fname, fname_run)
 
@@ -827,7 +823,7 @@ def _delete_netplan_files():
         fwglobals.log.debug('_delete_netplan_files: %s' % fname)
         if re.search('run', fname):
             fname_run = fname
-            fname = fname_run.replace('.run.yaml', '')
+            fname = fname_run.replace('run.yaml', 'yaml')
             fname_backup = fname + '.fworig'
 
             os.remove(fname_run)
@@ -1345,7 +1341,7 @@ def get_netplan_filenames():
     for fname in files:
         with open(fname, 'r') as stream:
             if re.search('run', fname):
-                fname = fname.replace('.run.yaml', '')
+                fname = fname.replace('run.yaml', 'yaml')
             config = yaml.safe_load(stream)
             if 'network' in config:
                 network = config['network']
@@ -1383,7 +1379,7 @@ def add_remove_netplan_interface(params):
     else:
         metric = 0
 
-    fname = fwglobals.g.NETPLAN_FILES[pci] + '.run.yaml'
+    fname = fwglobals.g.NETPLAN_FILES[pci].replace('yaml', 'run.yaml')
 
     if re.match('yes', dhcp):
         config_section['dhcp4'] = True
