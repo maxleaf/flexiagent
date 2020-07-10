@@ -1427,7 +1427,11 @@ def add_remove_netplan_interface(params):
     return (True, None)
 
 def get_dhcp_netplan_interface(if_name):
-    for fname in glob.glob("/etc/netplan/*.yaml"):
+    files = glob.glob("/etc/netplan/*.yaml") + \
+            glob.glob("/lib/netplan/*.yaml") + \
+            glob.glob("/run/netplan/*.yaml")
+
+    for fname in files:
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
 
