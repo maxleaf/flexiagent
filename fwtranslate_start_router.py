@@ -23,6 +23,7 @@
 import os
 import re
 
+import fwnetplan
 import fwglobals
 import fwutils
 
@@ -113,6 +114,9 @@ def start_router(params=None):
                 cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
+
+    netplan_files = fwnetplan.get_netplan_filenames()
+    fwnetplan._set_netplan_filename(netplan_files)
 
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
@@ -205,17 +209,17 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "create %s" % fwglobals.g.NETPLAN_FILE
+    cmd['cmd']['descr'] = "create Netplan files"
     cmd['cmd']['params']  = {
-        'module': 'fwutils',
+        'module': 'fwnetplan',
         'func'  : 'add_del_netplan_file',
         'args'  : {'is_add': 1}
     }
     cmd['revert'] = {}
     cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "remove %s" % fwglobals.g.NETPLAN_FILE
+    cmd['revert']['descr'] = "remove Netplan files"
     cmd['revert']['params']  = {
-        'module': 'fwutils',
+        'module': 'fwnetplan',
         'func'  : 'add_del_netplan_file',
         'args'  : {'is_add': 0}
     }
