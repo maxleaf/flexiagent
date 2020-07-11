@@ -34,6 +34,7 @@ import re
 import fwapplications_api
 import fwdb_requests
 import fwglobals
+import fwnetplan
 import fwstats
 import shutil
 import sys
@@ -823,8 +824,7 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
-    if os.path.exists(fwglobals.g.NETPLAN_FILE):
-        os.remove(fwglobals.g.NETPLAN_FILE)
+    fwnetplan._delete_netplan_files()
 
     reset_dhcpd()
 
@@ -1288,95 +1288,6 @@ def _get_interface_address(pci):
         return addr
 
     return None
-
-def add_del_netplan_file(params):
-    is_add = params['is_add']
-    fname = fwglobals.g.NETPLAN_FILE
-
-    if is_add:
-        if not os.path.exists(fname):
-            config = dict()
-            config['network'] = {'version': 2}
-            with open(fname, 'w+') as stream:
-                yaml.safe_dump(config, stream, default_flow_style=False)
-    else:
-        if os.path.exists(fname):
-            os.remove(fname)
-
-    return (True, None)
-
-def add_remove_netplan_interface(params):
-    pci = params['pci']
-    is_add = params['is_add']
-    dhcp = params['dhcp']
-    ip = params['ip']
-    gw = params['gw']
-    config_section = {}
-    if params['metric']:
-        metric = int(params['metric'])
-    else:
-        metric = 0
-
-    fname = fwglobals.g.NETPLAN_FILE
-
-    if re.match('yes', dhcp):
-        config_section['dhcp4'] = True
-        config_section['dhcp4-overrides'] = {'route-metric': metric}
-    else:
-        config_section['dhcp4'] = False
-        config_section['addresses'] = [ip]
-        if gw is not None and gw:
-            config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
-
-    try:
-        with open(fname, 'r') as stream:
-            config = yaml.safe_load(stream)
-            network = config['network']
-
-        if 'ethernets' not in network:
-            network['ethernets'] = {}
-
-        ethernets = network['ethernets']
-
-        tap_name = pci_to_tap(pci)
-        if is_add == 1:
-            if tap_name in ethernets:
-                del ethernets[tap_name]
-            ethernets[tap_name] = config_section
-        else:
-            del ethernets[tap_name]
-
-        with open(fname, 'w') as stream:
-            yaml.safe_dump(config, stream)
-
-        cmd = 'sudo netplan apply'
-        fwglobals.log.debug(cmd)
-        subprocess.check_output(cmd, shell=True)
-    except Exception as e:
-        err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
-              % (pci, fname, str(e))
-        fwglobals.log.error(err)
-        return (False, None)
-
-    return (True, None)
-
-def get_dhcp_netplan_interface(if_name):
-    for fname in glob.glob("/etc/netplan/*.yaml"):
-        with open(fname, 'r') as stream:
-            config = yaml.safe_load(stream)
-
-        if 'network' in config:
-            network = config['network']
-
-            if 'ethernets' in network:
-                ethernets = network['ethernets']
-
-                if if_name in ethernets:
-                    interface = ethernets[if_name]
-                    if 'dhcp4' in interface:
-                        if interface['dhcp4'] == True:
-                            return 'yes'
-    return 'no'
 
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
