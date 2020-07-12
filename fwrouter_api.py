@@ -31,6 +31,7 @@ import subprocess
 
 import fwglobals
 import fwutils
+import fwnetplan
 
 from fwrouter_cfg import FwRouterCfg
 from fwapplications import FwApps
@@ -91,6 +92,7 @@ class FWROUTER_API:
         self.router_failure  = False
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
+        self.thread_dhcpc = None
 
     def finalize(self):
         """Destructor method
@@ -134,6 +136,33 @@ class FWROUTER_API:
             time.sleep(1)  # 1 sec
             fwtunnel_stats.tunnel_stats_test()
 
+    def dhcpc_thread(self):
+        """DHCP client thread.
+        Its function is to monitor state of WAN interfaces with DHCP.
+        """
+        time.sleep(10)  # 10 sec
+        while self.router_started:
+            time.sleep(1)  # 1 sec
+            apply_netplan = False
+            wan_list = self.get_wan_interface_addr_pci()
+
+            for wan in wan_list:
+                if wan['dhcp'] == 'no':
+                    continue
+
+                name = fwutils.pci_to_tap(wan['pci'])
+                addr = fwutils.get_interface_address(name)
+                if not addr:
+                    apply_netplan = True
+
+            if apply_netplan:
+                try:
+                    cmd = 'netplan apply'
+                    fwglobals.log.debug(cmd)
+                    subprocess.check_output(cmd, shell=True)
+                except Exception as e:
+                    fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
+
     def restore_vpp_if_needed(self):
         """Restore VPP.
         If vpp doesn't run because of crash or device reboot,
@@ -155,6 +184,8 @@ class FWROUTER_API:
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
+                netplan_files = fwnetplan.get_netplan_filenames()
+                fwnetplan._set_netplan_filename(netplan_files)
             return False
 
         # Now start router.
@@ -522,6 +553,9 @@ class FWROUTER_API:
         if self.thread_tunnel_stats is None:
             self.thread_tunnel_stats = threading.Thread(target=self.tunnel_stats_thread, name='Tunnel Stats Thread')
             self.thread_tunnel_stats.start()
+        if self.thread_dhcpc is None:
+            self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
+            self.thread_dhcpc.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -533,6 +567,10 @@ class FWROUTER_API:
         if self.thread_tunnel_stats:
             self.thread_tunnel_stats.join()
             self.thread_tunnel_stats = None
+
+        if self.thread_dhcpc:
+            self.thread_dhcpc.join()
+            self.thread_dhcpc = None
 
     def _on_start_router(self):
         """Handles post start VPP activities.
