@@ -55,13 +55,8 @@ def test():
 
         # Ensure that the failure state was recorded into file
         state_file = "/etc/flexiwan/agent/.router.state"
-        try:
-            state_file_size_str = subprocess.check_output("sudo stat -c %%s %s" % state_file, shell=True)
-        except subprocess.CalledProcessError:
-            assert False, "%s file not found - failure was not recorded" % state_file
-
-        state_file_size = int(state_file_size_str.rstrip())
-        assert state_file_size > 0, "%s file is empty - failure description was not recorded" % state_file
+        exists = fwtests.file_exists(state_file)
+        assert exists, "%s: file not found/empty file - failure was not recorded" % state_file
 
         # Ensure that vpp was stopped as a result of failure
         vpp_pid = fwtests.vpp_pid()
@@ -78,11 +73,8 @@ def test():
         assert ok, "'reset-router' request failed"
 
         # Ensure that 'reset-router' deleted failure state record file and emptied request database file
-        try:
-            state_file_size_str = subprocess.check_output("sudo stat -c %%s %s" % state_file, shell=True)
-            assert False, "failure state record file %s was not deleted by 'reset-router' request" % state_file
-        except subprocess.CalledProcessError:
-            pass
+        exists = fwtests.file_exists(state_file)
+        assert exists==False, "failure state file still exists: %s" % state_file
 
         config = agent.show("--router configuration")
         assert config == '', "request database was not emptired by 'reset-router' request:\n%s" % config

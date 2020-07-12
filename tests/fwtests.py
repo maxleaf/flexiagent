@@ -187,3 +187,12 @@ def wait_fwagent_exit(timeout=1000000):
                 print("ERROR: wait_fwagent_exit: return on timeout (%s): %s" % (str(timeout), p.info['pid']))
                 return False
     return True
+
+def file_exists(filename, check_size=True):
+    try:
+        file_size_str = subprocess.check_output("sudo stat -c %%s %s" % filename, shell=True)
+    except subprocess.CalledProcessError:
+        return False
+    if check_size and int(file_size_str.rstrip()) == 0:
+        return False
+    return True
