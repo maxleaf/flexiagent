@@ -842,18 +842,6 @@ class FwagentDaemon(object):
             self.thread_main = None
         fwglobals.log.debug("FwagentDaemon: stopped")
 
-    def disconnect(self):
-        """Disconnect Websocket.
-
-        :returns: None.
-        """
-        fwglobals.log.debug("FwagentDaemon: disconnect")
-
-        # Initiate connection shutdown
-        if self.active:
-            self.agent.disconnect()  # Break WebSocket connection event loop to get control back to main()
-            fwglobals.log.debug("FwagentDaemon: disconnect from server was initiated")
-
     def reset(self):
         """Restart the main daemon loop.
 

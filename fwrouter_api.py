@@ -161,11 +161,14 @@ class FWROUTER_API:
 
             if apply_netplan:
                 try:
-                    fwagent.daemon_rpc('disconnect')
+                    fwagent.stop(False, False)
 
                     cmd = 'netplan apply'
                     fwglobals.log.debug(cmd)
                     subprocess.check_output(cmd, shell=True)
+
+                    time.sleep(10)
+                    fwagent.start(False)
 
                 except Exception as e:
                     fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
