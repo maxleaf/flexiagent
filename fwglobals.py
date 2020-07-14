@@ -32,15 +32,14 @@ from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
-from fwapplications_api import FwApps
-from fwpolicies_api import FwPolicies
+from fwapplications import FwApps
+from fwrouter_cfg import FwRouterCfg
 
 modules = {
-    'fwagent_api':  __import__('fwagent_api'),
-    'fwapps_api':   __import__('fwapplications_api'),
-    'fwpolicy_api': __import__('fwpolicies_api'),
-    'fwrouter_api': __import__('fwrouter_api'),
-    'os_api':       __import__('os_api'),
+    'fwagent_api':      __import__('fwagent_api'),
+    'fwapplications':   __import__('fwapplications'),
+    'fwrouter_api':     __import__('fwrouter_api'),
+    'os_api':           __import__('os_api'),
 }
 
 request_handlers = {
@@ -63,14 +62,6 @@ request_handlers = {
     'upgrade-device-sw':            '_call_agent_api',
     'reset-device':                 '_call_agent_api',
     'sync-device':                  '_call_agent_api',
-
-    # Applications API
-    'add-app-info':                 '_call_apps_api',
-    'remove-app-info':              '_call_apps_api',
-
-    # Policy API
-    'add-policy-info':              '_call_policy_api',
-    'remove-policy-info':           '_call_policy_api',
 
     # Router API
     'aggregated-router-api':        '_call_router_api',
@@ -144,8 +135,7 @@ request_handlers = {
     'vxlan_add_del_tunnel':         '_call_vpp_api',
 
     # Python API
-    'python':                       '_call_python_api',
-    'python-kwargs':                '_call_python_kwargs_api'
+    'python':                       '_call_python_api'
 }
 
 global g_initialized
@@ -203,7 +193,7 @@ class Fwglobals:
         self.FWAGENT_CONF_FILE   = self.DATA_PATH + 'fwagent_conf.yaml'  # Optional, if not present, defaults are taken
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'
         self.VERSIONS_FILE       = self.DATA_PATH + '.versions.yaml'
-        self.SQLITE_DB_FILE      = self.DATA_PATH + '.requests.sqlite'
+        self.ROUTER_CFG_FILE     = self.DATA_PATH + '.requests.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
@@ -219,6 +209,7 @@ class Fwglobals:
         self.APP_REC_DB_FILE = self.DATA_PATH + '.app_rec.sqlite'
         self.MULTILINK_DB_FILE = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
+        self.NETPLAN_FILES = {}
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
@@ -226,6 +217,11 @@ class Fwglobals:
         self.WS_STATUS_CODE_NOT_APPROVED = 403
         self.WS_STATUS_DEVICE_CHANGE     = 900
         self.WS_STATUS_LOCAL_ERROR       = 999
+        # Cache to save various global data
+        self.AGENT_CACHE = {}
+        # PCI to VPP names, assuming names and PCI are unique and not changed during operation
+        self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
+        self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -236,6 +232,12 @@ class Fwglobals:
             if re.match("WS_STATUS_", a):
                 self.ws_reconnect_status_codes.append(getattr(self, a))
 
+    def get_cache_data(self, key):
+        """get the cache data for a given key
+
+        :returns: data for a given key, None if key does not exist
+        """
+        return self.AGENT_CACHE.get(key)
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
@@ -264,10 +266,10 @@ class Fwglobals:
         :returns: None.
         """
         self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
+        self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE)
         self.os_api     = OS_API()
-        self.apps_api   = FwApps(self.APP_REC_DB_FILE)
-        self.policy_api = FwPolicies()
+        self.apps       = FwApps(self.APP_REC_DB_FILE)
 
         self.router_api.restore_vpp_if_needed()
 
@@ -275,6 +277,7 @@ class Fwglobals:
         """Destructor method
         """
         self.router_api.finalize()
+        self.router_cfg.finalize()
 
     def __str__(self):
         """Get string representation of configuration.
@@ -296,17 +299,8 @@ class Fwglobals:
     def _call_agent_api(self, req, params):
         return self.agent_api.call(req, params)
 
-    def _call_apps_api(self, req, params):
-        return self.apps_api.call(req, params)
-
-    def _call_policy_api(self, req, params):
-        return self.policy_api.call(req, params)
-
     def _call_router_api(self, req, params):
-        if req == 'aggregated-router-api':
-            return self.router_api.call_aggregated(params['requests'])
-        else:
-            return self.router_api.call(req, params)
+        return self.router_api.call(req, params)
 
     def _call_os_api(self, req, params):
         return self.os_api.call_simple(req, params)
@@ -318,23 +312,14 @@ class Fwglobals:
         func = self._call_python_api_get_func(req, params)
         args = params.get('args')
         if args:
-            ret = func(args)
+            ret = func(**args)
         else:
             ret = func()
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
+            args_str = json.dumps(args) if args else ""
             log.error('_call_python_api: %s(%s) failed: %s' % \
-                    (params['func'], json.dumps(args), val))
-        reply = {'ok':ok, 'message':val}
-        return reply
-
-    def _call_python_kwargs_api(self, req, params):
-        func = self._call_python_api_get_func(req, params)
-        ret = func(**params['args'])
-        (ok, val) = self._call_python_api_parse_result(ret)
-        if not ok:
-            log.error('_call_python_kwargs_api: %s(%s) failed: %s' % \
-                    (params['func'], json.dumps(params['args']), val))
+                    (params['func'], args_str, val))
         reply = {'ok':ok, 'message':val}
         return reply
 
@@ -346,6 +331,8 @@ class Fwglobals:
                 func = getattr(self, params['func'])
             elif params['object'] == 'fwglobals.g.router_api':
                 func = getattr(self.router_api, params['func'])
+            elif params['object'] == 'fwglobals.g.apps':
+                func = getattr(self.apps, params['func'])
             else:
                 raise Exception("object '%s' is not supported" % (params['object']))
         else:
@@ -417,9 +404,9 @@ class Fwglobals:
             #
             if reply['ok'] == 1 and handler_name == '_call_router_api':
                 # Update the configuration signature
-                self.router_api.db_requests.update_signature(received_msg)
+                self.router_cfg.update_signature(received_msg)
                 # Add the updated signatire to the reply, so server could be quite
-                reply['router-cfg-hash'] = self.router_api.db_requests.get_signature()
+                reply['router-cfg-hash'] = self.router_cfg.get_signature()
 
             return reply
 

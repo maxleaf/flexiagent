@@ -67,7 +67,7 @@ def test():
 
         # Start router with initial configuration
         #
-        (ok, _) = agent.cli('-f %s' % cli_before_sync_file, bg_time=fwagent_run_time)
+        (ok, _) = agent.cli('-f %s' % cli_before_sync_file, daemon=True)
         assert ok
 
         # Ensure that initial configuration was applied properly

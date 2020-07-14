@@ -39,9 +39,9 @@ cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 def test():
     with fwtests.TestFwagent() as agent:
 
-        fwagent_run_time = 100
+        fwagent_run_time = 90
 
-        (ok, _) = agent.cli('-f %s' % cli_start_router_add_tunnel_file, bg_time=fwagent_run_time)
+        (ok, _) = agent.cli('-f %s' % cli_start_router_add_tunnel_file, daemon=True)
         assert ok
 
         started = fwtests.wait_vpp_to_start(timeout=40)

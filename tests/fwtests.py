@@ -35,6 +35,7 @@ class TestFwagent:
     def __init__(self):
         code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
+        self.daemon_pid = None
 
     def __enter__(self):
         os.system('systemctl stop flexiwan-router')     # Ensure there is no other instance of fwagent
@@ -48,6 +49,8 @@ class TestFwagent:
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
+        if self.daemon_pid:
+            os.system('kill -9 %s' % self.daemon_pid)   # Kill daemon if runs
         os.system('%s reset --soft' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
         if vpp_does_run():
             if traceback:
@@ -56,17 +59,23 @@ class TestFwagent:
             os.system('%s stop' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
 
 
-    def cli(self, args, print_output_on_error=True, bg_time=None):
+    def cli(self, args, daemon=False, print_output_on_error=True):
 
-        # If asked to run on background for X seconds
-        if bg_time:
-            cmd = '%s cli %s -l %d &' % (self.fwagent_py, args, bg_time)
+        # Create instance of background fwagent if asked.
+        if daemon:
+            cmd = '%s daemon --dont_connect &' % (self.fwagent_py)
             try:
                 os.system(cmd)
-                return (True, '')
-            except:
-                return (False, "'%s' failed" % cmd)
+                self.daemon_pid = fwagent_daemon_pid()
+                time.sleep(1)  # Give a second to fwagent to be initialized
+            except Exception as e:
+                return (False, "'%s' failed: %s" % (cmd, str(e)))
 
+        # Invoke CLI.
+        # If fwagent was started on background, the API command will be invoked on it.
+        # If there is no fwagent in background, the local instance of it will be
+        # created, API command will be run on it, and instance will be destroyed.
+        #
         cmd = '%s cli %s' % (self.fwagent_py, args)
         out = subprocess.check_output(cmd, shell=True).strip()
 
@@ -82,12 +91,13 @@ class TestFwagent:
         ret = json.loads(match.group(1))
         if 'ok' in ret and ret['ok'] == 0:
             ok = False
-            print("TestFwagent::cli: FAILURE REPORT START")
-            print("TestFwagent::cli: command: '%s'" % cmd)
-            print("TestFwagent::cli: error:   '%s'" % ret['error'])
-            print("TestFwagent::cli: output:")
-            print(out)
-            print("TestFwagent::cli: FAILURE REPORT END")
+            if print_output_on_error:
+                print("TestFwagent::cli: FAILURE REPORT START")
+                print("TestFwagent::cli: command: '%s'" % cmd)
+                print("TestFwagent::cli: error:   '%s'" % ret['error'])
+                print("TestFwagent::cli: output:")
+                print(out)
+                print("TestFwagent::cli: FAILURE REPORT END")
         else:
             ok = True
 
@@ -105,6 +115,14 @@ def vpp_does_run():
 def vpp_pid():
     try:
         pid = subprocess.check_output(['pidof', 'vpp'])
+    except:
+        pid = None
+    return pid
+
+def fwagent_daemon_pid():
+    try:
+        cmd = "ps -ef | grep 'fwagent daemon' | grep -v grep | tr -s ' ' | cut -d ' ' -f2"
+        pid = subprocess.check_output(cmd, shell=True)
     except:
         pid = None
     return pid
@@ -242,3 +260,13 @@ def router_is_configured(expected_cfg_dump_filename, print_error=True):
     elif print_error:
         print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
     return ok
+
+def file_exists(filename, check_size=True):
+    try:
+        file_size_str = subprocess.check_output("sudo stat -c %%s %s" % filename, shell=True)
+    except subprocess.CalledProcessError:
+        return False
+    if check_size and int(file_size_str.rstrip()) == 0:
+        return False
+    return True
+

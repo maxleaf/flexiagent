@@ -158,15 +158,38 @@ def _add_app_info(params, cmd_list, cache_key):
     new_params = copy.deepcopy(params)
     new_params['substs'] = [ { 'add_param':cache_key, 'val_by_key':cache_key} ]
 
+
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']          = "add-app-info"
-    cmd['cmd']['params']        = new_params
-    cmd['cmd']['descr']         = "Add APP %s" % (params['id'])
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "Add APP %s" % (params['id'])
+    cmd['cmd']['params']    = {
+                'object': 'fwglobals.g.apps',
+                'func':   'add_remove_application',
+                'args': {
+                    'add':          True,
+                    'id':           params['id'],
+                    'category':     params.get('category'),
+                    'serviceClass': params.get('serviceClass'),
+                    'importance':   params.get('importance')
+                },
+                'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]
+    }
     cmd['revert'] = {}
-    cmd['revert']['name']       = 'remove-app-info'
-    cmd['revert']['params']     = new_params
-    cmd['revert']['descr']      = "Delete APP %s" % (params['id'])
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "Delete APP %s" % (params['id'])
+    cmd['revert']['params'] = {
+                'object': 'fwglobals.g.apps',
+                'func':   'add_remove_application',
+                'args': {
+                    'add':          False,
+                    'id':           params['id'],
+                    'category':     params.get('category'),
+                    'serviceClass': params.get('serviceClass'),
+                    'importance':   params.get('importance')
+                },
+                'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]
+    }
     cmd_list.append(cmd)
 
 def add_app(params):

@@ -24,8 +24,10 @@ import json
 import yaml
 import sys
 import os
+import re
 from shutil import copyfile
 import fwglobals
+import fwrouter_cfg
 import fwstats
 import fwutils
 
@@ -67,6 +69,28 @@ class FWAGENT_API:
             raise Exception("fwagent_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
         return reply
 
+    def _prepare_tunnel_info(self, tunnel_ids):
+        tunnel_info = []
+        tunnels = fwglobals.g.router_cfg.get_tunnels()
+        for params in tunnels:
+            try:
+                tunnel_id = params["tunnel-id"]
+                if tunnel_id in tunnel_ids:
+                    # key1-key4 are the crypto keys stored in
+                    # the management for each tunnel
+                    tunnel_info.append({
+                        "id": str(tunnel_id),
+                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
+                        "key2": params["ipsec"]["local-sa"]["integr-key"],
+                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
+                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
+                    })
+
+            except Exception as e:
+                fwglobals.log.excep("failed to create tunnel information %s" % str(e))
+                raise e
+        return tunnel_info
+
     def _get_device_info(self, params):
         """Get device information.
 
@@ -82,13 +106,11 @@ class FWAGENT_API:
             # Load network configuration.
             info['network'] = {}
             info['network']['interfaces'] = fwglobals.g.handle_request('interfaces')['message']
-            utils_default_route = fwutils.get_default_route()
-            default_route = {
-                "addr": "default",
-                "via": utils_default_route[0],
-                "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
-                }
-            info['network']['routes'] = [ default_route ]
+            info['reconfig'] = fwutils.get_reconfig_hash()
+            # Load tunnel info, if requested by the management
+            if params and params['tunnels']:
+                info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
+                
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))
@@ -103,7 +125,7 @@ class FWAGENT_API:
         reply = fwstats.get_stats()
 
         # Add router configuration hash to assist database synchronization feature
-        reply['router-cfg-hash'] = fwglobals.g.router_api.db_requests.get_signature()
+        reply['router-cfg-hash'] = fwglobals.g.router_cfg.get_signature()
 
         return reply
 
@@ -205,8 +227,8 @@ class FWAGENT_API:
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwutils.get_router_config()
-        reply = {'ok': 1, 'message': configs if configs != None else {}}
+        configs = fwrouter_cfg.dump()
+        reply = {'ok': 1, 'message': configs if configs else {}}
         return reply
 
     def _reset_device_soft(self, params=None):
@@ -237,7 +259,7 @@ class FWAGENT_API:
         fwglobals.log.info("FWAGENT_API: _sync_device started")
 
         remote_signature = params['router-cfg-hash']
-        local_signature  = fwglobals.g.router_api.db_requests.get_signature()
+        local_signature  = fwglobals.g.router_cfg.get_signature()
         fwglobals.log.debug(
             "FWAGENT_API: _sync_device: cfg signature: received=%s, stored=%s" %
             (remote_signature, local_signature))
@@ -256,7 +278,7 @@ class FWAGENT_API:
                 raise Exception("FWAGENT_API: _sync_device failed (%s)" % str(reply.get('message')))
         if restart_router:
             fwglobals.g.router_api.call('start-router')
-        fwglobals.g.router_api.db_requests.reset_signature()
+        fwglobals.g.router_cfg.reset_signature()
 
         fwglobals.log.info("FWAGENT_API: _sync_device finished")
         return {'ok': 1}
