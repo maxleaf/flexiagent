@@ -1163,11 +1163,11 @@ def modify_dhcpd(is_add, params):
 
     :returns: String with sed commands.
     """
-    pci = params['params']['interface']
-    range_start = params['params'].get('range_start', '')
-    range_end = params['params'].get('range_end', '')
-    dns = params['params'].get('dns', {})
-    mac_assign = params['params'].get('mac_assign', {})
+    pci         = params['interface']
+    range_start = params.get('range_start', '')
+    range_end   = params.get('range_end', '')
+    dns         = params.get('dns', {})
+    mac_assign  = params.get('mac_assign', {})
 
     address = IPNetwork(_get_interface_address(pci))
     router = str(address.ip)

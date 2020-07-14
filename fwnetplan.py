@@ -146,9 +146,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric=None, dhcp=None):
         err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname, str(e))
         fwglobals.log.error(err)
-        return (False, err)
-
-    return (True, None)
+        pass
 
 def get_dhcp_netplan_interface(if_name):
     files = glob.glob("/etc/netplan/*.yaml") + \

@@ -35,13 +35,12 @@ def _change_dhcpd_conf(params, cmd_list):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "python"
-    cmd['revert']['descr']  = "update dhcpd config file"
+    cmd['cmd']['descr']     = "update dhcpd config file"
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
                                 'func':   'modify_dhcpd',
                                 'args':   { 'is_add': 1, 'params': params }
                               }
-    cmd['cmd']['descr'] = "modify dhcpd config file"
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "clean dhcpd config file"
