@@ -146,7 +146,7 @@ class FWROUTER_API:
         """
         time.sleep(30)  # 30 sec
         while self.router_started:
-            time.sleep(10)  # 10 sec
+            time.sleep(1)  # 1 sec
             apply_netplan = False
             wan_list = self.get_wan_interface_addr_pci()
 
@@ -161,10 +161,11 @@ class FWROUTER_API:
 
             if apply_netplan:
                 try:
-                    fwglobals.g.fwagent.disconnect()
                     cmd = 'netplan apply'
                     fwglobals.log.debug(cmd)
                     subprocess.check_output(cmd, shell=True)
+                    fwglobals.g.fwagent.disconnect()
+                    time.sleep(10)  # 10 sec
 
                 except Exception as e:
                     fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
