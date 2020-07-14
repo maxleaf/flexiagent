@@ -71,7 +71,7 @@ def global_signal_handler(signum, frame):
 
 signal.signal(signal.SIGINT, global_signal_handler)
 
-class Fwagent:
+class FwAgent:
     """This class implements abstraction of mediator between manager called
     flexiManage and device called flexiEdge. The manager runs on remote server,
     the Fwagent runs on device. The Fwagent establishes protected connection
@@ -87,7 +87,6 @@ class Fwagent:
     def __init__(self, handle_sigterm=True):
         """Constructor method
         """
-        fwglobals.g.initialize()
         self.token                = None
         self.version              = fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE)
         self.ws                   = None
@@ -134,10 +133,9 @@ class Fwagent:
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
-        self._clean_on_exit()
-        fwglobals.g.finalize()
+        self.finalize()
 
-    def _clean_on_exit(self):
+    def finalize(self):
         # Close connection
         if self.ws:
             self.ws.close()
@@ -742,6 +740,8 @@ class FwagentDaemon(object):
         exit(1)
 
     def __enter__(self):
+        fwglobals.g.initialize_agent()
+        self.agent = fwglobals.g.fwagent
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -750,7 +750,8 @@ class FwagentDaemon(object):
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
-        self.stop(stop_vpp=False)  # Don't stop VPP on fwagent exit to keep it routing packets. To stop is use 'fwagent stop'
+        self.stop(stop_vpp=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
+        fwglobals.g.finalize_agent()
         fwglobals.log.debug("FwagentDaemon: exited")
 
     def _check_system(self):
@@ -950,8 +951,6 @@ def daemon():
     fwglobals.log.info("starting in daemon mode")
 
     with FwagentDaemon() as agent_daemon:
-
-        agent_daemon.agent = Fwagent(handle_sigterm=False)
 
         # Start the FwagentDaemon main function in separate thread as it is infinite,
         # and we need to get to Pyro4.Daemon.serveSimple() call to run rpc loop.

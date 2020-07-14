@@ -28,6 +28,7 @@ import time
 import traceback
 import yaml
 
+from fwagent import FwAgent
 from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
@@ -231,6 +232,7 @@ class Fwglobals:
         # PCI to VPP names, assuming names and PCI are unique and not changed during operation
         self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
         self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
+        self.fwagent = None
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -268,24 +270,40 @@ class Fwglobals:
             #     if isinstance(val, (int, float, str, unicode)):
             #         log.debug("  %s: %s" % (a, str(val)), to_terminal=False)
 
-    def initialize(self):
-        """Initialize agent, router and OS API.
-        Restore VPP if needed.
-
-        :returns: None.
+    def initialize_agent(self):
+        """Initialize singleton object. Restore VPP if needed.
         """
-        self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
-        self.os_api     = OS_API()
-        self.apps_api   = FwApps(self.APP_REC_DB_FILE)
-        self.policy_api = FwPolicies()
+        global log
+        log.debug('Fwglobals.initialize_agent: agent %s' % ('exists' if self.fwagent else 'does not exists'))
 
-        self.router_api.restore_vpp_if_needed()
+        if not self.fwagent:
+            self.fwagent    = FwAgent(handle_sigterm=False)
+            self.agent_api  = FWAGENT_API()
+            self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
+            self.os_api     = OS_API()
+            self.apps_api   = FwApps(self.APP_REC_DB_FILE)
+            self.policy_api = FwPolicies()
 
-    def finalize(self):
+            self.router_api.restore_vpp_if_needed()
+
+    def finalize_agent(self):
         """Destructor method
         """
-        self.router_api.finalize()
+        global log
+        log.debug('Fwglobals.finalize_agent: agent %s' % ('exists' if self.fwagent else 'does not exists'))
+
+        if self.fwagent:
+            self.router_api.finalize()
+            self.fwagent.finalize()
+
+            del self.policy_api
+            del self.apps_api
+            del self.os_api
+            del self.router_api
+            del self.agent_api
+            del self.fwagent
+
+            self.fwagent = None
 
     def __str__(self):
         """Get string representation of configuration.

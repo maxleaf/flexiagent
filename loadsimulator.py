@@ -138,7 +138,7 @@ class LoadSimulator:
         """
         fwglobals.log.info("started in simulate mode")
 
-        with fwagent.Fwagent() as agent:
+        with fwagent.FwAgent() as agent:
 
             self.enable(int(count))
 
