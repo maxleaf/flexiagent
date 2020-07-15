@@ -220,6 +220,7 @@ class Fwglobals:
         self.MULTILINK_DB_FILE = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.NETPLAN_FILES = {}
+        self.NETPLAN_FILE = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
