@@ -18,7 +18,7 @@ pytestdebug.log
 *.rar
 *.tar
 *.zip
-
+*.DS_Store
 # Text files
 *.txt
 
