@@ -377,7 +377,7 @@ class Checker:
 
         for metric, gws in metrics.items():
             if len(gws) > 1:
-                return metric, gws
+                return metric, metrics
 
         return None, None
 
@@ -432,11 +432,18 @@ class Checker:
             fname_baseline = fname.replace('yaml', 'baseline.yaml')
             os.system('mv %s %s' % (fname, fname_baseline))
 
-        for route in routes:
-            metric += 100
-            rip = route.split('via ')[1].split(' ')[0]
-            subprocess.check_output('ip route del default via %s' % rip, shell=True).strip()
-            subprocess.check_output('ip route add default via %s metric %u' % (rip, metric), shell=True).strip()
+            for dev in devices:
+                ifname = dev.get('ifname')
+                gateway = dev.get('gateway')
+                if gateway is None:
+                    continue
+                if primary_gw is not None and gateway == primary_gw:
+                    self._add_netplan_interface(fname_baseline, ifname, 0)
+                else:
+                    self._add_netplan_interface(fname_baseline, ifname, metric)
+                    metric += 100
+
+        subprocess.check_output('sudo netplan apply', shell=True)
 
         return True
 
