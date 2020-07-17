@@ -77,9 +77,11 @@ class FwagentCli:
         except Pyro4.errors.CommunicationError:
             fwglobals.log.warning("FwagentCli: no daemon Fwagent was found, use local instance")
             self.daemon = None
-            self.agent  = fwagent.Fwagent()
 
     def __enter__(self):
+        if not self.daemon:
+	        fwglobals.g.initialize_agent()
+	        self.agent = fwglobals.g.fwagent
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -93,7 +95,7 @@ class FwagentCli:
             # if router was started by cli execution.
             if self.agent_linger:
                 time.sleep(self.agent_linger)
-            self.agent.__exit__(exc_type, exc_value, traceback)
+            fwglobals.g.finalize_agent()
 
     def run_loop(self):
         while True:

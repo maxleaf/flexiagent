@@ -30,6 +30,7 @@ import yaml
 import json
 import subprocess
 
+import fwagent
 import fwglobals
 import fwutils
 import fwnetplan
@@ -143,7 +144,7 @@ class FWROUTER_API:
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        time.sleep(10)  # 10 sec
+        time.sleep(30)  # 30 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
             apply_netplan = False
@@ -163,6 +164,9 @@ class FWROUTER_API:
                     cmd = 'netplan apply'
                     fwglobals.log.debug(cmd)
                     subprocess.check_output(cmd, shell=True)
+                    fwglobals.g.fwagent.disconnect()
+                    time.sleep(10)  # 10 sec
+
                 except Exception as e:
                     fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
 
@@ -1233,7 +1237,7 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
-                        pci = request['params']['pci']
+                        pci = request['params'].get('pci')
                         gw = request['params'].get('gateway')
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
@@ -1244,7 +1248,7 @@ class FWROUTER_API:
 
                         else:
                             return pci, gw
-        return None
+        return None, None
 
     def get_wan_interface_addr_pci(self):
         wan_list = []
