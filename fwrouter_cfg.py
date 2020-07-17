@@ -76,6 +76,11 @@ class FwRouterCfg:
         """Generates uniq key for request out of request name 'req' and
         request parameters 'params'. To do that uses function defined in the
         correspondent translator file, e.g. fwtranslate_add_tunnel.py.
+
+        !IMPORTANT!  keep this function internal! No one should be aware of
+                     database implementation. If you feel need to expose this
+                     function, please consider to add API to this class
+                     that encapsulates the needed functionality!
         """
         src_req      = fwrouter_api.fwrouter_translators[req].get('src', req)  # 'remove-X' requests use key generator of correspondent 'add-X' requests
         src_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
@@ -175,8 +180,8 @@ class FwRouterCfg:
             types = [
                 'start-router',
                 'add-interface',
-                'add-route',
                 'add-tunnel',
+                'add-route',		# routes should come after tunnels, as they might use them
                 'add-dhcp-config',
                 'add-application',
                 'add-multilink-policy'
@@ -220,9 +225,9 @@ class FwRouterCfg:
             'add-multilink-policy': "=========== POLICIES ========="
         }
 
-        out      = ''
-        prev_msg = { 'message': 'undefined' }
+        out = '\nsignature: %s\n' % self.db.get('signature')
 
+        prev_msg = { 'message': 'undefined' }
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
         for msg in cfg:
             # Print separator between sections
@@ -236,6 +241,9 @@ class FwRouterCfg:
             if full:
                 out += "Executed: %s\n" % str(msg['executed'])
                 out += "Commands:\n  %s" % fwutils.yaml_dump(msg['cmd_list'])
+
+        if cfg:
+            out = '\nsignature: %s\n' % self.db.get('signature')
         return out
 
     def _get_requests(self, req):
@@ -335,14 +343,112 @@ class FwRouterCfg:
                             (str(new), str(current), str(delta)))
 
     def get_signature(self):
+        """Retrives signature of the current configuration.
+        The signature is SHA-1 based hash on requests store in local database.
+
+        :returns: the signature as a string.
+        """
         return self.db['signature']
 
     def reset_signature(self):
+        """Resets configuration signature to the empty sting.
+        """
         if not 'signature' in self.db:
             self.db['signature'] = ""
-        if len(self.db['signature']) > 0:
+        if self.db['signature']:
             fwglobals.log.debug("fwrouter_cfg: reset signature")
             self.db['signature'] = ""
+
+    def get_sync_list(self, requests):
+        """Intersects requests provided within 'requests' argument against
+        the requests stored in the local database and generates delta list that
+        can be used for synchronization of router configuration. This delta list
+        is called sync-list. It includes sequence of 'remove-X' and 'add-X'
+        requests that should be applied to device in order to configure it with
+        the configuration, reflected in the input list 'requests'.
+            Order of requests in the sync-list is important for proper
+        configuration of VPP! The list should start with the 'remove-X' requests
+        in order to remove not needed configuration items and to modify existing
+        configuration in following order:
+            [ 'add-multilink-policy', 'add-application', 'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
+        Than the sync-list should include the 'add-X' requests to add missing
+        configuration items or to complete modification of existing configuration
+        items. The 'add-X' requests should be added in order opposite to the
+        'remove-X' requests:
+            [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        Note the modification is broken into pair of correspondent 'remove-X' and
+        'add-X' requests.
+
+        :param requests: list of requests that reflects the desired configuration.
+                         The requests are in formant of flexiManage<->flexiEdge
+                         message: { 'message': 'add-X', 'params': {...}}.
+
+        :returns: synchronization list - list of 'remove-X' and 'add-X' requests
+                         that takes device to the desired configuration if applied
+                         to the device.
+        """
+
+        # Firstly we hack a little bit the input list as follows:
+        # build dictionary out of this list where values are list elements
+        # (requests) and keys are request keys that local database would use
+        # to store these requests. Accidentally these are exactly same keys
+        # dumped by fwglobals.g.router_cfg.dump() used below ;)
+        #
+        desired_requests = {}
+        for request in requests:
+            key = self._get_request_key(request['message'], request.get('params'))
+            desired_requests.update(request)
+
+        # Now dump local configuration in order of 'remove-X' list
+        #
+        add_order = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        remove_order = add_order.reverse()
+        delta_list = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+
+        # Now go over dumped requests and remove those that present in the input
+        # list and that have same parameters. They correspond to configuration
+        # items that should be not touched by synchronization. The dumped requests
+        # that present in the input list but have different parameters stand
+        # for modifications. They should be added to the delta list as 'remove-X'
+        # and than added again as 'add-X' later as it would be a new configuration
+        # item.
+        #
+        for (idx, request) in enumerate(delta_list):
+            dumped_key = request['key']
+            if dumped_key in desired_requests:
+                dumped_params  = request.get('params')
+                desired_params = desired_requests[dumped_key].get('params')
+                if dumped_params == desired_params:
+                    # Exactly same configuration item should be removed from
+                    # delta list. As well we remove it from input list to avoid
+                    # adding it back to delta list later with 'add-X' requests.
+                    #
+                    del delta_list[idx]
+                    requests.remove(desired_requests[dumped_key])
+                else:
+                    # The modified configuration item should stay in both
+                    # the delta list and the input list. Though in delta list
+                    # it should come with 'remove-X' request name.
+                    # It should stay in the input list to be added later as 'add-X'.
+                    #
+                    request['message'] = request['message'].replace('add-', 'remove-')
+            else:
+                # The configuration item does not present in the input list.
+                # So it stands for item to be removed.
+                #
+                request['message'] = request['message'].replace('add-', 'remove-')
+
+        # At this point the input list includes 'add-X' requests that stand
+        # for new or for modified configuration items.
+        # Just go and add them to the delta list 'as-is'.
+        # Note we don't rely on order of requests in the input list, so we go
+        # and do double cycling of O(n x m) to ensure proper order.
+        for req in add_order:
+            for request in requests:
+                if request['message'] == req:
+                    delta_list.append(request)
+
+        return delta_list
 
 ################################################################################
 #    GLOBAL UTILITY FUNCTION

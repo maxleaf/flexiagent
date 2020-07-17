@@ -256,8 +256,16 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
-        fwglobals.log.info("FWAGENT_API: _sync_device started")
+        fwglobals.log.info("FWAGENT_API: _sync_device STARTED")
 
+        # Check if there is a need to sync at all.
+        # It might be race between receiving sync-device request from server
+        # and sending success reply to the previous request, so server might
+        # deduce that we out of sync, when we are OK.
+        # So we ensure that the configuration signature received from server
+        # differs from the one of the current configuration. If it is not,
+        # we are OK - simply return.
+        #
         remote_signature = params['router-cfg-hash']
         local_signature  = fwglobals.g.router_cfg.get_signature()
         fwglobals.log.debug(
@@ -265,20 +273,74 @@ class FWAGENT_API:
             (remote_signature, local_signature))
         if remote_signature == local_signature:
             fwglobals.log.info("FWAGENT_API: _sync_device: no need to sync")
+            fwglobals.g.router_cfg.reset_signature()
             return {'ok': 1}
 
-        # Below is the temporary rude implementation:
-        # soft reset device and load received configuration.
-        # Later we will implement more elegant solution described above :)
-        restart_router = fwglobals.g.router_api.router_started
-        self._reset_device_soft()
-        for request in params['requests']:
-            reply = fwglobals.g.router_api.call(request['message'], request.get('params'))
-            if reply['ok'] == 0:
-                raise Exception("FWAGENT_API: _sync_device failed (%s)" % str(reply.get('message')))
-        if restart_router:
-            fwglobals.g.router_api.call('start-router')
-        fwglobals.g.router_cfg.reset_signature()
+        # Now go over configuration requests received within sync-device request,
+        # intersect them against the requests stored locally and generate new list
+        # of remove-X and add-X requests that should take device to configuration
+        # received with the sync-device.
+        #
+        sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
 
-        fwglobals.log.info("FWAGENT_API: _sync_device finished")
+        # Find out if sync goes to remove or to add new interfaces.
+        # In this case the vpp should be restarted in order to release/capture
+        # correspondent devices.
+        # Note the modified interfaces do not require restart, so we should
+        # filter out 'remove-interface' requests that have correspondent 'add-
+        # interface' requests. The criteria for match is pci.
+        #
+        restart_router = False
+        if fwglobals.g.router_api.router_started:
+            interfaces = {}
+            for request in sync_list:
+                if re.search('-interface', request['message']):
+                    pci = request['params']['pci']
+                    if pci in interfaces:
+                        del interfaces[pci]
+                    else:
+                        interfaces[pci] = None
+            restart_router = bool(interfaces)  # True if dict is not empty, o/w False
+
+        # Remember if router is running before we start smart sync, as it might stop it
+        restart_router_after_reset = fwglobals.g.router_api.router_started
+
+        # Finally update configuration.
+        # Firstly try smart sync - apply sync-list modifications only.
+        # If that fails, go with brutal sync - reset configuration and apply sync-device list
+        #
+        try:
+            # Stop router if needed
+            if restart_router:
+                reply = fwglobals.g.router_api.call("stop-router")
+                if reply['ok'] == 0:
+                    raise Exception(" _sync_device: stop-router failed: " + str(reply.get('message')))
+
+            # Update configuration.
+            for request in sync_list:
+                reply = fwglobals.g.router_api.call(request['message'], request.get('params'))
+                if reply['ok'] == 0:
+                    raise Exception(" _sync_device: smart sync failed: " + str(reply.get('message')))
+
+            # Start router if needed
+            if restart_router:
+                reply = fwglobals.g.router_api.call("start-router")
+                if reply['ok'] == 0:
+                    raise Exception(" _sync_device: start-router failed: " + str(reply.get('message')))
+
+        except Exception as e:
+            fwglobals.log.error("FWAGENT_API: _sync_device: smart sync failed: %s" % str(e))
+            self._reset_device_soft()
+            for request in params['requests']:
+                reply = fwglobals.g.router_api.call(request['message'], request.get('params'))
+                if reply['ok'] == 0:
+                    error = request['message'] + ': ' + str(reply.get('message'))
+                    fwglobals.log.error("FWAGENT_API: _sync_device: brutal sync failed: %s" % error)
+                    raise Exception(error)
+            if restart_router_after_reset:
+                fwglobals.g.router_api.call('start-router')
+            fwglobals.log.debug("FWAGENT_API: _sync_device: brutal sync succeeded")
+
+        fwglobals.g.router_cfg.reset_signature()
+        fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
         return {'ok': 1}
