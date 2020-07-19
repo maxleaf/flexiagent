@@ -111,9 +111,10 @@ def add_service(params):
             'serverKey': params['config']['serverKey'],
             'serverCrt': params['config']['serverCrt'],
             'tlsKey': params['config']['tlsKey'],
+            'dhKey': params['config']['dhKey'],
             'dnsIp': params['config']['dnsIp'],
             'dnsName': params['config']['dnsName'],
-            'dhKey': params['config']['dhKey']
+            'port': params['config']['port']
         }
 
         cmd_revert_params['func'] = 'remove_openvpn_server'    

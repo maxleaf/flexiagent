@@ -1683,7 +1683,7 @@ def configure_server_file(params):
         'echo "local %s" >> %s' % (params['deviceWANIp'], destFile),
 
         # Which TCP/UDP port should OpenVPN listen on?
-        'echo "port 1194" >> %s' % destFile,
+        # 'echo "port 1194" >> %s' % destFile,
 
         # TCP or UDP server?
         'echo "proto udp" >> %s' % destFile,
@@ -1762,6 +1762,10 @@ def configure_server_file(params):
     else:
         commands.append('echo "push \\"route 172.16.0.0 255.255.255.0\\"" >> %s' % (destFile))
 
+    # Port
+    if 'port' in params and params['port']:
+        commands.append('echo "port %s" >> %s' % (params['port'], destFile))
+
     # DNS options
     if 'dnsIp' in params and isinstance(params['dnsIp'], list):
         for ip in params['dnsIp']:            
@@ -1786,6 +1790,7 @@ def configure_client_file(params):
 
     commands = [
         ' > %s' % destFile,
+        'echo "client" >> %s' % destFile,
         'echo "dev tun" >> %s' % destFile,
         'echo "proto udp" >> %s' % destFile,
         'echo "remote %s" >> %s' % (params['deviceWANIp'], destFile),
