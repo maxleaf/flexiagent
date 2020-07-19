@@ -41,18 +41,18 @@ def _backup_netplan_files():
             shutil.move(fname, fname_run)
 
 def _delete_netplan_files():
-    files = glob.glob("/etc/netplan/*.yaml") + \
-            glob.glob("/lib/netplan/*.yaml") + \
-            glob.glob("/run/netplan/*.yaml")
+    files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
+            glob.glob("/lib/netplan/*.fwrun.yaml") + \
+            glob.glob("/run/netplan/*.fwrun.yaml")
 
     for fname in files:
         fwglobals.log.debug('_delete_netplan_files: %s' % fname)
-        if re.search('fwrun.yaml', fname):
-            fname_run = fname
-            fname = fname_run.replace('fwrun.yaml', 'yaml')
-            fname_backup = fname + '.fworig'
+        fname_run = fname
+        fname = fname_run.replace('fwrun.yaml', 'yaml')
+        fname_backup = fname + '.fworig'
 
-            os.remove(fname_run)
+        os.remove(fname_run)
+        if os.path.exists(fname_backup):
             shutil.move(fname_backup, fname)
 
 def add_del_netplan_file(is_add):
@@ -104,9 +104,24 @@ def _set_netplan_filename(files):
                 fwglobals.g.NETPLAN_FILES[pci] = fname
                 fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, pci, fname))
 
+def _add_netplan_file(fname):
+    if os.path.exists(fname):
+        return
+
+    config = dict()
+    config['network'] = {'version': 2}
+    with open(fname, 'w+') as stream:
+        yaml.safe_dump(config, stream, default_flow_style=False)
+
+
 def add_remove_netplan_interface(is_add, pci, ip, gw, metric=None, dhcp=None):
     metric = int(metric) if metric else 0
-    fname  = fwglobals.g.NETPLAN_FILES[pci].replace('yaml', 'fwrun.yaml')
+
+    if pci in fwglobals.g.NETPLAN_FILES:
+        fname = fwglobals.g.NETPLAN_FILES[pci].replace('yaml', 'fwrun.yaml')
+    else:
+        fname = fwglobals.g.NETPLAN_FILE
+        _add_netplan_file(fname)
 
     config_section = {}
     if dhcp and re.match('yes', dhcp):

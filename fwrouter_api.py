@@ -29,6 +29,7 @@ import yaml
 import json
 import subprocess
 
+import fwagent
 import fwglobals
 import fwutils
 import fwnetplan
@@ -140,7 +141,7 @@ class FWROUTER_API:
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        time.sleep(10)  # 10 sec
+        time.sleep(30)  # 30 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
             apply_netplan = False
@@ -160,6 +161,9 @@ class FWROUTER_API:
                     cmd = 'netplan apply'
                     fwglobals.log.debug(cmd)
                     subprocess.check_output(cmd, shell=True)
+                    fwglobals.g.fwagent.disconnect()
+                    time.sleep(10)  # 10 sec
+
                 except Exception as e:
                     fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
 
@@ -771,3 +775,4 @@ class FWROUTER_API:
             del params['substs']
         else:  # list
             params.remove(substs_element)
+
