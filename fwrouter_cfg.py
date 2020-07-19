@@ -317,6 +317,21 @@ class FwRouterCfg:
                         return pci, gw
         return (None, None)
 
+    def get_interface_ips(self, pci_list=None):
+        """Fetches IP-s of interfaces stored in the configuration database.
+
+        :param pci_list: filter interfaces to be handled by pci.
+
+        :returns: list of IP addresses. The addresses are without length.
+        """
+        if_ips = []
+        interfaces = self.get_interfaces()
+        for params in interfaces:
+            if not pci_list or params['pci'] in pci_list:
+                if_ips.append(params['addr'].split('/')[0])
+        return if_ips
+
+
     def update_signature(self, request):
         """Updates the database signature.
         This function assists the database synchronization feature that keeps

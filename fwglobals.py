@@ -62,6 +62,7 @@ request_handlers = {
     'upgrade-device-sw':            '_call_agent_api',
     'reset-device':                 '_call_agent_api',
     'sync-device':                  '_call_agent_api',
+    'modify-device':                '_call_agent_api',
 
     # Router API
     'aggregated-router-api':        '_call_router_api',
@@ -73,7 +74,6 @@ request_handlers = {
     'remove-route':                 '_call_router_api',
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
-    'modify-device':                '_call_router_api',
     'add-dhcp-config':              '_call_router_api',
     'remove-dhcp-config':           '_call_router_api',
     'add-application':              '_call_router_api',
