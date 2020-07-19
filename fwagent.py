@@ -503,7 +503,7 @@ class Fwagent:
         if self.ws:
             self.ws.close()
 
-    def handle_received_request(self, msg):
+    def handle_received_request(self, received_msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -520,15 +520,15 @@ class Fwagent:
         # Aggregation is not well defined in today protocol (May-2019),
         # so align all kind of aggregations to the common request format
         # expected by the agent framework.
-        msg = fwutils.fix_aggregated_message_format(msg)
+        msg = fwutils.fix_aggregated_message_format(received_msg)
 
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("_handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
+            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
 
         self.requestReceived = True
 
-        reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
+        reply = fwglobals.g.handle_request(msg['message'], msg.get('params'), received_msg=received_msg)
 
         if not 'entity' in reply and 'entity' in msg:
             reply.update({'entity': msg['entity'] + 'Reply'})
@@ -562,11 +562,13 @@ class Fwagent:
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
+                return None
             else:   # Take care of file with single request
                 (reply, unused_msg) = self.handle_received_request(requests)
                 if reply['ok'] == 0:
                     raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))
+                return reply
 
 def version():
     """Handles 'fwagent version' command.
@@ -688,8 +690,10 @@ def show(agent_info, router_info):
             fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
         elif router_info == 'configuration':
             fwrouter_cfg.print_basic()
-        elif router_info == 'request_db':
+        elif router_info == 'cfg_db':
             fwrouter_cfg.print_basic(full=True)
+        elif router_info == 'cfg_signature':
+            fwrouter_cfg.print_signature()
         elif router_info == 'multilink-policy':
             fwrouter_cfg.print_multilink()
 
@@ -730,12 +734,15 @@ class FwagentDaemon(object):
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, tb):
         # The three arguments to `__exit__` describe the exception
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
+
+        traceback.print_tb(tb)
+
         self.stop(stop_vpp=False)  # Don't stop VPP on fwagent exit to keep it routing packets. To stop is use 'fwagent stop'
         fwglobals.log.debug("FwagentDaemon: exited")
 
@@ -1018,7 +1025,19 @@ def cli(clean_request_db=True, api=None, script_fname=None):
     import fwagent_cli
     with fwagent_cli.FwagentCli() as cli:
         if api:
-            cli.execute(api)
+            ret = cli.execute(api)
+
+            # We return dictionary with serialized return value of the invoked API,
+            # so cli output can be parsed by invoker to extract the returned object.
+            #
+            if ret['succeeded']:
+                if ret['return-value']:
+                    ret_val = json.dumps(ret['return-value'])
+                else:
+                    ret_val = json.dumps({'ok': 1})
+            else:
+                ret_val = json.dumps({'ok': 0, 'error': ret['error']})
+            fwglobals.log.info('return-value-start ' + ret_val + ' return-value-end')
         else:
             cli.run_loop()
     if clean_request_db:
@@ -1073,7 +1092,7 @@ if __name__ == '__main__':
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db', 'multilink-policy'],
+    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version', 'cache'],
                         help="show various agent parameters")

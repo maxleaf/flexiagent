@@ -61,6 +61,8 @@ request_handlers = {
     'get-router-config':            '_call_agent_api',
     'upgrade-device-sw':            '_call_agent_api',
     'reset-device':                 '_call_agent_api',
+    'sync-device':                  '_call_agent_api',
+    'modify-device':                '_call_agent_api',
 
     # Router API
     'aggregated-router-api':        '_call_router_api',
@@ -72,7 +74,6 @@ request_handlers = {
     'remove-route':                 '_call_router_api',
     'add-tunnel':                   '_call_router_api',
     'remove-tunnel':                '_call_router_api',
-    'modify-device':                '_call_router_api',
     'add-dhcp-config':              '_call_router_api',
     'remove-dhcp-config':           '_call_router_api',
     'add-application':              '_call_router_api',
@@ -364,21 +365,23 @@ class Fwglobals:
     #          For example, it might contain pattern for grep to be run
     #          on command output.
     #
-    def handle_request(self, req, params=None, result=None):
+    def handle_request(self, req, params=None, result=None, received_msg=None):
         """Handle request.
 
-        :param params:    Parameters from flexiManage.
-        :param result:    Place for result.
+        :param req:          Request from flexiManage, e.g. 'start-router'
+        :param params:       Parameters from flexiManage.
+        :param result:       Place for result.
+        :param received_msg: The original message received from flexiManage.
 
         :returns: Dictionary with error string and status code.
         """
 
         try:
-            handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+            handler_name = request_handlers.get(req)
+            assert handler_name, 'fwglobals: "%s" request is not supported' % req
 
-            handler_func = getattr(self, handler)
-            assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler, req)
+            handler_func = getattr(self, handler_name)
+            assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler_name, req)
 
             if result is None:
                 reply = handler_func(req, params)
@@ -389,6 +392,21 @@ class Fwglobals:
                     myCmd = 'sudo vppctl api trace save error.api'
                     os.system(myCmd)
                     raise Exception(reply['message'])
+
+            # On router configuration request, e.g. add-interface,
+            # remove-tunnel, modify-device, etc. update the configuration database
+            # signature. This is needed to assists the database synchronization
+            # feature that keeps the configuration set by user on the flexiManage
+            # in sync with the one stored on the flexiEdge device.
+            # Note we do that here, as at this point we handle configuration
+            # request that was received from flexiManage and that was not
+            # generated locally.
+            #
+            if reply['ok'] == 1 and handler_name == '_call_router_api':
+                # Update the configuration signature
+                self.router_cfg.update_signature(received_msg)
+                # Add the updated signatire to the reply, so server could be quite
+                reply['router-cfg-hash'] = self.router_cfg.get_signature()
 
             return reply
 

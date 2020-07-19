@@ -1493,11 +1493,11 @@ def vpp_set_dhcp_detect(pci, remove):
 # {
 #   'message': 'aggregated-router-api',
 #   'params' : {
-#                'requests': <list of aggregated requests>,
-#                'original': <original message>
+#                'requests':     <list of aggregated requests>,
+#                'original_msg': <original message>
 #              }
 # }
-# The 'original' is needed for configuration hash feature - every received
+# The 'original_msg' is needed for configuration hash feature - every received
 # message is used for signing router configuration to enable database sync
 # between device and server. Once the protocol is fixed, there will be no more
 # need in this proprietary format.
@@ -1517,14 +1517,11 @@ def fix_aggregated_message_format(msg):
                 reconnect = True
                 break
 
-        return {
-            'message': 'aggregated-router-api',
-            'params' : {
-                'requests': msg,
-                'original': msg,
-                'reconnect': reconnect
+        return  \
+            {
+                'message': 'aggregated-router-api',
+                'params' : { 'requests': msg, 'reconnect': reconnect }
             }
-        }
 
     # 'start-router' aggregation
     # 'start-router' might include interfaces and routes. Move them into list.
@@ -1560,13 +1557,11 @@ def fix_aggregated_message_format(msg):
                     {
                         'message': 'start-router'
                     })
-            return {
-                'message': 'aggregated-router-api',
-                'params' : {
-                    'requests': requests,
-                    'original': msg
+            return \
+                {
+                    'message': 'aggregated-router-api',
+                    'params' : { 'requests': requests }
                 }
-            }
 
     # 'add-X' aggregation
     # 'add-interface'/'remove-interface' can have actually a list of interfaces.
@@ -1581,12 +1576,10 @@ def fix_aggregated_message_format(msg):
                     'params' : params
                 })
 
-        return {
-            'message': 'aggregated-router-api',
-            'params' : {
-                'requests': requests,
-                'original': msg
+        return \
+            {
+                'message': 'aggregated-router-api',
+                'params' : { 'requests': requests }
             }
-        }
 
     return msg  # No conversion is needed

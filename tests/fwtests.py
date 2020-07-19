@@ -20,8 +20,11 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import json
+import filecmp
 import os
 import psutil
+import pytest
 import re
 import subprocess
 import sys
@@ -74,15 +77,31 @@ class TestFwagent:
         # created, API command will be run on it, and instance will be destroyed.
         #
         cmd = '%s cli %s' % (self.fwagent_py, args)
-        out = subprocess.check_output(cmd, shell=True)
-        ok = False if re.search('\bError\b|\berror\b|["\']ok["\'][ ]*:[ ]*0', out) else True
-        if not ok and print_output_on_error:
-            print("TestFwagent::cli: FAILURE REPORT START")
+        out = subprocess.check_output(cmd, shell=True).strip()
+
+        # Deserialize object printed by CLI onto STDOUT
+        match = re.search('return-value-start (.*) return-value-end', out)
+        if not match:
+            print("TestFwagent::cli: BAD OUTPUT START")
             print("TestFwagent::cli: command: '%s'" % cmd)
             print("TestFwagent::cli: output:")
             print(out)
-            print("TestFwagent::cli: FAILURE REPORT END")
-        return (ok, out)
+            print("TestFwagent::cli: BAD OUTPUT END")
+            return (False, { 'error': 'bad CLI output format'})
+        ret = json.loads(match.group(1))
+        if 'ok' in ret and ret['ok'] == 0:
+            ok = False
+            if print_output_on_error:
+                print("TestFwagent::cli: FAILURE REPORT START")
+                print("TestFwagent::cli: command: '%s'" % cmd)
+                print("TestFwagent::cli: error:   '%s'" % ret['error'])
+                print("TestFwagent::cli: output:")
+                print(out)
+                print("TestFwagent::cli: FAILURE REPORT END")
+        else:
+            ok = True
+
+        return (ok, ret)
 
     def show(self, args):
         cmd = '%s show %s' % (self.fwagent_py, args)
@@ -110,35 +129,73 @@ def fwagent_daemon_pid():
 
 def vpp_is_configured(config_entities, print_error=True):
 
-    def _check_command_output(cmd, descr='', print_error=True):
-        out = subprocess.check_output(cmd, shell=True).rstrip()
-        if out != str(amount):
+    def _run_command(cmd, print_error=True):
+        # This function simulates subprocess.check_output() using the Popen
+        # object in order to avoid excpetions when process exits with non-zero
+        # status. Otherwise pytest intercepts the exception and fails the test.
+        # We need it to read output of 'vppctl' command that might exit abnormally
+        # on 'clib_socket_init: connect (fd 3, '/run/vpp/cli.sock'): Connection refused' error.
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        (out, unused_err) = p.communicate()
+        retcode = p.poll()
+        return (retcode, out.rstrip())
+
+    def _check_command_output(cmd, expected_out, descr='', cmd_on_error=None, print_error=True):
+        # Can't use 'subprocess.check_output' as it raises exception on non-zero return code
+        # due to 'clib_socket_init: connect (fd 3, '/run/vpp/cli.sock'): Connection refused' error.
+        # Use Popen instead and collect output using communicate() method.
+        (retcode, out) = _run_command(cmd)
+        if retcode != 0 or out != expected_out:
             if print_error:
-                print("ERROR: number %s doesn't match: expected %d, found %s" % (descr, amount, out))
-                print("ERROR: cmd=%s" % (cmd))
-                print("ERROR: out=%s" % (out))
+                if retcode != 0:
+                    print("ERROR: cmd=%s: exit code=%s" % (cmd, str(retcode)))
+                else:
+                    print("ERROR: number %s doesn't match: expected %s, found %s" % (descr, expected_out, out))
+                    print("ERROR: cmd=%s" % (cmd))
+                    print("ERROR: out=%s" % (out))
+                    if cmd_on_error:
+                        (retcode, out) = _run_command(cmd_on_error)
+                        print("ERROR: (%s):\n%s" % (cmd_on_error, str(out)))
             return False
         return True
 
     for (e, amount) in config_entities:
+        output = str(amount)
         if e == 'interfaces':
             # Count number of interfaces that are UP
-            cmd = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
-            if not _check_command_output(cmd, 'UP interfaces'):
-                out = subprocess.check_output(r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)'", shell=True).rstrip()
-                print("ERROR:\n" + out)
+            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
+            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)'"
+            if not _check_command_output(cmd, output, 'UP interfaces', cmd_on_error, print_error):
                 return False
         if e == 'tunnels':
             # Count number of existing tunnel
             # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
-            cmd = "sudo vppctl sh ipsec gre tunnel | grep src | wc -l"
-            if not _check_command_output(cmd, 'tunnels', print_error=False):
-                cmd = "sudo vppctl show vxlan tunnel | grep src | wc -l"
-                if not _check_command_output(cmd, 'tunnels', print_error):
-                    out_ipsec = subprocess.check_output("sudo vppctl sh ipsec gre tunnel", shell=True).rstrip()
-                    out_vxlan = subprocess.check_output("sudo vppctl show vxlan tunnel", shell=True).rstrip()
-                    print("ERROR:\n" + out_ipsec + "\n" + out_vxlan)
+            cmd          = "sudo vppctl sh ipsec gre tunnel | grep src | wc -l"
+            cmd_on_error = "sudo vppctl sh ipsec gre tunnel"
+            if not _check_command_output(cmd, output, 'tunnels', cmd_on_error, print_error):
+                cmd          = "sudo vppctl show vxlan tunnel | grep src | wc -l"
+                cmd_on_error = "sudo vppctl show vxlan tunnel"
+                if not _check_command_output(cmd, output, 'tunnels', cmd_on_error, print_error) and print_error:
                     return False
+        if e == 'applications':
+            # Not supported yet - applications are relfected in VPP ACL,
+            # but the relation between number of applications and ACL rules
+            # is not linear.
+            continue
+        if e == 'multilink-policies':
+            # Count number of existing tunnel
+            # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
+            cmd          = "sudo vppctl show fwabf policy | grep fwabf: | wc -l"
+            cmd_on_error = "sudo vppctl show fwabf policy"
+            if not _check_command_output(cmd, output, 'multilink-policies', cmd_on_error, print_error):
+                return False
+        if e == 'dhcp-servers':
+            # Count number of existing tunnel
+            # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
+            cmd          = "sudo grep -E '^subnet [0-9.]+ netmask' /etc/dhcp/dhcpd.conf | wc -l"
+            cmd_on_error = "sudo cat /etc/dhcp/dhcpd.conf"
+            if not _check_command_output(cmd, output, 'dhcp-servers', cmd_on_error, print_error):
+                return False
     return True
 
 
@@ -151,7 +208,7 @@ def wait_vpp_to_start(timeout=1000000):
         pid = vpp_pid()
     if timeout == 0:
         return False
-    # Wait for vpp to be ready tp process cli requests
+    # Wait for vpp to be ready to process cli requests
     res = subprocess.call("sudo vppctl sh version", shell=True)
     while res != 0 and timeout > 0:
         time.sleep(3)
@@ -196,3 +253,19 @@ def file_exists(filename, check_size=True):
     if check_size and int(file_size_str.rstrip()) == 0:
         return False
     return True
+
+def router_is_configured(expected_cfg_dump_filename, print_error=True):
+    # Dumps current agent configuration into temporary file and checks
+    # if the dump file is equal to the provided expected dump file.
+    actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
+    dump_configuration_cmd = "sudo fwagent show --router configuration > %s" % actual_cfg_dump_filename
+    subprocess.call(dump_configuration_cmd, shell=True)
+    dump_multilink_cmd = "sudo fwagent show --router multilink-policy >> %s" % actual_cfg_dump_filename
+    subprocess.call(dump_multilink_cmd, shell=True)
+    ok = filecmp.cmp(expected_cfg_dump_filename, actual_cfg_dump_filename)
+    if ok:
+        os.remove(actual_cfg_dump_filename)
+    elif print_error:
+        print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
+    return ok
+
