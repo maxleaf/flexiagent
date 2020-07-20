@@ -215,7 +215,7 @@ class FwRouterCfg:
         :param escape: list of types of configuration requests that should be escaped while dumping
         :param full:   return requests together with translated commands.
         """
-        separators = {
+        sections = {
             'start-router':         "======== START COMMAND =======",
             'add-interface':        "========== INTERFACES ========",
             'add-route':            "============ ROUTES ==========",
@@ -225,23 +225,29 @@ class FwRouterCfg:
             'add-multilink-policy': "=========== POLICIES ========="
         }
 
-        out      = ''
+        out = {}
         prev_msg = { 'message': 'undefined' }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
         for msg in cfg:
-            # Print separator between sections
+            # Add new section
             if msg['message'] != prev_msg['message']:
-                out += separators[msg['message']] + "\n"
                 prev_msg['message'] = msg['message']
+                section_name = sections[msg['message']]
+                out[section_name] = []
 
-            # Print configuration item in section
-            out += "Key: %s\n" % msg['key']
-            out += "%s\n" % json.dumps(msg['params'], sort_keys=True, indent=2)
+            # Add configuration item to section
+            item = {
+                'Key ':   msg['key'],
+                'Params': msg['params']
+            }
             if full:
-                out += "Executed: %s\n" % str(msg['executed'])
-                out += "Commands:\n  %s" % fwutils.yaml_dump(msg['cmd_list'])
-        return out
+                item.update({'Executed': str(msg['executed'])})
+                item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
+            out[section_name].append(item)
+        if not out:
+            return ''
+        return json.dumps(out, indent=2)
 
     def _get_requests(self, req):
         """Retrives list of configuration requests parameters for requests with
