@@ -406,8 +406,7 @@
               "order": "load-balance"
             },
             {
-              "pathlabels": [ "blue" ],
-              "order": "priority"
+              "pathlabels": [ "blue" ]
             }
           ],
           "order": "load-balance",
@@ -425,12 +424,10 @@
         "action": {
           "links": [
             {
-              "pathlabels": [ "black" ],
-              "order": "priority"
+              "pathlabels": [ "black" ]
             }
-          ],
-          "order": "priority",
-          "fallback": "by-destination"
+          ]
+          "fallback": "drop"
         }
       }
     ]

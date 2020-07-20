@@ -266,9 +266,9 @@ def add_policy(params):
 
     for rule in params['rules']:
         priority = rule['priority']
-        fallback = rule['action']['fallback']
-        order = rule['action']['order']
-        links = rule['action']['links']
+        fallback = rule['action'].get('fallback', 'by-destination')
+        order    = rule['action'].get('order', 'priority')
+        links    = rule['action']['links']
 
         classification = rule['classification']
         app = classification.get('application', None)

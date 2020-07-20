@@ -1335,7 +1335,7 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     group_id = 1
     for link in links:
         order = ''
-        if re.match(link['order'], 'load-balancing'):
+        if re.match(link.get('order', 'priority'), 'load-balancing'):
             order = 'random'
 
         labels = link['pathlabels']
