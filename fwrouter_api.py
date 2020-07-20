@@ -144,7 +144,7 @@ class FWROUTER_API:
         while self.router_started:
             time.sleep(1)  # 1 sec
             apply_netplan = False
-            wan_list = self.get_wan_interface_addr_pci()
+            wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
             for wan in wan_list:
                 if wan['dhcp'] == 'no':
@@ -522,27 +522,43 @@ class FWROUTER_API:
                         requests. Note the list should include one original
                         request and one or more simulated requests.
         """
-        new_params = None
+        new_request_list = None
 
         # 'add-application' preprocessing:
         # the currently configured applications should be removed firstly.
         # We do that by adding simulated 'remove-application' request in front
         # of the original 'add-application' request.
         #
-        if req == 'add-application':
-            new_params = { 'requests': [
-                 { 'message': 'remove-application', 'params' : params },
-                 { 'message': 'add-application',    'params' : params }]
-            }
-        elif req == 'aggregated-router-api':
-            # 'add-application' might come withing aggregating request.
-            # In this case insert the simulated 'remove-application' before it.
-            for (idx,request) in enumerate(params['requests']):
-                if request['message'] == 'add-application':
-                    params['requests'].insert(idx,
-                        { 'message': 'remove-application', 'params' : request.get('params') })
-                    new_params = param
-                    break
+        application_params = fwglobals.g.router_cfg.get_applications()
+        if application_params:
+            if req == 'add-application':
+                new_request_list = [
+                    { 'message': 'remove-application', 'params' : application_params },
+                    { 'message': 'add-application',    'params' : params }
+                ]
+            elif req == 'aggregated-router-api':
+                # 'add-application' might come within aggregating request.
+                # In this case insert the simulated 'remove-application' before it.
+                for (idx,request) in enumerate(params['requests']):
+                    if request['message'] == 'remove-application':
+                        break       # List already has 'remove-application', no need to insert
+                    if request['message'] == 'add-application':
+                        new_request_list =  params['requests']
+                        new_request_list[idx:idx] = [{ 'message': 'remove-application', 'params' : application_params }]
+                        break
+
+        # If new aggregation list was not initialized yet while handling
+        # 'add-application' above, initialize is now to simplify list update
+        # by further code below.
+        #
+        if not new_request_list:
+            if req == 'aggregated-router-api':
+                new_request_list = params['requests']
+            else:
+                new_request_list = [ { 'message': req, 'params' : params } ]
+            new_list_generated = False
+        else:
+            new_list_generated = True
 
         # 'add/remove-application' and 'add/remove-tunnel' requires
         # multilink policy re-install: if exists, the policy should be removed
@@ -550,26 +566,26 @@ class FWROUTER_API:
         #
         multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
         if multilink_policy_params:
-            if re.search('(add|remove)-(application|tunnel)', req):
-                new_params = { 'requests': [
-                    { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
-                    { 'message': req, 'params' : params },
-                    { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
-                }
-        elif req == 'aggregated-router-api':
-            for (idx,request) in enumerate(params['requests']):
-                if re.search('(add|remove)-(application|tunnel)', request['message']):
-                    params['requests'].insert(idx,
-                        { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params })
-                    params['requests'].append(
-                        { 'message': 'add-multilink-policy', 'params' : multilink_policy_params })
-                    new_params = param
-                    break
+            if re.match('(add|remove)-(application|tunnel)', req):
+                new_request_list[0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
+                new_request_list[-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
+                new_list_generated = True
+            elif req == 'aggregated-router-api':
+                for (idx,request) in enumerate(new_request_list):
+                    if re.match('remove-multilink-policy', request['message']):
+                        break   # List already has 'remove-multilink-policy', no need to insert
+                    if re.search('(add|remove)-(application|tunnel)', request['message']):
+                        new_request_list[idx:idx] = [{ 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
+                        new_request_list[-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
+                        new_list_generated = True
+                        break
 
-        if new_params:
+        if new_list_generated:
+            new_params = { 'requests' : new_request_list }
             fwglobals.log.debug("_preprocess_request: the %s:%s was replaced with %s:%s" % \
                 (req, json.dumps(params), 'aggregated-router-api', json.dumps(new_params)))
             return ('aggregated-router-api' , new_params)
+
         return (req, params)
 
     def _start_threads(self):

@@ -589,16 +589,21 @@ def version():
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
-def reset(soft):
+def reset(soft=False, quite=False):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
 
     :param soft:  Soft reset: resets router configuration only.
                   No re-registration is needed.
+    :param quite: No prints onto screen, but into syslog only.
+                  This might be needed by tests.
 
     :returns: None.
     """
+    if quite:
+        fwglobals.log.set_target(to_syslog=True, to_terminal=False)
+
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
 
     fwutils.reset_router_config()
@@ -1048,7 +1053,7 @@ if __name__ == '__main__':
 
     command_funcs = {
                     'version':lambda args: version(),
-                    'reset': lambda args: reset(soft=args.soft),
+                    'reset': lambda args: reset(soft=args.soft, quite=args.quite),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(start_loop=not args.dont_connect),
@@ -1072,6 +1077,8 @@ if __name__ == '__main__':
     parser_reset = subparsers.add_parser('reset', help='Reset device: clear router configuration and remove device registration')
     parser_reset.add_argument('-s', '--soft', action='store_true',
                         help="clean router configuration only, device remains registered")
+    parser_reset.add_argument('-q', '--quite', action='store_true',
+                        help="don't print info onto screen, print into syslog only")
     parser_stop = subparsers.add_parser('stop', help='Stop router and reset interfaces')
     parser_stop.add_argument('-s', '--reset_softly', action='store_true',
                         help="reset router softly: clean router configuration")

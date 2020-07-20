@@ -426,7 +426,7 @@
             {
               "pathlabels": [ "black" ]
             }
-          ]
+          ],
           "fallback": "drop"
         }
       }

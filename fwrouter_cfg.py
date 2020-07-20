@@ -269,7 +269,7 @@ class FwRouterCfg:
         if not type:
             return interfaces
         for params in interfaces:
-            if not re.match('wan', params['type'], re.IGNORECASE):
+            if not re.match(type, params['type'], re.IGNORECASE):
                 interfaces.remove(params)   # Use wasteful remove() as number of interfaces is O(1)
         return interfaces
 
@@ -279,6 +279,11 @@ class FwRouterCfg:
     def get_multilink_policy(self):
         if 'add-multilink-policy' in self.db:
             return self.db['add-multilink-policy']['params']
+        return None
+
+    def get_applications(self):
+        if 'add-application' in self.db:
+            return self.db['add-application']['params']
         return None
 
     def get_lan_interface_names(self):

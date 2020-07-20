@@ -26,6 +26,8 @@ import sys
 import os
 import re
 from shutil import copyfile
+import subprocess
+import time
 import fwglobals
 import fwstats
 import fwutils
@@ -419,17 +421,14 @@ class FWAGENT_API:
                     if fwglobals.g.router_cfg.exists('add-route', remove_route_params):
                         remove.append({'message': 'remove-route', 'params':  remove_route_params})
                 # Add 'add-X' request only if 'modify-routes' element has 'new_route' parameter.
-                if route['new_route'] != '':
-                    add_route_params = {k:v for k,v in route.items() if k != 'old_route'}
+                if params['new_route'] != '':
+                    add_route_params = {k:v for k,v in params.items() if k != 'old_route'}
                     add_route_params['via'] = add_route_params.pop('new_route')
                     add.append({'message': 'add-route', 'params':  add_route_params})
             return (add, remove)
 
 
         fwglobals.log.info("FWAGENT_API: _modify_device STARTED")
-
-        list_additions = []
-        list_removals  = []
 
         # Handle inconsistency in section / list / entity names.
         # Order of elements is order of execution of 'add-X' requests.
@@ -449,10 +448,10 @@ class FWAGENT_API:
         # We call this list the 'modify list'.
         ########################################################################
 
-        for section in sections:
-            section_name = section[0]
-            list_name    = section[1]
-            entity_name  = section[2]
+        list_additions = []
+        list_removals  = []
+
+        for (section_name, list_name, entity_name) in sections:
             if section_name in params:
                 # 'modify_routes' and 'modify_router' require special handling
                 if section_name == 'modify_router':
@@ -462,7 +461,7 @@ class FWAGENT_API:
                 else:
                     (additions, removals) = _modify_device_entity(params[section_name][list_name], entity_name)
                 # Update final lists
-                list_additions.append(additions)    # Tail
+                list_additions.extend(additions)    # Tail
                 list_removals[0:0] = removals       # Head
 
         # If there are interfaces that are going to be removed during device
@@ -478,11 +477,11 @@ class FWAGENT_API:
         ip_list = fwglobals.g.router_cfg.get_interface_ips(pci_list)
         tunnels = fwglobals.g.router_cfg.get_tunnels()
         remove_tunnel_requests = []
-        for params in tunnels:
-            if params['src'] in ip_list:
+        for t in tunnels:
+            if t['src'] in ip_list:
                 remove_tunnel_requests.append({
                         'message': 'remove-tunnel',
-                        'params' : {'tunnel-id': params['tunnel-id']}
+                        'params' : {'tunnel-id': t['tunnel-id']}
                     })
         if remove_tunnel_requests:
             # 'remove-tunnel'-s should be added right after 'remove-interfaces'.
@@ -512,19 +511,18 @@ class FWAGENT_API:
                     should_restart_router = True
 
         if should_restart_router:
-            self.call("stop-router")
+            fwglobals.g.router_api.call("stop-router")
 
         # Finally modify device!
         # Note we use fwglobals.g.handle_request() and not the fwglobals.g.router_api.call()
         # in order to enforce update of configuration signature.
         #
-        modify_list = list_removals.append(list_additions)
         reply = fwglobals.g.handle_request(
-            'aggregated-router-api', { 'requests': modify_list },
+            'aggregated-router-api', params={ 'requests': list_removals + list_additions },
             received_msg={ 'message': 'modify-device', 'params': params })
 
         if should_restart_router:
-            self.call("start-router")
+            fwglobals.g.router_api.call("start-router")
 
         fwglobals.log.info("FWAGENT_API: _modify_device FINISHED (ok=%d)" % reply['ok'])
 
@@ -553,7 +551,7 @@ class FWAGENT_API:
             time.sleep(5)
             for gw in added_gateways:
                 try:
-                    cmd = 'ping -c 3 %s' % interface['gateway']
+                    cmd = 'ping -c 3 %s' % gw
                     output = subprocess.check_output(cmd, shell=True)
                     fwglobals.log.debug("FWAGENT_API: _modify_device: %s: %s" % (cmd, output))
                 except Exception as e:
