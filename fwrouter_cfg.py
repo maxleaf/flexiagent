@@ -88,7 +88,7 @@ class FwRouterCfg:
         src_req_key  = src_key_func(params)
         return src_req_key
 
-    def update(self, req, params, cmd_list, executed):
+    def update(self, req, params, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
         requests are not stored but remove the correspondent 'add-X' requests.
