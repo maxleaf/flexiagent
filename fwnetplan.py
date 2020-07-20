@@ -65,6 +65,12 @@ def add_del_netplan_file(params):
 
     return (True, None)
 
+def _get_netplan_interface_name(name, section):
+    if 'set-name' in section:
+        return section['set-name']
+    else:
+        return name
+
 def get_netplan_filenames():
     output = subprocess.check_output('ip route show default', shell=True).strip()
     routes = output.splitlines()
@@ -91,8 +97,9 @@ def get_netplan_filenames():
                 if 'ethernets' in network:
                     ethernets = network['ethernets']
                     for dev in ethernets:
-                        gateway = devices[dev] if dev in devices else None
-                        pci = fwutils.linux_to_pci_addr(dev)[0]
+                        name = _get_netplan_interface_name(dev, ethernets[dev])
+                        gateway = devices[name] if name in devices else None
+                        pci = fwutils.linux_to_pci_addr(name)[0]
                         if fname in our_files:
                             our_files[fname].append({'ifname': dev, 'gateway': gateway, 'pci': pci})
                         else:
