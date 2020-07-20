@@ -827,6 +827,35 @@ def reset_router_config():
 
     reset_dhcpd()
 
+def print_router_config(basic=True, full=False, multilink=False, signature=False):
+    """Print router configuration.
+
+     :returns: None.
+     """
+    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
+        if basic:
+            cfg = router_cfg.dumps(full=full, escape=['add-application','add-multilink-policy'])
+        elif multilink:
+            cfg = router_cfg.dumps(full=full, types=['add-application','add-multilink-policy'])
+        elif signature:
+            cfg = router_cfg.get_signature()
+        else:
+            cfg = ''
+        print(cfg)
+
+def dump_router_config(full=False):
+    """Dumps router configuration into list of requests that look exactly
+    as they would look if were received from server.
+
+    :param full: return requests together with translated commands.
+
+    :returns: list of 'add-X' requests.
+    """
+    cfg = []
+    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
+        cfg = router_cfg.dump(full)
+    return cfg
+
 def get_router_state():
     """Check if VPP is running.
 

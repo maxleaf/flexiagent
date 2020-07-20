@@ -34,7 +34,6 @@ import fwglobals
 import fwutils
 import fwnetplan
 
-from fwrouter_cfg import FwRouterCfg
 from fwapplications import FwApps
 from fwmultilink import FwMultilink
 from vpp_api import VPP_API
@@ -237,7 +236,7 @@ class FWROUTER_API:
         # is need. It adds the simulated 'remove-application' request to the
         # the real received 'add-application' forming thus new aggregation request.
         #
-        (req, params) = _preprocess_request(rq, params)
+        (req, params) = self._preprocess_request(req, params)
 
         if req == 'aggregated-router-api':
             return self._call_aggregated(params['requests'])
@@ -535,7 +534,7 @@ class FWROUTER_API:
                  { 'message': 'remove-application', 'params' : params },
                  { 'message': 'add-application',    'params' : params }]
             }
-        else if req == 'aggregated-router-api':
+        elif req == 'aggregated-router-api':
             # 'add-application' might come withing aggregating request.
             # In this case insert the simulated 'remove-application' before it.
             for (idx,request) in enumerate(params['requests']):
@@ -557,7 +556,7 @@ class FWROUTER_API:
                     { 'message': req, 'params' : params },
                     { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
                 }
-        else if req == 'aggregated-router-api':
+        elif req == 'aggregated-router-api':
             for (idx,request) in enumerate(params['requests']):
                 if re.search('(add|remove)-(application|tunnel)', request['message']):
                     params['requests'].insert(idx,

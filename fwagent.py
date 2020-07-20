@@ -52,7 +52,6 @@ import threading
 import traceback
 import yaml
 import fwglobals
-import fwrouter_cfg
 import fwstats
 import fwutils
 from fwlog import Fwlog
@@ -687,13 +686,13 @@ def show(agent_info, router_info):
         if router_info == 'state':
             fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
         elif router_info == 'configuration':
-            fwrouter_cfg.print_basic()
+            fwutils.print_router_config()
         elif router_info == 'cfg_db':
-            fwrouter_cfg.print_basic(full=True)
+            fwutils.print_router_config(full=True)
         elif router_info == 'cfg_signature':
-            fwrouter_cfg.print_signature()
+            fwutils.print_router_config(basic=False, signature=True)
         elif router_info == 'multilink-policy':
-            fwrouter_cfg.print_multilink()
+            fwutils.print_router_config(basic=False, multilink=True)
 
 @Pyro4.expose
 class FwagentDaemon(object):

@@ -265,38 +265,37 @@ class Fwglobals:
     def initialize_agent(self):
         """Initialize singleton object. Restore VPP if needed.
         """
-        global log
-        log.debug('Fwglobals.initialize_agent: agent %s' % ('exists' if self.fwagent else 'does not exists'))
+        if self.fwagent:
+            global log
+            log.warning('Fwglobals.initialize_agent: agent exists')
+            return
 
-        if not self.fwagent:
-            self.fwagent    = FwAgent(handle_sigterm=False)
-            self.agent_api  = FWAGENT_API()
-            self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
-            self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE)
-            self.os_api     = OS_API()
-            self.apps       = FwApps(self.APP_REC_DB_FILE)
+        self.fwagent    = FwAgent(handle_sigterm=False)
+        self.agent_api  = FWAGENT_API()
+        self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE)
+        self.os_api     = OS_API()
+        self.apps       = FwApps(self.APP_REC_DB_FILE)
 
-            self.router_api.restore_vpp_if_needed()
+        self.router_api.restore_vpp_if_needed()
 
     def finalize_agent(self):
         """Destructor method
         """
-        global log
-        log.debug('Fwglobals.finalize_agent: agent %s' % ('exists' if self.fwagent else 'does not exists'))
+        if not self.fwagent:
+            global log
+            log.warning('Fwglobals.finalize_agent: agent does not exists')
+            return
 
-        if self.fwagent:
-            self.router_api.finalize()
-            self.router_cfg.finalize()
-            self.fwagent.finalize()
-
-            del self.policy_api
-            del self.apps_api
-            del self.os_api
-            del self.router_api
-            del self.agent_api
-            del self.fwagent
-
-            self.fwagent = None
+        self.router_api.finalize()
+        self.router_cfg.finalize()
+        self.fwagent.finalize()
+        del self.apps
+        del self.os_api
+        del self.router_api
+        del self.agent_api
+        del self.fwagent
+        self.fwagent = None
 
     def __str__(self):
         """Get string representation of configuration.

@@ -27,7 +27,6 @@ import os
 import re
 from shutil import copyfile
 import fwglobals
-import fwrouter_cfg
 import fwstats
 import fwutils
 
@@ -228,7 +227,7 @@ class FWAGENT_API:
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwrouter_cfg.dump()
+        configs = fwutils.dump_router_config()
         reply = {'ok': 1, 'message': configs if configs else {}}
         return reply
 
@@ -458,7 +457,7 @@ class FWAGENT_API:
                 # 'modify_routes' and 'modify_router' require special handling
                 if section_name == 'modify_router':
                     (additions, removals) = _modify_device_router(params[section_name])
-                else if section_name == 'modify_routes':
+                elif section_name == 'modify_routes':
                     (additions, removals) = _modify_device_routes(params[section_name][list_name], entity_name)
                 else:
                     (additions, removals) = _modify_device_entity(params[section_name][list_name], entity_name)
@@ -490,7 +489,7 @@ class FWAGENT_API:
             # As 'remove-interfaces' should be at the list_removals beginning,
             # it is quite simple to find right location for insertion.
             idx = 0
-            for (idx, request) in enumerate(list_removals)
+            for (idx, request) in enumerate(list_removals):
                 if request['message'] != 'remove-interface':
                     break
             list_removals[idx:idx] = remove_tunnel_requests
@@ -506,11 +505,11 @@ class FWAGENT_API:
         # or to be unassigned. The assignment/un-assignment causes modification
         # of the /etc/vpp/startup.conf file, that in turns requires VPP restart.
         #
-        should_restart_router = True \
-            if fwglobals.g.router_cfg.exists('start-router') and
-               'modify_router' in params and
-                ('assign' in params['modify_router'] or 'unassign' in params['modify_router'] )
-            else False
+        should_restart_router = False
+        if fwglobals.g.router_cfg.exists('start-router'):
+            if 'modify_router' in params:
+                if ('assign' in params['modify_router']) or ('unassign' in params['modify_router']):
+                    should_restart_router = True
 
         if should_restart_router:
             self.call("stop-router")
@@ -545,8 +544,8 @@ class FWAGENT_API:
         ########################################################################
         added_gateways = []
         for request in list_additions:
-            if request['message'] == 'add-interface' and
-               request['params'].get('type', '').lower() == 'wan' and
+            if request['message'] == 'add-interface' and \
+               request['params'].get('type', '').lower() == 'wan' and \
                request['params'].get('gateway') != None:
                 added_gateways.append(request['params']['gateway'])
         if added_gateways:
