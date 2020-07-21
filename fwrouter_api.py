@@ -144,7 +144,6 @@ class FWROUTER_API:
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        time.sleep(30)  # 30 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
             apply_netplan = False
