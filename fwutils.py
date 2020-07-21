@@ -579,6 +579,9 @@ def vpp_ip_to_sw_if_index(ip):
 
      :returns: sw_if_index.
      """
+    if not ip or ip == None:
+        fwglobals.log.excep("IP address is empty")
+
     network = IPNetwork(ip)
 
     for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
@@ -1316,7 +1319,10 @@ def modify_dhcpd(params):
     mac_assign = params['params'].get('mac_assign', {})
     is_add = params['params']['is_add']
 
-    address = IPNetwork(_get_interface_address(pci))
+    address_str = _get_interface_address(pci)
+    if not address_str or address_str == None:
+        fwglobals.log.excep("IP address is empty, pci %s" % pci)
+    address = IPNetwork(address_str)
     router = str(address.ip)
     subnet = str(address.network)
     netmask = str(address.netmask)
