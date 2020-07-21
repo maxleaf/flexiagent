@@ -252,18 +252,6 @@ def add_policy(params):
 
     policy_acl_ids = set()
 
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['descr']  = "remove-multilink-policy"
-    cmd['cmd']['params'] = {
-                            'object': 'fwglobals.g.router_api',
-                            'func'  : 'call',
-                            'args'  : { 'req' : 'remove-multilink-policy' }
-                           }
-    cmd_list.append(cmd)
-
     for rule in params['rules']:
         priority = rule['priority']
         fallback = rule['action'].get('fallback', 'by-destination')

@@ -289,6 +289,10 @@ class FWAGENT_API:
         # received with the sync-device.
         #
         sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
+        if not sync_list:
+            fwglobals.log.info("FWAGENT_API: _sync_device: sync_list is empty, no need to sync")
+            fwglobals.g.router_cfg.reset_signature()
+            return {'ok': 1}
 
         # Find out if sync goes to remove or to add new interfaces.
         # In this case the vpp should be restarted in order to release/capture
@@ -324,10 +328,14 @@ class FWAGENT_API:
                     raise Exception(" _sync_device: stop-router failed: " + str(reply.get('message')))
 
             # Update configuration.
-            for request in sync_list:
-                reply = fwglobals.g.router_api.call(request['message'], request.get('params'))
-                if reply['ok'] == 0:
-                    raise Exception(" _sync_device: smart sync failed: " + str(reply.get('message')))
+            # We use aggregated message for that as preprocessing of the sync-list
+            # requests might be needed. For example, if sync-list includes
+            # multiple 'add-tunnel'/'remove-tunnel', the multiling policy should
+            # be reinstalled. And that should be done only once for whole sync-list.
+            #
+            reply = fwglobals.g.router_api.call('aggregated-router-api', {'requests': sync_list } )
+            if reply['ok'] == 0:
+                raise Exception(" _sync_device: smart sync failed: " + str(reply.get('message')))
 
             # Start router if needed
             if restart_router:

@@ -387,13 +387,13 @@ class FWROUTER_API:
         :returns: Status codes dictionary.
         """
         api_defs = fwrouter_translators.get(req)
-        assert api_defs, 'FWROUTER_API: there is no api for request "' + req + '"'
+        assert api_defs, 'FWROUTER_API: there is no api for request "%s"' % req
 
         module = fwrouter_modules.get(fwrouter_translators[req]['module'])
-        assert module, 'FWROUTER_API: there is no module for request "' + req + '"'
+        assert module, 'FWROUTER_API: there is no module for request "%s"' % req
 
         func = getattr(module, fwrouter_translators[req]['api'])
-        assert func, 'FWROUTER_API: there is no api function for request "' + req + '"'
+        assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
 
         if fwrouter_translators[req]['api'] == 'revert':
             cmd_list = func(req, params)
@@ -522,70 +522,171 @@ class FWROUTER_API:
                         requests. Note the list should include one original
                         request and one or more simulated requests.
         """
-        new_request_list = None
+
+        multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
 
         # 'add-application' preprocessing:
-        # the currently configured applications should be removed firstly.
-        # We do that by adding simulated 'remove-application' request in front
-        # of the original 'add-application' request.
+        # 1. The currently configured applications should be removed firstly.
+        #    We do that by adding simulated 'remove-application' request in
+        #    front of the original 'add-application' request.
+        # 2. The multilink policy should be re-installed: if exists, the policy
+        #    should be removed before application removal/adding and should be
+        #    added again after it.
         #
         application_params = fwglobals.g.router_cfg.get_applications()
         if application_params:
             if req == 'add-application':
-                new_request_list = [
+                updated_requests = [
                     { 'message': 'remove-application', 'params' : application_params },
                     { 'message': 'add-application',    'params' : params }
                 ]
-            elif req == 'aggregated-router-api':
-                # 'add-application' might come within aggregating request.
-                # In this case insert the simulated 'remove-application' before it.
-                for (idx,request) in enumerate(params['requests']):
-                    if request['message'] == 'remove-application':
-                        break       # List already has 'remove-application', no need to insert
-                    if request['message'] == 'add-application':
-                        new_request_list =  params['requests']
-                        new_request_list[idx:idx] = [{ 'message': 'remove-application', 'params' : application_params }]
-                        break
+                req     = 'aggregated-router-api',
+                params  = { 'requests' : updated_requests }
 
-        # If new aggregation list was not initialized yet while handling
-        # 'add-application' above, initialize is now to simplify list update
-        # by further code below.
-        #
-        if not new_request_list:
-            if req == 'aggregated-router-api':
-                new_request_list = params['requests']
-            else:
-                new_request_list = [ { 'message': req, 'params' : params } ]
-            new_list_generated = False
-        else:
-            new_list_generated = True
+                if multilink_policy_params:
+                    params['requests'][0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
+                    params['requests'][-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
 
-        # 'add/remove-application' and 'add/remove-tunnel' requires
-        # multilink policy re-install: if exists, the policy should be removed
-        # before these requests and should be installed again after them.
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % \
+                    ('aggregated-router-api', json.dumps(params)))
+                return (req, params)
+
+        # 'add-multilink-policy' preprocessing:
+        # 1. The currently configured policy should be removed firstly.
+        #    We do that by adding simulated 'remove-multilink-policy' request in
+        #    front of the original 'add-multilink-policy' request.
         #
-        multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
+        if multilink_policy_params:
+            if req == 'add-multilink-policy':
+                updated_requests = [
+                    { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
+                    { 'message': 'add-multilink-policy',    'params' : params }
+                ]
+                req     = 'aggregated-router-api',
+                params  = { 'requests' : updated_requests }
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % \
+                    ('aggregated-router-api', json.dumps(params)))
+                return (req, params)
+
+        # 'add/remove-tunnel' and 'add/remove-application' preprocessing:
+        # 1. The multilink policy should be re-installed: if exists, the policy
+        #    should be removed before tunnel/application removal/adding and should be
+        #    added again after it.
+        #
         if multilink_policy_params:
             if re.match('(add|remove)-(application|tunnel)', req):
-                new_request_list[0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
-                new_request_list[-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
-                new_list_generated = True
-            elif req == 'aggregated-router-api':
-                for (idx,request) in enumerate(new_request_list):
-                    if re.match('remove-multilink-policy', request['message']):
-                        break   # List already has 'remove-multilink-policy', no need to insert
-                    if re.search('(add|remove)-(application|tunnel)', request['message']):
-                        new_request_list[idx:idx] = [{ 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
-                        new_request_list[-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
-                        new_list_generated = True
-                        break
+                params  = { 'requests' : [
+                    { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
+                    { 'message': req, 'params' : params },
+                    { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }
+                ] }
+                req = 'aggregated-router-api'
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % \
+                    (req, json.dumps(params)))
+                return (req, params)
 
-        if new_list_generated:
-            new_params = { 'requests' : new_request_list }
-            fwglobals.log.debug("_preprocess_request: the %s:%s was replaced with %s:%s" % \
-                (req, json.dumps(params), 'aggregated-router-api', json.dumps(new_params)))
-            return ('aggregated-router-api' , new_params)
+        # No preprocessing is needed for rest of simple requests, return.
+        if req != 'aggregated-router-api':
+            return (req, params)
 
+        # Now perform same preprocessing for aggregated requests, either
+        # original or created above.
+        # We do few passes on requests to find insertion points if needed.
+        # It is based on the first appearance of the preprocessor requests.
+        #
+        updated = False
+
+        indexes = {
+            'remove-application'      : -1,
+            'add-application'         : -1,
+            'remove-tunnel'           : -1,
+            'add-tunnel'              : -1,
+            'remove-multilink-policy' : -1,
+            'add-multilink-policy'    : -1
+        }
+
+        requests = params['requests']
+        for (idx,request) in enumerate(requests):
+            for req_name in indexes:
+                if req_name == request['message']:
+                    if indexes[req_name] == -1:
+                        indexes[req_name] = idx
+
+        def _insert_request(requests, idx, req_name, params, updated):
+            requests.insert(idx, { 'message': req_name, 'params': params })
+            # Update indexes
+            indexes[req_name] = idx
+            for name in indexes:
+                if name != req_name and indexes[name] >= idx:
+                    indexes[name] += 1
+            updated = True
+
+        # Now preprocess 'add-application': insert 'remove-application' if:
+        # - there are applications to be removed
+        # - the 'add-application' was found in requests
+        #
+        if application_params and indexes['add-application'] > -1:
+            if indexes['remove-application'] == -1:
+                # If list has no 'remove-application' at all just add it before 'add-applications'.
+                idx = indexes['add-application']
+                _insert_request(requests, idx, 'remove-application', application_params, updated)
+            elif indexes['remove-application'] > indexes['add-application']:
+                # If list has 'remove-application' after the 'add-applications',
+                # it is not supported yet ;) Implement on demand
+                raise Exception("_preprocess_request: 'remove-application' was found after 'add-application': NOT SUPPORTED")
+
+        # Now preprocess 'add-multilink-policy': insert 'remove-multilink-policy' if:
+        # - there are policies to be removed
+        # - the 'add-multilink-policy' was found in requests
+        #
+        if multilink_policy_params and indexes['add-multilink-policy'] > -1:
+            if indexes['remove-multilink-policy'] == -1:
+                # If list has no 'remove-multilink-policy' at all just add it before 'add-multilink-policy'.
+                idx = indexes['add-multilink-policy']
+                _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
+            elif indexes['remove-multilink-policy'] > indexes['add-multilink-policy']:
+                # If list has 'remove-multilink-policy' after the 'add-multilink-policy',
+                # it is not supported yet ;) Implement on demand
+                raise Exception("_preprocess_request: 'remove-multilink-policy' was found after 'add-multilink-policy': NOT SUPPORTED")
+
+        # Now preprocess 'add/remove-application' and 'add/remove-tunnel':
+        # reinstall multilink policy if exists:
+        # - remove policy before the first appearance of one of preprocessing requests
+        # - add policy at the end of request list (this is to save find the exact location)
+        #
+        if multilink_policy_params:
+            # Firstly find the right place to insert the 'remove-multilink-policy'.
+            # It should be the first appearance of one of the preprocessing requests.
+            #
+            idx = 10000
+            idx_last = -1
+            for req_name in indexes:
+                if indexes[req_name] > -1:
+                    if indexes[req_name] < idx:
+                        idx = indexes[req_name]
+                    idx_last = indexes[req_name]
+            if idx == 10000:
+                # No requests to preprocess were found, return
+                return (req, params)
+
+            # Now add policy reinstallation if needed.
+            # Before that filter out all not supported cases.
+            #
+            if indexes['remove-multilink-policy'] > idx:
+                raise Exception(\
+                    "_preprocess_request: 'remove-multilink-policy' was found in not supported place: %d, should be before %d" % \
+                    (indexes['remove-policy'], idx))
+            if indexes['add-multilink-policy'] < idx_last:  # We exploit the fact that only one 'add-multilink-policy' is possible
+                raise Exception(\
+                    "_preprocess_request: 'add-multilink-policy' was found in not supported place: %d, should be not before %d" % \
+                    (indexes['add-multilink-policy'], idx_last))
+            if indexes['remove-multilink-policy'] == -1:
+                _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
+            if indexes['add-multilink-policy'] == -1:
+                _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
+
+        if updated:
+            fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % (req, json.dumps(params)))
         return (req, params)
 
     def _start_threads(self):
