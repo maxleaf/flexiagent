@@ -191,7 +191,7 @@ def _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list):
     }
     cmd_list.append(cmd)
 
-def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list):
+def _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list):
     """Generate attach policy commands.
 
      :param policy_id:   Policy id.
@@ -202,10 +202,10 @@ def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip
     """
     is_ipv6 = 0
 
-    for int_name in lan_pci_list:
+    for int_name in lan_vpp_name_list:
         _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list)
 
-    for int_name in loopback_ip_list:
+    for int_name in loopback_vpp_name_list:
         _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list)
 
 def _add_acl(params, cmd_list, cache_key):
@@ -247,8 +247,8 @@ def add_policy(params):
      :returns: List of commands.
     """
     cmd_list = []
-    lan_pci_list = fwglobals.g.router_cfg.get_lan_interface_names()
-    loopback_ip_list = fwglobals.g.router_cfg.get_tunnel_interface_names()
+    lan_vpp_name_list      = fwutils.get_interface_vpp_names(type='lan')
+    loopback_vpp_name_list = fwutils.get_tunnel_interface_vpp_names()
 
     policy_acl_ids = set()
 
@@ -266,7 +266,7 @@ def add_policy(params):
             _add_acl(prefix, cmd_list, 'acl_index')
             policy_id = _generate_policy_id()
             _add_policy_rule_from_cache_key(policy_id, links, 'acl_index', fallback, order, cmd_list)
-            _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list)
 
         elif app:
             id = app.get('appId', None)
@@ -281,13 +281,13 @@ def add_policy(params):
                     continue
                 policy_id = _generate_policy_id()
                 _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list)
-                _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+                _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list)
                 policy_acl_ids.add(acl_id)
 
         else:
             policy_id = _generate_policy_id()
             _add_policy_rule(policy_id, links, None, fallback, order, cmd_list)
-            _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list)
 
     return cmd_list
 

@@ -675,7 +675,7 @@ class FWROUTER_API:
             if indexes['remove-multilink-policy'] > idx:
                 raise Exception(\
                     "_preprocess_request: 'remove-multilink-policy' was found in not supported place: %d, should be before %d" % \
-                    (indexes['remove-policy'], idx))
+                    (indexes['remove-multilink-policy'], idx))
             if indexes['add-multilink-policy'] < idx_last:  # We exploit the fact that only one 'add-multilink-policy' is possible
                 raise Exception(\
                     "_preprocess_request: 'add-multilink-policy' was found in not supported place: %d, should be not before %d" % \

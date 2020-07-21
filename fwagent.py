@@ -928,9 +928,10 @@ class FwagentDaemon(object):
         if self.agent:
             api_func = getattr(self.agent, api_name)
             if api_args:
-                api_func(**api_args)
+                ret = api_func(**api_args)
             else:
-                api_func()
+                ret = api_func()
+            return ret
 
 def daemon(start_loop=True):
     """Handles 'fwagent daemon' command.

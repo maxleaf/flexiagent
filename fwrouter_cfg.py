@@ -264,13 +264,15 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None):
+    def get_interfaces(self, type=None, pci=None):
         interfaces = self._get_requests('add-interface')
-        if not type:
+        if not type and not pci:
             return interfaces
         for params in interfaces:
-            if not re.match(type, params['type'], re.IGNORECASE):
-                interfaces.remove(params)   # Use wasteful remove() as number of interfaces is O(1)
+            if type and not re.match(type, params['type'], re.IGNORECASE):
+                interfaces.remove(params)
+            elif pci and pci != params['pci']:
+                interfaces.remove(params)
         return interfaces
 
     def get_tunnels(self):
@@ -285,27 +287,6 @@ class FwRouterCfg:
         if 'add-application' in self.db:
             return self.db['add-application']['params']
         return None
-
-    def get_lan_interface_names(self):
-        import fwutils
-        if_names = []
-        interfaces = self.get_interfaces()
-        for params in interfaces:
-            if re.match('lan', params['type'], re.IGNORECASE):
-                sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
-                if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
-                if_names.append(if_name)
-        return if_names
-
-    def get_tunnel_interface_names(self):
-        import fwutils
-        if_names = []
-        tunnels = self.get_tunnels()
-        for params in tunnels:
-            sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-            if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
-            if_names.append(if_name)
-        return if_names
 
     def get_wan_interface_gw(self, ip):
         import fwutils

@@ -21,6 +21,7 @@
 ################################################################################
 
 import glob
+import json
 import os
 import time
 import subprocess
@@ -153,6 +154,11 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric=None, dhcp=None):
 
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
+
+        fwglobals.log.debug("NNNNNNNNNNNNNNOWWWWWWWWWWWWWWWWWWWWWWW")
+        fwglobals.log.debug("add_remove_netplan_interface: %s:\n%s" % \
+            (fname, json.dumps(config, sort_keys=True, indent=4)))
+        fwglobals.log.debug("NNNNNNNNNNNNNNOWWWWWWWWWWWWWWWWWWWWWWW")
 
         cmd = 'sudo netplan apply'
         fwglobals.log.debug(cmd)

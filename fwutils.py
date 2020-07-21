@@ -210,7 +210,7 @@ def get_linux_interface_gateway(if_name):
 
     return '', ''
 
-def get_interface_address(iface):
+def get_interface_address(if_name):
     """Get interface IP address.
 
     :param iface:        Interface name.
@@ -218,16 +218,19 @@ def get_interface_address(iface):
     :returns: IP address.
     """
     interfaces = psutil.net_if_addrs()
-    if iface not in interfaces:
+    if if_name not in interfaces:
+        fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
         return None
 
-    addresses = interfaces[iface]
+    addresses = interfaces[if_name]
     for addr in addresses:
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    return ''
+
+    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
+    return None
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -1161,17 +1164,6 @@ def vpp_startup_conf_remove_nat(vpp_config_filename):
         del config['nat']
     fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
 
-def _get_interface_address(pci):
-    """ Get interface ip address from commands DB.
-    """
-    interfaces = fwglobals.g.router_cfg.get_interfaces()
-    for params in interfaces:
-        if params['pci'] != pci:
-            continue
-        addr = params['addr']
-        return addr
-    return None
-
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
@@ -1198,7 +1190,11 @@ def modify_dhcpd(is_add, params):
     dns         = params.get('dns', {})
     mac_assign  = params.get('mac_assign', {})
 
-    address = IPNetwork(_get_interface_address(pci))
+    interfaces = fwglobals.g.router_cfg.get_interfaces(pci=pci)
+    if not interfaces:
+        return (False, "modify_dhcpd: %s was not found" % (pci))
+
+    address = IPNetwork(interfaces[0]['addr'])
     router = str(address.ip)
     subnet = str(address.network)
     netmask = str(address.netmask)
@@ -1356,10 +1352,11 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
 def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, remove):
     """Attach VPP with flexiwan policy rules.
 
-    :param params: params - rule parameters:
-                        sw_if_index -  Interface index.
-                        policy_id   - the policy id (two byte integer)
-                        remove      - True to remove rule, False to add.
+    :param int_name:  The name of the interface in VPP
+    :param policy_id: The policy id (two byte integer)
+    :param priority:  The priority (integer)
+    :param is_ipv6:   True if policy should be applied on IPv6 packets, False otherwise.
+    :param remove:    True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1386,6 +1383,25 @@ def get_interface_sw_if_index(ip):
 
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return pci_to_vpp_sw_if_index(pci)
+
+def get_interface_vpp_names(type=None):
+    res = []
+    interfaces = fwglobals.g.router_cfg.get_interfaces()
+    for params in interfaces:
+        if type == None or re.match(type, params['type'], re.IGNORECASE):
+            sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+            if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
+            res.append(if_vpp_name)
+    return res
+
+def get_tunnel_interface_vpp_names():
+    res = []
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for params in tunnels:
+        sw_if_index = vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+        if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
+        res.append(if_vpp_name)
+    return res
 
 def get_interface_gateway(ip):
     """Convert interface src IP address into gateway IP address.
