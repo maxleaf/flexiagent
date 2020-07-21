@@ -71,7 +71,7 @@ class Checker:
     def save_config (self):
         if self.vpp_config_modified:
             fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
-            self.update_grub_file(False)
+            self.update_grub_file()
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
 
     def __enter__(self):
@@ -726,6 +726,7 @@ class Checker:
                 if ret != 0:
                     print(prompt + "failed to write hugepages=%d into %s" % (default_hugepages, vpp_hugepages_file))
                     return False
+                    os.system('sysctl -p %s' %(vpp_hugepages_file))
                 return True
             return True
 
@@ -752,6 +753,7 @@ class Checker:
         if ret != 0:
             print(prompt + "failed to write hugepages=%d into %s" % (hugepages, vpp_hugepages_file))
             return False
+        os.system('sysctl -p %s' %(vpp_hugepages_file))
         return True
 
     def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=None):
@@ -834,7 +836,7 @@ class Checker:
         num_worker_cores = psutil.cpu_count() - 1
         input_cores = 0
         while True:
-            str_cores = raw_input(prompt + "Enter number of cores to process packets (max:[%d]): " % num_worker_cores)
+            str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
             try:
                 if len(str_cores) == 0:
                     break
@@ -859,6 +861,7 @@ class Checker:
         workers_param_val               = 0
         num_of_rx_queues_param          = None
         num_of_rx_queues_param_val      = 0
+        dev_default_key                 = 'dev default' # to avoid errors and mistypes
 
         # if configuration files does not exist, create it, and create the 'cpu' and 'dpdk' sections.
         if not conf:
@@ -907,10 +910,12 @@ class Checker:
         if conf and conf['dpdk']:
             for element in conf['dpdk']:
                 if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                    for element2 in element['dev default']:
-                        if 'num-rx-queues' in element2:
-                            num_of_rx_queues_param = element2
-                            num_of_rx_queues_param_val = int(num_of_rx_queues_param.split(' ')[1])
+                    for key in element.keys():
+                        if key == dev_default_key:
+                            for element2 in element[dev_default_key]:
+                                if 'num-rx-queues' in element2:
+                                    num_of_rx_queues_param = element2
+                                    num_of_rx_queues_param_val = int(num_of_rx_queues_param.split(' ')[1])
 
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
@@ -936,14 +941,15 @@ class Checker:
             if num_of_rx_queues_param:
                 for element in conf['dpdk']:
                     if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                        if num_of_rx_queues_param in element['dev default']:
-                            element['dev default'].remove(num_of_rx_queues_param)
-                            num_of_rx_queues_param = 'num-rx-queues 0'
-                            element['dev default'].append(num_of_rx_queues_param)   
+                        for key in element.keys():
+                            if key == dev_default_key:
+                                if num_of_rx_queues_param in element[dev_default_key]:
+                                    element[dev_default_key].remove(num_of_rx_queues_param)
+                                    num_of_rx_queues_param = 'num-rx-queues 0'
+                                    element[dev_default_key].append(num_of_rx_queues_param)   
             self.vpp_config_modified = True
             self.update_grub = True
             return True 
-
 
         # in case multi core configured
         if input_cores != 0:
@@ -973,16 +979,18 @@ class Checker:
  
             if num_of_rx_queues_param_val != input_cores:
                 if conf.get('dpdk'):
-                    dict_found = False
+                    elem_exist = False
                     for element in conf['dpdk']:
                         if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                            dict_found = True
-                            if num_of_rx_queues_param in element['dev default']:
-                                element['dev default'].remove(num_of_rx_queues_param)
-                                num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
-                                element['dev default'].append(num_of_rx_queues_param)
-                                self.vpp_config_modified = True   
-                    if dict_found == False:
+                            for key in element.keys():
+                                if key == dev_default_key:
+                                    elem_exist = True   
+                                    if num_of_rx_queues_param in element[dev_default_key]:
+                                        element[dev_default_key].remove(num_of_rx_queues_param)
+                                        num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
+                                        element[dev_default_key].append(num_of_rx_queues_param)
+                                        self.vpp_config_modified = True   
+                    if elem_exist == False:
                         self._add_dict_to_dpdk(input_cores)
                         self.vpp_config_modified = True 
 
@@ -1011,21 +1019,22 @@ class Checker:
         # 1. create a new sub directory in 'dpdk'
         # 2. populated it with num-rx-queues %value
         cfg = self.vpp_configuration
-        dict_exist = False
+        dev_default_key = 'dev default'
+        elem_exist = False
         for element in cfg['dpdk']:
-            if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                dict_exist = True
-                element['dev default'] = []
-                element['dev default'].append('num-rx-queues %d' % (num_of_cores))
-                break
-        if dict_exist == False:
-            cfg['dpdk'].append({'dev default':{}})
-            for element in cfg['dpdk']:
-                if 'dev default' in element:
-                    element['dev default'] = []
-                    element['dev default'].append('num-rx-queues %d' % (num_of_cores))
-                    break
- 
+            if str(type(element)) == "<type 'class ruamel.yaml.comments.CommentedMap'>":
+                for key in element.keys():
+                    if key == dev_default_key:
+                        elem_exist = True
+                        element[dev_default_key].append('num-rx-queues %d' % (num_of_cores))
+                        break
+
+        if elem_exist == False:
+            cfg['dpdk'].append({})
+            element = cfg['dpdk'][len(cfg['dpdk'])-1]
+            element[dev_default_key] = []
+            element[dev_default_key].append('num-rx-queues %d' % (num_of_cores))
+
         return True
 
     def soft_check_cpu_power_saving(self, fix=False, silently=False, prompt=''):
@@ -1100,10 +1109,8 @@ class Checker:
 
         return True         
 
-    def update_grub_file(self, reset=False):
-        """Update /etc/default/grub to work with more then 1 core.
-
-        :returns True if values were changed by user and system needs to reboot or False
+    def update_grub_file(self):
+        """Update /etc/default/grub to work with configured number of cores.
         """
         # This function does the following:
         # 1. check how many cores to update
@@ -1112,16 +1119,13 @@ class Checker:
         if self.update_grub == False:
             return
 
-        if reset == True:
-            num_of_workers_cores = 0
-        else:
-            num_of_workers_cores = 0
-            cfg = self.vpp_configuration
-            if cfg and cfg['cpu']:
-                for param in cfg['cpu']:
-                    if 'workers' == param[0:7]:
-                        current_workers_param = param
-                        num_of_workers_cores = int(current_workers_param.split(' ')[1])
+        num_of_workers_cores = 0
+        cfg = self.vpp_configuration
+        if cfg and cfg['cpu']:
+            for param in cfg['cpu']:
+                if 'workers' == param[0:7]:
+                    current_workers_param = param
+                    num_of_workers_cores = int(current_workers_param.split(' ')[1])
 
         if num_of_workers_cores == 0:
             update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on\"'
@@ -1154,6 +1158,5 @@ class Checker:
         os.remove (grub_write_file)
         if add_grub_line == True:
             os.system ("sudo update-grub")
-            return True
-        else:
-            return False
+        return
+

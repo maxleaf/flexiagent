@@ -211,20 +211,6 @@ def check_soft_configuration(checker, fix=False, quite=False):
             succeeded = False
     return succeeded
 
-def quit_soft_configuration(checker):
-    """ quit system_checker
-    :returns: 'True' if succeeded.
-    """ 
-    # This function quits the system checker
-    # the checker function saves the changes to the configration file.
-    # Howeefer, if the user choose not to save the changes maded, we need to revert
-    # back to the previous configuration
-    checker.vpp_config_modified = False # don't update startup.conf on exit from system_checker
-    checker.update_grub = False
-    return True
-
-
-
 def reset_system_to_defaults(checker):
     """ reset vpp configuration to default
 
@@ -242,9 +228,10 @@ def reset_system_to_defaults(checker):
             return True
         elif choice == 'y' or choice == 'Y':
             shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
-            shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
+            if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
+                shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
             checker.update_grub = True
-            checker.update_grub_file(True)
+            checker.update_grub_file()
             reboot_needed = True
             break
     
@@ -252,11 +239,11 @@ def reset_system_to_defaults(checker):
         while True:
             choice = raw_input("Reboot the system? [Y/n]: ")
             if choice == 'n' or choice == 'N':
+                print ("Please reboot the system for changes to take effect.")
                 return True
             elif choice == 'y' or choice == 'Y' or choice == '':
                 print ("Rebooting....")
                 os.system('reboot now')
-
     return True
 
 def main(args):
@@ -307,30 +294,26 @@ def main(args):
         # The start intercation with user.
         check_soft_configuration(checker, fix=False)
         choice = 'x'
-        while not (choice == '' or choice == '0' or choice == '1'):
+        while not (choice == '' or choice == '0' or choice == '4'):
             choice = raw_input(
                             "\n" +
                             "\t[0] - quit and use fixed parameters\n" +
-                            "\t 1  - quit\n" +
-                            "\t 2  - check system configuration\n" +
-                            "\t 3  - configure system silently\n" +
-                            "\t 4  - configure system interactively\n" +
-                            "\t 5  - restore system to factory defaults\n" +
-                            "\t-------------------------------------\n" +
+                            "\t 1  - check system configuration\n" +
+                            "\t 2  - configure system silently\n" +
+                            "\t 3  - configure system interactively\n" +
+                            "\t 4  - restore system to factory defaults\n" +
+                            "\t-----------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
-                print('')
-                success = quit_soft_configuration(checker)
-            elif choice == '2':
             	print('')
                 success = check_soft_configuration(checker, fix=False)
-            elif choice == '3':
+            elif choice == '2':
             	print('')
                 success = check_soft_configuration(checker, fix=True, quite=True)
-            elif choice == '4':
+            elif choice == '3':
             	print('')
                 success = check_soft_configuration(checker, fix=True, quite=False)
-            elif choice == '5':
+            elif choice == '4':
                 print ('')
                 success = reset_system_to_defaults(checker)
             else:
@@ -338,6 +321,8 @@ def main(args):
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
 	        if success == True:
+                    print ("Please wait..")
+                    os.system("sudo systemctl stop flexiwan-router")
                     checker.save_config()
                     if checker.update_grub == True:
 		                rebootSys = 'x'
@@ -347,9 +332,10 @@ def main(args):
                                     if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
                                         print ("Rebooting...")
                                         os.system('reboot now')
+                                    else:
+                                        print ("Please reboot the system for changes to take effect.")
 
-                print ("Please wait..")
-                os.system("sudo systemctl restart flexiwan-router")
+                os.system("sudo systemctl start flexiwan-router")
                 print ("Done.")
 		
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
