@@ -179,7 +179,7 @@ def add_remove_netplan_interface(params):
 
         # make sure IP address is applied in Linux
         ip_address_is_found = False
-        for _ in range(3):
+        for _ in range(10):
             if fwutils.get_interface_address(tap_name):
                 ip_address_is_found = True
                 break
