@@ -220,7 +220,7 @@ def get_interface_address(iface):
     """
     interfaces = psutil.net_if_addrs()
     if iface not in interfaces:
-        return None
+        return ''
 
     addresses = interfaces[iface]
     for addr in addresses:

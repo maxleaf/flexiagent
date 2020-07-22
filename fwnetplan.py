@@ -173,9 +173,21 @@ def add_remove_netplan_interface(params):
         with open(fname, 'w') as stream:
             yaml.safe_dump(config, stream)
 
-        cmd = 'sudo netplan apply'
+        cmd = 'netplan apply'
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
+
+        # make sure IP address is applied in Linux
+        ip_address_is_found = False
+        for _ in range(3):
+            if fwutils.get_interface_address(tap_name):
+                ip_address_is_found = True
+                break
+            time.sleep(1)
+        if not ip_address_is_found:
+            fwglobals.log.error("add_remove_netplan_interface failed: no ip address in Linux")
+            return (False, None)
+
     except Exception as e:
         err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname, str(e))
