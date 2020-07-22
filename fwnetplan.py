@@ -178,15 +178,16 @@ def add_remove_netplan_interface(params):
         subprocess.check_output(cmd, shell=True)
 
         # make sure IP address is applied in Linux
-        ip_address_is_found = False
-        for _ in range(10):
-            if fwutils.get_interface_address(tap_name):
-                ip_address_is_found = True
-                break
-            time.sleep(1)
-        if not ip_address_is_found:
-            fwglobals.log.error("add_remove_netplan_interface failed: no ip address in Linux")
-            return (False, None)
+        if is_add == 1:
+            ip_address_is_found = False
+            for _ in range(10):
+                if fwutils.get_interface_address(tap_name):
+                    ip_address_is_found = True
+                    break
+                time.sleep(1)
+            if not ip_address_is_found:
+                fwglobals.log.error("add_remove_netplan_interface: %s has no ip address" % tap_name)
+                return (False, None)
 
     except Exception as e:
         err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
