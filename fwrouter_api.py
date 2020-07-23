@@ -30,8 +30,10 @@ import yaml
 import json
 import subprocess
 
+import fwagent
 import fwglobals
 import fwutils
+import fwnetplan
 
 from fwdb_requests import FwDbRequests
 from fwapplications_api import FwApps
@@ -96,6 +98,7 @@ class FWROUTER_API:
         self.router_failure  = False
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
+        self.thread_dhcpc = None
 
     def finalize(self):
         """Destructor method
@@ -140,6 +143,35 @@ class FWROUTER_API:
             time.sleep(1)  # 1 sec
             fwtunnel_stats.tunnel_stats_test()
 
+    def dhcpc_thread(self):
+        """DHCP client thread.
+        Its function is to monitor state of WAN interfaces with DHCP.
+        """
+        while self.router_started:
+            time.sleep(1)  # 1 sec
+            apply_netplan = False
+            wan_list = self.get_wan_interface_addr_pci()
+
+            for wan in wan_list:
+                if wan['dhcp'] == 'no':
+                    continue
+
+                name = fwutils.pci_to_tap(wan['pci'])
+                addr = fwutils.get_interface_address(name)
+                if not addr:
+                    apply_netplan = True
+
+            if apply_netplan:
+                try:
+                    cmd = 'netplan apply'
+                    fwglobals.log.debug(cmd)
+                    subprocess.check_output(cmd, shell=True)
+                    fwglobals.g.fwagent.disconnect()
+                    time.sleep(10)  # 10 sec
+
+                except Exception as e:
+                    fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
+
     def restore_vpp_if_needed(self):
         """Restore VPP.
         If vpp doesn't run because of crash or device reboot,
@@ -161,6 +193,8 @@ class FWROUTER_API:
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
+                netplan_files = fwnetplan.get_netplan_filenames()
+                fwnetplan._set_netplan_filename(netplan_files)
             return False
 
         # Now start router.
@@ -652,6 +686,9 @@ class FWROUTER_API:
         if self.thread_tunnel_stats is None:
             self.thread_tunnel_stats = threading.Thread(target=self.tunnel_stats_thread, name='Tunnel Stats Thread')
             self.thread_tunnel_stats.start()
+        if self.thread_dhcpc is None:
+            self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
+            self.thread_dhcpc.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -664,6 +701,10 @@ class FWROUTER_API:
             self.thread_tunnel_stats.join()
             self.thread_tunnel_stats = None
 
+        if self.thread_dhcpc:
+            self.thread_dhcpc.join()
+            self.thread_dhcpc = None
+
     def _start_router(self, req, params):
         """Start and configure VPP.
 
@@ -675,6 +716,11 @@ class FWROUTER_API:
         # cleanup of globals in tunnels
         fwtranslate_add_tunnel.init_tunnels()
 
+        # Reset failure state before start- hopefully we will succeed.
+        # On no luck the start will set failure again
+        #
+        self._unset_router_failure()
+
         # 'start-router' preprocessing:
         # the 'start-router' request might include interfaces and routes.
         # For each of them simulate 'add-interface' and 'add-route' request
@@ -685,9 +731,6 @@ class FWROUTER_API:
                 if 'interfaces' in params:
                     fwglobals.g.handle_request('add-interface', params['interfaces'])
                     del params['interfaces']
-                if 'routes' in params:
-                    fwglobals.g.handle_request('add-route', params['routes'])
-                    del params['routes']
                 if bool(params) == False:
                     params = None
             except Exception as e:
@@ -716,7 +759,6 @@ class FWROUTER_API:
         # run the watchdog thread, if it doesn't run
         self.router_started = True
         self._start_threads()
-        self._unset_router_failure()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
 
@@ -848,25 +890,6 @@ class FWROUTER_API:
         except Exception as e:
                 fwglobals.log.excep("_modify_device: %s" % str(e))
                 raise e
-
-        # Modifying interfaces might result in removal of static routes,
-        # which can affect the agent's ability to reconnect to the MGMT
-        # (if default route or any other route the agent uses to connect to
-        # the MGMT was removed). In order to overcome this, we try to restore
-        # the lost routes. Since this is a best effort solution, we don't return
-        # error if we fail to restore a route.
-        changed_ips = map(lambda interface: interface['addr'], interfaces)
-        if len(changed_ips) > 0:
-            for key in self.db_requests.db:
-                try:
-                    if re.match('add-route', key):
-                        next_hop_ip = self.db_requests.db[key]['params']['via']
-                        if(any([fwutils.is_ip_in_subnet(next_hop_ip, subnet) for subnet in changed_ips])):
-                            fwglobals.log.info('restoring static route: ' + str(key))
-                            self._apply_db_request(key)
-                except Exception as e:
-                    fwglobals.log.excep("_modify_device: failed to restore static routes %s" % str(e))
-                    pass
 
         return {'ok':1}
 
@@ -1227,11 +1250,6 @@ class FWROUTER_API:
         else:  # list
             params.remove(substs_element)
 
-    def get_default_route_address(self):
-        for key, request in self.db_requests.db.items():
-            if re.search('add-route:default', key):
-                return request['params']['via']
-
     def get_pci_lan_interfaces(self):
         interfaces = []
         for key, request in self.db_requests.db.items():
@@ -1266,10 +1284,24 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
+                        pci = request['params'].get('pci')
+                        gw = request['params'].get('gateway')
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
-                        if request['params'].get('gateway'):
-                            return request['params']['pci'], request['params']['gateway']
+                        if not gw:
+                            tap = pci_to_tap(pci)
+                            rip, metric = fwutils.get_linux_interface_gateway(tap)
+                            return pci, rip
+
                         else:
-                            return request['params']['pci'], self.get_default_route_address()
-        return (None, None)
+                            return pci, gw
+        return None, None
+
+    def get_wan_interface_addr_pci(self):
+        wan_list = []
+        for key, request in self.db_requests.db.items():
+            if re.search('add-interface', key):
+                if re.match('wan', request['params']['type'], re.IGNORECASE):
+                    wan_list.append(request['params'])
+
+        return wan_list

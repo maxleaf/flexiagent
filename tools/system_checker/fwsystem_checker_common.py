@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import glob
 import json
 import os
 import psutil
@@ -37,6 +38,7 @@ import fwtool_vpp_startupconf_dict
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
 import fwglobals
+import fwnetplan
 
 class Checker:
     """This is Checker class representation.
@@ -325,9 +327,6 @@ class Checker:
             default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
-            if len(default_routes) > 1:
-                print(prompt + "only one default route is allowed, found %d" % len(default_routes))
-                return False  # Return here and do not throw exception as we propose no way to fix that. Replace with exception on demand :)
             return True
         except Exception as e:
             print(prompt + str(e))
@@ -349,6 +348,142 @@ class Checker:
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
+
+    def _get_duplicate_metric(self):
+        output = subprocess.check_output('ip route show default', shell=True).strip()
+        routes = output.splitlines()
+
+        metrics = {}
+        for route in routes:
+            dev = route.split('dev ')[1].split(' ')[0]
+            rip = route.split('via ')[1].split(' ')[0]
+            parts = route.split('metric ')
+            metric = 0
+            if len(parts) > 1:
+                metric = int(parts[1])
+            if metric in metrics:
+                metrics[metric].append([dev,rip])
+            else:
+                metrics[metric] = [[dev,rip]]
+
+        for metric, gws in metrics.items():
+            if len(gws) > 1:
+                return metric, metrics
+
+        return None, None
+
+    def _get_gateways(self):
+        output = subprocess.check_output('ip route show default', shell=True).strip()
+        routes = output.splitlines()
+
+        gws = []
+        for route in routes:
+            rip = route.split('via ')[1].split(' ')[0]
+            gws.append(rip)
+
+        return gws
+
+    def _add_netplan_interface(self, fname, dev, metric):
+        print("%s is assigned metric %u" % (dev, metric))
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+            network = config['network']
+
+        ethernets = network['ethernets']
+        if dev in ethernets:
+            section = ethernets[dev]
+            if 'dhcp4' in section and section['dhcp4'] == True:
+                section['dhcp4-overrides'] = {'route-metric': metric}
+            else:
+                def_route_existed = False
+                if 'routes' in section:
+                    routes = section['routes']
+                    for route in routes:
+                        if route['to'] == '0.0.0.0/0':
+                            route['metric'] = metric
+                            def_route_existed = True
+                if not def_route_existed and 'gateway4' in section:
+                    section['routes'] = [{'to': '0.0.0.0/0',
+                                          'via': section['gateway4'],
+                                          'metric': metric}]
+                    del section['gateway4']
+
+        with open(fname, 'w') as stream:
+            yaml.safe_dump(config, stream)
+
+    def _fix_duplicate_metric(self, primary_gw):
+        metric, metrics = self._get_duplicate_metric()
+        if metric is None:
+            return True
+
+        files = fwnetplan.get_netplan_filenames()
+        metric = 100
+        for fname, devices in files.items():
+            os.system('cp %s %s.fworig' % (fname, fname))
+            fname_baseline = fname.replace('yaml', 'baseline.yaml')
+            os.system('mv %s %s' % (fname, fname_baseline))
+
+            for dev in devices:
+                ifname = dev.get('ifname')
+                gateway = dev.get('gateway')
+                if gateway is None:
+                    continue
+                if primary_gw is not None and gateway == primary_gw:
+                    self._add_netplan_interface(fname_baseline, ifname, 0)
+                else:
+                    self._add_netplan_interface(fname_baseline, ifname, metric)
+                    metric += 100
+
+        subprocess.check_output('sudo netplan apply', shell=True)
+
+        return True
+
+    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=None):
+        """Check if default routes have duplicate metrics.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        try:
+            # Find all default routes and ensure that there are no duplicate metrics
+            metric, metrics = self._get_duplicate_metric()
+            if metric is not None:
+                raise Exception("Multiple default routes with the same metric %u" % metric)
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            if not fix:
+                return False
+            else:
+                if silently:
+                    gws = self._get_gateways()
+                    return self._fix_duplicate_metric(gws[0])
+                while True:
+                    try:
+                        print("\nGateways to choose from:")
+                        gws = self._get_gateways()
+                        id = 1
+                        for gw in gws:
+                            print("         %u  - %s" % (id, gw))
+                            id += 1
+                        id = int(raw_input(prompt + "please choose the gw number: "))
+                        if id > len(gws):
+                            print("Wrong number chosen!")
+                            return False
+                        return self._fix_duplicate_metric(gws[id-1])
+                    except Exception as e:
+                        print(prompt + str(e))
+                        while True:
+                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            if choice == 'y' or choice == 'Y' or choice == '':
+                                break
+                            elif choice == 'n' or choice == 'N':
+                                return False
+        return True
+
 
     def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):
         """Check hostname syntax.

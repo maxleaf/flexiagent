@@ -20,6 +20,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import glob
+import hashlib
 import inspect
 import json
 import os
@@ -32,9 +34,11 @@ import re
 import fwapplications_api
 import fwdb_requests
 import fwglobals
+import fwnetplan
 import fwstats
 import shutil
 import sys
+import traceback
 import yaml
 from netaddr import IPNetwork, IPAddress
 
@@ -183,6 +187,30 @@ def get_default_route():
     except:
         return ("", "")
 
+def get_linux_interface_gateway(if_name):
+    """Get gateway.
+
+    :returns: Gateway ip address.
+    """
+    try:
+        dgw = os.popen('ip route list match default | grep via').read()
+    except:
+        return '', ''
+
+    metric = ''
+
+    routes = dgw.splitlines()
+    for route in routes:
+        rip = route.split('via ')[1].split(' ')[0]
+        rdev = route.split('dev ')[1].split(' ')[0]
+        metric_str = route.split('metric ')
+        if len(metric_str) > 1:
+            metric = route.split('metric ')[1].split(' ')[0]
+        if re.match(if_name, rdev):
+            return rip, metric
+
+    return '', ''
+
 def get_interface_address(iface):
     """Get interface IP address.
 
@@ -190,13 +218,17 @@ def get_interface_address(iface):
 
     :returns: IP address.
     """
-    addresses = psutil.net_if_addrs()[iface]
+    interfaces = psutil.net_if_addrs()
+    if iface not in interfaces:
+        return None
+
+    addresses = interfaces[iface]
     for addr in addresses:
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    raise Exception("get_interface_address(%s): no IPv4 address was found" % iface)
+    return ''
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -241,6 +273,7 @@ def linux_to_pci_addr(linuxif):
     :returns: PCI address.
     """
     NETWORK_BASE_CLASS = "02"
+    vpp_run = vpp_does_run()
     lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
     for line in lines:
         vals = line.decode().split("\t", 1)
@@ -251,6 +284,10 @@ def linux_to_pci_addr(linuxif):
             if vals[0] == 'Class:':
                 if vals[1][0:2] == NETWORK_BASE_CLASS:
                     interface = pci_to_linux_iface(slot)
+                    if not interface and vpp_run:
+                        interface = pci_to_tap(slot)
+                    if not interface:
+                        continue
                     if interface == linuxif:
                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
                         return (pci_addr_full(slot), "" if driver=='driver' else driver)
@@ -314,9 +351,40 @@ def pci_is_vmxnet3(pci):
         return False
     return True
 
-
 # 'pci_to_vpp_if_name' function maps interface referenced by pci, eg. '0000:00:08.00'
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
+# We use the interface cache mapping, if doesn't exist we rebuild the cache
+def pci_to_vpp_if_name(pci):
+    """Convert PCI address into VPP interface name.
+
+    :param pci:      PCI address.
+
+    :returns: VPP interface name.
+    """
+    pci = pci_addr_full(pci)
+    vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+    if vpp_if_name: return vpp_if_name
+    else: return _build_pci_to_vpp_if_name_maps(pci, None)
+
+# 'vpp_if_name_to_pci' function maps interface name, eg. 'GigabitEthernet0/8/0'
+# into the pci of that interface, eg. '0000:00:08.00'.
+# We use the interface cache mapping, if doesn't exist we rebuild the cache
+def vpp_if_name_to_pci(vpp_if_name):
+    """Convert PCI address into VPP interface name.
+
+    :param vpp_if_name:      VPP interface name.
+
+    :returns: PCI address.
+    """
+    pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
+    if pci: return pci
+    else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
+
+# '_build_pci_to_vpp_if_name_maps' function build the local caches of
+# pci to vpp_if_name and vise vera
+# if pci provided, return the name found for this pci,
+# else, if name provided, return the pci for this name,
+# else, return None
 # To do that we dump all hardware interfaces, split the dump into list by empty line,
 # and search list for interface that includes the pci name.
 # The dumps brings following table:
@@ -326,42 +394,39 @@ def pci_is_vmxnet3(pci):
 #   ...
 #   pci: device 8086:100e subsystem 8086:001e address 0000:00:08.00 numa 0
 #
-def pci_to_vpp_if_name(pci):
-    """Convert PCI address into VPP interface name.
+def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
+    shif = _vppctl_read('show hardware-interfaces')
+    if shif == None:
+        fwglobals.log.debug("_build_pci_to_vpp_if_name_maps: Error reading interface info")
+    data = shif.splitlines()
+    for intf in _get_group_delimiter(data, r"^\w.*?\d"):
+        # Contains data for a given interface
+        ifdata = ''.join(intf)
+        (k,v) = _parse_vppname_map(ifdata,
+            valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
+            keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
+        if k and v:
+            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_addr_full(k)
 
-    :param pci:      PCI address.
+    vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
+    for hw_if in vmxnet3hw:
+        vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
+        pci_addr = pci_bytes_to_str(hw_if.pci_addr)
+        fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[vpp_if_name] = pci_addr
 
-    :returns: VPP interface name.
-    """
-    # vpp_api.cli() throw exception in vpp 19.01 (and work with vpp 19.04)
-    # hw = fwglobals.g.router_api.vpp_api.cli("show hardware")
-    hw = _vppctl_read('show hardware-interfaces')
-    if hw is None:
-        raise Exception("pci_to_vpp_if_name: failed to fetch hardware info from VPP")
-    for hw_if in re.split(r'\n\s*\n+', hw):
-        if re.search(pci, hw_if):
-            # In the interface description find line that has word at the beginning.
-            # This word is interface name. All the rest of lines start with spaces.
-            for line in hw_if.splitlines():
-                match = re.match(r'([^\s]+)', line)
-                if match:
-                    vpp_if_name = match.group(1)
-                    break
-            return vpp_if_name
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): not found in 'sh hard'" % (pci))
+    if pci:
+        vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+        if vpp_if_name: return vpp_if_name
+    elif vpp_if_name:
+        pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
+        if pci: return pci
 
-    # If no hardware interfaces were found, try vmxnet3 interfaces
-    pci_bytes = pci_str_to_bytes(pci)
-    hw_1 = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
-    for hw_if in hw_1:
-        if hw_if.pci_addr == pci_bytes:
-            vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
-            return vpp_if_name
-
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh hard: %s" % (pci, str(hw)))
-    fwglobals.log.debug("pci_to_vpp_if_name(%s): sh vmxnet3: %s" % (pci, str(hw_1)))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
+    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
+    fwglobals.log.debug(traceback.extract_stack())
     return None
-
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
 #    struct
@@ -386,6 +451,21 @@ def pci_str_to_bytes(pci_str):
     function = int(list[3], 16)
     bytes = ((domain & 0xffff) << 16) | ((bus & 0xff) << 8) | ((slot & 0x1f) <<3 ) | (function & 0x7)
     return socket.htonl(bytes)   # vl_api_vmxnet3_create_t_handler converts parameters by ntoh for some reason (vpp\src\plugins\vmxnet3\vmxnet3_api.c)
+
+# 'pci_str_to_bytes' converts pci bytes into full string "0000:0b:00.0"
+def pci_bytes_to_str(pci_bytes):
+    """Converts PCI bytes to PCI full string.
+
+    :param pci_str:      PCI bytes.
+
+    :returns: PCI full string.
+    """
+    bytes = socket.ntohl(pci_bytes)
+    domain   = (bytes >> 16)
+    bus      = (bytes >> 8) & 0xff
+    slot     = (bytes >> 3) & 0x1f
+    function = (bytes) & 0x7
+    return "%04x:%02x:%02x.%02x" % (domain, bus, slot, function)
 
 # 'pci_to_vpp_sw_if_index' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into index of this interface in VPP, eg. 1.
@@ -744,6 +824,7 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
+    fwnetplan._delete_netplan_files()
 
     reset_dhcpd()
 
@@ -1328,7 +1409,8 @@ def vpp_multilink_update_labels(params):
     if params.get('next_hop'):
         next_hop = params['next_hop']
     else:
-        next_hop = fwglobals.g.router_api.get_default_route_address()
+        tap = vpp_if_name_to_tap(vpp_if_name)
+        next_hop, metric = get_linux_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not found in params and there is no default gateway")
 
@@ -1448,8 +1530,51 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_api.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def _create_static_route(args):
+def get_reconfig_hash():
+    res = ''
+    wan_list = fwglobals.g.router_api.get_wan_interface_addr_pci()
+    vpp_run = vpp_does_run()
+
+    for wan in wan_list:
+        name = pci_to_linux_iface(wan['pci'])
+
+        if name is None and vpp_run:
+            name = pci_to_tap(wan['pci'])
+
+        if name is None:
+            return ''
+
+        addr = get_interface_address(name)
+        if not re.search(addr, wan['addr']):
+            res += 'addr:' + addr + ','
+
+        gw, metric = get_linux_interface_gateway(name)
+        if not re.match(gw, wan['gateway']):
+            res += 'gw:' + gw + ','
+
+    if res:
+        fwglobals.log.info('reconfig_hash_get: %s' % res)
+        hash = hashlib.md5(res).hexdigest()
+        return hash
+
+    return ''
+
+def add_static_route(args):
+    """Add static route.
+
+    :param params: params:
+                        addr    - Destination network.
+                        via     - Gateway address.
+                        metric  - Metric.
+                        remove  - True to remove route.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
     params = args['params']
+
+    if params['addr'] == 'default':
+        return (True, None)
+
     metric = params.get('metric', None)
     metric_str = ''
     remove = args['remove']
@@ -1496,52 +1621,31 @@ def _create_static_route(args):
 
     return (True, None)
 
-def add_static_route(args):
-    """Add static route.
+def vpp_set_dhcp_detect(params):
+    """Enable/disable DHCP detect feature.
 
-    :param params: params - rule parameters:
-                        sw_if_index -  Interface index.
-                        policy_id   - the policy id (two byte integer)
-                        remove      - True to remove rule, False to add.
+    :param params: params:
+                        pci     -  Interface PCI.
+                        remove  - True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    params = args['params']
-    op = 'del' if args['remove'] else 'add'
+    op = ''
+    if params['remove']:
+        op = 'del'
 
-    if params['addr'] != 'default':
-        return _create_static_route(args)
-    else:  # if params['addr'] is 'default', we have to remove current default GW before adding the new one
-        (old_ip, old_dev) = get_default_route()
-        old_via = old_ip if len(old_dev)==0 else '%s dev %s' % (old_ip, old_dev)
-        new_ip = params['via']
-        if not 'pci' in params:
-            if old_via == "":
-                cmd = "sudo ip route %s default via %s" % (op, new_ip)
-            else:
-                if not args['remove']:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
-                          (old_via, new_ip)
-                else:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s" % \
-                          (new_ip, old_via)
-        else:
-            tap = pci_to_tap(params['pci'])
-            if old_via == "":
-                cmd = "sudo ip route %s default via %s dev %s" % (op, new_ip, tap)
-            else:
-                if not args['remove']:
-                    cmd = "sudo ip route del default via %s; sudo ip route add default via %s dev %s" % \
-                          (old_via, new_ip, tap)
-                else:
-                    cmd = "sudo ip route del default via %s dev %s; sudo ip route add default via %s" % \
-                          (new_ip, tap, old_via)
+    sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+    int_name = vpp_sw_if_index_to_name(sw_if_index)
 
-    try:
-        fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
-    except:
-        return (False, None)
+    vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)
+
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
     return (True, None)
 
