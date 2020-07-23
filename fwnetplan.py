@@ -102,8 +102,9 @@ def get_netplan_filenames():
                         else:
                             gateway = devices[dev] if dev in devices else None
                             pci = fwutils.linux_to_pci_addr(dev)[0]
-                            device_info = {'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name}
-                            fwglobals.log.debug(device_info)
+
+                        device_info = {'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name}
+                        fwglobals.log.debug(device_info)
                         if fname in our_files:
                             our_files[fname].append(device_info)
                         else:
