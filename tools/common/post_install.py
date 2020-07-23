@@ -30,7 +30,7 @@ FW_EXIT_CODE_OK = 0
 def run_migrations():
     print("Post installation Migrations...")
     # Get files path for migration
-    migration_path = os.path.abspath(os.path.dirname(__file__) + '/../migrations')
+    migration_path = os.path.abspath(os.path.dirname(__file__) + './../migrations')
     # Add path to system to allow imports
     sys.path.append(migration_path)
     # Get all python files in the migration path
