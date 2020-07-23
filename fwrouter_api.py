@@ -153,7 +153,8 @@ class FWROUTER_API:
             wan_list = self.get_wan_interface_addr_pci()
 
             for wan in wan_list:
-                if wan['dhcp'] == 'no':
+                dhcp = wan.get('dhcp', 'no')
+                if dhcp == 'no':
                     continue
 
                 name = fwutils.pci_to_tap(wan['pci'])
