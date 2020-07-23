@@ -150,7 +150,8 @@ class FWROUTER_API:
             wan_list = self.get_wan_interface_addr_pci()
 
             for wan in wan_list:
-                if wan['dhcp'] == 'no':
+                dhcp = wan.get('dhcp', 'no')
+                if dhcp == 'no':
                     continue
 
                 name = fwutils.pci_to_tap(wan['pci'])
@@ -672,6 +673,11 @@ class FWROUTER_API:
         # cleanup of globals in tunnels
         fwtranslate_add_tunnel.init_tunnels()
 
+        # Reset failure state before start- hopefully we will succeed.
+        # On no luck the start will set failure again
+        #
+        self._unset_router_failure()
+
         # 'start-router' preprocessing:
         # the 'start-router' request might include interfaces and routes.
         # For each of them simulate 'add-interface' and 'add-route' request
@@ -710,7 +716,6 @@ class FWROUTER_API:
         # run the watchdog thread, if it doesn't run
         self.router_started = True
         self._start_threads()
-        self._unset_router_failure()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
 
