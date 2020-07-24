@@ -141,6 +141,8 @@ def add_remove_netplan_interface(params):
     else:
         metric = 0
 
+    set_name = ''
+    old_ifname = ''
     ifname = fwutils.pci_to_tap(pci)
 
     if pci in fwglobals.g.NETPLAN_FILES:
@@ -149,7 +151,8 @@ def add_remove_netplan_interface(params):
         fname_backup = fname + '.fworig'
 
         if fwglobals.g.NETPLAN_FILES[pci].get('set-name'):
-            ifname = fwglobals.g.NETPLAN_FILES[pci].get('set-name')
+            old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
+            set_name = fwglobals.g.NETPLAN_FILES[pci].get('set-name')
 
         with open(fname_backup, 'r') as stream:
             old_config = yaml.safe_load(stream)
@@ -171,8 +174,8 @@ def add_remove_netplan_interface(params):
         ethernets = network['ethernets']
 
         if old_ethernets:
-            if ifname in old_ethernets:
-                config_section = old_ethernets[ifname]
+            if old_ifname in old_ethernets:
+                config_section = old_ethernets[old_ifname]
 
         if re.match('yes', dhcp):
             config_section['dhcp4'] = True
@@ -215,7 +218,8 @@ def add_remove_netplan_interface(params):
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
-            for _ in range(10):
+            for _ in range(50):
+                ifname = set_name if set_name else ifname
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break

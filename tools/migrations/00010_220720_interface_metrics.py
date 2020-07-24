@@ -88,7 +88,7 @@ def up():
                             else:
                                 request['params']['metric'] = str(metric)
                                 metric += 1
-                        db_requests.update(key, request, request['params'], request['cmd_list'],
+                        db_requests.update(key, request['request'], request['params'], request['cmd_list'],
                                            request['executed'])
 
     except Exception as e:
