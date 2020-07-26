@@ -637,7 +637,8 @@ class FWROUTER_API:
         :returns: None.
         """
         if idx_failed_cmd != 0:
-            for t in reversed(cmd_list[0:idx_failed_cmd]):
+            last_element = idx_failed_cmd if idx_failed_cmd > 0 else len(cmd_list)
+            for t in reversed(cmd_list[0:last_element]):
                 if 'revert' in t:
                     rev_cmd = t['revert']
                     try:
