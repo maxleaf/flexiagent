@@ -201,6 +201,8 @@ def add_remove_netplan_interface(params):
                         del config_section['gateway4']
                     config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
 
+        ifname = set_name if set_name else ifname
+
         if is_add == 1:
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
@@ -223,7 +225,6 @@ def add_remove_netplan_interface(params):
         if is_add == 1:
             ip_address_is_found = False
             for _ in range(50):
-                ifname = set_name if set_name else ifname
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
