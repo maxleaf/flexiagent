@@ -22,21 +22,20 @@
 
 import fwglobals
 
-def revert(req, params):
+def revert(request):
     """Generate list of commands for the 'remove-X' type of requests.
     To do that it fetches the list of commands for the corresponding 'add-X'
     request, goes over this list from the end to the beginning and for every
     command takes it's revert section and adds it to the result list.
     In this way we create list of commands that reverts the original request.
 
-    :param req:    The name of the request to be translated, e.g. 'remove-tunnel'
-    :param params: The parameters of the request to be translated, e.g. {'id':'1'}
+    :param request: The request received from flexiManage.
 
     :returns: A list of commands.
     """
 
     # Fetch list of commands for the correspondent 'add-X' request
-    (cmd_list_src, executed) = fwglobals.g.router_cfg.get_request_cmd_list(req, params)
+    (cmd_list_src, executed) = fwglobals.g.router_cfg.get_request_cmd_list(request)
 
     # If there is no 'add-XXX' commands to revert,
     # or if the 'add-XXX' commands were never executed,

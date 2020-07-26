@@ -72,9 +72,9 @@ class FwRouterCfg:
             del self.db[req_key]
         self.reset_signature()
 
-    def _get_request_key(self, req, params):
-        """Generates uniq key for request out of request name 'req' and
-        request parameters 'params'. To do that uses function defined in the
+    def _get_request_key(self, request):
+        """Generates uniq key for request out of request name and
+        request parameters. To do that uses function defined in the
         correspondent translator file, e.g. fwtranslate_add_tunnel.py.
 
         !IMPORTANT!  keep this function internal! No one should be aware of
@@ -82,19 +82,21 @@ class FwRouterCfg:
                      function, please consider to add API to this class
                      that encapsulates the needed functionality!
         """
+        req     = request['message']
+        params  = request.get('params')
+
         src_req      = fwrouter_api.fwrouter_translators[req].get('src', req)  # 'remove-X' requests use key generator of correspondent 'add-X' requests
         src_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
         src_key_func = getattr(src_module, fwrouter_api.fwrouter_translators[src_req]['key_func'])
         src_req_key  = src_key_func(params)
         return src_req_key
 
-    def update(self, req, params, cmd_list=None, executed=False):
+    def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
         requests are not stored but remove the correspondent 'add-X' requests.
 
-        :param req:         The request, e.g. 'add-tunnel'.
-        :param params:      The dictionary with request parameters, e.g. {'id':1}.
+        :param request:     The request received from flexiManage.
         :param cmd_list:    List of commands to be executed in order to fullfil
                             configuration request. The command can invoke VPP API,
                             run Linux shell commands, update internal agent objects,
@@ -104,7 +106,10 @@ class FwRouterCfg:
                             translated but was not executed.
         :returns: None.
         """
-        req_key = self._get_request_key(req, params)
+        req     = request['message']
+        params  = request.get('params')
+        req_key = self._get_request_key(request)
+
         try:
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
@@ -114,51 +119,53 @@ class FwRouterCfg:
             pass
         except Exception as e:
             fwglobals.log.error("FwRouterCfg.update(%s) failed: %s, %s" % \
-                        (req_key, str(e), traceback.format_exc()))
+                        (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
 
-    def get_request_params(self, req, params):
-        """Retrives parameters of the request with name 'req' and parameters
-        'params'. I know that it sounds weired :) This is hack. We use this
-        function to retrieve parameters of the 'add-X' requests stored in DB,
-        when the provided request is correspondent 'remove-X'.
+    def get_request_params(self, request):
+        """Retrives parameters of the request as they are stored in DB.
+        I know that it sounds weired, as request includes parameters in 'params'
+        field :) This is hack. We use this function to retrieve parameters
+        of the 'add-X' requests stored in DB, when the provided request is
+        correspondent 'remove-X'.
         Note:
             - the 'remove-X' requests are not stored in DB
             - the 'remove-X' 'params' is a subset of the 'add-X' 'params',
               which is sufficient to generate DB key.
 
-        :param req:         The name of the 'remove-X' request, e.g. 'remove-tunnel'.
+        :param request:         The name of the 'remove-X' request, e.g. 'remove-tunnel'.
         :param params:      The parameters of the 'remove-X' request.
 
         :returns: the parameters of the correspondent 'add-X' request.
         """
-        req_key = self._get_request_key(req, params)
+        req_key = self._get_request_key(request)
         if not req_key in self.db:
             return None
         return self.db[req_key].get('params')
 
-    def get_request_cmd_list(self, req, params):
+    def get_request_cmd_list(self, request):
         """Retrives translation of the request to list of commands.
 
-        :param req:    The name of the request, e.g. 'remove-tunnel'
-        :param params: The parameters of the request, e.g. {'id':'1'}
+        :param request: The request as it would be received on network,
+                        including name (request['message']) and parmateres
+                        (request['params']) if exist.
 
         :returns: the tuple of the command list and the 'executed' flag
         """
-        req_key = self._get_request_key(req, params)
+        req_key = self._get_request_key(request)
         if not req_key in self.db:
             return (None, None)
         return (self.db[req_key].get('cmd_list'), self.db[req_key].get('executed'))
 
-    def exists(self, req, params=None):
+    def exists(self, req_name, params=None):
         """Check if entry exists in DB.
 
         :param req:  name of configuration request.
 
         :returns: 'True' if request exists and 'False' otherwise.
         """
-        req_key = self._get_request_key(req, params)
+        req_key = self._get_request_key({'message': req_name, 'params': params})
         res = True if req_key in self.db else False
         return res
 
@@ -264,14 +271,16 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None, pci=None):
+    def get_interfaces(self, type=None, pci=None, ip=None):
         interfaces = self._get_requests('add-interface')
-        if not type and not pci:
+        if not type and not pci and not ip:
             return interfaces
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
                 interfaces.remove(params)
             elif pci and pci != params['pci']:
+                interfaces.remove(params)
+            elif ip and not re.match(ip, params['addr']):
                 interfaces.remove(params)
         return interfaces
 
@@ -290,21 +299,19 @@ class FwRouterCfg:
 
     def get_wan_interface_gw(self, ip):
         import fwutils
-        interfaces = self.get_interfaces()
-        for params in interfaces:
-            if re.match('wan', params['type'], re.IGNORECASE):
-                if re.search(ip, params['addr']):
-                    pci = params['pci']
-                    gw  = params.get('gateway')
-                    # If gateway not exist in interface configuration, use default
-                    # This is needed when upgrading from version 1.1.52 to 1.2.X
-                    if not gw:
-                        tap = fwutils.pci_to_tap(pci)
-                        rip, unused_metric = fwutils.get_linux_interface_gateway(tap)
-                        return pci, rip
-                    else:
-                        return pci, gw
-        return (None, None)
+        interfaces = self.get_interfaces(type='wan', ip=ip)
+        if not interfaces:
+            return (None, None)
+        pci = interfaces[0]['pci']
+        gw  = interfaces[0].get('gateway')
+        # If gateway not exist in interface configuration, use default
+        # This is needed when upgrading from version 1.1.52 to 1.2.X
+        if not gw:
+            tap = fwutils.pci_to_tap(pci)
+            rip, unused_metric = fwutils.get_linux_interface_gateway(tap)
+            return pci, rip
+        else:
+            return pci, gw
 
     def get_interface_ips(self, pci_list=None):
         """Fetches IP-s of interfaces stored in the configuration database.

@@ -199,7 +199,7 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces = fwglobals.g.handle_request('interfaces')
+        interfaces = fwglobals.g.handle_request({'message':'interfaces'})
         default_route = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
@@ -525,7 +525,7 @@ class FwAgent:
 
         self.requestReceived = True
 
-        reply = fwglobals.g.handle_request(msg['message'], msg.get('params'), received_msg=received_msg)
+        reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
 
         if not 'entity' in reply and 'entity' in msg:
             reply.update({'entity': msg['entity'] + 'Reply'})

@@ -221,11 +221,10 @@ class FWROUTER_API:
             self.call('stop-router')
         fwglobals.log.info("FWROUTER_API: stop_router: stopped")
 
-    def call(self, req, params=None):
+    def call(self, request):
         """Executes router configuration request: 'add-X' or 'remove-X'.
 
-        :param req:         Request name.
-        :param params:      Parameters from flexiManage.
+        :param req: The request received from flexiManage.
 
         :returns: Status codes dictionary.
         """
@@ -236,12 +235,12 @@ class FWROUTER_API:
         # is need. It adds the simulated 'remove-application' request to the
         # the real received 'add-application' forming thus new aggregation request.
         #
-        (req, params) = self._preprocess_request(req, params)
+        request = self._preprocess_request(request)
 
-        if req == 'aggregated-router-api':
-            return self._call_aggregated(params['requests'])
+        if request['message'] == 'aggregated-router-api':
+            return self._call_aggregated(request['params']['requests'])
         else:
-            return self._call_simple(req, params)
+            return self._call_simple(request)
 
     def _call_aggregated(self, requests):
         """Execute multiple requests.
@@ -260,27 +259,27 @@ class FWROUTER_API:
         # in the aggregated request fails and as a result of this whole aggregated request is rollback-ed.
         # For example, 'remove-interface' has 'pci' parameter only, and has no IP, LAN/WAN type, etc.
         fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
-        for req in requests:
+        for request in requests:
             try:
-                if re.match('remove-', req['message']):
-                    req['params'] = fwglobals.g.router_cfg.get_request_params(req['message'], req['params'])
+                if re.match('remove-', request['message']):
+                    request['params'] = fwglobals.g.router_cfg.get_request_params(request)
             except Exception as e:
-                fwglobals.log.excep("_call_aggregated: failed to fetch params for %s: %s " % (json.dumps(req), str(e)))
+                fwglobals.log.excep("_call_aggregated: failed to fetch params for %s: %s " % (json.dumps(request), str(e)))
                 raise e
 
 
-        for (idx, req) in enumerate(requests):
+        for (idx, request) in enumerate(requests):
             try:
-                fwglobals.log.debug("_call_aggregated: executing request %s" % (json.dumps(req)))
-                self.call(req['message'], req.get('params'))
+                fwglobals.log.debug("_call_aggregated: executing request %s" % (json.dumps(request)))
+                self.call(request)
             except Exception as e:
                 # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to execute %s. reverting previous requests..." % json.dumps(req))
-                for req in reversed(requests[0:idx]):
+                fwglobals.log.error("_call_aggregated: failed to execute %s. reverting previous requests..." % json.dumps(request))
+                for request in reversed(requests[0:idx]):
                     try:
-                        op = req['message']
-                        req['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
-                        self._call_simple(req['message'], req['params'])
+                        op = request['message']
+                        request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
+                        self._call_simple(request)
                     except Exception as e:
                         # on failure to revert move router into failed state
                         err_str = "_call_aggregated: failed to revert request %s while running rollback on aggregated request" % op
@@ -303,15 +302,16 @@ class FWROUTER_API:
             addr = params['loopback-iface']['addr']
             fwtunnel_stats.tunnel_stats_add(id, addr)
 
-    def _call_simple(self, req, params=None):
+    def _call_simple(self, request):
         """Execute single request.
 
-        :param req:         Request name.
-        :param params:      Request parameters.
+        :param request: The request received from flexiManage.
 
         :returns: Status codes dictionary.
         """
         try:
+            req = request['message']
+
             # If device failed, which means it is in not well defined state,
             # reject request immediately as it can't be fulfilled.
             # Permit 'start-router' to try to get out of failed state.
@@ -331,11 +331,11 @@ class FWROUTER_API:
             #
             if router_was_started == False and \
                (req == 'add-application' or req == 'add-multilink-policy'):
-               fwglobals.g.router_cfg.update(req, params)
+               fwglobals.g.router_cfg.update(request)
                return {'ok':1}
 
             # Translate request to list of commands to be executed
-            cmd_list = self._translate(req, params)
+            cmd_list = self._translate(request)
 
             # Execute list of commands. Do it only if vpp runs.
             # Some 'remove-XXX' requests must be executed
@@ -344,10 +344,10 @@ class FWROUTER_API:
             # applied to running vpp.
             #
             if router_was_started or req == 'start-router':
-                self._execute(req, cmd_list)
+                self._execute(request, cmd_list)
                 executed = True
             elif re.match('remove-',  req):
-                self._execute(req, cmd_list, filter='must')
+                self._execute(request, cmd_list, filter='must')
                 executed = True
             else:
                 executed = False
@@ -360,7 +360,7 @@ class FWROUTER_API:
             # crashed VPP by watchdog.
             #
             try:
-                fwglobals.g.router_cfg.update(req, params, cmd_list, executed)
+                fwglobals.g.router_cfg.update(request, cmd_list, executed)
             except Exception as e:
                 self._revert(cmd_list)
                 raise e
@@ -369,7 +369,7 @@ class FWROUTER_API:
                 self._fill_tunnel_stats_dict()
 
         except Exception as e:
-            err_str = "FWROUTER_API::_call_simple: %s" % traceback.format_exc()
+            err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
             if req == 'start-router' or req == 'stop-router':
                 self._set_router_failure("failed to " + req)
@@ -378,14 +378,16 @@ class FWROUTER_API:
         return {'ok':1}
 
 
-    def _translate(self, req, params=None):
+    def _translate(self, request):
         """Translate request in a series of commands.
 
-        :param req:         Request name.
-        :param params:      Request parameters.
+        :param request: The request received from flexiManage.
 
         :returns: Status codes dictionary.
         """
+        req    = request['message']
+        params = request.get('params')
+
         api_defs = fwrouter_translators.get(req)
         assert api_defs, 'FWROUTER_API: there is no api for request "%s"' % req
 
@@ -396,23 +398,26 @@ class FWROUTER_API:
         assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
 
         if fwrouter_translators[req]['api'] == 'revert':
-            cmd_list = func(req, params)
+            cmd_list = func(request)
             return cmd_list
 
         cmd_list = func(params) if params else func()
         return cmd_list
 
-    def _execute(self, req, cmd_list, filter=None):
+    def _execute(self, request, cmd_list, filter=None):
         """Execute request.
 
-        :param req:         Request name.
-        :param req_key:     Request key.
+        :param request:     The request received from flexiManage.
         :param cmd_list:    Commands list.
-        :param filter:      Filter.
-
+        :param filter:      Filter for commands to be executed.
+                            If provided and if command has 'filter' field and
+                            their values are same, the command will be executed.
+                            If None, the check for filter is not applied.
         :returns: None.
         """
         cmd_cache = {}
+
+        req = request['message']
 
         fwglobals.log.debug("FWROUTER_API: === start execution of %s ===" % (req))
 
@@ -422,7 +427,9 @@ class FWROUTER_API:
             # If precondition exists, ensure that it is OK
             if 'precondition' in t:
                 precondition = t['precondition']
-                reply = fwglobals.g.handle_request(precondition['name'], precondition.get('params'), result)
+                reply = fwglobals.g.handle_request(
+                    { 'message': precondition['name'], 'params':  precondition.get('params') },
+                    result)
                 if reply['ok'] == 0:
                     fwglobals.log.debug("FWROUTER_API:_execute: %s: escape as precondition is not met: %s" % (cmd['descr'], precondition['descr']))
                     continue
@@ -450,13 +457,13 @@ class FWROUTER_API:
                 # Now execute command
                 result = None if not 'cache_ret_val' in cmd else \
                     { 'result_attr' : cmd['cache_ret_val'][0] , 'cache' : cmd_cache , 'key' :  cmd['cache_ret_val'][1] }
-                reply = fwglobals.g.handle_request(cmd['name'], cmd.get('params'), result)
+                reply = fwglobals.g.handle_request({ 'message': cmd['name'], 'params':  cmd.get('params')}, result)
                 if reply['ok'] == 0:        # On failure go back revert already executed commands
                     fwglobals.log.debug("FWROUTER_API: %s failed ('ok' is 0)" % cmd['name'])
                     raise Exception("API failed: %s" % reply['message'])
 
             except Exception as e:
-                err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), traceback.format_exc())
+                err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), str(traceback.format_exc()))
                 fwglobals.log.error(err_str)
                 fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
                 # On failure go back to the begining of list and revert executed commands.
@@ -471,7 +478,7 @@ class FWROUTER_API:
                     self._substitute(cmd_cache, t['revert'].get('params'))
                 except Exception as e:
                     fwglobals.log.excep("_execute: failed to substitute revert command: %s\n%s, %s" % \
-                                (str(t), str(e), traceback.format_exc()))
+                                (str(t), str(e), str(traceback.format_exc())))
                     fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
                     self._revert(cmd_list, idx)
                     raise e
@@ -492,7 +499,8 @@ class FWROUTER_API:
                 if 'revert' in t:
                     rev_cmd = t['revert']
                     try:
-                        reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
+                        reply = fwglobals.g.handle_request(
+                            { 'message': rev_cmd['name'], 'params': rev_cmd.get('params')})
                         if reply['ok'] == 0:
                             err_str = "handle_request(%s) failed" % rev_cmd['name']
                             fwglobals.log.error(err_str)
@@ -503,7 +511,7 @@ class FWROUTER_API:
                         fwglobals.log.excep(err_str)
                         self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
 
-    def _preprocess_request(self, req, params):
+    def _preprocess_request(self, request):
         """Some requests require preprocessing. For example before handling
         'add-application' the currently configured applications should be removed.
         The simplest way to do that is just to simulate 'remove-application'
@@ -515,14 +523,16 @@ class FWROUTER_API:
             Note the main benefit of this approach is automatic revert of
         the simulated requests if the original request fails.
 
-        :param req:     The name of the original request
-        :param params:  The parameters of the original request
+        :param request: The original request received from flexiManage
 
-        :returns: (req, params) - The new aggregated request and it's parameters.
-                        Note the parameters are list of simulated and original
-                        requests. Note the list should include one original
-                        request and one or more simulated requests.
+        :returns: request - The new aggregated request and it's parameters.
+                        Note the parameters are list of requests that might be
+                        a mix of simulated requests and original requests.
+                        This mix should include one original request and one or
+                        more simulated requests.
         """
+        req    = request['message']
+        params = request.get('params')
 
         multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
 
@@ -541,16 +551,15 @@ class FWROUTER_API:
                     { 'message': 'remove-application', 'params' : application_params },
                     { 'message': 'add-application',    'params' : params }
                 ]
-                req     = 'aggregated-router-api',
-                params  = { 'requests' : updated_requests }
+                params = { 'requests' : updated_requests }
 
                 if multilink_policy_params:
                     params['requests'][0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
                     params['requests'][-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
 
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % \
-                    ('aggregated-router-api', json.dumps(params)))
-                return (req, params)
+                request = {'message': 'aggregated-router-api', 'params': params}
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                return request
 
         # 'add-multilink-policy' preprocessing:
         # 1. The currently configured policy should be removed firstly.
@@ -563,11 +572,9 @@ class FWROUTER_API:
                     { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
                     { 'message': 'add-multilink-policy',    'params' : params }
                 ]
-                req     = 'aggregated-router-api',
-                params  = { 'requests' : updated_requests }
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % \
-                    ('aggregated-router-api', json.dumps(params)))
-                return (req, params)
+                request = {'message': 'aggregated-router-api', 'params': { 'requests' : updated_requests }}
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                return request
 
         # 'add/remove-tunnel' and 'add/remove-application' preprocessing:
         # 1. The multilink policy should be re-installed: if exists, the policy
@@ -581,14 +588,13 @@ class FWROUTER_API:
                     { 'message': req, 'params' : params },
                     { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }
                 ] }
-                req = 'aggregated-router-api'
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % \
-                    (req, json.dumps(params)))
-                return (req, params)
+                request = {'message': 'aggregated-router-api', 'params': params}
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                return request
 
         # No preprocessing is needed for rest of simple requests, return.
         if req != 'aggregated-router-api':
-            return (req, params)
+            return request
 
         # Now perform same preprocessing for aggregated requests, either
         # original or created above.
@@ -607,9 +613,9 @@ class FWROUTER_API:
         }
 
         requests = params['requests']
-        for (idx,request) in enumerate(requests):
+        for (idx , _request) in enumerate(requests):
             for req_name in indexes:
-                if req_name == request['message']:
+                if req_name == _request['message']:
                     if indexes[req_name] == -1:
                         indexes[req_name] = idx
 
@@ -668,7 +674,7 @@ class FWROUTER_API:
                     idx_last = indexes[req_name]
             if idx == 10000:
                 # No requests to preprocess were found, return
-                return (req, params)
+                return request
 
             # Now add policy reinstallation if needed.
             # Before that filter out all not supported cases.
@@ -687,8 +693,8 @@ class FWROUTER_API:
                 _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
 
         if updated:
-            fwglobals.log.debug("_preprocess_request: request was replaced with %s:%s" % (req, json.dumps(params)))
-        return (req, params)
+            fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+        return request
 
     def _start_threads(self):
         """Start all threads.
@@ -799,8 +805,8 @@ class FWROUTER_API:
         ]
         messages = fwglobals.g.router_cfg.dump(types=types)
         for msg in messages:
-            reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
-            if reply.get('ok', 1) == 0:  # Break and return error on faiure of any request
+            reply = fwglobals.g.handle_request(msg)
+            if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 
 

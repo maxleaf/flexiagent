@@ -314,34 +314,34 @@ class Fwglobals:
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)
 
-    def _call_agent_api(self, req, params):
-        return self.agent_api.call(req, params)
+    def _call_agent_api(self, request):
+        return self.agent_api.call(request)
 
-    def _call_router_api(self, req, params):
-        return self.router_api.call(req, params)
+    def _call_router_api(self, request):
+        return self.router_api.call(request)
 
-    def _call_os_api(self, req, params):
-        return self.os_api.call_simple(req, params)
+    def _call_os_api(self, request):
+        return self.os_api.call_simple(request)
 
-    def _call_vpp_api(self, req, params, result=None):
-        return self.router_api.vpp_api.call_simple(req, params, result)
+    def _call_vpp_api(self, request, result=None):
+        return self.router_api.vpp_api.call_simple(request, result)
 
-    def _call_python_api(self, req, params):
-        func = self._call_python_api_get_func(req, params)
-        args = params.get('args')
+    def _call_python_api(self, request):
+        func = self._call_python_api_get_func(request['params'])
+        args = request['params'].get('args')
         if args:
             ret = func(**args)
         else:
             ret = func()
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
+            func_str = request['params'].get('func')
             args_str = json.dumps(args) if args else ""
-            log.error('_call_python_api: %s(%s) failed: %s' % \
-                    (params['func'], args_str, val))
+            log.error('_call_python_api: %s(%s) failed: %s' % (func_str, args_str, val))
         reply = {'ok':ok, 'message':val}
         return reply
 
-    def _call_python_api_get_func(self, req, params):
+    def _call_python_api_get_func(self, params):
         if 'module' in params:
             func = getattr(__import__(params['module']), params['func'])
         elif 'object' in params:
@@ -383,11 +383,10 @@ class Fwglobals:
     #          For example, it might contain pattern for grep to be run
     #          on command output.
     #
-    def handle_request(self, req, params=None, result=None, received_msg=None):
+    def handle_request(self, request, result=None, received_msg=None):
         """Handle request.
 
-        :param req:          Request from flexiManage, e.g. 'start-router'
-        :param params:       Parameters from flexiManage.
+        :param request:      The request received from flexiManage.
         :param result:       Place for result.
         :param received_msg: The original message received from flexiManage.
 
@@ -395,16 +394,19 @@ class Fwglobals:
         """
 
         try:
-            handler_name = request_handlers.get(req)
+            req    = request['message']
+            params = request.get('params')
+
+            handler_name = request_handlers.get(request['message'])
             assert handler_name, 'fwglobals: "%s" request is not supported' % req
 
             handler_func = getattr(self, handler_name)
             assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler_name, req)
 
             if result is None:
-                reply = handler_func(req, params)
+                reply = handler_func(request)
             else:
-                reply = handler_func(req, params, result)
+                reply = handler_func(request, result)
             if reply['ok'] == 0:
                 if 'usage' in params and params['usage'] != 'precondition':  # Don't generate error if precondition fails
                     myCmd = 'sudo vppctl api trace save error.api'
@@ -431,7 +433,7 @@ class Fwglobals:
         except Exception as e:
             global log
             err_str = "%s(%s): %s" % (req, format(params), str(e))
-            log.error(err_str + ': %s' % traceback.format_exc())
+            log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}
             return reply
 

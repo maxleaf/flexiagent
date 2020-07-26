@@ -52,14 +52,16 @@ class FWAGENT_API:
        connection using JSON requests.
        For list of available APIs see the 'fwagent_api' variable.
     """
-    def call(self, req, params):
+    def call(self, request):
         """Invokes API specified by the 'req' parameter.
 
-        :param req: Request name.
-        :param params: Parameters from flexiManage.
+        :param request: The request received from flexiManage.
 
         :returns: Reply.
         """
+        req    = request['message']
+        params = request.get('params')
+
         handler = fwagent_api.get(req)
         assert handler, 'fwagent_api: "%s" request is not supported' % req
 
@@ -107,7 +109,7 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwglobals.g.handle_request('interfaces')['message']
+            info['network']['interfaces'] = fwglobals.g.handle_request({ 'message': 'interfaces'})['message']
             info['reconfig'] = fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
@@ -526,7 +528,10 @@ class FWAGENT_API:
         # in order to enforce update of configuration signature.
         #
         reply = fwglobals.g.handle_request(
-            'aggregated-router-api', params={ 'requests': list_removals + list_additions },
+            {
+			  'message': 'aggregated-router-api',
+              'params':  { 'requests': list_removals + list_additions }
+            },
             received_msg={ 'message': 'modify-device', 'params': params })
 
         if should_restart_router:

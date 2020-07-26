@@ -1388,7 +1388,7 @@ def get_interface_sw_if_index(ip):
     :returns: sw_if_index.
     """
 
-    pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    pci, unused_gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return pci_to_vpp_sw_if_index(pci)
 
 def get_interface_vpp_names(type=None):
