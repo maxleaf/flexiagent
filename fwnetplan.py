@@ -201,11 +201,12 @@ def add_remove_netplan_interface(params):
                         del config_section['gateway4']
                     config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
 
+        ifname = set_name if set_name else ifname
+
         if is_add == 1:
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
-            section_name = old_ifname if set_name else ifname
-            ethernets[section_name] = config_section
+            ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
                 del ethernets[ifname]
@@ -222,7 +223,6 @@ def add_remove_netplan_interface(params):
 
         # make sure IP address is applied in Linux
         if is_add == 1:
-            ifname = set_name if set_name else ifname
             ip_address_is_found = False
             for _ in range(50):
                 if fwutils.get_interface_address(ifname):
