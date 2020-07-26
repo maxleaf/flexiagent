@@ -233,12 +233,6 @@ def start_router(params=None):
         'args'  : {'is_add': 0}
     }
     cmd_list.append(cmd)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = 'exec'
-    cmd['cmd']['params']  = [ 'sudo netplan apply' ]
-    cmd['cmd']['descr']   = "netplan apply"
-    cmd_list.append(cmd)
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)

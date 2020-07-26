@@ -589,21 +589,16 @@ def version():
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
-def reset(soft=False, quite=False):
+def reset(soft=False):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
 
     :param soft:  Soft reset: resets router configuration only.
                   No re-registration is needed.
-    :param quite: No prints onto screen, but into syslog only.
-                  This might be needed by tests.
 
     :returns: None.
     """
-    if quite:
-        fwglobals.log.set_target(to_syslog=True, to_terminal=False)
-
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
 
     fwutils.reset_router_config()
@@ -1054,7 +1049,7 @@ if __name__ == '__main__':
 
     command_funcs = {
                     'version':lambda args: version(),
-                    'reset': lambda args: reset(soft=args.soft, quite=args.quite),
+                    'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(start_loop=not args.dont_connect),
@@ -1085,7 +1080,11 @@ if __name__ == '__main__':
                         help="reset router softly: clean router configuration")
     parser_stop.add_argument('-r', '--dont_stop_vpp', action='store_true',
                         help="stop agent connection loop only")
+    parser_stop.add_argument('-q', '--quite', action='store_true',
+                        help="don't print info onto screen, print into syslog only")
     parser_start = subparsers.add_parser('start', help='Resumes daemon connection loop if it was stopped by "fwagent stop"')
+    parser_start.add_argument('-q', '--quite', action='store_true',
+                        help="don't print info onto screen, print into syslog only")
     parser_start.add_argument('-r', '--start_router', action='store_true',
                         help="start router before loop is started")
     parser_daemon = subparsers.add_parser('daemon', help='Run agent in daemon mode: infinite register-connect loop')
@@ -1111,6 +1110,9 @@ if __name__ == '__main__':
                         # Note we don't use circle brackets, e.g. "--api inject_requests(request.json)" to avoid bash confuse
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
+
+    if hasattr(args, 'quite') and args.quite:
+        fwglobals.log.set_target(to_syslog=True, to_terminal=False)
 
     fwglobals.log.debug("---> exec " + str(args), to_terminal=False)
     command_funcs[args.command](args)

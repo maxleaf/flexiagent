@@ -39,9 +39,9 @@ class TestFwagent:
 
     def __enter__(self):
         os.system('systemctl stop flexiwan-router')     # Ensure there is no other instance of fwagent
-        os.system('%s reset --soft' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+        os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
         if vpp_does_run():
-            os.system('%s stop' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
+            os.system('%s stop --quite' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -51,12 +51,12 @@ class TestFwagent:
         # arguments will be `None`.
         if self.daemon_pid:
             os.system('kill -9 %s' % self.daemon_pid)   # Kill daemon if runs
-        os.system('%s reset --soft' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+        os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
         if vpp_does_run():
             if traceback:
                 print("!!!! TestFwagent got exception !!!")
                 tb.print_tb(traceback)
-            os.system('%s stop' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
+            os.system('%s stop --quite' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
 
 
     def cli(self, args, daemon=False, print_output_on_error=True):
@@ -226,6 +226,7 @@ def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
         timeout -= 1
         configured = vpp_is_configured(cfg_to_check, print_error=False)
     if timeout == 0:
+        vpp_is_configured(cfg_to_check, print_error=True)
         print("ERROR: wait_vpp_to_be_configured: return on timeout (%s)" % str(to))
         configured = False
     if not configured:  # If failed - run again, this time with print_error=True
@@ -241,6 +242,7 @@ def wait_fwagent_exit(timeout=1000000):
             (_, alive) = psutil.wait_procs([p], timeout=timeout)
             for p in alive:
                 p.kill()
+                print("ERROR: wait_fwagent_exit: %s: %s" % (p.info['pid'], str(p)))
                 print("ERROR: wait_fwagent_exit: return on timeout (%s): %s" % (str(timeout), p.info['pid']))
                 return False
     return True

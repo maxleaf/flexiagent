@@ -92,10 +92,12 @@ def add_interface(params):
     ######################################################################
 
     # Add interface section into Netplan configuration file
-    gw = params.get('gateway', None)
+    gw     = params.get('gateway', None)
+    metric = params.get('metric', 0)
+    dhcp   = params.get('dhcp', 'no')
 
     # enable DHCP packets detection in VPP
-    if params.get('dhcp','') == 'yes':
+    if dhcp == 'yes':
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']   = "python"
@@ -126,8 +128,8 @@ def add_interface(params):
                           'pci'   : iface_pci,
                           'ip'    : iface_addr,
                           'gw'    : gw,
-                          'metric': params.get('metric'),
-                          'dhcp'  : params.get('dhcp')
+                          'metric': metric,
+                          'dhcp'  : dhcp
                          }
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -141,24 +143,11 @@ def add_interface(params):
                           'pci'   : iface_pci,
                           'ip'    : iface_addr,
                           'gw'    : gw,
-                          'metric': params.get('metric'),
-                          'dhcp'  : params.get('dhcp')
+                          'metric': metric,
+                          'dhcp'  : dhcp
                 }
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"
-    cmd_list.append(cmd)
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, iface_pci)
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                                "sudo ip link set dev DEV-STUB up" ]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_pci)
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                                "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)

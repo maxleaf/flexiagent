@@ -140,14 +140,14 @@ class FWROUTER_API:
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        time.sleep(30)  # 30 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
             apply_netplan = False
             wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
             for wan in wan_list:
-                if wan['dhcp'] == 'no':
+                dhcp = wan.get('dhcp', 'no')
+                if dhcp == 'no':
                     continue
 
                 name = fwutils.pci_to_tap(wan['pci'])
@@ -487,7 +487,8 @@ class FWROUTER_API:
         :returns: None.
         """
         if idx_failed_cmd != 0:
-            for t in reversed(cmd_list[0:idx_failed_cmd]):
+            last_element = idx_failed_cmd if idx_failed_cmd > 0 else len(cmd_list)
+            for t in reversed(cmd_list[0:last_element]):
                 if 'revert' in t:
                     rev_cmd = t['revert']
                     try:
@@ -721,9 +722,14 @@ class FWROUTER_API:
         """Handles post start VPP activities.
         :returns: None.
         """
+
+        # Reset failure state before start- hopefully we will succeed.
+        # On no luck the start will set failure again
+        #
+        self._unset_router_failure()
+
         self.router_started = True
         self._start_threads()
-        self._unset_router_failure()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router(self):
