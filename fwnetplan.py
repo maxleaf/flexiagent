@@ -35,10 +35,12 @@ def _backup_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():
         fname = values.get('fname')
         fname_backup = fname + '.fworig'
+        fname_run = fname.replace('yaml', 'fwrun.yaml')
 
         if not os.path.exists(fname_backup):
             fwglobals.log.debug('_backup_netplan_files: doing backup of %s' % fname)
-            shutil.move(fname, fname_backup)
+            shutil.copyfile(fname, fname_backup)
+            shutil.move(fname, fname_run)
 
 def _delete_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
@@ -150,8 +152,8 @@ def add_remove_netplan_interface(params):
         fname_run = fname.replace('yaml', 'fwrun.yaml')
         fname_backup = fname + '.fworig'
 
+        old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
         if fwglobals.g.NETPLAN_FILES[pci].get('set-name'):
-            old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
             set_name = fwglobals.g.NETPLAN_FILES[pci].get('set-name')
 
         with open(fname_backup, 'r') as stream:
@@ -160,8 +162,7 @@ def add_remove_netplan_interface(params):
             old_ethernets = old_network['ethernets']
     else:
         fname_run = fwglobals.g.NETPLAN_FILE
-
-    _add_netplan_file(fname_run)
+        _add_netplan_file(fname_run)
 
     try:
         with open(fname_run, 'r') as stream:
@@ -201,12 +202,15 @@ def add_remove_netplan_interface(params):
                     config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
 
         if is_add == 1:
-            if ifname in ethernets:
-                del ethernets[ifname]
+            if old_ifname in ethernets:
+                del ethernets[old_ifname]
             ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
                 del ethernets[ifname]
+            if old_ethernets:
+                if old_ifname in old_ethernets:
+                    ethernets[old_ifname] = old_ethernets[old_ifname]
 
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
