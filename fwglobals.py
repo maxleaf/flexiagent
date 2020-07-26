@@ -432,7 +432,9 @@ class Fwglobals:
 
         except Exception as e:
             global log
-            err_str = "%s(%s): %s" % (req, format(params), str(e))
+            if len(str(params)) > 4096:
+                params = '<truncated>'
+            err_str = "%s(%s): %s" % (str(e), req, format(params))
             log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}
             return reply

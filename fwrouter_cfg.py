@@ -407,8 +407,8 @@ class FwRouterCfg:
         #
         desired_requests = {}
         for request in requests:
-            key = self._get_request_key(request['message'], request.get('params'))
-            desired_requests.update(request)
+            key = self._get_request_key(request)
+            desired_requests.update({key:request})
 
         # Now dump local configuration in order of 'remove-X' list
         #
