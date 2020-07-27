@@ -204,9 +204,7 @@ def add_remove_netplan_interface(params):
         if is_add == 1:
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
-                ethernets[old_ifname] = config_section
-            else:
-                ethernets[ifname] = config_section
+            ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
                 del ethernets[ifname]
