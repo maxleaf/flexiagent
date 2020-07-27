@@ -804,12 +804,6 @@ class FWROUTER_API:
         interfaces = []
         should_restart_router = False
 
-        # First, create a list of remove-tunnel requests to remove
-        # all tunnels that are connected to the modified interfaces.
-        # These tunnels must be removed before modifying the interface
-        # and will be added back (if needed) via a message from the MGMT.
-        if 'modify_interfaces' in params or 'modify_router' in params:
-            requests += self._create_remove_tunnels_request(params)
         if 'modify_routes' in params:
             requests += self._create_modify_routes_request(params['modify_routes'])
         if 'modify_interfaces' in params:
