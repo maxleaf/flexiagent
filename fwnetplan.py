@@ -34,11 +34,13 @@ import yaml
 def _backup_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():
         fname = values.get('fname')
-        fname_backup = fname + '.fworig'
+        fname_backup = fname + '.fw_run_orig'
+        fname_run = fname.replace('yaml', 'fwrun.yaml')
 
         if not os.path.exists(fname_backup):
             fwglobals.log.debug('_backup_netplan_files: doing backup of %s' % fname)
-            shutil.move(fname, fname_backup)
+            shutil.copyfile(fname, fname_backup)
+            shutil.move(fname, fname_run)
 
 def _delete_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
@@ -49,7 +51,7 @@ def _delete_netplan_files():
         fwglobals.log.debug('_delete_netplan_files: %s' % fname)
         fname_run = fname
         fname = fname_run.replace('fwrun.yaml', 'yaml')
-        fname_backup = fname + '.fworig'
+        fname_backup = fname + '.fw_run_orig'
 
         os.remove(fname_run)
         if os.path.exists(fname_backup):
@@ -80,15 +82,22 @@ def get_netplan_filenames():
 
         devices[dev] = rip
 
-    files = glob.glob("/etc/netplan/*.yaml") + \
-            glob.glob("/lib/netplan/*.yaml") + \
-            glob.glob("/run/netplan/*.yaml")
+    files = glob.glob("/etc/netplan/*.fw_run_orig") + \
+            glob.glob("/lib/netplan/*.fw_run_orig") + \
+            glob.glob("/run/netplan/*.fw_run_orig")
+
+    if not files:
+        files = glob.glob("/etc/netplan/*.yaml") + \
+                glob.glob("/lib/netplan/*.yaml") + \
+                glob.glob("/run/netplan/*.yaml")
+
+    fwglobals.log.debug("get_netplan_filenames: %s" % files)
 
     our_files = {}
     for fname in files:
         with open(fname, 'r') as stream:
-            if re.search('fwrun.yaml', fname):
-                fname = fname.replace('fwrun.yaml', 'yaml')
+            if re.search('fw_run_orig', fname):
+                fname = fname.replace('yaml.fw_run_orig', 'yaml')
             config = yaml.safe_load(stream)
             if 'network' in config:
                 network = config['network']
@@ -148,10 +157,10 @@ def add_remove_netplan_interface(params):
     if pci in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[pci].get('fname')
         fname_run = fname.replace('yaml', 'fwrun.yaml')
-        fname_backup = fname + '.fworig'
+        fname_backup = fname + '.fw_run_orig'
 
+        old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
         if fwglobals.g.NETPLAN_FILES[pci].get('set-name'):
-            old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
             set_name = fwglobals.g.NETPLAN_FILES[pci].get('set-name')
 
         with open(fname_backup, 'r') as stream:
@@ -160,8 +169,7 @@ def add_remove_netplan_interface(params):
             old_ethernets = old_network['ethernets']
     else:
         fname_run = fwglobals.g.NETPLAN_FILE
-
-    _add_netplan_file(fname_run)
+        _add_netplan_file(fname_run)
 
     try:
         with open(fname_run, 'r') as stream:
@@ -201,12 +209,17 @@ def add_remove_netplan_interface(params):
                     config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
 
         if is_add == 1:
-            if ifname in ethernets:
-                del ethernets[ifname]
+            if old_ifname in ethernets:
+                del ethernets[old_ifname]
+            if set_name in ethernets:
+                del ethernets[set_name]
             ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
                 del ethernets[ifname]
+            if old_ethernets:
+                if old_ifname in old_ethernets:
+                    ethernets[old_ifname] = old_ethernets[old_ifname]
 
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
@@ -219,7 +232,7 @@ def add_remove_netplan_interface(params):
         if is_add == 1:
             ip_address_is_found = False
             for _ in range(50):
-                ifname = set_name if set_name else ifname
+                ifname = fwutils.pci_to_tap(pci)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
