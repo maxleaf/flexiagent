@@ -88,9 +88,9 @@ def get_netplan_filenames():
 
     our_files = {}
     for fname in files:
+        if re.search('fwrun.yaml', fname):
+            continue
         with open(fname, 'r') as stream:
-            if re.search('fwrun.yaml', fname):
-                fname = fname.replace('fwrun.yaml', 'yaml')
             config = yaml.safe_load(stream)
             if 'network' in config:
                 network = config['network']
