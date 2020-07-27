@@ -201,7 +201,8 @@ def add_remove_netplan_interface(params):
                         del config_section['gateway4']
                     config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
 
-        ifname = set_name if set_name else ifname
+        if (pci):
+            ifname = fwutils.pci_to_tap(pci)
 
         if is_add == 1:
             if old_ifname in ethernets:
@@ -228,6 +229,10 @@ def add_remove_netplan_interface(params):
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
+                if set_name:
+                    if fwutils.get_interface_address(set_name):
+                        ip_address_is_found = True
+                        break
                 time.sleep(1)
             if not ip_address_is_found:
                 fwglobals.log.error("add_remove_netplan_interface: %s has no ip address" % ifname)
