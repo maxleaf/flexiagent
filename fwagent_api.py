@@ -243,7 +243,7 @@ class FWAGENT_API:
         :returns: Dictionary with status code.
         """
         if fwglobals.g.router_api.router_started:
-            fwglobals.g.router_api.call('stop-router')   # Stop VPP if it runs
+            fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_router_config()
         return {'ok': 1}
 
@@ -325,7 +325,7 @@ class FWAGENT_API:
         try:
             # Stop router if needed
             if restart_router:
-                reply = fwglobals.g.router_api.call("stop-router")
+                reply = fwglobals.g.router_api.call({'message':'stop-router'})
                 if reply['ok'] == 0:
                     raise Exception(" _sync_device: stop-router failed: " + str(reply.get('message')))
 
@@ -335,13 +335,13 @@ class FWAGENT_API:
             # multiple 'add-tunnel'/'remove-tunnel', the multiling policy should
             # be reinstalled. And that should be done only once for whole sync-list.
             #
-            reply = fwglobals.g.router_api.call('aggregated-router-api', {'requests': sync_list } )
+            reply = fwglobals.g.router_api.call({'message':'aggregated-router-api', 'params': {'requests': sync_list}} )
             if reply['ok'] == 0:
                 raise Exception(" _sync_device: smart sync failed: " + str(reply.get('message')))
 
             # Start router if needed
             if restart_router:
-                reply = fwglobals.g.router_api.call("start-router")
+                reply = fwglobals.g.router_api.call({'message':'start-router'})
                 if reply['ok'] == 0:
                     raise Exception(" _sync_device: start-router failed: " + str(reply.get('message')))
 
@@ -349,13 +349,13 @@ class FWAGENT_API:
             fwglobals.log.error("FWAGENT_API: _sync_device: smart sync failed: %s" % str(e))
             self._reset_device_soft()
             for request in params['requests']:
-                reply = fwglobals.g.router_api.call(request['message'], request.get('params'))
+                reply = fwglobals.g.router_api.call(request)
                 if reply['ok'] == 0:
                     error = request['message'] + ': ' + str(reply.get('message'))
                     fwglobals.log.error("FWAGENT_API: _sync_device: brutal sync failed: %s" % error)
                     raise Exception(error)
             if restart_router_after_reset:
-                fwglobals.g.router_api.call('start-router')
+                fwglobals.g.router_api.call({'message':'start-router'})
             fwglobals.log.debug("FWAGENT_API: _sync_device: brutal sync succeeded")
 
         fwglobals.g.router_cfg.reset_signature()
@@ -521,7 +521,7 @@ class FWAGENT_API:
                     should_restart_router = True
 
         if should_restart_router:
-            fwglobals.g.router_api.call("stop-router")
+            fwglobals.g.router_api.call({'message':'stop-router'})
 
         # Finally modify device!
         # Note we use fwglobals.g.handle_request() and not the fwglobals.g.router_api.call()
@@ -535,7 +535,7 @@ class FWAGENT_API:
             received_msg={ 'message': 'modify-device', 'params': params })
 
         if should_restart_router:
-            fwglobals.g.router_api.call("start-router")
+            fwglobals.g.router_api.call({'message':'start-router'})
 
         fwglobals.log.info("FWAGENT_API: _modify_device FINISHED (ok=%d)" % reply['ok'])
 

@@ -198,7 +198,7 @@ class FWROUTER_API:
                 db_app_rec.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
-            self.call('start-router')
+            self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
             self._set_router_failure("failed to restore vpp configuration")
@@ -210,7 +210,7 @@ class FWROUTER_API:
         """
         fwglobals.log.info("FWROUTER_API: start_router")
         if self.router_started == False:
-            self.call('start-router')
+            self.call({'message':'start-router'})
         fwglobals.log.info("FWROUTER_API: start_router: started")
 
     def stop_router(self):
@@ -218,7 +218,7 @@ class FWROUTER_API:
         """
         fwglobals.log.info("FWROUTER_API: stop_router")
         if self.router_started == True:
-            self.call('stop-router')
+            self.call({'message':'stop-router'})
         fwglobals.log.info("FWROUTER_API: stop_router: stopped")
 
     def call(self, request):
@@ -680,10 +680,12 @@ class FWROUTER_API:
             # Before that filter out all not supported cases.
             #
             if indexes['remove-multilink-policy'] > idx:
+                fwglobals.log.error("_preprocess_request: current requests: %s" % json.dumps(requests))
                 raise Exception(\
                     "_preprocess_request: 'remove-multilink-policy' was found in not supported place: %d, should be before %d" % \
                     (indexes['remove-multilink-policy'], idx))
             if indexes['add-multilink-policy'] < idx_last:  # We exploit the fact that only one 'add-multilink-policy' is possible
+                fwglobals.log.error("_preprocess_request: current requests: %s" % json.dumps(requests))
                 raise Exception(\
                     "_preprocess_request: 'add-multilink-policy' was found in not supported place: %d, should be not before %d" % \
                     (indexes['add-multilink-policy'], idx_last))

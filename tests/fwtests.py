@@ -35,13 +35,9 @@ class TestFwagent:
     def __init__(self):
         code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
-        self.daemon_pid = None
 
     def __enter__(self):
-        os.system('systemctl stop flexiwan-router')     # Ensure there is no other instance of fwagent
-        os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
-        if vpp_does_run():
-            os.system('%s stop --quite' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
+        self.clean()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -49,14 +45,19 @@ class TestFwagent:
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
-        if self.daemon_pid:
-            os.system('kill -9 %s' % self.daemon_pid)   # Kill daemon if runs
-        os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+        self.clean(traceback)
+
+    def clean(self, traceback=None):
+        os.system('systemctl stop flexiwan-router')             # Ensure there is no other instance of fwagent
+        daemon_pid = fwagent_daemon_pid()
+        if daemon_pid:
+            os.system('kill -9 %s' % daemon_pid)                # Ensure daemon by previous failed test does not run
         if vpp_does_run():
-            if traceback:
-                print("!!!! TestFwagent got exception !!!")
-                tb.print_tb(traceback)
-            os.system('%s stop --quite' % self.fwagent_py)          # Stop vpp and restore interfaces back to Linux
+            os.system('%s stop --quite' % self.fwagent_py)      # Stop vpp and restore interfaces back to Linux
+        os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+        if traceback:
+            print("!!!! TestFwagent got exception !!!")
+            tb.print_tb(traceback)
 
 
     def cli(self, args, daemon=False, print_output_on_error=True):
@@ -66,7 +67,6 @@ class TestFwagent:
             cmd = '%s daemon --dont_connect &' % (self.fwagent_py)
             try:
                 os.system(cmd)
-                self.daemon_pid = fwagent_daemon_pid()
                 time.sleep(1)  # Give a second to fwagent to be initialized
             except Exception as e:
                 return (False, "'%s' failed: %s" % (cmd, str(e)))
