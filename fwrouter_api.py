@@ -100,10 +100,10 @@ class FWROUTER_API:
     def finalize(self):
         """Destructor method
         """
+        self.router_started = False
+        self._stop_threads()   # IMPORTANT! Stop threads before other components finalization.
         self.vpp_api.finalize()
         self.db_requests.finalize()
-        self.router_started = False
-        self._stop_threads()
 
     def watchdog(self):
         """Watchdog thread.
