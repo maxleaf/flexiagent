@@ -150,6 +150,19 @@ def add_interface(params):
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, iface_pci)
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+                                "sudo ip link set dev DEV-STUB up" ]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_pci)
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+                                "sudo ip link set dev DEV-STUB down" ]
+    cmd_list.append(cmd)
+
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
     if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
         labels = params['multilink']['labels']
