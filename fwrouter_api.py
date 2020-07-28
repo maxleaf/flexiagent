@@ -586,29 +586,30 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === end execution of %s (key=%s) ===" % (req, req_key))
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
-        """Revert commands.
-
-        :param cmd_list:            Commands list.
-        :param idx_failed_cmd:      The last command index to be reverted.
-
+        """Revert list commands that are previous to the failed command with
+        index 'idx_failed_cmd'.
+        :param cmd_list:        Commands list.
+        :param idx_failed_cmd:  The index of command, execution of which
+                                failed, so all commands in list before it
+                                should be reverted.
         :returns: None.
         """
-        if idx_failed_cmd != 0:
-            last_element = idx_failed_cmd if idx_failed_cmd > 0 else len(cmd_list)
-            for t in reversed(cmd_list[0:last_element]):
-                if 'revert' in t:
-                    rev_cmd = t['revert']
-                    try:
-                        reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
-                        if reply['ok'] == 0:
-                            err_str = "handle_request(%s) failed" % rev_cmd['name']
-                            fwglobals.log.error(err_str)
-                            raise Exception(err_str)
-                    except Exception as e:
-                        err_str = "_revert: exception while '%s': %s(%s): %s" % \
-                                    (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
-                        fwglobals.log.excep(err_str)
-                        self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
+        idx_failed_cmd = idx_failed_cmd if idx_failed_cmd >= 0 else len(cmd_list)
+
+        for t in reversed(cmd_list[0:idx_failed_cmd]):
+            if 'revert' in t:
+                rev_cmd = t['revert']
+                try:
+                    reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
+                    if reply['ok'] == 0:
+                        err_str = "handle_request(%s) failed" % rev_cmd['name']
+                        fwglobals.log.error(err_str)
+                        raise Exception(err_str)
+                except Exception as e:
+                    err_str = "_revert: exception while '%s': %s(%s): %s" % \
+                                (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
+                    fwglobals.log.excep(err_str)
+                    self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
 
 
     def _update_db_requests(self, complement, req_key, request, params, cmd_list, executed=True):
