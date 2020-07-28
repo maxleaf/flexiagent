@@ -474,36 +474,6 @@ class FWAGENT_API:
                 list_additions.extend(additions)    # Tail
                 list_removals[0:0] = removals       # Head
 
-        # If there are interfaces that are going to be removed during device
-        # modification either as part of 'unassign' or 'modify-interface'
-        # operations, we have to remove tunnels that use this interfaces.
-        # The tunnels will be added back by separate request sent by flexiManage.
-        # That means flexiManage is responsible to reconstruct tunnels!
-        #
-        pci_list = []
-        for request in list_removals:
-            if request['message'] == 'remove-interface':
-                pci_list.append(request['params']['pci'])
-        ip_list = fwglobals.g.router_cfg.get_interface_ips(pci_list)
-        tunnels = fwglobals.g.router_cfg.get_tunnels()
-        remove_tunnel_requests = []
-        for t in tunnels:
-            if t['src'] in ip_list:
-                remove_tunnel_requests.append({
-                        'message': 'remove-tunnel',
-                        'params' : {'tunnel-id': t['tunnel-id']}
-                    })
-        if remove_tunnel_requests:
-            # 'remove-tunnel'-s should be added right after 'remove-interfaces'.
-            # As 'remove-interfaces' should be at the list_removals beginning,
-            # it is quite simple to find right location for insertion.
-            idx = 0
-            for (idx, request) in enumerate(list_removals):
-                if request['message'] != 'remove-interface':
-                    break
-            list_removals[idx:idx] = remove_tunnel_requests
-
-
         ########################################################################
         # Now go and modify device configuration.
         # We do that by simulating receiving the aggregated router configuration

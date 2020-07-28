@@ -92,14 +92,13 @@ class FWROUTER_API:
         self.router_failure  = False
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
-        self.thread_dhcpc = None
+        self.thread_dhcpc    = None
 
     def finalize(self):
         """Destructor method
         """
+        self._stop_threads()  # IMPORTANT! Do that before rest of finalizations!
         self.vpp_api.finalize()
-        self.router_started = False
-        self._stop_threads()
 
     def watchdog(self):
         """Watchdog thread.
@@ -153,6 +152,7 @@ class FWROUTER_API:
                 name = fwutils.pci_to_tap(wan['pci'])
                 addr = fwutils.get_interface_address(name)
                 if not addr:
+                    fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                     apply_netplan = True
 
             if apply_netplan:
@@ -486,30 +486,31 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === end execution of %s ===" % (req))
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
-        """Revert commands.
-
-        :param cmd_list:            Commands list.
-        :param idx_failed_cmd:      The last command index to be reverted.
-
+        """Revert list commands that are previous to the failed command with
+        index 'idx_failed_cmd'.
+        :param cmd_list:        Commands list.
+        :param idx_failed_cmd:  The index of command, execution of which
+                                failed, so all commands in list before it
+                                should be reverted.
         :returns: None.
         """
-        if idx_failed_cmd != 0:
-            last_element = idx_failed_cmd if idx_failed_cmd > 0 else len(cmd_list)
-            for t in reversed(cmd_list[0:last_element]):
-                if 'revert' in t:
-                    rev_cmd = t['revert']
-                    try:
-                        reply = fwglobals.g.handle_request(
-                            { 'message': rev_cmd['name'], 'params': rev_cmd.get('params')})
-                        if reply['ok'] == 0:
-                            err_str = "handle_request(%s) failed" % rev_cmd['name']
-                            fwglobals.log.error(err_str)
-                            raise Exception(err_str)
-                    except Exception as e:
-                        err_str = "_revert: exception while '%s': %s(%s): %s" % \
-                                    (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
-                        fwglobals.log.excep(err_str)
-                        self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
+        idx_failed_cmd = idx_failed_cmd if idx_failed_cmd >= 0 else len(cmd_list)
+
+        for t in reversed(cmd_list[0:idx_failed_cmd]):
+            if 'revert' in t:
+                rev_cmd = t['revert']
+                try:
+                    reply = fwglobals.g.handle_request(
+                        { 'message': rev_cmd['name'], 'params': rev_cmd.get('params')})
+                    if reply['ok'] == 0:
+                        err_str = "handle_request(%s) failed" % rev_cmd['name']
+                        fwglobals.log.error(err_str)
+                        raise Exception(err_str)
+                except Exception as e:
+                    err_str = "_revert: exception while '%s': %s(%s): %s" % \
+                                (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
+                    fwglobals.log.excep(err_str)
+                    self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
 
     def _preprocess_request(self, request):
         """Some requests require preprocessing. For example before handling
@@ -714,6 +715,8 @@ class FWROUTER_API:
     def _stop_threads(self):
         """Stop all threads.
         """
+        self.router_started = False
+
         if self.thread_watchdog:
             self.thread_watchdog.join()
             self.thread_watchdog = None
@@ -744,7 +747,6 @@ class FWROUTER_API:
         """Handles pre-VPP stop activities.
         :returns: None.
         """
-        self.router_started = False 
         self._stop_threads()
         fwutils.reset_dhcpd()
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))

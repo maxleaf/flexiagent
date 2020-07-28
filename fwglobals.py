@@ -271,9 +271,9 @@ class Fwglobals:
             return
 
         self.fwagent    = FwAgent(handle_sigterm=False)
+        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.agent_api  = FWAGENT_API()
         self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
-        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE)
         self.os_api     = OS_API()
         self.apps       = FwApps(self.APP_REC_DB_FILE)
 
@@ -288,8 +288,8 @@ class Fwglobals:
             return
 
         self.router_api.finalize()
-        self.router_cfg.finalize()
         self.fwagent.finalize()
+        self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
         del self.apps
         del self.os_api
         del self.router_api
