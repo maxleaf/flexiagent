@@ -100,10 +100,10 @@ class FWROUTER_API:
     def finalize(self):
         """Destructor method
         """
+        self.router_started = False
+        self._stop_threads()   # IMPORTANT! Stop threads before other components finalization.
         self.vpp_api.finalize()
         self.db_requests.finalize()
-        self.router_started = False
-        self._stop_threads()
 
     def watchdog(self):
         """Watchdog thread.
@@ -157,6 +157,7 @@ class FWROUTER_API:
                 name = fwutils.pci_to_tap(wan['pci'])
                 addr = fwutils.get_interface_address(name)
                 if not addr:
+                    fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                     apply_netplan = True
 
             if apply_netplan:
@@ -585,29 +586,30 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === end execution of %s (key=%s) ===" % (req, req_key))
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
-        """Revert commands.
-
-        :param cmd_list:            Commands list.
-        :param idx_failed_cmd:      The last command index to be reverted.
-
+        """Revert list commands that are previous to the failed command with
+        index 'idx_failed_cmd'.
+        :param cmd_list:        Commands list.
+        :param idx_failed_cmd:  The index of command, execution of which
+                                failed, so all commands in list before it
+                                should be reverted.
         :returns: None.
         """
-        if idx_failed_cmd != 0:
-            last_element = idx_failed_cmd if idx_failed_cmd > 0 else len(cmd_list)
-            for t in reversed(cmd_list[0:last_element]):
-                if 'revert' in t:
-                    rev_cmd = t['revert']
-                    try:
-                        reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
-                        if reply['ok'] == 0:
-                            err_str = "handle_request(%s) failed" % rev_cmd['name']
-                            fwglobals.log.error(err_str)
-                            raise Exception(err_str)
-                    except Exception as e:
-                        err_str = "_revert: exception while '%s': %s(%s): %s" % \
-                                    (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
-                        fwglobals.log.excep(err_str)
-                        self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
+        idx_failed_cmd = idx_failed_cmd if idx_failed_cmd >= 0 else len(cmd_list)
+
+        for t in reversed(cmd_list[0:idx_failed_cmd]):
+            if 'revert' in t:
+                rev_cmd = t['revert']
+                try:
+                    reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
+                    if reply['ok'] == 0:
+                        err_str = "handle_request(%s) failed" % rev_cmd['name']
+                        fwglobals.log.error(err_str)
+                        raise Exception(err_str)
+                except Exception as e:
+                    err_str = "_revert: exception while '%s': %s(%s): %s" % \
+                                (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
+                    fwglobals.log.excep(err_str)
+                    self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
 
 
     def _update_db_requests(self, complement, req_key, request, params, cmd_list, executed=True):
@@ -803,12 +805,6 @@ class FWROUTER_API:
         interfaces = []
         should_restart_router = False
 
-        # First, create a list of remove-tunnel requests to remove
-        # all tunnels that are connected to the modified interfaces.
-        # These tunnels must be removed before modifying the interface
-        # and will be added back (if needed) via a message from the MGMT.
-        if 'modify_interfaces' in params or 'modify_router' in params:
-            requests += self._create_remove_tunnels_request(params)
         if 'modify_routes' in params:
             requests += self._create_modify_routes_request(params['modify_routes'])
         if 'modify_interfaces' in params:

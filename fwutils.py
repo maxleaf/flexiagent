@@ -432,7 +432,7 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
 
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
-    fwglobals.log.debug(traceback.extract_stack())
+    fwglobals.log.debug(str(traceback.extract_stack()))
     return None
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
@@ -540,7 +540,7 @@ def vpp_if_name_to_tap(vpp_if_name):
     if taps is None:
         raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
 
-    pattern = '%s -> ([a-zA-Z0-9]+)' % vpp_if_name
+    pattern = '%s -> ([a-zA-Z0-9_]+)' % vpp_if_name
     match = re.search(pattern, taps)
     if match is None:
         return None

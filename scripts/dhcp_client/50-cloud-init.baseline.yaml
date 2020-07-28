@@ -1,0 +1,26 @@
+network:
+  ethernets:
+    wan_100:
+      match:
+        macaddress: 08:00:27:0b:1e:2b
+      dhcp4: true
+      dhcp4-overrides: {route-metric: 100}
+      set-name: WAN_100
+    main:
+      match:
+        macaddress: 08:00:27:68:d1:1e
+      dhcp4: true
+      dhcp4-overrides: {route-metric: 0}
+      set-name: WAN_0
+    lan:
+      match:
+        macaddress: 08:00:27:03:f6:b4 
+      addresses: [10.10.10.1/24]
+      set-name: LAN
+    wan_200:
+      match:
+        macaddress: 08:00:27:37:1d:88 
+      dhcp4: true
+      dhcp4-overrides: {route-metric: 200}
+      set-name: WAN_200
+  version: 2
