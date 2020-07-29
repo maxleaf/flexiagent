@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import datetime
 import json
 import filecmp
 import os
@@ -35,6 +36,11 @@ class TestFwagent:
     def __init__(self):
         code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
+
+        get_log_time_cmd = 'tail -1 /var/log/flexiwan/agent.log | cut -d" " -f1,2,3'
+        out = subprocess.check_output(get_log_time_cmd, shell=True).strip()
+        self.log_time_format = "%b %d %H:%M:%S"  # Jul 29 15:57:19 localhost fwagent: ...
+        self.log_start_time = datetime.datetime.strptime(out, self.log_time_format)
 
     def __enter__(self):
         self.clean()
@@ -107,6 +113,24 @@ class TestFwagent:
         cmd = '%s show %s' % (self.fwagent_py, args)
         out = subprocess.check_output(cmd, shell=True)
         return out.rstrip()
+
+    def grep_log(self, pattern, print_findings=True):
+        found = []
+        grep_cmd = "sudo egrep '%s' /var/log/flexiwan/agent.log" % pattern
+        out = subprocess.check_output(grep_cmd, shell=True)
+        if out:
+            lines = out.splitlines()
+            for line in lines:
+                # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
+                line_time  = ' '.join(line.split()[0:3])
+                line_time = datetime.datetime.strptime(line_time, self.log_time_format)
+                if line_time > self.log_start_time:
+                    found.append(line)
+            if found and print_findings:
+                for line in found:
+                    print('FwTest:grep_log(%s): %s' % (pattern, line))
+        return found
+
 
 def vpp_does_run():
     runs = True if vpp_pid() else False
@@ -256,13 +280,15 @@ def file_exists(filename, check_size=True):
         return False
     return True
 
-def router_is_configured(expected_cfg_dump_filename, print_error=True):
+def router_is_configured(expected_cfg_dump_filename,
+                         fwagent_py='python /usr/share/flexiwan/agent/fwagent.py',
+                         print_error=True):
     # Dumps current agent configuration into temporary file and checks
     # if the dump file is equal to the provided expected dump file.
     actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
-    dump_configuration_cmd = "sudo fwagent show --router configuration > %s" % actual_cfg_dump_filename
+    dump_configuration_cmd = "sudo %s show --router configuration > %s" % (fwagent_py, actual_cfg_dump_filename)
     subprocess.call(dump_configuration_cmd, shell=True)
-    dump_multilink_cmd = "sudo fwagent show --router multilink-policy >> %s" % actual_cfg_dump_filename
+    dump_multilink_cmd = "sudo %s show --router multilink-policy >> %s" % (fwagent_py, actual_cfg_dump_filename)
     subprocess.call(dump_multilink_cmd, shell=True)
     ok = filecmp.cmp(expected_cfg_dump_filename, actual_cfg_dump_filename)
     if ok:
@@ -270,4 +296,3 @@ def router_is_configured(expected_cfg_dump_filename, print_error=True):
     elif print_error:
         print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
     return ok
-

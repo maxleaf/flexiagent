@@ -372,8 +372,8 @@ class FwRouterCfg:
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against
-        the requests stored in the local database and generates delta list that
-        can be used for synchronization of router configuration. This delta list
+        the requests stored in the local database and generates output list that
+        can be used for synchronization of router configuration. This output list
         is called sync-list. It includes sequence of 'remove-X' and 'add-X'
         requests that should be applied to device in order to configure it with
         the configuration, reflected in the input list 'requests'.
@@ -405,40 +405,44 @@ class FwRouterCfg:
         # to store these requests. Accidentally these are exactly same keys
         # dumped by fwglobals.g.router_cfg.dump() used below ;)
         #
-        desired_requests = {}
+        input_requests = {}
         for request in requests:
             key = self._get_request_key(request)
-            desired_requests.update({key:request})
+            input_requests.update({key:request})
 
         # Now dump local configuration in order of 'remove-X' list
         #
-        add_order = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        remove_order = add_order.reverse()
-        delta_list = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+        add_order       = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        remove_order    = add_order.reverse()
+        output_requests = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+
+        same_requests = {}   # Exactly same configuration items, no need to add/remove/modify
 
         # Now go over dumped requests and remove those that present in the input
         # list and that have same parameters. They correspond to configuration
         # items that should be not touched by synchronization. The dumped requests
         # that present in the input list but have different parameters stand
-        # for modifications. They should be added to the delta list as 'remove-X'
+        # for modifications. They should be added to the output list as 'remove-X'
         # and than added again as 'add-X' later as it would be a new configuration
         # item.
         #
-        for (idx, request) in enumerate(delta_list):
+        for (idx, request) in enumerate(output_requests):
             dumped_key = request['key']
-            if dumped_key in desired_requests:
-                dumped_params  = request.get('params')
-                desired_params = desired_requests[dumped_key].get('params')
-                if dumped_params == desired_params:
+            if dumped_key in input_requests:
+                dumped_params = request.get('params')
+                input_params  = input_requests[dumped_key].get('params')
+                if dumped_params == input_params:
                     # Exactly same configuration item should be removed from
-                    # delta list. As well we remove it from input list to avoid
-                    # adding it back to delta list later with 'add-X' requests.
+                    # output list. It should be neither removed nor add nor modified.
+                    # As well note it aside, so it will be not added later, when
+                    # 'add-X' from input list that stands for new items
+                    # will be added to the output list.
                     #
-                    del delta_list[idx]
-                    requests.remove(desired_requests[dumped_key])
+                    del output_requests[idx]
+                    same_requests[dumped_key] = None
                 else:
                     # The modified configuration item should stay in both
-                    # the delta list and the input list. Though in delta list
+                    # the output list and the input list. Though in output list
                     # it should come with 'remove-X' request name.
                     # It should stay in the input list to be added later as 'add-X'.
                     #
@@ -451,12 +455,14 @@ class FwRouterCfg:
 
         # At this point the input list includes 'add-X' requests that stand
         # for new or for modified configuration items.
-        # Just go and add them to the delta list 'as-is'.
+        # Just go and add them to the output list 'as-is'.
         # Note we don't rely on order of requests in the input list, so we go
         # and do double cycling of O(n x m) to ensure proper order.
         for req in add_order:
             for request in requests:
                 if request['message'] == req:
-                    delta_list.append(request)
+                    key = self._get_request_key(request)
+                    if not key in same_requests:  # Don't add requests that should be not removed/added/modified
+                        output_requests.append(request)
 
-        return delta_list
+        return output_requests

@@ -957,7 +957,7 @@ def daemon(start_loop=True):
             host=fwglobals.g.FWAGENT_DAEMON_HOST,
             port=fwglobals.g.FWAGENT_DAEMON_PORT,
             ns=False,
-            verbose=True)
+            verbose=False)
 
 def daemon_rpc(func, **kwargs):
     """Wrapper for methods of the FwagentDaemon object that runs on background

@@ -21,6 +21,7 @@
 import json
 import glob
 import os
+import subprocess
 import sys
 
 ######################################################################
@@ -80,7 +81,7 @@ def test():
                                             ],
                                             timeout=30)
         assert vpp_configured_initial
-        router_configured_initial = fwtests.router_is_configured(dump_before_sync_file)
+        router_configured_initial = fwtests.router_is_configured(dump_before_sync_file, fwagent_py=agent.fwagent_py)
         assert router_configured_initial
 
         # Ensure that the configuration database signature was updated
@@ -115,9 +116,8 @@ def test():
                                             ],
                                             timeout=30)
         assert vpp_configured_no_sync
-        router_configured_no_sync = fwtests.router_is_configured(dump_before_sync_file)
+        router_configured_no_sync = fwtests.router_is_configured(dump_before_sync_file, fwagent_py=agent.fwagent_py)
         assert router_configured_no_sync
-
 
         # Inject sync-device request with new configuration
         #
@@ -134,9 +134,11 @@ def test():
                                             ],
                                             timeout=40)
         assert vpp_configured_synced
-        router_configured_synced = fwtests.router_is_configured(dump_after_sync_file)
+        router_configured_synced = fwtests.router_is_configured(dump_after_sync_file, fwagent_py=agent.fwagent_py)
         assert router_configured_synced
 
+        lines = agent.grep_log('error: ')
+        assert len(lines) == 0, "errors found in log!"
 
         # Ensure that the configuration database signature was reset on
         # synchronization success.
