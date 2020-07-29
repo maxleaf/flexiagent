@@ -540,7 +540,7 @@ def vpp_if_name_to_tap(vpp_if_name):
     if taps is None:
         raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
 
-    pattern = '%s -> ([a-zA-Z0-9]+)' % vpp_if_name
+    pattern = '%s -> ([a-zA-Z0-9_]+)' % vpp_if_name
     match = re.search(pattern, taps)
     if match is None:
         return None
