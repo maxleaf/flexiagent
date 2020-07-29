@@ -57,7 +57,12 @@ def _delete_netplan_files():
         if os.path.exists(fname_backup):
             shutil.move(fname_backup, fname)
 
-def add_del_netplan_file(is_add):
+    if files:
+        cmd = 'netplan apply'
+        fwglobals.log.debug(cmd)
+        subprocess.check_output(cmd, shell=True)
+
+def add_del_netplan_files(is_add):
     if is_add:
         _backup_netplan_files()
     else:

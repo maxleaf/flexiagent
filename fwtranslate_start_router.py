@@ -116,10 +116,6 @@ def start_router(params=None):
             cmd['cmd']['name']    = "exec"
             cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
             cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
-            cmd['revert'] = {}
-            cmd['revert']['name']    = "exec"
-            cmd['revert']['params']  = [ "sudo netplan apply" ]
-            cmd['revert']['descr']  = "apply netplan configuration"
             cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
@@ -221,7 +217,7 @@ def start_router(params=None):
     cmd['cmd']['descr'] = "create Netplan files"
     cmd['cmd']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_file',
+        'func'  : 'add_del_netplan_files',
         'args'  : {'is_add': 1}
     }
     cmd['revert'] = {}
@@ -229,7 +225,7 @@ def start_router(params=None):
     cmd['revert']['descr'] = "remove Netplan files"
     cmd['revert']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_file',
+        'func'  : 'add_del_netplan_files',
         'args'  : {'is_add': 0}
     }
     cmd_list.append(cmd)

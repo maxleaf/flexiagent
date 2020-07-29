@@ -833,7 +833,7 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
-    fwnetplan._delete_netplan_files()
+    fwnetplan.add_del_netplan_files(is_add=False)
 
     reset_dhcpd()
 
