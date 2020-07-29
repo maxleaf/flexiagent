@@ -3,7 +3,7 @@
 username=$(head -n 1 $1)
 password=$(cat $1 | head -2 | tail -1)
 
-url="http://vpnqa02.flexiwan.com/api/auth/token?username=${username}"
+url="http://vpnqa02.flexiwan.com/api/auth/token/valid?username=${username}"
 # url="http://local.vpnflexiwan.com:5000/api/auth/token?username=${username}"
 
 # response=$(curl -H "Authorization: Bearer ${password}" --insecure --write-out '%{http_code}' --silent --output /dev/null $url)
