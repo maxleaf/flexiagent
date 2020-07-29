@@ -137,7 +137,7 @@ def _add_netplan_file(fname):
         return
 
     config = dict()
-    config['network'] = {'version': 2}
+    config['network'] = {'version': 2, 'renderer': 'networkd'}
     with open(fname, 'w+') as stream:
         yaml.safe_dump(config, stream, default_flow_style=False)
 
