@@ -54,7 +54,7 @@ fwrouter_modules = {
     'fwtranslate_add_dhcp_config': __import__('fwtranslate_add_dhcp_config'),
     'fwtranslate_add_app':         __import__('fwtranslate_add_app'),
     'fwtranslate_add_policy':      __import__('fwtranslate_add_policy'),
-    'fwtranslate_add_service':  __import__('fwtranslate_add_service')
+    # 'fwtranslate_add_service':  __import__('fwtranslate_add_service')
 }
 
 fwrouter_translators = {
@@ -72,8 +72,8 @@ fwrouter_translators = {
     'remove-application':         {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-application'},
     'add-multilink-policy':       {'module':'fwtranslate_add_policy',      'api': 'add_policy',       'key_func':'get_request_key'},
     'remove-multilink-policy':    {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-multilink-policy'},
-    'add-service':                {'module':'fwtranslate_add_service',     'api': 'add_service',      'key_func':'get_request_key'},
-    'remove-service':             {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-service'},
+    # 'add-service':                {'module':'fwtranslate_add_service',     'api': 'add_service',      'key_func':'get_request_key'},
+    # 'remove-service':             {'module':'fwtranslate_revert',          'api': 'revert',           'src': 'add-service'},
 }
 
 class FWROUTER_API:

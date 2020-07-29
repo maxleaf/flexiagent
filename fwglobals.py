@@ -35,13 +35,16 @@ from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications_api import FwApps
 from fwpolicies_api import FwPolicies
+from fwservices_api import FwServices
 
 modules = {
     'fwagent_api':  __import__('fwagent_api'),
     'fwapps_api':   __import__('fwapplications_api'),
     'fwpolicy_api': __import__('fwpolicies_api'),
     'fwrouter_api': __import__('fwrouter_api'),
+    'fwservices_api': __import__('fwservices_api'),
     'os_api':       __import__('os_api')    
+    
 }
 
 request_handlers = {
@@ -90,10 +93,12 @@ request_handlers = {
     'remove-application':           '_call_router_api',
     'add-multilink-policy':         '_call_router_api',
     'remove-multilink-policy':      '_call_router_api',
-    'add-service':                  '_call_router_api',
-    'remove-service':               '_call_router_api',
-    'modify-service':               '_call_router_api',
-    'upgrade-service':              '_call_router_api',
+
+    # Services API
+    'install-service':              '_call_services_api',
+    'uninstall-service':            '_call_services_api',
+    'modify-service':               '_call_services_api',
+    'upgrade-service':              '_call_services_api',
 
     ##############################################################
     # INTERNAL API-s
@@ -289,6 +294,7 @@ class Fwglobals:
             self.os_api     = OS_API()
             self.apps_api   = FwApps(self.APP_REC_DB_FILE)
             self.policy_api = FwPolicies()
+            self.services_api = FwServices()
 
             self.router_api.restore_vpp_if_needed()
 
@@ -308,6 +314,7 @@ class Fwglobals:
             del self.router_api
             del self.agent_api
             del self.fwagent
+            del self.services_api
 
             self.fwagent = None
 
@@ -339,6 +346,9 @@ class Fwglobals:
 
     def _call_router_api(self, req, params):
         return self.router_api.call(req, params)
+
+    def _call_services_api(self, req, params):
+        return self.services_api.call(req, params);
 
     def _call_os_api(self, req, params):
         return self.os_api.call_simple(req, params)
