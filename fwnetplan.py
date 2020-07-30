@@ -31,7 +31,7 @@ import fwutils
 import shutil
 import yaml
 
-def _backup_netplan_files():
+def backup_linux_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
@@ -42,7 +42,7 @@ def _backup_netplan_files():
             shutil.copyfile(fname, fname_backup)
             shutil.move(fname, fname_run)
 
-def _delete_netplan_files():
+def restore_linux_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
             glob.glob("/lib/netplan/*.fwrun.yaml") + \
             glob.glob("/run/netplan/*.fwrun.yaml")
@@ -61,12 +61,6 @@ def _delete_netplan_files():
         cmd = 'netplan apply'
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
-
-def add_del_netplan_files(is_add):
-    if is_add:
-        _backup_netplan_files()
-    else:
-        _delete_netplan_files()
 
 def _get_netplan_interface_name(name, section):
     if 'set-name' in section:

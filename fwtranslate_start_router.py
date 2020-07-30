@@ -209,24 +209,22 @@ def start_router(params=None):
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
-    cmd['cmd']['descr'] = "punt ip brodcast"
+    cmd['cmd']['descr'] = "punt ip broadcast"
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "create Netplan files"
+    cmd['cmd']['descr'] = "backup Linux netplan files"
     cmd['cmd']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_files',
-        'args'  : {'is_add': 1}
+        'func'  : 'backup_linux_netplan_files'
     }
     cmd['revert'] = {}
     cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "remove Netplan files"
+    cmd['revert']['descr'] = "restore linux netplan files"
     cmd['revert']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_files',
-        'args'  : {'is_add': 0}
+        'func'  : 'restore_linux_netplan_files'
     }
     cmd_list.append(cmd)
 
