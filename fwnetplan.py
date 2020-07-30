@@ -180,6 +180,7 @@ def add_remove_netplan_interface(params):
         with open(fname_run, 'r') as stream:
             config = yaml.safe_load(stream)
             network = config['network']
+            network['renderer'] = 'networkd'
 
         if 'ethernets' not in network:
             network['ethernets'] = {}
