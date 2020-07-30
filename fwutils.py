@@ -1667,15 +1667,16 @@ def install_openvpn_server(params):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-
     if (params['version']):
         # version = params['version']
         version = 'stable'
     else:
         version = 'stable'
 
-    dir = os.path.dirname(os.path.realpath(__file__))    
-
+    os.system('mkdir -p /etc/openvpn')
+    os.system('mkdir -p /etc/openvpn/server')
+    os.system('mkdir -p /etc/openvpn/client')
+    dir = os.path.dirname(os.path.realpath(__file__))
     shutil.copyfile('{}/vpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
     shutil.copyfile('{}/vpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
     shutil.copyfile('{}/vpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
@@ -1688,6 +1689,11 @@ def install_openvpn_server(params):
         'chmod +x /etc/openvpn/server/up-script.sh',
         'chmod +x /etc/openvpn/server/down-script.sh',
 
+        # Convert DOS format to UNIX format
+        "sed -i 's/\r$//' /etc/openvpn/server/auth-script.sh",
+        "sed -i 's/\r$//' /etc/openvpn/server/up-script.sh",
+        "sed -i 's/\r$//' /etc/openvpn/server/down-script.sh",
+        
         'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
         'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
         'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
@@ -1699,9 +1705,8 @@ def install_openvpn_server(params):
     ]
 
     for command in commands:        
-        ret = os.system(command)      
+        ret = os.system(command)
         if ret:
-            print('err: ' + ret)
             return (False, ret)
 
     configure_openvpn_server(params)

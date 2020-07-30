@@ -30,8 +30,13 @@ fwservices_api = {
     'upgrade-service':       '_upgrade_service',    
 }
 
-supported_services = {
-    'open-vpn':          {'install': 'install_openvpn_server', 'uninstall': 'remove_openvpn_server'},
+services = {
+    'open-vpn':          {
+        'install': fwutils.install_openvpn_server,
+        'uninstall': fwutils.remove_openvpn_server,
+        'modify': fwutils.configure_openvpn_server,
+        'upgrade': fwutils.install_openvpn_server
+    },
 }
 
 class FwServices:
@@ -50,6 +55,10 @@ class FwServices:
 
         :returns: Reply.
         """
+
+        service = services.get(params['type'])
+        assert service, '%s: "%s" app is not supported' % (req, params['type'])
+
         handler = fwservices_api.get(req)
         assert handler, 'fwservices_api: "%s" request is not supported' % req
 
@@ -68,14 +77,11 @@ class FwServices:
 
         :returns: Dictionary with information and status code.
         """
-        service = supported_services.get(params['type'])
-        assert service, 'install_service: "%s" app is not supported' % params['type']
-
         try:
-            fwutils[service.get('install')](params['config'])
+            services[params['type']]['install'](params['config'])
             reply = {'ok': 1}
         except:
-            fwutils[service.get('uninstall')]()
+            services[params['type']]['uninstall']()
             reply = {'ok': 0}
 
         return reply
@@ -87,9 +93,9 @@ class FwServices:
 
         :returns: Dictionary with information and status code.
         """
-        fwutils.vpp_multilink_update_policy_rule(params)
-
+        services[params['type']]['uninstall']()
         reply = {'ok': 1}
+
         return reply
     
     def _modify_service(self, params):
@@ -99,7 +105,7 @@ class FwServices:
 
         :returns: Dictionary with information and status code.
         """
-        fwutils.vpp_multilink_update_policy_rule(params)
+        services[params['type']]['modify'](params['config'])
 
         reply = {'ok': 1}
         return reply
@@ -111,7 +117,7 @@ class FwServices:
 
         :returns: Dictionary with information and status code.
         """
-        fwutils.vpp_multilink_update_policy_rule(params)
+        services[params['type']]['upgrade'](params['config'])
 
         reply = {'ok': 1}
         return reply
