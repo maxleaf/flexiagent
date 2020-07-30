@@ -413,10 +413,11 @@ class FwRouterCfg:
         # Now dump local configuration in order of 'remove-X' list
         #
         add_order       = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        remove_order    = add_order.reverse()
+        remove_order    = add_order[::-1]  # Reverse with no modification of source list :)
         output_requests = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
 
-        same_requests = {}   # Exactly same configuration items, no need to add/remove/modify
+        same_requests = {}            # Exactly same configuration items, no need to add/remove/modify
+        remove_request_indexes = []   # Indexes of requests in output list that should be removed
 
         # Now go over dumped requests and remove those that present in the input
         # list and that have same parameters. They correspond to configuration
@@ -433,12 +434,12 @@ class FwRouterCfg:
                 input_params  = input_requests[dumped_key].get('params')
                 if dumped_params == input_params:
                     # Exactly same configuration item should be removed from
-                    # output list. It should be neither removed nor add nor modified.
+                    # output list. It should be neither removed nor added nor modified.
                     # As well note it aside, so it will be not added later, when
                     # 'add-X' from input list that stands for new items
                     # will be added to the output list.
                     #
-                    del output_requests[idx]
+                    remove_request_indexes.append(idx)  # Can't delete from list, while iterating over it, so store it for now
                     same_requests[dumped_key] = None
                 else:
                     # The modified configuration item should stay in both
@@ -451,7 +452,14 @@ class FwRouterCfg:
                 # The configuration item does not present in the input list.
                 # So it stands for item to be removed.
                 #
-                request['message'] = request['message'].replace('add-', 'remove-')
+                if request['message'] == 'start-router':
+                    remove_request_indexes.append(idx)
+                else:
+                    request['message'] = request['message'].replace('add-', 'remove-')
+
+        for idx in remove_request_indexes[::-1]:
+            del output_requests[idx]
+
 
         # At this point the input list includes 'add-X' requests that stand
         # for new or for modified configuration items.
