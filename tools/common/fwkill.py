@@ -26,7 +26,8 @@
 # -> systemctl stop vpp
 # -> systemctl stop frr
 # -> unbinds network interfaces
-# -> reverts netplan files
+# -> reverts netplan config files
+# -> reverts VPP startup config file
 
 import os
 import sys
@@ -41,12 +42,15 @@ import fwnetplan
 def stop_agent():
     os.system('systemctl stop flexiwan-router')
 
+
 def main():
     """Entry point.
     """
     stop_agent()
     fwutils.stop_router()
     fwnetplan.delete_netplan_files()
+    fwutils.vpp_startup_conf_remove_nat({'vpp_config_filename': fwglobals.g.VPP_CONFIG_FILE})
+
 
 if __name__ == '__main__':
     main()
