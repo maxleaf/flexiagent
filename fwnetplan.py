@@ -42,13 +42,13 @@ def _backup_netplan_files():
             shutil.copyfile(fname, fname_backup)
             shutil.move(fname, fname_run)
 
-def _delete_netplan_files():
+def delete_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
             glob.glob("/lib/netplan/*.fwrun.yaml") + \
             glob.glob("/run/netplan/*.fwrun.yaml")
 
     for fname in files:
-        fwglobals.log.debug('_delete_netplan_files: %s' % fname)
+        fwglobals.log.debug('delete_netplan_files: %s' % fname)
         fname_run = fname
         fname = fname_run.replace('fwrun.yaml', 'yaml')
         fname_backup = fname + '.fw_run_orig'
@@ -67,7 +67,7 @@ def add_del_netplan_files(params):
     if is_add:
         _backup_netplan_files()
     else:
-        _delete_netplan_files()
+        delete_netplan_files()
 
     return (True, None)
 
