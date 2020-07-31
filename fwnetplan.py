@@ -48,7 +48,6 @@ def delete_netplan_files():
             glob.glob("/run/netplan/*.fwrun.yaml")
 
     for fname in files:
-        fwglobals.log.debug('delete_netplan_files: %s' % fname)
         fname_run = fname
         fname = fname_run.replace('fwrun.yaml', 'yaml')
         fname_backup = fname + '.fw_run_orig'
@@ -59,7 +58,6 @@ def delete_netplan_files():
 
     if files:
         cmd = 'netplan apply'
-        fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
 
 def add_del_netplan_files(params):

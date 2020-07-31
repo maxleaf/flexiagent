@@ -38,6 +38,8 @@ import fwglobals
 import fwutils
 import fwnetplan
 
+VPP_CONFIG_FILE = '/etc/vpp/startup.conf'
+
 
 def stop_agent():
     os.system('systemctl stop flexiwan-router')
@@ -49,7 +51,7 @@ def main():
     stop_agent()
     fwutils.stop_router()
     fwnetplan.delete_netplan_files()
-    fwutils.vpp_startup_conf_remove_nat({'vpp_config_filename': fwglobals.g.VPP_CONFIG_FILE})
+    fwutils.vpp_startup_conf_remove_nat({'vpp_config_filename': VPP_CONFIG_FILE})
 
 
 if __name__ == '__main__':
