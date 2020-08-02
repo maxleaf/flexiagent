@@ -324,6 +324,8 @@ class FWAGENT_API:
         # If that fails, go with full sync - reset configuration and apply sync-device list
         #
         try:
+            fwglobals.log.debug("FWAGENT_API: _sync_device: start smart sync")
+
             # Stop router if needed
             if restart_router:
                 reply = fwglobals.g.router_api.call({'message':'stop-router'})
@@ -347,6 +349,7 @@ class FWAGENT_API:
                     raise Exception(" _sync_device: start-router failed: " + str(reply.get('message')))
 
             smart_sync_failed = False
+            fwglobals.log.debug("FWAGENT_API: _sync_device: start smart succeeded")
 
         except Exception as e:
             fwglobals.log.error("FWAGENT_API: _sync_device: smart sync failed: %s" % str(e))
