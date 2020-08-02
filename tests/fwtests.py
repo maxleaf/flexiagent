@@ -36,11 +36,7 @@ class TestFwagent:
     def __init__(self):
         code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
-
-        get_log_time_cmd = 'tail -1 /var/log/flexiwan/agent.log | cut -d" " -f1,2,3'
-        out = subprocess.check_output(get_log_time_cmd, shell=True).strip()
-        self.log_time_format = "%b %d %H:%M:%S"  # Jul 29 15:57:19 localhost fwagent: ...
-        self.log_start_time = datetime.datetime.strptime(out, self.log_time_format)
+        self.log_start_time = get_log_time()
 
     def __enter__(self):
         self.clean()
@@ -117,18 +113,20 @@ class TestFwagent:
     def grep_log(self, pattern, print_findings=True):
         found = []
         grep_cmd = "sudo egrep '%s' /var/log/flexiwan/agent.log" % pattern
-        out = subprocess.check_output(grep_cmd, shell=True)
-        if out:
-            lines = out.splitlines()
-            for line in lines:
-                # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
-                line_time  = ' '.join(line.split()[0:3])
-                line_time = datetime.datetime.strptime(line_time, self.log_time_format)
-                if line_time > self.log_start_time:
-                    found.append(line)
-            if found and print_findings:
-                for line in found:
-                    print('FwTest:grep_log(%s): %s' % (pattern, line))
+        try:
+            out = subprocess.check_output(grep_cmd, shell=True)
+            if out:
+                lines = out.splitlines()
+                for line in lines:
+                    # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
+                    line_time = get_log_line_time(line)
+                    if line_time > self.log_start_time:
+                        found.append(line)
+                if found and print_findings:
+                    for line in found:
+                        print('FwTest:grep_log(%s): %s' % (pattern, line))
+        except subprocess.CalledProcessError:
+            pass   # 'egrep' returns failure on no match!
         return found
 
 
@@ -145,7 +143,7 @@ def vpp_pid():
 
 def fwagent_daemon_pid():
     try:
-        cmd = "ps -ef | grep 'fwagent daemon' | grep -v grep | tr -s ' ' | cut -d ' ' -f2"
+        cmd = "ps -ef | egrep 'fwagent.* daemon' | grep -v grep | tr -s ' ' | cut -d ' ' -f2"
         pid = subprocess.check_output(cmd, shell=True)
     except:
         pid = None
@@ -243,6 +241,31 @@ def wait_vpp_to_start(timeout=1000000):
     return True
 
 def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
+    '''Fetches configuration items from the running vpp according the list of
+    configuration item types provided within the 'cfg_to_check' argument,
+    and compares the number of fetched items to the number of items specified
+    in the 'cfg_to_check'. For example, the 'cfg_to_check' can specify
+    3 interfaces and 2 tunnels. In this case this function will ensure that
+    vpp runs and it has 3 interfaces in UP state and 2 tunnels.
+    If no expected configuration was found, the function sleeps 1 seconds and
+    retries. This is until 'timeout' seconds elapses. Then if still no expected
+    configuration was found, the False is returned.
+
+    :param cfg_to_check: list of configuration items, e.g. [('interfaces",3), ('tunnels",2)]
+                    OR
+                    name of JSON file with configuration, e.g. {"interfaces":3, "tunnels":2}
+    :param timeout: how much seconds wait for VPP to start and to get
+                    to the expected configuration.
+
+    :returns: True on success, False if VPP has no expected configuration.
+    '''
+    # If 'cfg_to_check' is a file, convert it into list of tuples.
+    #
+    if type(cfg_to_check) == str:
+        with open(cfg_to_check) as json_file:
+            cfg = json.load(json_file)
+            cfg_to_check = [ (key, cfg[key]) for key in cfg ]
+
     to = timeout
     configured = vpp_is_configured(cfg_to_check, print_error=False)
     while not configured and timeout > 0:
@@ -296,3 +319,20 @@ def router_is_configured(expected_cfg_dump_filename,
     elif print_error:
         print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
     return ok
+
+def get_log_time(log='/var/log/flexiwan/agent.log'):
+    out = subprocess.check_output(['tail','-1','/var/log/flexiwan/agent.log'])
+    if not out:
+        out = "Jan 01 00:00:01"
+    return get_log_line_time(out)
+
+def get_log_line_time(log_line):
+    # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
+    tokens = log_line.split()[0:3]
+    if len(tokens[1]) == 1:  # Add zero padding to single digit day of month
+        log_time = "%s 0%s %s" % (tokens[0], tokens[1], tokens[2])
+    else:
+        log_time = "%s %s %s" % (tokens[0], tokens[1], tokens[2])
+    return datetime.datetime.strptime(log_time, '%b %d %H:%M:%S')
+
+

@@ -294,7 +294,8 @@ class FWAGENT_API:
         if not sync_list:
             fwglobals.log.info("FWAGENT_API: _sync_device: sync_list is empty, no need to sync")
             fwglobals.g.router_cfg.reset_signature()
-            return {'ok': 1}
+            if params.get('type', '') != 'full-sync':
+                return {'ok': 1}   # Return if there is no full sync enforcement
 
         # Find out if sync goes to remove or to add new interfaces.
         # In this case the vpp should be restarted in order to release/capture
@@ -320,7 +321,7 @@ class FWAGENT_API:
 
         # Finally update configuration.
         # Firstly try smart sync - apply sync-list modifications only.
-        # If that fails, go with brutal sync - reset configuration and apply sync-device list
+        # If that fails, go with full sync - reset configuration and apply sync-device list
         #
         try:
             # Stop router if needed
@@ -345,18 +346,27 @@ class FWAGENT_API:
                 if reply['ok'] == 0:
                     raise Exception(" _sync_device: start-router failed: " + str(reply.get('message')))
 
+            smart_sync_failed = False
+
         except Exception as e:
             fwglobals.log.error("FWAGENT_API: _sync_device: smart sync failed: %s" % str(e))
+            smart_sync_failed = True
+
+        # Perform full sync if smart sync failed or if full sync is enforced
+        # by special attribute in 'sync-device' request.
+        #
+        if smart_sync_failed or params.get('type', '') == 'full-sync':
+            fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
             self._reset_device_soft()
             for request in params['requests']:
                 reply = fwglobals.g.router_api.call(request)
                 if reply['ok'] == 0:
                     error = request['message'] + ': ' + str(reply.get('message'))
-                    fwglobals.log.error("FWAGENT_API: _sync_device: brutal sync failed: %s" % error)
+                    fwglobals.log.error("FWAGENT_API: _sync_device: full sync failed: %s" % error)
                     raise Exception(error)
             if restart_router_after_reset:
                 fwglobals.g.router_api.call({'message':'start-router'})
-            fwglobals.log.debug("FWAGENT_API: _sync_device: brutal sync succeeded")
+            fwglobals.log.debug("FWAGENT_API: _sync_device: full sync succeeded")
 
         fwglobals.g.router_cfg.reset_signature()
         fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
