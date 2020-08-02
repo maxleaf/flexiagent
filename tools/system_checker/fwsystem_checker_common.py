@@ -34,7 +34,7 @@ import shutil
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
-import fwtool_vpp_startupconf_dict
+from fw_vpp_startupconf import FwStartupConf, L, T
 
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
@@ -60,7 +60,8 @@ class Checker:
         self.nameservers            = None
         self.detected_nics          = None
         self.supported_nics         = None
-        self.vpp_configuration      = fwtool_vpp_startupconf_dict.load(self.CFG_VPP_CONF_FILE)
+        self.fw_ac_db               = FwStartupConf()
+        self.vpp_configuration      = L(self.fw_ac_db.load(self.CFG_VPP_CONF_FILE))
         self.vpp_config_modified    = False
         self.update_grub            = False
 
@@ -70,7 +71,7 @@ class Checker:
 
     def save_config (self):
         if self.vpp_config_modified:
-            fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
+            self.fw_ac_db.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
             self.update_grub_file()
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
 
@@ -83,7 +84,7 @@ class Checker:
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         if self.vpp_config_modified:
-            fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
+            self.fw_ac_db.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
 
     def hard_check_sse42(self, supported):
         """Check SSE 4.2 support.
@@ -777,12 +778,14 @@ class Checker:
         buffers = 16384  # Set default
         conf    = self.vpp_configuration
         conf_param = None
-        if conf and conf.get('dpdk'):
-            for param in conf['dpdk']:
-                if 'num-mbufs' in param:
-                    buffers = int(param.split(' ')[1])
-                    conf_param = param
-                    break
+        if conf and conf['dpdk']:
+            key = self.fw_ac_db.get_element(conf['dpdk'], 'num-mbufs')
+            if key:
+                tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'], key)
+                if tup:
+                    buffers = int(tup[0].split(' ')[1])
+                    conf_param = tup[0]
+
         old = buffers
         while True:
             str_buffers = raw_input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
@@ -798,17 +801,20 @@ class Checker:
             return True     # No need to update
 
         if conf_param:
-            conf['dpdk'].remove(conf_param)
-            conf_param = 'num-mbufs %d' % buffers
-            conf['dpdk'].append(conf_param)
+            self.fw_ac_db.remove_element(conf['dpdk'], conf_param)
+            conf_param = 'num-mbufs %d' % (buffers)
+            tup = self.fw_ac_db.create_element(conf_param)
+            conf['dpdk'].append(tup)
             self.vpp_config_modified = True
             return True
 
         if not conf:
-            conf = {}
-        if conf.get('dpdk') is None:
-            conf['dpdk'] = []
-        conf['dpdk'].append({ 'num-mbufs' : buffers })
+            conf = L([])
+        if conf['dpdk'] is None:
+            tup = self.fw_ac_db.create_element('dpdk')
+            conf.append(tup)
+        
+        conf['dpdk'].append(self.fw_ac_db.create_element('num-mbufs %d' %(buffers)))
         self.vpp_config_modified = True
         return True
 
@@ -865,36 +871,42 @@ class Checker:
 
         # if configuration files does not exist, create it, and create the 'cpu' and 'dpdk' sections.
         if not conf:
-            conf = {}
-        if conf.get('cpu') is None:
-            conf['cpu'] = []
-            conf['cpu'].append('main-core 0')
+            conf = L([])
+        tup = self.fw_ac_db.get_tuple_from_key(conf, 'cpu')
+        if tup == None:
+            tup = self.fw_ac_db.create_element('cpu')
+            conf.append(tup)
+            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0')) 
             if input_cores == 0:
-                conf['cpu'].append('corelist-workers 0')
+                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 0'))
             elif input_cores == 1:
-                conf['cpu'].append('corelist-workers 1')
+                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1'))
             else:
-                conf['cpu'].append('corelist-workers 1-%d' % (input_cores))
-            conf['cpu'].append('workers %d' % (input_cores))
+                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1-%d' % (input_cores)))
+            conf['cpu'].append(self.fw_ac_db.create_element('workers %d' % (input_cores)))
             self.vpp_config_modified = True
    
-        if conf.get('dpdk') is None:
-            conf['dpdk'] = []
-            self._add_dict_to_dpdk(input_cores)
+        if conf['dpdk']is None:
+            conf.append(self.fw_ac_db.create_element('dpdk'))
+            self._add_tup_to_dpdk(input_cores)
             self.vpp_config_modified = True
             self.update_grub = True
             return True
 
         # configuration file exist    
-        if conf and conf.get('cpu'):
-            for param in conf['cpu']:
-                if 'main-core' in param:
-                    main_core_param = param
+        if conf and conf['cpu']:
+            string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
+            if string:
+                tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+                if tup_main_core:
+                    main_core_param = tup_main_core[0]
                     main_core_param_val = int(main_core_param.split(' ')[1])
                     
-            for param in conf['cpu']:
-                if 'corelist-workers' in param:
-                    corelist_worker_param = param
+            string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
+            if string:
+                tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+                if tup_core_list:
+                    corelist_worker_param = tup_core_list[0]
                     corelist_worker_param_val = corelist_worker_param.split(' ')[1]
                     if corelist_worker_param_val.isdigit():
                         corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
@@ -902,20 +914,19 @@ class Checker:
                         corelist_worker_param_nim_val = int(corelist_worker_param_val.split('-')[0])
                         corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
 
-            for param in conf['cpu']:
-                if 'workers' == param[0:7]:
-                    workers_param = param
-                    workers_param_val = int(workers_param.split(' ')[1])
+            tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],'workers %s' %(corelist_worker_param_max_val))
+            if tup_workers:
+                workers_param = tup_workers[0]
+                workers_param_val = int(workers_param.split(' ')[1])
  
-        if conf and conf['dpdk']:
-            for element in conf['dpdk']:
-                if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                    for key in element.keys():
-                        if key == dev_default_key:
-                            for element2 in element[dev_default_key]:
-                                if 'num-rx-queues' in element2:
-                                    num_of_rx_queues_param = element2
-                                    num_of_rx_queues_param_val = int(num_of_rx_queues_param.split(' ')[1])
+        if conf and conf['dpdk'] and conf['dpdk'][dev_default_key]:
+            lst = conf['dpdk'][dev_default_key]
+            string = self.fw_ac_db.get_element(lst,'num-rx-queues')
+            if string:
+                tup_num_rx = self.fw_ac_db.get_tuple_from_key(lst, string)
+                if tup_num_rx:
+                    num_of_rx_queues_param = tup_num_rx[0]
+                    num_of_rx_queues_param_val = int(num_of_rx_queues_param.split(' ')[1])
 
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
@@ -926,114 +937,108 @@ class Checker:
         # in case no multi core requested
         if input_cores == 0:
             if main_core_param:
-                conf['cpu'].remove(main_core_param)
-                main_core_param = 'main-core 0'
-                conf['cpu'].append(main_core_param)
+                self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
+            main_core_param = 'main-core 0'
+            conf['cpu'].append(self.fw_ac_db.create_element(main_core_param))
+            
             if corelist_worker_param:
-                conf['cpu'].remove(corelist_worker_param)
-                corelist_worker_param = 'corelist-workers 0' 
-                conf['cpu'].append(corelist_worker_param)
+                self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
+            corelist_worker_param = 'corelist-workers 0' 
+            conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
+            
             if workers_param:
-                conf['cpu'].remove(workers_param)
-                workers_param = 'workers 0'
-                conf['cpu'].append(workers_param)
+                self.fw_ac_db.remove_element(conf['cpu'], workers_param)
+            workers_param = 'workers 0'
+            conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
 
             if num_of_rx_queues_param:
-                for element in conf['dpdk']:
-                    if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                        for key in element.keys():
-                            if key == dev_default_key:
-                                if num_of_rx_queues_param in element[dev_default_key]:
-                                    element[dev_default_key].remove(num_of_rx_queues_param)
-                                    num_of_rx_queues_param = 'num-rx-queues 0'
-                                    element[dev_default_key].append(num_of_rx_queues_param)   
+                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
+            num_of_rx_queues_param = 'num-rx-queues 0'
+            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
+
             self.vpp_config_modified = True
             self.update_grub = True
             return True 
 
         # in case multi core configured
         if input_cores != 0:
+            new_main_core_param = 'main-core 0'
             if main_core_param:
                 if main_core_param_val != 0:
-                    conf['cpu'].remove(main_core_param)
-                    main_core_param = 'main-core 0'
-                    conf['cpu'].append(main_core_param)
+                    self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
+                    conf['cpu'].append(self.fw_ac_db.create_element(new_main_core_param))
                     self.vpp_config_modified = True
-        
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element(new_main_core_param))
+                self.vpp_config_modified = True
+
+            if input_cores == 1:
+                new_corelist_worker_param = 'corelist-workers 1'
+            else:
+                new_corelist_worker_param = 'corelist-workers 1-%d' % (input_cores)
             if corelist_worker_param:
                 if corelist_worker_param_nim_val != 1 or corelist_worker_param_max_val != input_cores:
-                    conf['cpu'].remove(corelist_worker_param)
-                    if input_cores == 1:
-                        corelist_worker_param = 'corelist-workers 1'
-                    else:
-                        corelist_worker_param = 'corelist-workers 1-%d' % (input_cores)
-                    conf['cpu'].append(corelist_worker_param)
+                    self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
+                    conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
                     self.vpp_config_modified = True
- 
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
+                self.vpp_config_modified = True
+
+            new_workers_param = 'workers %d' % (input_cores)
             if workers_param:
                 if workers_param_val != input_cores:
-                    conf['cpu'].remove(workers_param)
-                    workers_param = 'workers %d' % (input_cores)
-                    conf['cpu'].append(workers_param)
+                    self.fw_ac_db.remove_element(conf['cpu'], workers_param)
+                    conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
                     self.vpp_config_modified = True
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
+                self.vpp_config_modified = True
+
  
             if num_of_rx_queues_param_val != input_cores:
-                if conf.get('dpdk'):
-                    elem_exist = False
-                    for element in conf['dpdk']:
-                        if str(type(element)) == "<class 'ruamel.yaml.comments.CommentedMap'>":
-                            for key in element.keys():
-                                if key == dev_default_key:
-                                    elem_exist = True   
-                                    if num_of_rx_queues_param in element[dev_default_key]:
-                                        element[dev_default_key].remove(num_of_rx_queues_param)
-                                        num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
-                                        element[dev_default_key].append(num_of_rx_queues_param)
-                                        self.vpp_config_modified = True   
-                    if elem_exist == False:
-                        self._add_dict_to_dpdk(input_cores)
+                if conf['dpdk']:
+                    if conf['dpdk'][dev_default_key]:
+                        new_num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
+                        string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key], 'num-rx-queues')
+                        if string:
+                            tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
+                            if tup:
+                                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], string)
+                            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
+                    else:
+                        self._add_tup_to_dpdk(input_cores)
                         self.vpp_config_modified = True 
 
             if self.vpp_config_modified == True:
                 self.update_grub = True
             return True
 
-    def _add_dict_to_dpdk(self, num_of_cores):
-        """ The configuration file is "translated" to a kind of yaml file.
-        conf is the main dictioanry, containing key:value elements.
-        dpdk is a key in this dictionary, with a list as a value.
-        One of the elements of this list is an un-named sub-dictionary.
-        it also contains key:value elements.
-        One of it's keys is 'dev default', which is a key to a list.
-        This list contains string values, such as 'num-rx-queues some_value'
-
-        So, the function checks if the 'dpdk' list contains a dictionary.
-        If not, it creates it, and add the list 'dev default' with one value of
-        'num-rx-queues %num_of_cores'
+    def _add_tup_to_dpdk(self, num_of_cores):
+        """ 
+        adds 'def default' tuple to 'dpdk' and sets 'num-rx-queue' value
 
         :param num_of_cores:  num of cores to handle incoming traffic
 
         :returns True
         """
         # This function does the following:
-        # 1. create a new sub directory in 'dpdk'
+        # 1. create a new sub tuple in 'dpdk'
         # 2. populated it with num-rx-queues %value
         cfg = self.vpp_configuration
         dev_default_key = 'dev default'
         elem_exist = False
-        for element in cfg['dpdk']:
-            if str(type(element)) == "<type 'class ruamel.yaml.comments.CommentedMap'>":
-                for key in element.keys():
-                    if key == dev_default_key:
-                        elem_exist = True
-                        element[dev_default_key].append('num-rx-queues %d' % (num_of_cores))
-                        break
+        string = self.fw_ac_db.get_element(cfg['dpdk'], dev_default_key)
+        if string:
+            tup = self.fw_ac_db.get_tuple_from_key(string)
+            if tup:
+                elem_exist = True
+                tup.append(self.fw_ac_db.create_element('num-rx-queues %d' % (num_of_cores)))
 
         if elem_exist == False:
-            cfg['dpdk'].append({})
-            element = cfg['dpdk'][len(cfg['dpdk'])-1]
-            element[dev_default_key] = []
-            element[dev_default_key].append('num-rx-queues %d' % (num_of_cores))
+            tup = self.fw_ac_db.create_element(dev_default_key)
+            cfg['dpdk'].append(tup)
+            cfg['dpdk'][dev_default_key].append(self.fw_ac_db.create_element('num-rx-queues %d' % (num_of_cores)))
 
         return True
 
@@ -1059,12 +1064,13 @@ class Checker:
         usec            = 0
         conf            = self.vpp_configuration
         conf_param      = None
-        if conf and conf.get('unix'):
-            for param in conf['unix']:
-                if 'poll-sleep-usec' in param:
-                    usec = int(param.split(' ')[1])
-                    conf_param = param
-                    break
+        if conf and conf['unix']:
+            string = self.fw_ac_db.get_element(conf['unix'], 'poll-sleep-usec')
+            if string:
+                tup = self.fw_ac_db.get_tuple_from_key(conf['unix'],string)
+                if tup:
+                    usec = int(tup[0].split(' ')[1])
+                    conf_param = tup[0]
 
         while True:
             str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")        
@@ -1080,30 +1086,26 @@ class Checker:
         if enable_ps_mode == True:
             if usec == usec_rest:
                 return True   #nothing to do    
-
-            if conf_param:
-                conf['unix'].remove(conf_param)
-                conf_param = 'poll-sleep-usec %d' % usec_rest
-                conf['unix'].append(conf_param)
-                self.vpp_config_modified = True
             else:
+                if conf_param:
+                    self.fw_ac_db.remove_element(conf['unix'], conf_param)
                 conf_param = 'poll-sleep-usec %d' % usec_rest
-                conf['unix'].append(conf_param)
+                conf['unix'].append(self.fw_ac_db.create_element(conf_param))
                 self.vpp_config_modified = True
+                return True
 
-            return True
-
+        if enable_ps_mode == True:
             if not conf:
-                conf = {}
-            if conf.get('unix') is None:
-                conf['unix'] = []
-            conf['unix'].append({ 'poll-sleep-usec' : usec_rest })
+                conf = L([])
+            if conf['unix'] is None:
+                tup = self.fw_ac_db.create_element(conf,'unix')
+                tup.append(self.fw_ac_db.create_elemen('poll-sleep-usec %d' %(usec_rest)))
             self.vpp_config_modified = True
             return True
 
         if enable_ps_mode == False:
             if conf_param:
-                conf['unix'].remove(conf_param)
+                self.fw_ac_db.remove_element(conf['unix'], conf_param)
                 self.vpp_config_modified = True
                 return True
 
