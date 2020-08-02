@@ -73,6 +73,12 @@ def test():
                                             expected_dump_cfg[idx], fwagent_py=agent.fwagent_py)
             assert router_configured
 
+            # Ensure no errors in log
+            #
+            lines = agent.grep_log('error: ')
+            assert len(lines) == 0, "errors found in log: %s" % '\n'.join(lines)
+
+
         # Ensure smart and full sync are noted in log
         #
         lines = agent.grep_log('smart sync', print_findings=False)
@@ -80,10 +86,16 @@ def test():
         lines = agent.grep_log('full sync', print_findings=False)
         assert len(lines) > 0, "log has no mention of full sync: %s" % '\n'.join(lines)
 
-        # Ensure no errors in log
+        # Ensure that VPP was restarted twice during test.
+        # In this case the log should have three following lines:
+        #     Aug  2 06:13:03 localhost fwagent: router was started: vpp_pid=...
+        # The 1st - for start with initial configuration
+        # The 2nd - for start after smart sync
+        # The 3rd - for start after full sync
         #
-        lines = agent.grep_log('error: ')
-        assert len(lines) == 0, "errors found in log: %s" % '\n'.join(lines)
+        lines = agent.grep_log('router was started: vpp_pid=', print_findings=False)
+        assert len(lines) == 3, "log has not expected number of VPP starts (expected 3): %d:%s" % \
+                                (len(lines), '\n'.join(lines))
 
         # Ensure that the configuration database signature was reset as a result of 'sync-device'
         #

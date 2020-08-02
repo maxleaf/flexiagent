@@ -222,14 +222,16 @@ class FwRouterCfg:
         :param escape: list of types of configuration requests that should be escaped while dumping
         :param full:   return requests together with translated commands.
         """
-        sections = {
-            'start-router':         "======== START COMMAND =======",
-            'add-interface':        "========== INTERFACES ========",
-            'add-route':            "============ ROUTES ==========",
-            'add-tunnel':           "============ TUNNELS =========",
-            'add-dhcp-config':      "========= DHCP CONFIG ========",
-            'add-application':      "========= APPLICATIONS =======",
-            'add-multilink-policy': "=========== POLICIES ========="
+        sections = {                # Use stairway to ensure section order in
+                                    # output string created by json.dumps()
+                                    #
+            'start-router':         "======= START COMMAND =======",
+            'add-interface':        "======== INTERFACES ========",
+            'add-route':            "========= ROUTES =========",
+            'add-tunnel':           "========== TUNNELS ==========",
+            'add-dhcp-config':      "=========== DHCP CONFIG ===========",
+            'add-application':      "============ APPLICATIONS ============",
+            'add-multilink-policy': "============= POLICIES ============="
         }
 
         out = {}
@@ -254,7 +256,7 @@ class FwRouterCfg:
             out[section_name].append(item)
         if not out:
             return ''
-        return json.dumps(out, indent=2)
+        return json.dumps(out, indent=2, sort_keys=True)
 
     def _get_requests(self, req):
         """Retrives list of configuration requests parameters for requests with
