@@ -650,6 +650,7 @@ def stop(reset_router_config, stop_router):
             return
         else:
             # if daemon runs, stop connection loop, stop vpp
+            # and continue to fwutils.stop_router
             daemon_rpc('stop', stop_vpp=True)
     except:
         # Continue and stop vpp from shell and get interfaces back to Linux

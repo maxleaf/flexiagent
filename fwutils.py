@@ -765,7 +765,7 @@ def gre_sub_file(fname):
         if k and v: tres["ipsec-gre-"+k] = "ipsec-gre" + v
     return _sub_file(fname, tres)
 
-def kill_router():
+def stop_router():
     """Stop VPP and rebind Linux interfaces.
 
      :returns: Error message and status code.

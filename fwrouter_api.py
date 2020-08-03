@@ -747,7 +747,7 @@ class FWROUTER_API:
         except Exception as e:
             err_str = "_stop_router: failed to stop gracefully: %s, %s" % (str(e), traceback.format_exc())
             fwglobals.log.excep(err_str)
-            fwutils.kill_router()
+            fwutils.stop_router()
             self._set_router_failure("failed to stop router gracefully")
             raise e
 
@@ -996,7 +996,7 @@ class FWROUTER_API:
                         f.write(err_str)
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
-            fwutils.kill_router()
+            fwutils.stop_router()
 
     def _unset_router_failure(self):
         """Unset router failure state.
