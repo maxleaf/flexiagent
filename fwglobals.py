@@ -113,7 +113,7 @@ request_handlers = {
     'gresub':                       '_call_os_api',
     'ifcount':                      '_call_os_api',
     'ifstats':                      '_call_os_api',
-    'stop_router':                  '_call_os_api',
+    'kill_router':                  '_call_os_api',
     'connect_to_router':            '_call_os_api',
     'disconnect_from_router':       '_call_os_api',
 
