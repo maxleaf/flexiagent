@@ -325,6 +325,8 @@ class FWAGENT_API:
         #
         try:
             fwglobals.log.debug("FWAGENT_API: _sync_device: start smart sync")
+            fwglobals.log.debug("FWAGENT_API: _sync_device: sync-list: %s" % \
+                                json.dumps(sync_list, indent=2, sort_keys=True))
 
             # Stop router if needed
             if restart_router:

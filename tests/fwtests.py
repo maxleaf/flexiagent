@@ -329,6 +329,8 @@ def get_log_time(log='/var/log/flexiwan/agent.log'):
 def get_log_line_time(log_line):
     # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
     tokens = log_line.split()[0:3]
+    if not tokens:
+        tokens = ["Jan", "01", "00:00:01"]
     if len(tokens[1]) == 1:  # Add zero padding to single digit day of month
         log_time = "%s 0%s %s" % (tokens[0], tokens[1], tokens[2])
     else:
