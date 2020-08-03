@@ -448,7 +448,7 @@ class Checker:
 
         return True
 
-    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
+    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=None):
         """Check if default routes have duplicate metrics.
 
         :param fix:             Fix problem.
@@ -492,6 +492,7 @@ class Checker:
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
+        return True
 
 
     def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):

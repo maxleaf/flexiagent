@@ -30,6 +30,7 @@ import yaml
 import json
 import subprocess
 
+import fwagent
 import fwglobals
 import fwutils
 import fwnetplan
@@ -99,10 +100,10 @@ class FWROUTER_API:
     def finalize(self):
         """Destructor method
         """
+        self.router_started = False
+        self._stop_threads()   # IMPORTANT! Stop threads before other components finalization.
         self.vpp_api.finalize()
         self.db_requests.finalize()
-        self.router_started = False
-        self._stop_threads()
 
     def watchdog(self):
         """Watchdog thread.
@@ -143,19 +144,20 @@ class FWROUTER_API:
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        time.sleep(10)  # 10 sec
         while self.router_started:
             time.sleep(1)  # 1 sec
             apply_netplan = False
             wan_list = self.get_wan_interface_addr_pci()
 
             for wan in wan_list:
-                if wan['dhcp'] == 'no':
+                dhcp = wan.get('dhcp', 'no')
+                if dhcp == 'no':
                     continue
 
                 name = fwutils.pci_to_tap(wan['pci'])
                 addr = fwutils.get_interface_address(name)
                 if not addr:
+                    fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                     apply_netplan = True
 
             if apply_netplan:
@@ -163,6 +165,9 @@ class FWROUTER_API:
                     cmd = 'netplan apply'
                     fwglobals.log.debug(cmd)
                     subprocess.check_output(cmd, shell=True)
+                    fwglobals.g.fwagent.disconnect()
+                    time.sleep(10)  # 10 sec
+
                 except Exception as e:
                     fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
 
@@ -581,28 +586,30 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === end execution of %s (key=%s) ===" % (req, req_key))
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
-        """Revert commands.
-
-        :param cmd_list:            Commands list.
-        :param idx_failed_cmd:      The last command index to be reverted.
-
+        """Revert list commands that are previous to the failed command with
+        index 'idx_failed_cmd'.
+        :param cmd_list:        Commands list.
+        :param idx_failed_cmd:  The index of command, execution of which
+                                failed, so all commands in list before it
+                                should be reverted.
         :returns: None.
         """
-        if idx_failed_cmd != 0:
-            for t in reversed(cmd_list[0:idx_failed_cmd]):
-                if 'revert' in t:
-                    rev_cmd = t['revert']
-                    try:
-                        reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
-                        if reply['ok'] == 0:
-                            err_str = "handle_request(%s) failed" % rev_cmd['name']
-                            fwglobals.log.error(err_str)
-                            raise Exception(err_str)
-                    except Exception as e:
-                        err_str = "_revert: exception while '%s': %s(%s): %s" % \
-                                    (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
-                        fwglobals.log.excep(err_str)
-                        self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
+        idx_failed_cmd = idx_failed_cmd if idx_failed_cmd >= 0 else len(cmd_list)
+
+        for t in reversed(cmd_list[0:idx_failed_cmd]):
+            if 'revert' in t:
+                rev_cmd = t['revert']
+                try:
+                    reply = fwglobals.g.handle_request(rev_cmd['name'], rev_cmd.get('params'))
+                    if reply['ok'] == 0:
+                        err_str = "handle_request(%s) failed" % rev_cmd['name']
+                        fwglobals.log.error(err_str)
+                        raise Exception(err_str)
+                except Exception as e:
+                    err_str = "_revert: exception while '%s': %s(%s): %s" % \
+                                (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
+                    fwglobals.log.excep(err_str)
+                    self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
 
 
     def _update_db_requests(self, complement, req_key, request, params, cmd_list, executed=True):
@@ -669,6 +676,11 @@ class FWROUTER_API:
         # cleanup of globals in tunnels
         fwtranslate_add_tunnel.init_tunnels()
 
+        # Reset failure state before start- hopefully we will succeed.
+        # On no luck the start will set failure again
+        #
+        self._unset_router_failure()
+
         # 'start-router' preprocessing:
         # the 'start-router' request might include interfaces and routes.
         # For each of them simulate 'add-interface' and 'add-route' request
@@ -707,7 +719,6 @@ class FWROUTER_API:
         # run the watchdog thread, if it doesn't run
         self.router_started = True
         self._start_threads()
-        self._unset_router_failure()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
 
@@ -794,12 +805,6 @@ class FWROUTER_API:
         interfaces = []
         should_restart_router = False
 
-        # First, create a list of remove-tunnel requests to remove
-        # all tunnels that are connected to the modified interfaces.
-        # These tunnels must be removed before modifying the interface
-        # and will be added back (if needed) via a message from the MGMT.
-        if 'modify_interfaces' in params or 'modify_router' in params:
-            requests += self._create_remove_tunnels_request(params)
         if 'modify_routes' in params:
             requests += self._create_modify_routes_request(params['modify_routes'])
         if 'modify_interfaces' in params:
@@ -1233,7 +1238,7 @@ class FWROUTER_API:
             if re.search('add-interface', key):
                 if re.match('wan', request['params']['type'], re.IGNORECASE):
                     if re.search(ip, request['params']['addr']):
-                        pci = request['params']['pci']
+                        pci = request['params'].get('pci')
                         gw = request['params'].get('gateway')
                         # If gateway not exist in interface configuration, use default
                         # This is needed when upgrading from version 1.1.52 to 1.2.X
@@ -1244,7 +1249,7 @@ class FWROUTER_API:
 
                         else:
                             return pci, gw
-        return None
+        return None, None
 
     def get_wan_interface_addr_pci(self):
         wan_list = []

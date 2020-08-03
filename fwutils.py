@@ -180,12 +180,19 @@ def get_default_route():
     :returns: Default route.
     """
     try:
-        dgw = os.popen('ip route list match default').read()
-        rip = dgw.split('default via ')[1].split(' ')[0]
-        rdev = dgw.split(' dev ')[1].split(' ')[0]
-        return (rip, rdev)
+        output = os.popen('ip route list match default').read()
+        if output:
+            routes = output.splitlines()
+            if routes:
+                route = routes[0]
+                dev_split = route.split('dev ')
+                rdev = dev_split[1].split(' ')[0] if len(dev_split) > 1 else ''
+                rip_split = route.split('via ')
+                rip = rip_split[1].split(' ')[0] if len(rip_split) > 1 else ''
+                return (rip, rdev)
     except:
         return ("", "")
+    return ("", "")
 
 def get_linux_interface_gateway(if_name):
     """Get gateway.
@@ -220,7 +227,7 @@ def get_interface_address(iface):
     """
     interfaces = psutil.net_if_addrs()
     if iface not in interfaces:
-        return None
+        return ''
 
     addresses = interfaces[iface]
     for addr in addresses:
@@ -425,7 +432,7 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
 
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
-    fwglobals.log.debug(traceback.extract_stack())
+    fwglobals.log.debug(str(traceback.extract_stack()))
     return None
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
@@ -533,7 +540,7 @@ def vpp_if_name_to_tap(vpp_if_name):
     if taps is None:
         raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
 
-    pattern = '%s -> ([a-zA-Z0-9]+)' % vpp_if_name
+    pattern = '%s -> ([a-zA-Z0-9_]+)' % vpp_if_name
     match = re.search(pattern, taps)
     if match is None:
         return None

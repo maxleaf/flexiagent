@@ -1,0 +1,26 @@
+network:
+  ethernets:
+    enp0s10:
+      dhcp4: true
+      dhcp4-overrides:
+        route-metric: 100
+    enp0s9:
+      dhcp4: true
+      dhcp4-overrides:
+        route-metric: 200
+    lan:
+      addresses:
+      - 20.20.20.1/24
+      dhcp4: false
+      match:
+        macaddress: 08:00:27:88:33:fd
+      set-name: LAN
+    wan_0:
+      dhcp4: true
+      dhcp4-overrides:
+        route-metric: 0
+      match:
+        macaddress: 08:00:27:5a:18:a5
+      set-name: WAN_0
+  renderer: networkd
+  version: 2
