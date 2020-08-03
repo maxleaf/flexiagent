@@ -18,7 +18,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-# This migration script fix the dhcp and metric configuration for device interfaces
+# This migration script fix the dhcp stop made by mistake on release 1.3.9
 
 import os
 import re
