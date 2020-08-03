@@ -54,33 +54,33 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'get-device-info':              '_call_agent_api',
-    'get-device-stats':             '_call_agent_api',
-    'get-device-logs':              '_call_agent_api',
-    'get-device-packet-traces':     '_call_agent_api',
-    'get-device-os-routes':         '_call_agent_api',
-    'get-router-config':            '_call_agent_api',
-    'upgrade-device-sw':            '_call_agent_api',
-    'reset-device':                 '_call_agent_api',
-    'sync-device':                  '_call_agent_api',
-    'modify-device':                '_call_agent_api',
+    'get-device-info':              {'name': '_call_agent_api'},
+    'get-device-stats':             {'name': '_call_agent_api'},
+    'get-device-logs':              {'name': '_call_agent_api'},
+    'get-device-packet-traces':     {'name': '_call_agent_api'},
+    'get-device-os-routes':         {'name': '_call_agent_api'},
+    'get-router-config':            {'name': '_call_agent_api'},
+    'upgrade-device-sw':            {'name': '_call_agent_api'},
+    'reset-device':                 {'name': '_call_agent_api'},
+    'sync-device':                  {'name': '_call_agent_api'},
+    'modify-device':                {'name': '_call_agent_api', 'sign': True},
 
     # Router API
-    'aggregated-router-api':        '_call_router_api',
-    'start-router':                 '_call_router_api',
-    'stop-router':                  '_call_router_api',
-    'add-interface':                '_call_router_api',
-    'remove-interface':             '_call_router_api',
-    'add-route':                    '_call_router_api',
-    'remove-route':                 '_call_router_api',
-    'add-tunnel':                   '_call_router_api',
-    'remove-tunnel':                '_call_router_api',
-    'add-dhcp-config':              '_call_router_api',
-    'remove-dhcp-config':           '_call_router_api',
-    'add-application':              '_call_router_api',
-    'remove-application':           '_call_router_api',
-    'add-multilink-policy':        '_call_router_api',
-    'remove-multilink-policy':     '_call_router_api',
+    'aggregated-router-api':        {'name': '_call_router_api', 'sign': True},
+    'start-router':                 {'name': '_call_router_api', 'sign': True},
+    'stop-router':                  {'name': '_call_router_api', 'sign': True},
+    'add-interface':                {'name': '_call_router_api', 'sign': True},
+    'remove-interface':             {'name': '_call_router_api', 'sign': True},
+    'add-route':                    {'name': '_call_router_api', 'sign': True},
+    'remove-route':                 {'name': '_call_router_api', 'sign': True},
+    'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
+    'remove-tunnel':                {'name': '_call_router_api', 'sign': True},
+    'add-dhcp-config':              {'name': '_call_router_api', 'sign': True},
+    'remove-dhcp-config':           {'name': '_call_router_api', 'sign': True},
+    'add-application':              {'name': '_call_router_api', 'sign': True},
+    'remove-application':           {'name': '_call_router_api', 'sign': True},
+    'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
+    'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
 
     ##############################################################
     # INTERNAL API-s
@@ -95,48 +95,48 @@ request_handlers = {
     ##############################################################
 
     # OS API
-    'interfaces':                   '_call_os_api',
-    'cpuutil':                      '_call_os_api',
-    'exec':                         '_call_os_api',
-    'savefile':                     '_call_os_api',
-    'pcisub':                       '_call_os_api',
-    'tapsub':                       '_call_os_api',
-    'gresub':                       '_call_os_api',
-    'ifcount':                      '_call_os_api',
-    'ifstats':                      '_call_os_api',
-    'stop_router':                  '_call_os_api',
-    'connect_to_router':            '_call_os_api',
-    'disconnect_from_router':       '_call_os_api',
+    'interfaces':                   {'name': '_call_os_api'},
+    'cpuutil':                      {'name': '_call_os_api'},
+    'exec':                         {'name': '_call_os_api'},
+    'savefile':                     {'name': '_call_os_api'},
+    'pcisub':                       {'name': '_call_os_api'},
+    'tapsub':                       {'name': '_call_os_api'},
+    'gresub':                       {'name': '_call_os_api'},
+    'ifcount':                      {'name': '_call_os_api'},
+    'ifstats':                      {'name': '_call_os_api'},
+    'stop_router':                  {'name': '_call_os_api'},
+    'connect_to_router':            {'name': '_call_os_api'},
+    'disconnect_from_router':       {'name': '_call_os_api'},
 
     # VPP API
-    'abf_itf_attach_add_del':       '_call_vpp_api',
-    'abf_policy_add_del':           '_call_vpp_api',
-    'acl_add_replace':              '_call_vpp_api',
-    'acl_del':                      '_call_vpp_api',
-    'bridge_domain_add_del':        '_call_vpp_api',
-    'create_loopback_instance':     '_call_vpp_api',
-    'delete_loopback':              '_call_vpp_api',
-    'ipsec_gre_add_del_tunnel':     '_call_vpp_api',
-    'ipsec_sad_add_del_entry':      '_call_vpp_api',
-    'ipsec_spd_add_del':            '_call_vpp_api',
-    'ipsec_interface_add_del_spd':  '_call_vpp_api',
-    'ipsec_spd_add_del_entry':      '_call_vpp_api',
-    'l2_flags':                     '_call_vpp_api',
-    'nat44_add_del_interface_addr':             '_call_vpp_api',
-    'nat44_interface_add_del_output_feature':   '_call_vpp_api',
-    'nat44_forwarding_enable_disable':          '_call_vpp_api',
-    'nat44_add_del_identity_mapping':           '_call_vpp_api',
-    'sw_interface_add_del_address': '_call_vpp_api',
-    'sw_interface_set_flags':       '_call_vpp_api',
-    'sw_interface_set_l2_bridge':   '_call_vpp_api',
-    'sw_interface_set_mac_address': '_call_vpp_api',
-    'sw_interface_set_mtu':         '_call_vpp_api',
-    'vmxnet3_create':               '_call_vpp_api',
-    'vmxnet3_delete':               '_call_vpp_api',
-    'vxlan_add_del_tunnel':         '_call_vpp_api',
+    'abf_itf_attach_add_del':       {'name': '_call_vpp_api'},
+    'abf_policy_add_del':           {'name': '_call_vpp_api'},
+    'acl_add_replace':              {'name': '_call_vpp_api'},
+    'acl_del':                      {'name': '_call_vpp_api'},
+    'bridge_domain_add_del':        {'name': '_call_vpp_api'},
+    'create_loopback_instance':     {'name': '_call_vpp_api'},
+    'delete_loopback':              {'name': '_call_vpp_api'},
+    'ipsec_gre_add_del_tunnel':     {'name': '_call_vpp_api'},
+    'ipsec_sad_add_del_entry':      {'name': '_call_vpp_api'},
+    'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
+    'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
+    'ipsec_spd_add_del_entry':      {'name': '_call_vpp_api'},
+    'l2_flags':                     {'name': '_call_vpp_api'},
+    'nat44_add_del_interface_addr':             {'name': '_call_vpp_api'},
+    'nat44_interface_add_del_output_feature':   {'name': '_call_vpp_api'},
+    'nat44_forwarding_enable_disable':          {'name': '_call_vpp_api'},
+    'nat44_add_del_identity_mapping':           {'name': '_call_vpp_api'},
+    'sw_interface_add_del_address': {'name': '_call_vpp_api'},
+    'sw_interface_set_flags':       {'name': '_call_vpp_api'},
+    'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
+    'sw_interface_set_mac_address': {'name': '_call_vpp_api'},
+    'sw_interface_set_mtu':         {'name': '_call_vpp_api'},
+    'vmxnet3_create':               {'name': '_call_vpp_api'},
+    'vmxnet3_delete':               {'name': '_call_vpp_api'},
+    'vxlan_add_del_tunnel':         {'name': '_call_vpp_api'},
 
     # Python API
-    'python':                       '_call_python_api'
+    'python':                       {'name': '_call_python_api'}
 }
 
 global g_initialized
@@ -199,19 +199,19 @@ class Fwglobals:
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
-        self.DHCP_LOG_FILE     = '/var/log/dhcpd.log'
-        self.VPP_LOG_FILE     = '/var/log/vpp/vpp.log'
-        self.OSPF_LOG_FILE     = '/var/log/frr/ospfd.log'
+        self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
+        self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
+        self.OSPF_LOG_FILE       = '/var/log/frr/ospfd.log'
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
-        self.VPP_CONFIG_FILE_BACKUP = '/etc/vpp/startup.conf.orig'
+        self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
-        self.DHCPD_CONFIG_FILE = '/etc/dhcp/dhcpd.conf'
-        self.APP_REC_DB_FILE = self.DATA_PATH + '.app_rec.sqlite'
-        self.MULTILINK_DB_FILE = self.DATA_PATH + '.multilink.sqlite'
+        self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
+        self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
+        self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
-        self.NETPLAN_FILES = {}
-        self.NETPLAN_FILE = '/etc/netplan/99-flexiwan.fwrun.yaml'
+        self.NETPLAN_FILES       = {}
+        self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
@@ -397,12 +397,10 @@ class Fwglobals:
             req    = request['message']
             params = request.get('params')
 
-            handler_name = request_handlers.get(request['message'])
-            assert handler_name, 'fwglobals: "%s" request is not supported' % req
+            handler = request_handlers.get(request['message'])
+            assert handler, 'fwglobals: "%s" request is not supported' % req
 
-            handler_func = getattr(self, handler_name)
-            assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler_name, req)
-
+            handler_func = getattr(self, handler.get('name'))
             if result is None:
                 reply = handler_func(request)
             else:
@@ -422,7 +420,7 @@ class Fwglobals:
             # request that was received from flexiManage and that was not
             # generated locally.
             #
-            if reply['ok'] == 1 and handler_name == '_call_router_api':
+            if reply['ok'] == 1 and handler.get('sign', False):
                 # Update the configuration signature
                 self.router_cfg.update_signature(received_msg)
                 # Add the updated signatire to the reply, so server could be quite
