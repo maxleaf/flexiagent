@@ -1186,7 +1186,7 @@ def vpp_startup_conf_add_devices(params):
             tup = p.create_element(config_param)
             config['dpdk'].append(tup)
 
-    fw_vpp_startupconf.dump(config, filename)
+    p.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_devices(params):
@@ -1198,11 +1198,11 @@ def vpp_startup_conf_remove_devices(params):
         return
     for dev in params['devices']:
         config_param = 'dev %s' % dev
-        str = p.get_element(config['dpdk'],config_param)
-        if str:
-            p.remove_element(config['dpdk'], str)
+        key = p.get_element(config['dpdk'],config_param)
+        if key:
+            p.remove_element(config['dpdk'], key)
 
-    fw_vpp_startupconf.dump(config, filename)
+    p.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_add_nat(params):
@@ -1211,23 +1211,23 @@ def vpp_startup_conf_add_nat(params):
     config = L(p.load(filename))
     tup = p.create_element('nat')
     config.append(tup)
-    tup.append(p.create_element('endpoint-dependent'))
-    tup.append(p.create_element('translation hash buckets 1048576'))
-    tup.append(p.create_element('translation hash memory 268435456'))
-    tup.append(p.create_element('user hash buckets 1024'))
-    tup.append(p.create_element('max translations per user 10000'))
+    config['nat'].append(p.create_element('endpoint-dependent'))
+    config['nat'].append(p.create_element('translation hash buckets 1048576'))
+    config['nat'].append(p.create_element('translation hash memory 268435456'))
+    config['nat'].append(p.create_element('user hash buckets 1024'))
+    config['nat'].append(p.create_element('max translations per user 10000'))
  
-    fw_vpp_startupconf.dump(config, filename)
+    p.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_nat(params):
     filename = params['vpp_config_filename']
     p = FwStartupConf()
     config = L(p.load(filename))
-    str = p.get_element(config, 'nat')
-    if str:
-        p.remove_element(config,str)
-    fw_vpp_startupconf.dump(config, filename)
+    key = p.get_element(config, 'nat')
+    if key:
+        p.remove_element(config,key)
+    p.dump(config, filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def _get_interface_address(pci):
