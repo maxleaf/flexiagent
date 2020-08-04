@@ -40,6 +40,7 @@ from fwdb_requests import FwDbRequests
 
 SQLITE_DB_FILE = '/etc/flexiwan/agent/.requests.sqlite'
 
+
 def _is_start_router_in_db():
     with FwDbRequests(SQLITE_DB_FILE) as db_requests:
         for key, request in db_requests.db.items():
@@ -47,7 +48,8 @@ def _is_start_router_in_db():
                 return True
     return False
 
-def up():
+
+def migrate():
     try:
         print("* Migrating start-router...")
         if not _is_start_router_in_db():
@@ -57,10 +59,8 @@ def up():
     except Exception as e:
         print("Migration error: %s : %s" % (__file__, str(e)))
 
-def down():
-    pass
 
 if __name__ == "__main__":
-    up()
+    migrate()
 
 

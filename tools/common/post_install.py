@@ -20,6 +20,22 @@
 
 # This script run post install tasks:
 #  - device database migrations
+#
+# Device database migration:
+# --------------------------
+# Migration is called on upgrade or downgrade to/from this release.
+# 1) Upgrade is called after this version is installed and before restarting the daemon service
+# 2) Downgrade is called before this version is uninstalled
+# 3) Every migration script will get <from_version>, <to_version> and 'upgrade'/'downgrade' parameters
+#
+# The migration script should decide based on the versions how to upgrade or downgrade to/from this release.
+#
+# Guidelines:
+# * If the migrate is backward compatible, run it only on any upgrade to this release and don't run on downgrade
+# * Use as much as possible major releases, for example if version 1.2.14 is released, then 1.3.10 is released.
+# The migration script in 1.3.10 should run migrations from 1.2.X to 1.3.10 (and not from 1.2.14).
+# This allows version 1.2.15 developed after 1.3.10, to upgrade as well.
+# * For specific release cases/bugs use the exact version.
 
 import os
 import sys
@@ -44,7 +60,7 @@ def run_migrations():
         imported_file = os.path.splitext(imported_file)[0]
         print("Migrating file %s" % (imported_file))
         imported = __import__(imported_file)
-        imported.up()
+        imported.migrate()
 
 if __name__ == '__main__':
     try:

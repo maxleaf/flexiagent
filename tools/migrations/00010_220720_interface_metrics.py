@@ -40,6 +40,7 @@ from fwdb_requests import FwDbRequests
 
 SQLITE_DB_FILE = '/etc/flexiwan/agent/.requests.sqlite'
 
+
 def _find_primary_ip():
     output = subprocess.check_output('ip route show default', shell=True).strip()
     routes = output.splitlines()
@@ -54,6 +55,7 @@ def _find_primary_ip():
 
     return ''
 
+
 def _find_gateway_ip(pci):
     ip = ''
     ifname = fwutils.pci_to_linux_iface(pci)
@@ -67,7 +69,8 @@ def _find_gateway_ip(pci):
 
     return ''
 
-def up():
+
+def migrate():
     try:
         print("* Migrating interface DHCP and Metrics configuration...")
         metric = 100
@@ -94,10 +97,8 @@ def up():
     except Exception as e:
         print("Migration error: %s : %s" % (__file__, str(e)))
 
-def down():
-    pass
 
 if __name__ == "__main__":
-    up()
+    migrate()
 
 
