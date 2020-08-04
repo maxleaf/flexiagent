@@ -50,6 +50,8 @@ def _is_start_router_in_db():
 
 
 def migrate(prev_version, new_version, upgrade):
+    if upgrade != 'upgrade' or prev_version != '1.3.9':
+        return
     try:
         print("* Migrating start-router...")
         if not _is_start_router_in_db():
