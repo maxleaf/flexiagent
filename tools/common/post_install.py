@@ -43,8 +43,8 @@ import glob
 
 FW_EXIT_CODE_OK = 0
 
-def run_migrations():
-    print("Post installation Migrations...")
+def run_migrations(prev_version, new_version, upgrade):
+    print("Post installation Migrations from %s to %s on %s" % (prev_version, new_version, upgrade))
     # Get files path for migration
     migration_path = os.path.abspath(os.path.dirname(__file__) + './../migrations')
     # Add path to system to allow imports
@@ -60,11 +60,19 @@ def run_migrations():
         imported_file = os.path.splitext(imported_file)[0]
         print("Migrating file %s" % (imported_file))
         imported = __import__(imported_file)
-        imported.migrate()
+        imported.migrate(prev_version, new_version, upgrade)
 
 if __name__ == '__main__':
     try:
-        run_migrations()
+        if len(sys.argv) < 4:
+            print("Usage: %s <prev_version> <new_version> <upgrade|downgrade>" % sys.argv[0])
+            exit(FW_EXIT_CODE_OK)
+
+        prev_version = sys.argv[1].split('-')[0]
+        new_version = sys.argv[2].split('-')[0]
+        upgrade = sys.argv[3]
+
+        run_migrations(prev_version, new_version, upgrade)
     except Exception as e:
         print("Post install error: %s" % (str(e)))
     exit(FW_EXIT_CODE_OK)

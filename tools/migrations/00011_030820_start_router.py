@@ -49,7 +49,7 @@ def _is_start_router_in_db():
     return False
 
 
-def migrate():
+def migrate(prev_version, new_version, upgrade):
     try:
         print("* Migrating start-router...")
         if not _is_start_router_in_db():

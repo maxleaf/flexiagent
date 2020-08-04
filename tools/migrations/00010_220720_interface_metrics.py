@@ -70,7 +70,7 @@ def _find_gateway_ip(pci):
     return ''
 
 
-def migrate():
+def migrate(prev_version, new_version, upgrade):
     try:
         print("* Migrating interface DHCP and Metrics configuration...")
         metric = 100
