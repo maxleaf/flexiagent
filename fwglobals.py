@@ -34,6 +34,7 @@ from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications import FwApps
+from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 
 modules = {
@@ -208,6 +209,7 @@ class Fwglobals:
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
+        self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.NETPLAN_FILES       = {}
@@ -276,6 +278,7 @@ class Fwglobals:
         self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
         self.apps       = FwApps(self.APP_REC_DB_FILE)
+        self.policies   = FwPolicies(self.POLICY_REC_DB_FILE)
 
         self.router_api.restore_vpp_if_needed()
 
@@ -291,6 +294,7 @@ class Fwglobals:
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
         del self.apps
+        del self.policies
         del self.os_api
         del self.router_api
         del self.agent_api

@@ -577,13 +577,13 @@ class FWROUTER_API:
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
                 return request
 
-        # 'add/remove-tunnel' and 'add/remove-application' preprocessing:
+        # 'add/remove-application' preprocessing:
         # 1. The multilink policy should be re-installed: if exists, the policy
-        #    should be removed before tunnel/application removal/adding and should be
+        #    should be removed before application removal/adding and should be
         #    added again after it.
         #
         if multilink_policy_params:
-            if re.match('(add|remove)-(application|tunnel)', req):
+            if re.match('(add|remove)-(application)', req):
                 params  = { 'requests' : [
                     { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
                     { 'message': req, 'params' : params },
