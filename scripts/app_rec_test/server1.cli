@@ -1,15 +1,5 @@
 [
 {
-      "entity":  "agent",
-      "message": "add-dhcp-config",
-      "params": {
-          "interface": "0000:00:08.00",
-          "range_start": "20.20.20.2",
-          "range_end": "20.20.20.255",
-          "dns": ["8.8.8.8", "8.8.8.4"]
-       }
-},
-{
   "entity":  "agent",
   "message": "add-application",
   "params": {"applications":[{
@@ -95,6 +85,33 @@
            ]}
 },
 {
+      "entity":  "agent",
+      "message": "add-multilink-policy",
+      "params": {
+        "rules": [{
+          "id": 1,
+          "priority": 100,
+          "classification": {
+            "application": {
+              "category":"network"
+            }
+          },
+          "action": {
+            "fallback": "by-destination",
+            "links": [
+              {
+                "order": "priority",
+                "pathlabels": [
+                  "5e8d7cc005369313f5ceff16"
+                ]
+              }
+            ],
+            "order": "priority"
+          }
+        }]
+      }
+},
+{
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
@@ -125,35 +142,41 @@
       "multilink": {
         "labels": [ "brown" ]
       }
-
     }
   }
 },
 {
-      "entity":  "agent",
-      "message": "add-multilink-policy",
-      "params": {
-        "rules": [{
-          "id": 1,
-          "priority": 100,
-          "classification": {
-            "application": {
-              "category":"network"
-            }
-          },
-          "action": {
-            "fallback": "by-destination",
-            "links": [
-              {
-                "order": "priority",
-                "pathlabels": [
-                  "5e8d7cc005369313f5ceff16"
-                ]
-              }
-            ],
-            "order": "priority"
-          }
-        }]
+  "entity":  "agent",
+  "message": "remove-tunnel",
+  "params": {
+    "src": "192.168.0.110",
+    "dst": "192.168.0.104",
+    "tunnel-id": 1,
+    "ipsec": {
+      "local-sa": {
+         "spi": 5,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "4e2f8c6fcdd1bdafa13235d388e31bef",
+         "integr-alg": "sha1-96",
+         "integr-key": "2e11aa3a41c04c6440cb39fa40313689"
+      },
+      "remote-sa": {
+         "spi": 4,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "9be852e667ae2436d0197a91aca318a2",
+         "integr-alg": "sha1-96",
+         "integr-key": "be6baffee24ec9f7aac8044ca859c40d"
       }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.7/31",
+      "mac":"02:00:27:fd:00:04",
+      "mtu":1360,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "brown" ]
+      }
+    }
+  }
 }
 ]

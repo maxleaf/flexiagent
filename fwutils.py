@@ -1306,7 +1306,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     return (True, None)
 
 
-def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl_id=None):
+def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl_id=None, priority=None):
     """Updates VPP with flexiwan policy rules.
     In general, policy rules instruct VPP to route packets to specific interface,
     which is marked with multilink label that noted in policy rule.
@@ -1323,6 +1323,11 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     op = 'add' if add else 'del'
+
+    if add:
+        fwglobals.g.policies.add_policy(policy_id, priority)
+    else:
+        fwglobals.g.policies.remove_policy(policy_id)
 
     if re.match(fallback, 'drop'):
         fallback = 'fallback drop'
@@ -1530,6 +1535,23 @@ def vpp_set_dhcp_detect(pci, remove):
 
     return True
 
+
+def tunnel_change_postprocess(add, addr):
+    """Tunnel add/remove postprocessing
+
+    :param params: params - rule parameters:
+                        add -  True if tunnel is added, False otherwise.
+                        addr - loopback address
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    sw_if_index = vpp_ip_to_sw_if_index(addr)
+    if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
+    policies = fwglobals.g.policies.policies_get()
+    remove = not add
+
+    for policy_id, priority in policies.items():
+        vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
 # Today (May-2019) message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:
