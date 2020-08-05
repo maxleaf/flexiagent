@@ -23,10 +23,13 @@
 #
 # Device database migration:
 # --------------------------
-# Migration is called on upgrade or downgrade to/from this release.
-# 1) Upgrade is called after this version is installed and before restarting the daemon service
-# 2) Downgrade is called before this version is uninstalled
-# 3) Every migration script will get <from_version>, <to_version> and 'upgrade'/'downgrade' parameters
+# Migration is called on post installation or pre removal to/from this release.
+# This module is called with three parameters from_version, to_version, install/remove
+# From postinst, it is called with install
+# From prerm, it is called with remove
+# In case of from < to (upgrade) - run only on install
+# In case of from > to (downgrade) - run only on remove
+# If no version is available, function is called with NULL
 #
 # The migration script should decide based on the versions how to upgrade or downgrade to/from this release.
 #
@@ -40,12 +43,13 @@
 import os
 import sys
 import glob
+import re
 
 FW_EXIT_CODE_OK      = 0
 FW_EXIT_CODE_ERROR   = 0x1
 
 def run_migrations(prev_version, new_version, upgrade):
-    print("Post installation Migrations from %s to %s on %s" % (prev_version, new_version, upgrade))
+    print("Migrations from %s to %s on %s" % (prev_version, new_version, upgrade))
     # Get files path for migration
     migration_path = os.path.abspath(os.path.dirname(__file__) + './../migrations')
     # Add path to system to allow imports
@@ -63,18 +67,39 @@ def run_migrations(prev_version, new_version, upgrade):
         imported = __import__(imported_file)
         imported.migrate(prev_version, new_version, upgrade)
 
+# Function to test if v1 > v2 or vice versa
+# v1>v2, return 1
+# v1=v2, return 0
+# v1<v2, return -1
+def cmpVer(v1, v2):
+    def toInt(num):
+        try:
+            return int(num)
+        except ValueError:
+            return 0
+    def normalize(v):
+        return [toInt(x) for x in re.split(r'[\.-]',re.sub(r'(\.0+)*$','', v))]
+    return cmp(normalize(v1), normalize(v2))
+
 if __name__ == '__main__':
     try:
         if len(sys.argv) < 4:
-            print("Usage: %s <prev_version> <new_version> <upgrade|downgrade>" % sys.argv[0])
+            print("Usage: %s <prev_version> <new_version> <install|remove>" % sys.argv[0])
             exit(FW_EXIT_CODE_ERROR)
 
-        # Parse version numbers. For example 1.3.9-205.abcdef will be converted to 1.3.9
-        prev_version = sys.argv[1].split('-')[0]
-        new_version = sys.argv[2].split('-')[0]
+        prev_version = sys.argv[1]
+        new_version = sys.argv[2]
         upgrade = sys.argv[3]
 
-        run_migrations(prev_version, new_version, upgrade)
+        if prev_version != 'NULL' and new_version != 'NULL':
+            cv = cmpVer(prev_version, new_version)
+            # In case of from > to (downgrade) - run only on remove
+            if cv == 1 and upgrade == 'remove':
+                run_migrations(prev_version, new_version, 'downgrade')
+            # In case of from < to (upgrade) - run only on install
+            elif cv == -1 and upgrade =='install':
+                run_migrations(prev_version, new_version, 'upgrade')
+
     except Exception as e:
         print("Post install error: %s" % (str(e)))
     exit(FW_EXIT_CODE_OK)
