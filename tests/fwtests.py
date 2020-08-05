@@ -158,7 +158,7 @@ def vpp_is_configured(config_entities, print_error=True):
         # We need it to read output of 'vppctl' command that might exit abnormally
         # on 'clib_socket_init: connect (fd 3, '/run/vpp/cli.sock'): Connection refused' error.
         p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        (out, unused_err) = p.communicate()
+        (out, _) = p.communicate()
         retcode = p.poll()
         return (retcode, out.rstrip())
 

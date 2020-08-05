@@ -421,11 +421,11 @@ class FwAgent:
         def run(*args):
             slept = 0
             while self.isConnRunning:
-                # Every 50 seconds ensure that connection to management is alive.
+                # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field
-                if (slept % 50) == 0:
+                if (slept % 30) == 0:
                     if self.requestReceived:
                         self.requestReceived = False
                     else:
@@ -433,8 +433,8 @@ class FwAgent:
                         ws.close()
                         fwglobals.log.debug("connect: connection was terminated")
                         break
-                # Every 50 seconds update statistics
-                if (slept % 50) == 0:
+                # Every 30 seconds update statistics
+                if (slept % 30) == 0:
                     if loadsimulator.g.enabled():
                         if loadsimulator.g.started:
                             loadsimulator.g.update_stats()
@@ -555,13 +555,13 @@ class FwAgent:
             requests = json.loads(f.read())
             if type(requests) is list:   # Take care of file with list of requests
                 for (idx, req) in enumerate(requests):
-                    (reply, unused_msg) = self.handle_received_request(req)
+                    (reply, _) = self.handle_received_request(req)
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
                 return None
             else:   # Take care of file with single request
-                (reply, unused_msg) = self.handle_received_request(requests)
+                (reply, _) = self.handle_received_request(requests)
                 if reply['ok'] == 0:
                     raise Exception('failed to inject request #%d in %s: %s' % \
                                     ((idx+1), filename, reply['message']))

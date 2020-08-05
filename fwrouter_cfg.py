@@ -310,7 +310,7 @@ class FwRouterCfg:
         # This is needed when upgrading from version 1.1.52 to 1.2.X
         if not gw:
             tap = fwutils.pci_to_tap(pci)
-            rip, unused_metric = fwutils.get_linux_interface_gateway(tap)
+            rip, _ = fwutils.get_linux_interface_gateway(tap)
             return pci, rip
         else:
             return pci, gw

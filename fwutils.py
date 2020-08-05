@@ -1289,7 +1289,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop, unused_metric = get_linux_interface_gateway(tap)
+        next_hop, _ = get_linux_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not provided and there is no default gateway")
 
@@ -1388,7 +1388,7 @@ def get_interface_sw_if_index(ip):
     :returns: sw_if_index.
     """
 
-    pci, unused_gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return pci_to_vpp_sw_if_index(pci)
 
 def get_interface_vpp_names(type=None):
