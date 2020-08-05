@@ -607,8 +607,6 @@ class FWROUTER_API:
         indexes = {
             'remove-application'      : -1,
             'add-application'         : -1,
-            'remove-tunnel'           : -1,
-            'add-tunnel'              : -1,
             'remove-multilink-policy' : -1,
             'add-multilink-policy'    : -1
         }
@@ -657,7 +655,7 @@ class FWROUTER_API:
                 # it is not supported yet ;) Implement on demand
                 raise Exception("_preprocess_request: 'remove-multilink-policy' was found after 'add-multilink-policy': NOT SUPPORTED")
 
-        # Now preprocess 'add/remove-application' and 'add/remove-tunnel':
+        # Now preprocess 'add/remove-application':
         # reinstall multilink policy if exists:
         # - remove policy before the first appearance of one of preprocessing requests
         # - add policy at the end of request list (this is to save find the exact location)
