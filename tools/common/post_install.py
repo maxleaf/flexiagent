@@ -41,7 +41,8 @@ import os
 import sys
 import glob
 
-FW_EXIT_CODE_OK = 0
+FW_EXIT_CODE_OK      = 0
+FW_EXIT_CODE_ERROR   = 0x1
 
 def run_migrations(prev_version, new_version, upgrade):
     print("Post installation Migrations from %s to %s on %s" % (prev_version, new_version, upgrade))
@@ -66,8 +67,9 @@ if __name__ == '__main__':
     try:
         if len(sys.argv) < 4:
             print("Usage: %s <prev_version> <new_version> <upgrade|downgrade>" % sys.argv[0])
-            exit(FW_EXIT_CODE_OK)
+            exit(FW_EXIT_CODE_ERROR)
 
+        # Parse version numbers. For example 1.3.9-205.abcdef will be converted to 1.3.9
         prev_version = sys.argv[1].split('-')[0]
         new_version = sys.argv[2].split('-')[0]
         upgrade = sys.argv[3]
