@@ -65,6 +65,16 @@ class T(list):
 			#super(T,self).__setitem__(self.ELEM_KEY,key)
 			super(T,self).__setitem__(self.T_ELEM_VALUE,value)
 
+	"""
+	API
+	overriding append for the tuple. The 2nd element (index 1) in the tuple is an L-list.
+	So we can use this knowledge to easily add elements to the list without using the
+	key of the tuple. For example, instead of e['key'].append(value), we can simply use
+	e.append(value)
+	"""
+	def append(self, value):
+		self[1].append(value)
+
 	def __str__(self):
 		s = '(' + str(super(T,self).__getitem__(self.T_ELEM_KEY)) + ", " + str(super(T,self).__getitem__(self.T_ELEM_VALUE)) + ')'
 		return s
@@ -313,7 +323,6 @@ class FwStartupConf:
 
 	def get_element(self, lst, search_str):
 		""" 
-		API.
 		API.
 		This function gets the key from a tuple. Should be used when the tuple represents a string line in the
 		correspoding startup.conf file. Strings in startup.conf file are translated to tuples with key and empty
