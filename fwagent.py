@@ -656,9 +656,6 @@ def stop(reset_router_config, stop_router):
         # Continue and stop vpp from shell and get interfaces back to Linux
         pass
 
-    # To be on safe side call fwutils.stop_router() as well to
-    # ensure interfaces are released back to Linux
-    fwutils.stop_router()
     if reset_router_config:
         fwutils.reset_router_config()
     fwglobals.log.info("done")

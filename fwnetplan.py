@@ -42,13 +42,12 @@ def _backup_netplan_files():
             shutil.copyfile(fname, fname_backup)
             shutil.move(fname, fname_run)
 
-def _delete_netplan_files():
+def delete_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
             glob.glob("/lib/netplan/*.fwrun.yaml") + \
             glob.glob("/run/netplan/*.fwrun.yaml")
 
     for fname in files:
-        fwglobals.log.debug('_delete_netplan_files: %s' % fname)
         fname_run = fname
         fname = fname_run.replace('fwrun.yaml', 'yaml')
         fname_backup = fname + '.fw_run_orig'
@@ -59,7 +58,6 @@ def _delete_netplan_files():
 
     if files:
         cmd = 'netplan apply'
-        fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
 
 def add_del_netplan_files(params):
@@ -67,7 +65,7 @@ def add_del_netplan_files(params):
     if is_add:
         _backup_netplan_files()
     else:
-        _delete_netplan_files()
+        delete_netplan_files()
 
     return (True, None)
 
@@ -137,7 +135,7 @@ def _add_netplan_file(fname):
         return
 
     config = dict()
-    config['network'] = {'version': 2}
+    config['network'] = {'version': 2, 'renderer': 'networkd'}
     with open(fname, 'w+') as stream:
         yaml.safe_dump(config, stream, default_flow_style=False)
 
@@ -180,6 +178,7 @@ def add_remove_netplan_interface(params):
         with open(fname_run, 'r') as stream:
             config = yaml.safe_load(stream)
             network = config['network']
+            network['renderer'] = 'networkd'
 
         if 'ethernets' not in network:
             network['ethernets'] = {}
