@@ -130,6 +130,17 @@ def get_machine_id():
     except:
         return None
 
+def get_machine_serial():
+    """Get machine serial number.
+
+    :returns: S/N string.
+    """
+    try:
+        serial = subprocess.check_output(['dmidecode', '-s', 'system-serial-number']).decode().split('\n')[0].strip()
+        return str(serial).upper()
+    except:
+        return '0'
+
 def vpp_pid():
     """Get pid of VPP process.
 

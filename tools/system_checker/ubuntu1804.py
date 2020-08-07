@@ -104,6 +104,67 @@ class Checker(fwsystem_checker_common.Checker):
                         return True if ret == 0 else False
                     return True
 
+    def _is_service_active(self, service):
+        """Return True if service is running"""
+        cmd = '/bin/systemctl status %s.service' % service
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        lines = proc.communicate()[0].split('\n')
+        for line in lines:
+            if 'Active:' in line:
+                if '(running)' in line:
+                    return True
+        return False
+
+    def _start_service(self, service):
+        """Return True if service is started"""
+        os.system('/bin/systemctl unmask %s.service > /dev/null 2>&1' % service)
+        os.system('/bin/systemctl enable %s.service > /dev/null 2>&1' % service)
+        os.system('/bin/systemctl start %s.service > /dev/null 2>&1' % service)
+        return True
+
+    def soft_check_networkd(self, fix=False, silently=False, prompt=None):
+        """Check if networkd is running.
+
+        :param fix:             Run networkd.
+        :param silently:        Run silently.
+        :param prompt:          Ask user for prompt.
+
+        :returns: 'True' if it networkd is running, 'False' otherwise.
+        """
+        running = False
+        try:
+            running = self._is_service_active("systemd-networkd")
+            if running == False:
+                raise Exception(prompt + 'networkd is not running')
+            else:
+                running = True
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            if not fix:
+                return False
+            else:
+                if silently:
+                    # Run the daemon if not running
+                    if not running:
+                        ret = self._start_service("systemd-networkd")
+                        if not ret:
+                            print(prompt + 'failed to start networkd')
+                            return ret
+                    return True
+                else:
+                    # Run the daemon if not running
+                    if not running:
+                        choice = raw_input(prompt + "start networkd? [Y/n]: ")
+                        if choice == 'y' or choice == 'Y' or choice == '':
+                            ret = self._start_service("systemd-networkd")
+                            if not ret:
+                                print(prompt + 'failed to start networkd')
+                                return ret
+                            return True
+                        else:
+                            return False
+
     def soft_check_disable_linux_autoupgrade(self, fix=False, silently=False, prompt=None):
         """Check if Linux autoupgrade is disabled.
 
