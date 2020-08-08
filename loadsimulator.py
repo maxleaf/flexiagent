@@ -56,7 +56,7 @@ class LoadSimulator:
         self.interface_wan = 'GigabitEthernet0/8/0'
         self.interface_lan = 'GigabitEthernet0/3/0'
         self.data = ''
-        self.version = fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE)
+        self.versions = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.thread_statistics = None
 
     def stop(self):
@@ -117,7 +117,7 @@ class LoadSimulator:
         fwglobals.log.info("connecting to flexiWAN orchestrator with uuid %s" % machine_id)
 
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
-        header_UserAgent = "User-Agent: fwagent/%s" % (self.version)
+        header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
 
         self.simulate_threads[self.simulate_id] = threading.Thread(target=fwagent.Fwagent().websocket_thread,
                                              name='Websocket Thread ' + str(self.simulate_id),

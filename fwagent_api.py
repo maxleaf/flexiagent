@@ -115,7 +115,6 @@ class FWAGENT_API:
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
-            info['serial'] = fwutils.get_machine_serial()
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))

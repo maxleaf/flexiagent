@@ -97,7 +97,7 @@ def get_device_packet_traces(num_of_packets, timeout):
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
-def get_agent_version(fname):
+def get_device_versions(fname):
     """Get agent version.
 
     :param fname:           Versions file name.
@@ -107,9 +107,9 @@ def get_agent_version(fname):
     try:
         with open(fname, 'r') as stream:
             versions = yaml.load(stream, Loader=yaml.BaseLoader)
-            return versions['components']['agent']['version']
+            return versions
     except:
-        err = "get_agent_version: failed to get agent version: %s" % (format(sys.exc_info()[1]))
+        err = "get_device_versions: failed to get versions: %s" % (format(sys.exc_info()[1]))
         fwglobals.log.error(err)
         return None
 
