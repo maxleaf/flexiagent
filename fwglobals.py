@@ -67,7 +67,6 @@ request_handlers = {
     'modify-device':                {'name': '_call_agent_api', 'sign': True},
 
     # Router API
-    'aggregated-router-api':        {'name': '_call_router_api', 'sign': True},
     'start-router':                 {'name': '_call_router_api', 'sign': True},
     'stop-router':                  {'name': '_call_router_api', 'sign': True},
     'add-interface':                {'name': '_call_router_api', 'sign': True},
@@ -400,8 +399,18 @@ class Fwglobals:
             req    = request['message']
             params = request.get('params')
 
-            handler = request_handlers.get(request['message'])
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+            if req != 'aggregated':
+                handler = request_handlers.get(req)
+                assert handler, 'fwglobals: "%s" request is not supported' % req
+            else:
+                # In case of aggregated request use the first request in aggregation
+                # to deduce the handler function.
+                # Note the aggregation might include requests of the same type
+                # only, e.g. Router API (add-tunnel, remove-application, etc)
+                #
+                handler = request_handlers.get(params['requests'][0]['message'])
+                assert handler, 'fwglobals: aggregation with "%s" request is not supported' % \
+                    params['requests'][0]['message']
 
             handler_func = getattr(self, handler.get('name'))
             if result is None:
@@ -433,8 +442,6 @@ class Fwglobals:
 
         except Exception as e:
             global log
-            if len(str(params)) > 4096:
-                params = '<truncated>'
             err_str = "%s(%s): %s" % (str(e), req, format(params))
             log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}

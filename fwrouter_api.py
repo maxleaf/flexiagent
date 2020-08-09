@@ -237,7 +237,7 @@ class FWROUTER_API:
         #
         request = self._preprocess_request(request)
 
-        if request['message'] == 'aggregated-router-api':
+        if request['message'] == 'aggregated':
             return self._call_aggregated(request['params']['requests'])
         else:
             return self._call_simple(request)
@@ -558,7 +558,7 @@ class FWROUTER_API:
                     params['requests'][0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
                     params['requests'][-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
 
-                request = {'message': 'aggregated-router-api', 'params': params}
+                request = {'message': 'aggregated', 'params': params}
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
                 return request
 
@@ -573,7 +573,7 @@ class FWROUTER_API:
                     { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
                     { 'message': 'add-multilink-policy',    'params' : params }
                 ]
-                request = {'message': 'aggregated-router-api', 'params': { 'requests' : updated_requests }}
+                request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
                 return request
 
@@ -589,12 +589,12 @@ class FWROUTER_API:
                     { 'message': req, 'params' : params },
                     { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }
                 ] }
-                request = {'message': 'aggregated-router-api', 'params': params}
+                request = {'message': 'aggregated', 'params': params}
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
                 return request
 
         # No preprocessing is needed for rest of simple requests, return.
-        if req != 'aggregated-router-api':
+        if req != 'aggregated':
             return request
 
         # Now perform same preprocessing for aggregated requests, either

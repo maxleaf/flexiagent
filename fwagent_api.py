@@ -340,7 +340,7 @@ class FWAGENT_API:
             # multiple 'add-tunnel'/'remove-tunnel', the multiling policy should
             # be reinstalled. And that should be done only once for whole sync-list.
             #
-            reply = fwglobals.g.router_api.call({'message':'aggregated-router-api', 'params': {'requests': sync_list}} )
+            reply = fwglobals.g.router_api.call({'message':'aggregated', 'params': {'requests': sync_list}} )
             if reply['ok'] == 0:
                 raise Exception(" _sync_device: smart sync failed: " + str(reply.get('message')))
 
@@ -514,7 +514,7 @@ class FWAGENT_API:
         #
         reply = fwglobals.g.handle_request(
             {
-			  'message': 'aggregated-router-api',
+			  'message': 'aggregated',
               'params':  { 'requests': list_removals + list_additions }
             },
             received_msg={ 'message': 'modify-device', 'params': params })
