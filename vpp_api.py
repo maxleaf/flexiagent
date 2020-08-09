@@ -127,7 +127,7 @@ class VPP_API:
     #               'key'         : <key by which to store the value> 
     #           }
     #
-    def call_simple(self, api, params=None, result=None):
+    def call_simple(self, request, result=None):
         """Call VPP command.
 
         :param api:            API name.
@@ -136,6 +136,9 @@ class VPP_API:
 
         :returns: Reply message.
         """
+        api    = request['message']
+        params = request.get('params')
+
         if not self.connected: 
             reply = {'message':"vpp doesn't run", 'ok':0}
             return reply
