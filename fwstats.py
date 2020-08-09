@@ -119,23 +119,36 @@ def update_stats():
         })
 
 def get_health():
+    # Get CPU info
     try:
         cpu_stats = psutil.cpu_percent(percpu = True)
     except Exception as e:
         fwglobals.log.excep("Error getting cpu stats: %s" % str(e))
         cpu_stats = [0]
+    # Get memory info
     try:
         memory_stats = psutil.virtual_memory().percent
     except Exception as e:
         fwglobals.log.excep("Error getting memory stats: %s" % str(e))
-        memory_stats = '0'
+        memory_stats = 0
+    # Get disk info
     try:
         disk_stats = psutil.disk_usage('/').percent
     except Exception as e:
         fwglobals.log.excep("Error getting disk stats: %s" % str(e))
-        disk_stats = '0'
+        disk_stats = 0
+    # Get temperature info
+    try:
+        temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
+        all_temp = psutil.sensors_temperatures()
+        for ttype, templist in all_temp.items():
+            for temp in templist:
+                if temp.current > temp_stats['value']:
+                    temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}
+    except Exception as e:
+        fwglobals.log.excep("Error getting temperature stats: %s" % str(e))
 
-    return {'cpu': [str(c) for c in cpu_stats], 'mem': str(memory_stats), 'disk': str(disk_stats)}
+    return {'cpu': cpu_stats, 'mem': memory_stats, 'disk': disk_stats, 'temp': temp_stats}
 
 def get_stats():
     """Return a new statistics dictionary.
