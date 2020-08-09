@@ -766,7 +766,7 @@ class FWROUTER_API:
                         f.write(err_str + '\n')
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
-            fwutils.stop_router()
+            fwutils.stop_vpp()
 
     def _unset_router_failure(self):
         """Unset router failure state.

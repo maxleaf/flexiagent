@@ -47,7 +47,6 @@ os_api_defs = {
     'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
     'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'stop_router':{'module':'fwutils', 'api':'stop_router', 'decode':'default'},
     'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
     'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
 }

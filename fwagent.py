@@ -630,22 +630,13 @@ def stop(reset_router_config, stop_router):
     """
     fwglobals.log.info("stopping router...")
     try:
-        if stop_router==False:
-            # if daemon runs, stop connection loop only, don't stop vpp
-            daemon_rpc('stop', stop_vpp=False)
-            fwglobals.log.info("done")
-            return
-        else:
-            # if daemon runs, stop connection loop, stop vpp
-            # and continue to fwutils.stop_router
-            daemon_rpc('stop', stop_vpp=True)
+        daemon_rpc('stop', stop_router=stop_router)
     except:
-        # Continue and stop vpp from shell and get interfaces back to Linux
-        pass
+        # If failed to stop, kill vpp from shell and get interfaces back to Linux
+        if stop_router:
+            fwglobals.log.excep("failed to stop vpp gracefully, kill it")
+            fwutils.stop_vpp()
 
-    # To be on safe side call fwutils.stop_router() as well to
-    # ensure interfaces are released back to Linux
-    fwutils.stop_router()
     if reset_router_config:
         fwutils.reset_router_config()
     fwglobals.log.info("done")
@@ -739,7 +730,7 @@ class FwagentDaemon(object):
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
-        self.stop(stop_vpp=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
+        self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
         fwglobals.g.finalize_agent()
         fwglobals.log.debug("FwagentDaemon: exited")
 
@@ -801,12 +792,12 @@ class FwagentDaemon(object):
         self.thread_main.start()
         fwglobals.log.debug("FwagentDaemon: started")
 
-    def stop(self, stop_vpp=True):
+    def stop(self, stop_router=True):
         """Stop main daemon loop.
         Once stopped, no more registration or connection retrials are performed.
         To resume registration/connection use the 'fwagent start' command.
 
-        :param stop_vpp:        Stop router, thus cheesing the packet routing.
+        :param stop_router: Stop router, thus cheesing the packet routing.
 
         :returns: None.
         """
@@ -818,12 +809,12 @@ class FwagentDaemon(object):
             self.agent.disconnect()  # Break WebSocket connection event loop to get control back to main()
             fwglobals.log.debug("FwagentDaemon: disconnect from server was initiated")
         # Stop vpp ASAP, as no more requests can arrive on connection
-        if stop_vpp:
+        if stop_router:
             try:
-                fwglobals.g.router_api.stop_router()
-                fwglobals.log.debug("FwagentDaemon: vpp stopped")
+                fwglobals.g.router_api.call({'message':'stop-router'})
+                fwglobals.log.debug("FwagentDaemon: router stopped")
             except Exception as e:
-                fwglobals.log.excep("FwagentDaemon: failed to stop vpp: " + str(e))
+                fwglobals.log.excep("FwagentDaemon: failed to stop router: " + str(e))
         elif fwglobals.g.router_api.router_started:
             fwglobals.log.debug("FwagentDaemon: vpp alive, use 'fwagent stop' to stop it")
         # Stop main connection loop

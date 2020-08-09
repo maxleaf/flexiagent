@@ -767,7 +767,7 @@ def gre_sub_file(fname):
         if k and v: tres["ipsec-gre-"+k] = "ipsec-gre" + v
     return _sub_file(fname, tres)
 
-def stop_router():
+def stop_vpp():
     """Stop VPP and rebind Linux interfaces.
 
      :returns: Error message and status code.
@@ -796,9 +796,7 @@ def stop_router():
             if drv not in dpdk.dpdk_drivers:
                 dpdk.bind_one(dpdk.devices[d]["Slot"], drv, False)
                 break
-
     fwstats.update_state(False)
-    return {'message':'Router stopped successfully', 'ok':1}
 
 def connect_to_router():
     """Connect to VPP Python API.

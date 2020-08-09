@@ -182,8 +182,9 @@ def start_router(params=None):
     cmd['cmd']['params']  = [ 'sudo systemctl start vpp; if [ -z "$(pgrep vpp)" ]; then exit 1; fi' ]
     cmd['cmd']['descr']   = "start vpp"
     cmd['revert'] = {}
-    cmd['revert']['name']   = "stop_router"
-    cmd['revert']['descr']  = "stop router"
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "stop vpp"
+    cmd['revert']['params'] = { 'module': 'fwutils', 'func': 'stop_vpp' }
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}

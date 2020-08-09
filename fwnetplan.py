@@ -48,7 +48,6 @@ def restore_linux_netplan_files():
             glob.glob("/run/netplan/*.fwrun.yaml")
 
     for fname in files:
-        fwglobals.log.debug('_delete_netplan_files: %s' % fname)
         fname_run = fname
         fname = fname_run.replace('fwrun.yaml', 'yaml')
         fname_backup = fname + '.fw_run_orig'
@@ -128,7 +127,7 @@ def _add_netplan_file(fname):
         return
 
     config = dict()
-    config['network'] = {'version': 2}
+    config['network'] = {'version': 2, 'renderer': 'networkd'}
     with open(fname, 'w+') as stream:
         yaml.safe_dump(config, stream, default_flow_style=False)
 
@@ -162,6 +161,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         with open(fname_run, 'r') as stream:
             config = yaml.safe_load(stream)
             network = config['network']
+            network['renderer'] = 'networkd'
 
         if 'ethernets' not in network:
             network['ethernets'] = {}
