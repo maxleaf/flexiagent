@@ -563,8 +563,8 @@ class FwAgent:
             else:   # Take care of file with single request
                 (reply, _) = self.handle_received_request(requests)
                 if reply['ok'] == 0:
-                    raise Exception('failed to inject request #%d in %s: %s' % \
-                                    ((idx+1), filename, reply['message']))
+                    raise Exception('failed to inject request from within %s: %s' % \
+                                    (filename, reply['message']))
                 return reply
 
 def version():
