@@ -114,11 +114,11 @@ def update_stats():
             'stats': stats['bytes'], 
             'period': stats['period'],
             'tunnel_stats': stats['tunnel_stats'],
-            'health': get_health(),
+            'health': get_system_health(),
             'utc': time.time()
         })
 
-def get_health():
+def get_system_health():
     # Get CPU info
     try:
         cpu_stats = psutil.cpu_percent(percpu = True)
@@ -188,7 +188,7 @@ def get_stats():
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
-        res_update_list[-1]['health'] = get_health()
+        res_update_list[-1]['health'] = get_system_health()
 
     return {'message': res_update_list, 'ok': 1}
 

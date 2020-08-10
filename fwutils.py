@@ -137,7 +137,7 @@ def get_machine_serial():
     """
     try:
         serial = subprocess.check_output(['dmidecode', '-s', 'system-serial-number']).decode().split('\n')[0].strip()
-        return str(serial).upper()
+        return str(serial)
     except:
         return '0'
 
