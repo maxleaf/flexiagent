@@ -7,10 +7,10 @@ flexiagent
    dpdk-devbind
    fwagent
    fwagent_api
-   fwdb_requests
    fwglobals
    fwlog
    fwrouter_api
+   fwrouter_cfg
    fwstats
    fwtranslate_add_interface
    fwtranslate_add_route

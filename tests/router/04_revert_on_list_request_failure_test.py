@@ -40,7 +40,8 @@ def test():
             print("   " + os.path.basename(t))
 
             # Load router configuration with spoiled lists
-            agent.cli('--ignore_errors -f %s' % t)
+            agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
+
             # Ensure that spoiled lists were reverted completely
             configured = fwtests.wait_vpp_to_be_configured([('interfaces', 0),('tunnels', 0)], timeout=30)
             assert configured

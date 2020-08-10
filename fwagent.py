@@ -88,7 +88,7 @@ class FwAgent:
         """Constructor method
         """
         self.token                = None
-        self.version              = fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE)
+        self.versions             = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.ws                   = None
         self.thread_statistics    = None
         self.should_reconnect     = False
@@ -199,15 +199,19 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces = fwglobals.g.handle_request('interfaces')
+        interfaces = fwglobals.g.handle_request({'message':'interfaces'})
         default_route = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
+        serial = fwutils.get_machine_serial()
         url = fwglobals.g.cfg.MANAGEMENT_URL  + "/api/connect/register"
 
         data = uparse.urlencode({'token': self.token.rstrip(),
-                                'fwagent_version' : self.version,
+                                'fwagent_version' : self.versions['components']['agent']['version'],
+                                'router_version' : self.versions['components']['router']['version'],
+                                'device_version' : self.versions['device'],
                                 'machine_id' : machine_id,
+                                'serial' : serial,
                                 'machine_name': machine_name,
                                 'ip_list': ip_list,
                                 'default_route': default_route[0],
@@ -334,7 +338,7 @@ class FwAgent:
             fwglobals.log.error("connect: can't connect (failed to retrieve machine ID in fwutils.py:get_machine_id")
             return False
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
-        header_UserAgent = "User-Agent: fwagent/%s" % (self.version)
+        header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
 
         self.ws = websocket.WebSocketApp(url,
                                     header     = {header_UserAgent},
@@ -421,11 +425,11 @@ class FwAgent:
         def run(*args):
             slept = 0
             while self.isConnRunning:
-                # Every 50 seconds ensure that connection to management is alive.
+                # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field
-                if (slept % 50) == 0:
+                if (slept % 30) == 0:
                     if self.requestReceived:
                         self.requestReceived = False
                     else:
@@ -433,8 +437,8 @@ class FwAgent:
                         ws.close()
                         fwglobals.log.debug("connect: connection was terminated")
                         break
-                # Every 50 seconds update statistics
-                if (slept % 50) == 0:
+                # Every 30 seconds update statistics
+                if (slept % 30) == 0:
                     if loadsimulator.g.enabled():
                         if loadsimulator.g.started:
                             loadsimulator.g.update_stats()
@@ -471,7 +475,7 @@ class FwAgent:
         pmsg = json.loads(message)
         msg = pmsg['msg']
 
-        reply = self.handle_received_msg(msg)
+        (reply, msg) = self.handle_received_request(msg)
 
         fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
@@ -500,7 +504,7 @@ class FwAgent:
         if self.ws:
             self.ws.close()
 
-    def _handle_received_request(self, msg):
+    def handle_received_request(self, received_msg):
         """Handles received request: invokes the global request handler
         while logging the request and the response returned by the global
         request handler. Note the global request handler is implemented
@@ -509,17 +513,23 @@ class FwAgent:
 
         :param msg:  Message instance.
 
-        :returns: None.
+        :returns: (reply, msg), where reply is reply to be sent back to server,
+                  msg is normalized received message.
         """
         print_message = fwglobals.g.cfg.DEBUG
 
+        # Aggregation is not well defined in today protocol (May-2019),
+        # so align all kind of aggregations to the common request format
+        # expected by the agent framework.
+        msg = fwutils.fix_aggregated_message_format(received_msg)
+
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("_handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
+            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
 
         self.requestReceived = True
 
-        reply = fwglobals.g.handle_request(msg['message'], msg.get('params'))
+        reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
 
         if not 'entity' in reply and 'entity' in msg:
             reply.update({'entity': msg['entity'] + 'Reply'})
@@ -527,32 +537,8 @@ class FwAgent:
             reply.update({'message': 'success'})
 
         if print_message:
-            fwglobals.log.debug("_handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
-        return reply
-
-    def handle_received_msg(self, msg):
-        """Handles standalone or aggregated message. Standalone message
-        represents one single API request, like 'add-interface'. Aggregated
-        message represents JSON list of API requests.
-
-        :param msg:  Message instance.
-
-        :returns: None.
-        """
-        if type(msg) is list:
-            executed_list = []
-            for request in msg:
-                reply = self._handle_received_request(request)
-                if reply['ok'] == 1:
-                    request['message'] = request['message'].replace('add-', 'remove-')
-                    executed_list.append(request)
-                else:
-                    for executed_req in executed_list:
-                        self._handle_received_request(executed_req)
-        else:
-            reply = self._handle_received_request(msg)
-
-        return reply
+            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+        return (reply, msg)
 
     def inject_requests(self, filename, ignore_errors=False):
         """Injects requests loaded from within 'file' JSON file,
@@ -566,19 +552,24 @@ class FwAgent:
                               rest of loaded requests will be not executed.
         :returns: N/A.
         """
+        fwglobals.log.debug("inject_requests(filename=%s, ignore_errors=%s)" % \
+            (filename, str(ignore_errors)))
+
         with open(filename, 'r') as f:
             requests = json.loads(f.read())
             if type(requests) is list:   # Take care of file with list of requests
                 for (idx, req) in enumerate(requests):
-                    reply = self._handle_received_request(req)
+                    (reply, _) = self.handle_received_request(req)
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
+                return None
             else:   # Take care of file with single request
-                reply = self._handle_received_request(requests)
+                (reply, _) = self.handle_received_request(requests)
                 if reply['ok'] == 0:
-                    raise Exception('failed to inject request #%d in %s: %s' % \
-                                    ((idx+1), filename, reply['message']))
+                    raise Exception('failed to inject request from within %s: %s' % \
+                                    (filename, reply['message']))
+                return reply
 
 def version():
     """Handles 'fwagent version' command.
@@ -602,7 +593,7 @@ def version():
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
-def reset(soft):
+def reset(soft=False):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
@@ -643,22 +634,13 @@ def stop(reset_router_config, stop_router):
     """
     fwglobals.log.info("stopping router...")
     try:
-        if stop_router==False:
-            # if daemon runs, stop connection loop only, don't stop vpp
-            daemon_rpc('stop', stop_vpp=False)
-            fwglobals.log.info("done")
-            return
-        else:
-            # if daemon runs, stop connection loop, stop vpp
-            # and continue to fwutils.stop_router
-            daemon_rpc('stop', stop_vpp=True)
+        daemon_rpc('stop', stop_router=stop_router)
     except:
-        # Continue and stop vpp from shell and get interfaces back to Linux
-        pass
+        # If failed to stop, kill vpp from shell and get interfaces back to Linux
+        if stop_router:
+            fwglobals.log.excep("failed to stop vpp gracefully, kill it")
+            fwutils.stop_vpp()
 
-    # To be on safe side call fwutils.stop_router() as well to
-    # ensure interfaces are released back to Linux
-    fwutils.stop_router()
     if reset_router_config:
         fwutils.reset_router_config()
     fwglobals.log.info("done")
@@ -689,7 +671,9 @@ def show(agent_info, router_info):
     """
     if agent_info:
         if agent_info == 'version':
-            fwglobals.log.info('Agent version: %s' % fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE), to_syslog=False)
+            fwglobals.log.info('Agent version: %s'
+                % fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version'],
+                to_syslog=False)
         if agent_info == 'cache':
             fwglobals.log.info("Agent cache...")
             cache = daemon_rpc('cache')
@@ -700,10 +684,12 @@ def show(agent_info, router_info):
             fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
         elif router_info == 'configuration':
             fwutils.print_router_config()
-        elif router_info == 'request_db':
+        elif router_info == 'cfg_db':
             fwutils.print_router_config(full=True)
+        elif router_info == 'cfg_signature':
+            fwutils.print_router_config(basic=False, signature=True)
         elif router_info == 'multilink-policy':
-            fwutils.print_multilink_policy_config()
+            fwutils.print_router_config(basic=False, multilink=True)
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -744,13 +730,13 @@ class FwagentDaemon(object):
         self.agent = fwglobals.g.fwagent
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, tb):
         # The three arguments to `__exit__` describe the exception
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
-        self.stop(stop_vpp=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
+        self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
         fwglobals.g.finalize_agent()
         fwglobals.log.debug("FwagentDaemon: exited")
 
@@ -812,12 +798,12 @@ class FwagentDaemon(object):
         self.thread_main.start()
         fwglobals.log.debug("FwagentDaemon: started")
 
-    def stop(self, stop_vpp=True):
+    def stop(self, stop_router=True):
         """Stop main daemon loop.
         Once stopped, no more registration or connection retrials are performed.
         To resume registration/connection use the 'fwagent start' command.
 
-        :param stop_vpp:        Stop router, thus cheesing the packet routing.
+        :param stop_router: Stop router, thus cheesing the packet routing.
 
         :returns: None.
         """
@@ -829,12 +815,12 @@ class FwagentDaemon(object):
             self.agent.disconnect()  # Break WebSocket connection event loop to get control back to main()
             fwglobals.log.debug("FwagentDaemon: disconnect from server was initiated")
         # Stop vpp ASAP, as no more requests can arrive on connection
-        if stop_vpp:
+        if stop_router:
             try:
-                fwglobals.g.router_api.stop_router()
-                fwglobals.log.debug("FwagentDaemon: vpp stopped")
+                fwglobals.g.router_api.call({'message':'stop-router'})
+                fwglobals.log.debug("FwagentDaemon: router stopped")
             except Exception as e:
-                fwglobals.log.excep("FwagentDaemon: failed to stop vpp: " + str(e))
+                fwglobals.log.excep("FwagentDaemon: failed to stop router: " + str(e))
         elif fwglobals.g.router_api.router_started:
             fwglobals.log.debug("FwagentDaemon: vpp alive, use 'fwagent stop' to stop it")
         # Stop main connection loop
@@ -934,27 +920,31 @@ class FwagentDaemon(object):
         if self.agent:
             api_func = getattr(self.agent, api_name)
             if api_args:
-                api_func(**api_args)
+                ret = api_func(**api_args)
             else:
-                api_func()
+                ret = api_func()
+            return ret
 
-def daemon():
+def daemon(start_loop=True):
     """Handles 'fwagent daemon' command.
     This command runs Fwagent in daemon mode. It creates the wrapping
     FwagentDaemon object that manages the instance of the Fwagent class and
     keeps it registered and connected to flexiManage.
     For more info See documentation on FwagentDaemon class.
 
+    :param start_loop: if True the register-and-connect loop will be started.
+
     :returns: None.
     """
     fwglobals.log.set_target(to_syslog=True, to_terminal=False)
-    fwglobals.log.info("starting in daemon mode")
+    fwglobals.log.info("starting in daemon mode (start_loop=%s)" % str(start))
 
     with FwagentDaemon() as agent_daemon:
 
         # Start the FwagentDaemon main function in separate thread as it is infinite,
         # and we need to get to Pyro4.Daemon.serveSimple() call to run rpc loop.
-        agent_daemon.start()
+        if start_loop:
+            agent_daemon.start()
 
         # Register FwagentDaemon object with Pyro framework and start Pyro request loop:
         # listen for rpc that invoke FwagentDaemon methods
@@ -964,7 +954,7 @@ def daemon():
             host=fwglobals.g.FWAGENT_DAEMON_HOST,
             port=fwglobals.g.FWAGENT_DAEMON_PORT,
             ns=False,
-            verbose=True)
+            verbose=False)
 
 def daemon_rpc(func, **kwargs):
     """Wrapper for methods of the FwagentDaemon object that runs on background
@@ -989,7 +979,7 @@ def daemon_rpc(func, **kwargs):
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
 
-def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
+def cli(clean_request_db=True, api=None, script_fname=None):
     """Handles 'fwagent cli' command.
     This command is not used in production. It assists unit testing.
     The 'fwagent cli' reads function names and their arguments from prompt and
@@ -1003,18 +993,17 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
 
     :param clean_request_db:    Clean request database before return.
                                 Effectively this flag resets the router configuration.
-    :param linger:              Sleep duration before return from cli.
-                                It might be used to keep vpp running, if it is
-                                controlled by CLI instance of fwagent.
-    :param api:                 The fwagent function to be executed,
-                                e.g. 'inject_requests(requests.json)'.
+    :param api:                 The fwagent function to be executed in list format,
+                                where the first element is api name, the rest
+                                elements are api arguments.
+                                e.g. [ 'inject_requests', 'requests.json' ].
                                 If provided, no prompt loop will be run.
     :param script_fname:        Shortcat for --api==inject_requests(<script_fname>)
                                 command. Is kept for backward compatibility.
     :returns: None.
     """
-    fwglobals.log.info("started in cli mode (clean_request_db=%s, linger=%s, api=%s)" % \
-                        (str(clean_request_db), str(linger), str(api)))
+    fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s)" % \
+                        (str(clean_request_db), str(api)))
 
     # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
@@ -1022,18 +1011,30 @@ def cli(clean_request_db=True, linger=None, api=None, script_fname=None):
         # Convert relative path into absolute, as daemon fwagent might have
         # working directory other than the typed 'fwagent cli -f' command.
         script_fname = os.path.abspath(script_fname)
-        api = 'inject_requests(%s)' % (script_fname)
+        api = ['inject_requests' , 'filename=%s' % script_fname ]
         fwglobals.log.debug(
-            "cli: generate 'api' out of 'script_fname': " + api)
+            "cli: generate 'api' out of 'script_fname': " + str(api))
 
     import fwagent_cli
-    with fwagent_cli.FwagentCli(agent_linger=linger) as cli:
+    with fwagent_cli.FwagentCli() as cli:
         if api:
-            cli.execute(api)
+            ret = cli.execute(api)
+
+            # We return dictionary with serialized return value of the invoked API,
+            # so cli output can be parsed by invoker to extract the returned object.
+            #
+            if ret['succeeded']:
+                if ret['return-value']:
+                    ret_val = json.dumps(ret['return-value'])
+                else:
+                    ret_val = json.dumps({'ok': 1})
+            else:
+                ret_val = json.dumps({'ok': 0, 'error': ret['error']})
+            fwglobals.log.info('return-value-start ' + ret_val + ' return-value-end')
         else:
             cli.run_loop()
     if clean_request_db:
-        fwglobals.g.router_api.db_requests.clean()
+        fwglobals.g.router_cfg.clean()
 
 
 if __name__ == '__main__':
@@ -1048,7 +1049,7 @@ if __name__ == '__main__':
                     'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
                     'start': lambda args: start(start_router=args.start_router),
-                    'daemon': lambda args: daemon(),
+                    'daemon': lambda args: daemon(start_loop=not args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
                     'show': lambda args: show(
                         agent_info=args.agent,
@@ -1056,7 +1057,6 @@ if __name__ == '__main__':
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
-                        linger=float(args.linger),
                         api=args.api)}
 
     parser = argparse.ArgumentParser(
@@ -1070,20 +1070,28 @@ if __name__ == '__main__':
     parser_reset = subparsers.add_parser('reset', help='Reset device: clear router configuration and remove device registration')
     parser_reset.add_argument('-s', '--soft', action='store_true',
                         help="clean router configuration only, device remains registered")
+    parser_reset.add_argument('-q', '--quite', action='store_true',
+                        help="don't print info onto screen, print into syslog only")
     parser_stop = subparsers.add_parser('stop', help='Stop router and reset interfaces')
     parser_stop.add_argument('-s', '--reset_softly', action='store_true',
                         help="reset router softly: clean router configuration")
     parser_stop.add_argument('-r', '--dont_stop_vpp', action='store_true',
                         help="stop agent connection loop only")
+    parser_stop.add_argument('-q', '--quite', action='store_true',
+                        help="don't print info onto screen, print into syslog only")
     parser_start = subparsers.add_parser('start', help='Resumes daemon connection loop if it was stopped by "fwagent stop"')
+    parser_start.add_argument('-q', '--quite', action='store_true',
+                        help="don't print info onto screen, print into syslog only")
     parser_start.add_argument('-r', '--start_router', action='store_true',
                         help="start router before loop is started")
     parser_daemon = subparsers.add_parser('daemon', help='Run agent in daemon mode: infinite register-connect loop')
+    parser_daemon.add_argument('-d', '--dont_connect', action='store_true',
+                        help="Don't start connection loop on daemon start")
     parser_simulate = subparsers.add_parser('simulate', help='register and connect many fake devices to FlexiWan orchestrator')
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration' , 'state' , 'request_db', 'multilink-policy'],
+    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version', 'cache'],
                         help="show various agent parameters")
@@ -1092,12 +1100,16 @@ if __name__ == '__main__':
                         help="File with requests to be executed")
     parser_cli.add_argument('-c', '--clean', action='store_true',
                         help="clean request database on exit")
-    parser_cli.add_argument('-l', '--linger', dest='linger', default=0,
-                        help="number of seconds to wait after completion (is needed for watchdog tests)")
-    parser_cli.add_argument('-i', '--api', dest='api', default=None,
-                        help="fwagent API to be invoked, e.g. '--api stop()'")
+    parser_cli.add_argument('-i', '--api', dest='api', default=None, nargs='+',
+                        help="fwagent API to be invoked with space separated arguments, e.g. '--api inject_requests request.json'")
+                        # If arguments include spaces escape them with slash, e.g. "--api inject_requests my\ request.json"
+                        # or surround argument with single quotes, e.g. "--api inject_requests 'my request.json'"
+                        # Note we don't use circle brackets, e.g. "--api inject_requests(request.json)" to avoid bash confuse
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
+
+    if hasattr(args, 'quite') and args.quite:
+        fwglobals.log.set_target(to_syslog=True, to_terminal=False)
 
     fwglobals.log.debug("---> exec " + str(args), to_terminal=False)
     command_funcs[args.command](args)

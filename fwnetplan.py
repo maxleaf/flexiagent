@@ -31,7 +31,7 @@ import fwutils
 import shutil
 import yaml
 
-def _backup_netplan_files():
+def backup_linux_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
@@ -42,13 +42,12 @@ def _backup_netplan_files():
             shutil.copyfile(fname, fname_backup)
             shutil.move(fname, fname_run)
 
-def _delete_netplan_files():
+def restore_linux_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
             glob.glob("/lib/netplan/*.fwrun.yaml") + \
             glob.glob("/run/netplan/*.fwrun.yaml")
 
     for fname in files:
-        fwglobals.log.debug('_delete_netplan_files: %s' % fname)
         fname_run = fname
         fname = fname_run.replace('fwrun.yaml', 'yaml')
         fname_backup = fname + '.fw_run_orig'
@@ -61,15 +60,6 @@ def _delete_netplan_files():
         cmd = 'netplan apply'
         fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
-
-def add_del_netplan_files(params):
-    is_add = params['is_add']
-    if is_add:
-        _backup_netplan_files()
-    else:
-        _delete_netplan_files()
-
-    return (True, None)
 
 def _get_netplan_interface_name(name, section):
     if 'set-name' in section:
@@ -142,18 +132,9 @@ def _add_netplan_file(fname):
         yaml.safe_dump(config, stream, default_flow_style=False)
 
 
-def add_remove_netplan_interface(params):
-    pci = params['pci']
-    is_add = params['is_add']
-    dhcp = params['dhcp']
-    ip = params['ip']
-    gw = params['gw']
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
     config_section = {}
     old_ethernets = {}
-    if params['metric']:
-        metric = int(params['metric'])
-    else:
-        metric = 0
 
     set_name = ''
     old_ifname = ''
@@ -197,7 +178,7 @@ def add_remove_netplan_interface(params):
         else:
             config_section['dhcp4'] = False
             config_section['addresses'] = [ip]
-            if gw is not None and gw:
+            if gw:
                 if 'routes' in config_section:
                     def_route_existed = False
                     routes = config_section['routes']

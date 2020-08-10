@@ -1,6 +1,6 @@
 [
 {
   "entity": "agent",
-  "message": "reset-router"
+  "message": "reset-device"
 }
 ]
