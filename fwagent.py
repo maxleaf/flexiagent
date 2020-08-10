@@ -88,7 +88,7 @@ class FwAgent:
         """Constructor method
         """
         self.token                = None
-        self.version              = fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE)
+        self.versions             = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.ws                   = None
         self.thread_statistics    = None
         self.should_reconnect     = False
@@ -203,11 +203,15 @@ class FwAgent:
         default_route = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
+        serial = fwutils.get_machine_serial()
         url = fwglobals.g.cfg.MANAGEMENT_URL  + "/api/connect/register"
 
         data = uparse.urlencode({'token': self.token.rstrip(),
-                                'fwagent_version' : self.version,
+                                'fwagent_version' : self.versions['components']['agent']['version'],
+                                'router_version' : self.versions['components']['router']['version'],
+                                'device_version' : self.versions['device'],
                                 'machine_id' : machine_id,
+                                'serial' : serial,
                                 'machine_name': machine_name,
                                 'ip_list': ip_list,
                                 'default_route': default_route[0],
@@ -334,7 +338,7 @@ class FwAgent:
             fwglobals.log.error("connect: can't connect (failed to retrieve machine ID in fwutils.py:get_machine_id")
             return False
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
-        header_UserAgent = "User-Agent: fwagent/%s" % (self.version)
+        header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
 
         self.ws = websocket.WebSocketApp(url,
                                     header     = {header_UserAgent},
@@ -667,7 +671,9 @@ def show(agent_info, router_info):
     """
     if agent_info:
         if agent_info == 'version':
-            fwglobals.log.info('Agent version: %s' % fwutils.get_agent_version(fwglobals.g.VERSIONS_FILE), to_syslog=False)
+            fwglobals.log.info('Agent version: %s'
+                % fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version'],
+                to_syslog=False)
         if agent_info == 'cache':
             fwglobals.log.info("Agent cache...")
             cache = daemon_rpc('cache')
