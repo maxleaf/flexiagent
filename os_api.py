@@ -65,24 +65,32 @@ class OS_DECODERS:
         out = []
 
         for nicname, addrs in inp.items():
+            isWifi = fwutils.is_wifi_interface(nicname)
+
             pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] == "":
+            if pciaddr[0] == "" and isWifi == False:
                 continue
             daddr = {
-                        'name':nicname,
-                        'pciaddr':pciaddr[0],
-                        'driver':pciaddr[1],
-                        'MAC':'',
-                        'IPv4':'',
-                        'IPv4Mask':'',
-                        'IPv6':'',
-                        'IPv6Mask':'',
-                        'dhcp':'',
-                        'gateway':'',
-                        'metric': '',
-                    }
+                'name':nicname,
+                'pciaddr':pciaddr[0],
+                'driver':pciaddr[1],
+                'MAC':'',
+                'IPv4':'',
+                'IPv4Mask':'',
+                'IPv6':'',
+                'IPv6Mask':'',
+                'dhcp':'',
+                'gateway':'',
+                'metric': '',
+            }
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
+            
+            if isWifi:
+                daddr['wifi'] = isWifi
+                daddr['driver'] = fwutils.get_wifi_interface_driver(nicname)
+
+                
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
                 daddr[addr_af_name] = addr.address.split('%')[0]
@@ -90,6 +98,7 @@ class OS_DECODERS:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
             out.append(daddr)
+        print('out=%s' % out)
         return (out,1)
 
     def execd(self, handle):

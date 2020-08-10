@@ -1651,3 +1651,33 @@ def vpp_set_dhcp_detect(params):
 
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
+def is_wifi_interface(interface_name):
+    """Check if interface is WIFI.                            
+
+    :param interface_name: Interface name to check.
+
+    :returns: Boolean.
+    """    
+    cmd = 'cat /proc/net/wireless | grep %s' % interface_name
+    try:
+        out = subprocess.check_output(cmd, shell=True).strip()
+        return True
+    except subprocess.CalledProcessError:
+        return False   
+
+def get_wifi_interface_driver(interface_name):
+    """Get WIFI interface driver.                            
+
+    :param interface_name: Interface name to check.
+
+    :returns: driver name.
+    """    
+    #   -i wlxd0374523abfb
+    try:
+        cmd = 'ethtool -i %s' % interface_name        
+        out = subprocess.check_output(cmd, shell=True).splitlines()
+        vals = out[0].decode().split("driver: ", 1)
+        print('vals=%s' % vals[-1])
+        return vals[-1]
+    except subprocess.CalledProcessError:
+        return ''   
