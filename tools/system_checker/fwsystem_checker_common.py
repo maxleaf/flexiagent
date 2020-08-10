@@ -867,14 +867,12 @@ class Checker:
         workers_param                   = None
         workers_param_val               = 0
         num_of_rx_queues_param          = None
-        num_of_rx_queues_param_val      = 0
+        num_of_rx_queues_param_val      = -1
         dev_default_key                 = 'dev default' # to avoid errors and mistypes
 
         # if configuration files does not exist, create it, and create the 'cpu' and 'dpdk' sections.
         if not conf:
             conf = L([])
-        tup = self.fw_ac_db.get_tuple_from_key(conf, 'cpu')
-        if tup == None:
             tup = self.fw_ac_db.create_element('cpu')
             conf.append(tup)
             conf['cpu'].append(self.fw_ac_db.create_element('main-core 0')) 
@@ -886,45 +884,46 @@ class Checker:
                 conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1-%d' % (input_cores)))
             conf['cpu'].append(self.fw_ac_db.create_element('workers %d' % (input_cores)))
             self.vpp_config_modified = True
-   
-        if conf['dpdk']is None:
+
             conf.append(self.fw_ac_db.create_element('dpdk'))
             self._add_tup_to_dpdk(input_cores)
             self.vpp_config_modified = True
             self.update_grub = True
             return True
 
-        # configuration file exist    
-        if conf and conf['cpu']:
-            string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
-            if string:
-                tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
-                if tup_main_core:
-                    main_core_param = tup_main_core[0]
-                    main_core_param_val = int(main_core_param.split(' ')[1])
+        # configuration file exist 
+        string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
+        if string:
+            tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+            if tup_main_core:
+                main_core_param = tup_main_core[0]
+                main_core_param_val = int(main_core_param.split(' ')[1])
                     
-            string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
-            if string:
-                tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
-                if tup_core_list:
-                    corelist_worker_param = tup_core_list[0]
-                    corelist_worker_param_val = corelist_worker_param.split(' ')[1]
-                    if corelist_worker_param_val.isdigit():
-                        corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
-                    else:
-                        corelist_worker_param_nim_val = int(corelist_worker_param_val.split('-')[0])
-                        corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
+        string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
+        if string:
+            tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+            if tup_core_list:
+                corelist_worker_param = tup_core_list[0]
+                corelist_worker_param_val = corelist_worker_param.split(' ')[1]
+                if corelist_worker_param_val.isdigit():
+                    corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
+                else:
+                    corelist_worker_param_nim_val = int(corelist_worker_param_val.split('-')[0])
+                    corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
 
-            tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],'workers %s' %(corelist_worker_param_max_val))
+        string = self.fw_ac_db.get_element(conf['cpu'],'workers')
+        if string:
+            tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
             if tup_workers:
                 workers_param = tup_workers[0]
                 workers_param_val = int(workers_param.split(' ')[1])
  
-        if conf and conf['dpdk'] and conf['dpdk'][dev_default_key]:
-            lst = conf['dpdk'][dev_default_key]
-            string = self.fw_ac_db.get_element(lst,'num-rx-queues')
+        if conf and not conf['dpdk']:
+            conf.append(self.fw_ac_db.create_element('dpdk'))
+        if conf['dpdk'][dev_default_key]:
+            string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key],'num-rx-queues')
             if string:
-                tup_num_rx = self.fw_ac_db.get_tuple_from_key(lst, string)
+                tup_num_rx = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
                 if tup_num_rx:
                     num_of_rx_queues_param = tup_num_rx[0]
                     num_of_rx_queues_param_val = int(num_of_rx_queues_param.split(' ')[1])
@@ -996,9 +995,8 @@ class Checker:
                 conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
                 self.vpp_config_modified = True
 
- 
             if num_of_rx_queues_param_val != input_cores:
-                if conf['dpdk']:
+                if conf['dpdk'] != None:
                     if conf['dpdk'][dev_default_key]:
                         new_num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
                         string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key], 'num-rx-queues')
@@ -1028,17 +1026,8 @@ class Checker:
         # 2. populated it with num-rx-queues %value
         cfg = self.vpp_configuration
         dev_default_key = 'dev default'
-        elem_exist = False
-        string = self.fw_ac_db.get_element(cfg['dpdk'], dev_default_key)
-        if string:
-            tup = self.fw_ac_db.get_tuple_from_key(string)
-            if tup:
-                elem_exist = True
-                tup.append(self.fw_ac_db.create_element('num-rx-queues %d' % (num_of_cores)))
-
-        if elem_exist == False:
-            tup = self.fw_ac_db.create_element(dev_default_key)
-            cfg['dpdk'].append(tup)
+        if cfg['dpdk'][dev_default_key] == None:
+            cfg['dpdk'].append(self.fw_ac_db.create_element(dev_default_key))
             cfg['dpdk'][dev_default_key].append(self.fw_ac_db.create_element('num-rx-queues %d' % (num_of_cores)))
 
         return True
@@ -1125,36 +1114,75 @@ class Checker:
         num_of_workers_cores = 0
         cfg = self.vpp_configuration
         if cfg and cfg['cpu']:
-            for param in cfg['cpu']:
-                if 'workers' == param[0:7]:
-                    current_workers_param = param
-                    num_of_workers_cores = int(current_workers_param.split(' ')[1])
+            string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
+            if string:
+                tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                if tup_workers:
+                    workers_param = tup_workers[0]
+                    num_of_workers_cores = int(workers_param.split(' ')[1])
 
+        update_line = ''
         if num_of_workers_cores == 0:
-            update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on\"'
+            update_line = ''
         elif num_of_workers_cores == 1:
-            update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1\"'
+            update_line = 'iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1'
         else:
-            update_line = 'GRUB_CMDLINE_LINUX_DEFAULT=\"iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d\"' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
+            update_line = 'iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
         grub_read_file  = '/etc/default/grub'
         grub_write_file = '/etc/default/grub.tmp'
 
         add_grub_line = False
+        grub_line_found = False
+        grub_line = ''
+        prefix_val = "GRUB_CMDLINE_LINUX_DEFAULT"
         read_file  = open(grub_read_file, "r")
         write_file = open(grub_write_file, "w")
         for line in read_file:
             if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
                 if line.startswith("#"):
                     write_file.write(line)
-                else: 
-                    line = "# " + line
+                else:
+                    grub_line_found = True
+                    grub_line = line
+                    line = "# "+line
                     write_file.write(line)
-                    add_grub_line = True
             else:
                 write_file.write(line)
-                add_grub_line = True
-        if add_grub_line == True:
-            write_file.write(update_line + '\n')
+
+    # remove old values if exist, so we can replace with ours.
+    # zero cores means reset to old line, without our additions
+        if grub_line_found == True:
+            add_grub_line = True
+            val_line = grub_line.split('=\"')[1].strip()
+            prefix_val = grub_line.split('=\"')[0]
+            val_line = val_line.strip('\" ')
+            val_line_list = val_line.split(' ')
+            for elem in val_line_list:
+                if elem.startswith('iommu'):
+                    val_line_list.remove(elem)
+            for elem in val_line_list:    
+                if elem.startswith('intel_iommu'):
+                    val_line_list.remove(elem)
+            for elem in val_line_list:         
+                if elem.startswith('isolcpus'):
+                    val_line_list.remove(elem)
+            for elem in val_line_list:  
+                if elem.startswith('nohz_full'):
+                    val_line_list.remove(elem)
+            for elem in val_line_list:        
+                if elem.startswith('rcu_nocbs'):
+                    val_line_list.remove(elem)
+            val_line = " ".join(val_line_list)
+
+            if num_of_workers_cores!=0:
+                grub_line = prefix_val+ '=\"' + val_line + " " + update_line + '\"'
+            else:
+                grub_line = prefix_val+ '=\"' + val_line +'\"'
+            write_file.write(grub_line+'\n')
+        else:
+            grub_line = prefix_val+'\"' + update_line + '\"'
+            write_file.write(grub_line+'\n')
+
         write_file.close()
         read_file.close()
         shutil.copyfile (grub_write_file, grub_read_file)

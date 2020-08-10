@@ -174,10 +174,10 @@ class FwStartupConf:
 		
 		:param lst: list to populate
 		"""
-		if self.value != '':
+		if self.value != None:
 			tup = T([self.key, L([(self.value, L([]))])])
 		else:
-			tup = T([self.key, L([])])
+			tup = self.create_element(self.key)
 		lst.append(tup)
 		self.path = self.path+ '/' + self.key
 		self.levels +=1
@@ -219,15 +219,16 @@ class FwStartupConf:
 		self.curr_list.append(tup)
 		self.key = self.value = ''
 
-	def _parese_line(self, line):
+	def _parse_line(self, line):
 		"""
 		This function parses a line read from the startup.conf file. According to the content of the line,
 		the appropriate return value is returned to trigger the appropriate function to update the DB.
 
 		:param line:  The line to parse
 		"""
+		line = line.strip()
 		if '{' in line:
-			if line.strip().endswith('}'):
+			if line.endswith('}'):
 				"""
 				Case of single line list as a 2nd value in a tuple: key { value }
 				"""
@@ -235,7 +236,7 @@ class FwStartupConf:
 				self.value = line.split('{')[1]
 				self.value = self.value[0:len(self.value)-1].strip()
 				return self.ADD_SINGLE_LINE_LIST
-			elif not line.strip().endswith('}'):
+			elif not line.endswith('}') and line[-1].isalpha():
 				"""
 				case of list starts in the same line of key : key { value
 				"""
@@ -276,7 +277,7 @@ class FwStartupConf:
 				line = new_line.strip()
 				if len(line) == 0 or line.startswith('#'):
 					continue
-				result = self._parese_line(line)
+				result = self._parse_line(line)
 
 				if result == self.ADD_LIST:
 					self._create_list(self.curr_list)
@@ -326,8 +327,8 @@ class FwStartupConf:
 		API.
 		This function gets the key from a tuple. Should be used when the tuple represents a string line in the
 		correspoding startup.conf file. Strings in startup.conf file are translated to tuples with key and empty
-		list. This means that the key is the actual value. The function will return the tuple which its key includes
-		the string given to be searched. For example: get_element(db['cpu'], 'corelist-work') will return a
+		list. This means that the key is the actual value. The function will return the tuple which its key starts
+		with the string given to be searched. For example: get_element(db['cpu'], 'corelist-work') will return a
 		string "corelist-workers 2-3,18-19", as this is the first line inside 'cpu' section that has the search string
 		'corelist-work' in it.
 
@@ -335,7 +336,7 @@ class FwStartupConf:
 		:param search_str:  The search string to use to mach for the tuple's key
 		"""
 		for element in lst:
-			if search_str in element[0]:
+			if element[0].startswith(search_str):
 				return element[0]
 		return None
 
@@ -423,7 +424,8 @@ class FwStartupConf:
 				self._dump_list(value[1], indent+1)
 				self._dump_line("}\n\n", indent)
 		else:
-			self._dump_line(string + "\n", indent)
+			if indent>0:
+				self._dump_line(string + "\n", indent)
 		return
 	
 	def _dump_line(self, value, indent):
