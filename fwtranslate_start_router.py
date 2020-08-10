@@ -78,6 +78,16 @@ def start_router(params=None):
      """
     cmd_list = []
 
+    # Initialize some stuff before router start
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "fwtranslate_add_tunnel.init_tunnels()"
+    cmd['cmd']['params']  = {
+                    'module': 'fwtranslate_add_tunnel',
+                    'func'  : 'init_tunnels'
+    }
+
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
     #   sudo ip addr flush dev enp0s8
@@ -85,29 +95,28 @@ def start_router(params=None):
     # in the configuration database.
     pci_list         = []
     pci_list_vmxnet3 = []
-    for key in fwglobals.g.router_api.db_requests.db:
-        if re.match('add-interface', key):
-            (_, params) = fwglobals.g.router_api.db_requests.fetch_request(key)
-            iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
-            if iface_pci:
-                # Firstly mark 'vmxnet3' interfaces as they need special care:
-                #   1. They should not appear in /etc/vpp/startup.conf.
-                #      If they appear in /etc/vpp/startup.conf, vpp will capture
-                #      them with vfio-pci driver, and 'create interface vmxnet3'
-                #      command will fail with 'device in use'.
-                #   2. They require additional VPP call vmxnet3_create on start
-                #      and complement vmxnet3_delete on stop
-                if fwutils.pci_is_vmxnet3(params['pci']):
-                    pci_list_vmxnet3.append(params['pci'])
-                else:
-                    pci_list.append(params['pci'])
+    interfaces = fwglobals.g.router_cfg.get_interfaces()
+    for params in interfaces:
+        iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
+        if iface_pci:
+            # Firstly mark 'vmxnet3' interfaces as they need special care:
+            #   1. They should not appear in /etc/vpp/startup.conf.
+            #      If they appear in /etc/vpp/startup.conf, vpp will capture
+            #      them with vfio-pci driver, and 'create interface vmxnet3'
+            #      command will fail with 'device in use'.
+            #   2. They require additional VPP call vmxnet3_create on start
+            #      and complement vmxnet3_delete on stop
+            if fwutils.pci_is_vmxnet3(params['pci']):
+                pci_list_vmxnet3.append(params['pci'])
+            else:
+                pci_list.append(params['pci'])
 
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "exec"
-                cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
-                cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
-                cmd_list.append(cmd)
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
+            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
+            cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
@@ -173,8 +182,9 @@ def start_router(params=None):
     cmd['cmd']['params']  = [ 'sudo systemctl start vpp; if [ -z "$(pgrep vpp)" ]; then exit 1; fi' ]
     cmd['cmd']['descr']   = "start vpp"
     cmd['revert'] = {}
-    cmd['revert']['name']   = "stop_router"
-    cmd['revert']['descr']  = "stop router"
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "stop vpp"
+    cmd['revert']['params'] = { 'module': 'fwutils', 'func': 'stop_vpp' }
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
@@ -200,24 +210,22 @@ def start_router(params=None):
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
-    cmd['cmd']['descr'] = "punt ip brodcast"
+    cmd['cmd']['descr'] = "punt ip broadcast"
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "create Netplan files"
+    cmd['cmd']['descr'] = "backup Linux netplan files"
     cmd['cmd']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_files',
-        'args'  : {'is_add': 1}
+        'func'  : 'backup_linux_netplan_files'
     }
     cmd['revert'] = {}
     cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "remove Netplan files"
+    cmd['revert']['descr'] = "restore linux netplan files"
     cmd['revert']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_files',
-        'args'  : {'is_add': 0}
+        'func'  : 'restore_linux_netplan_files'
     }
     cmd_list.append(cmd)
 
@@ -239,6 +247,35 @@ def start_router(params=None):
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':pci } ] }
         cmd_list.append(cmd)
+
+    # Once VPP started, apply configuration to it.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "FWROUTER_API::_on_apply_router_config()"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_apply_router_config'
+    }
+    cmd_list.append(cmd)
+
+    # Finalize some stuff after VPP start / before VPP stops.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "fwrouter_api._on_start_router()"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_start_router'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "fwrouter_api._on_stop_router()"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_stop_router'
+    }
+    cmd_list.append(cmd)
 
     return cmd_list
 

@@ -2,11 +2,7 @@
 {
   "entity":  "agent",
   "message": "remove-tunnel",
-  "params": {
-      "src": "8.8.1.1",
-      "dst": "8.8.1.2",
-      "tunnel-id": 1
-  }
+  "params": { "tunnel-id": 1 }
 }
 ,
 {
