@@ -64,13 +64,13 @@ request_handlers = {
     'upgrade-device-sw':            {'name': '_call_agent_api'},
     'reset-device':                 {'name': '_call_agent_api'},
     'sync-device':                  {'name': '_call_agent_api'},
-    'modify-device':                {'name': '_call_agent_api', 'sign': True},
 
     # Router API
     'start-router':                 {'name': '_call_router_api', 'sign': True},
     'stop-router':                  {'name': '_call_router_api', 'sign': True},
     'add-interface':                {'name': '_call_router_api', 'sign': True},
     'remove-interface':             {'name': '_call_router_api', 'sign': True},
+    'modify-interface':             {'name': '_call_router_api', 'sign': True},
     'add-route':                    {'name': '_call_router_api', 'sign': True},
     'remove-route':                 {'name': '_call_router_api', 'sign': True},
     'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
@@ -424,7 +424,7 @@ class Fwglobals:
                     raise Exception(reply['message'])
 
             # On router configuration request, e.g. add-interface,
-            # remove-tunnel, modify-device, etc. update the configuration database
+            # remove-tunnel, etc. update the configuration database
             # signature. This is needed to assists the database synchronization
             # feature that keeps the configuration set by user on the flexiManage
             # in sync with the one stored on the flexiEdge device.

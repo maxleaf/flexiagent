@@ -74,8 +74,9 @@ class FwRouterCfg:
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
-        request parameters. To do that uses function defined in the
-        correspondent translator file, e.g. fwtranslate_add_tunnel.py.
+        request parameters. To do that uses the get_request_key() function
+        that MUST be defined in the correspondent translator file,
+        e.g. fwtranslate_add_tunnel.py.
 
         !IMPORTANT!  keep this function internal! No one should be aware of
                      database implementation. If you feel need to expose this
@@ -85,11 +86,11 @@ class FwRouterCfg:
         req     = request['message']
         params  = request.get('params')
 
-        src_req      = fwrouter_api.fwrouter_translators[req].get('src', req)  # 'remove-X' requests use key generator of correspondent 'add-X' requests
-        src_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
-        src_key_func = getattr(src_module, fwrouter_api.fwrouter_translators[src_req]['key_func'])
-        src_req_key  = src_key_func(params)
-        return src_req_key
+        add_req      = re.sub(r'^\w+', 'add', req)
+        add_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[add_req]['module'])
+        add_key_func = getattr(add_module, 'get_request_key')
+        add_req_key  = add_key_func(params)
+        return add_req_key
 
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
@@ -341,8 +342,8 @@ class FwRouterCfg:
         where both signature and delta are strings.
 
         :param request: the last successfully handled router configuration
-                        request, e.g. add-interface, remove-tunnel, modify-device,
-                        etc. As configuration database signature should reflect
+                        request, e.g. add-interface, remove-tunnel, etc.
+                        As configuration database signature should reflect
                         the latest configuration, it should be updated with this
                         request.
         """
