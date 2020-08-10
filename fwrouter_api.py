@@ -243,7 +243,7 @@ class FWROUTER_API:
         #    In this case we have to ping the GW-s after modification.
         #    See explanations on that workaround later in this function.
         #
-        (restart_router, reconnect_agent, gateways) = _analyze_request(request)
+        (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
 
         # Some requests require preprocessing.
         # For example before handling 'add-application' the currently configured
@@ -254,7 +254,7 @@ class FWROUTER_API:
         #
         request = self._preprocess_request(request)
 
-        # Stop vpp if it should be restarted
+        # Stop vpp if it should be restarted.
         #
         if restart_router:
             fwglobals.g.router_api._call_simple({'message':'stop-router'})
@@ -270,6 +270,10 @@ class FWROUTER_API:
         #
         if restart_router:
             fwglobals.g.router_api._call_simple({'message':'start-router'})
+
+        # Notify Agent to reconnect if needed
+        #
+        fwglobals.g.fwagent.should_reconnect = reconnect_agent
 
 
         ########################################################################

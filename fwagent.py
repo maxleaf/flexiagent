@@ -482,7 +482,7 @@ class FwAgent:
         # when the new connection is opened, we send the reply to the MGMT right away.
         # We close the connection even if the request failed, as the change might have
         # taken place regardless of the request status, hence socket might not be operational.
-        self.should_reconnect = False if 'params' not in msg else msg['params'].get('reconnect', False)
+        #
         if self.should_reconnect == True:
             fwglobals.log.info("_on_message: device changed, closing connection to orchestrator")
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})

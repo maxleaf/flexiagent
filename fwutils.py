@@ -1580,19 +1580,10 @@ def fix_aggregated_message_format(msg):
 
     # 'list' aggregation
     if type(msg) == list:
-
-        # Figure out if 'reconnect' appears in one of aggregated messages.
-        # If it does, place it in the new aggregation header.
-        reconnect = False
-        for request in msg:
-            if 'params' in request and 'reconnect' in request['params']:
-                reconnect = True
-                break
-
         return  \
             {
                 'message': 'aggregated',
-                'params' : { 'requests': msg, 'reconnect': reconnect }
+                'params' : { 'requests': msg }
             }
 
     # 'start-router' aggregation
