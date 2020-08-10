@@ -49,10 +49,27 @@ class Fwlog:
 
         :returns: None.
         """
+        # Fold long strings into multiple lines to avoid truncation in log viewer
+        chunk_len = 2048
+        msgs = [log_message[i:i+chunk_len] for i in range(0, len(log_message), chunk_len)]
+
         if to_terminal and self.to_terminal_enabled:
-            print(log_message)
+            if len(msgs) == 1:
+                print(log_message)
+            else:
+                print("--multiline-start--")
+                for msg in msgs:
+                    print(msg)
+                print("--multiline-end--")
+
         if to_syslog and self.to_syslog_enabled:
-            syslog.syslog(log_message)
+            if len(msgs) == 1:
+                syslog.syslog(log_message)
+            else:
+                syslog.syslog("--multiline-start--")
+                for msg in msgs:
+                    syslog.syslog(msg)
+                syslog.syslog("--multiline-end--")
 
     def excep(self, log_message, to_terminal=True, to_syslog=True):
         """Print exception message.
