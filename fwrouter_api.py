@@ -229,6 +229,8 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
+        fwglobals.log.debug("FWROUTER_API::call: %s" % json.dumps(request))
+
         # First of all find out if:
         # 1. VPP should be restarted as a result of request execution.
         #    It should be restarted on addition/removal interfaces in order
@@ -334,7 +336,7 @@ class FWROUTER_API:
         for (idx, request) in enumerate(requests):
             try:
                 fwglobals.log.debug("_call_aggregated: executing request %s" % (json.dumps(request)))
-                self.call(request)
+                self._call_simple(request)
             except Exception as e:
                 # Revert previously succeeded simple requests
                 fwglobals.log.error("_call_aggregated: failed to execute %s. reverting previous requests..." % json.dumps(request))
@@ -603,7 +605,7 @@ class FWROUTER_API:
         (restart_router, reconnect_agent, gateways) = \
         (False,          False,           [])
 
-        if fwglobals.g.router_cfg.exists('start-router'):  # if vpp was started
+        if self.router_started:
             if re.match('(add|remove)-interface', request['message']):
                 restart_router  = True
                 reconnect_agent = True
@@ -617,13 +619,13 @@ class FWROUTER_API:
                     elif _request['message'] == 'modify-interface':
                         reconnect_agent = True
 
-        if re.match('(add|remove|modify)-interface', request['message']):
+        if re.match('modify-interface', request['message']):
             gw = request['params'].get('gateway')
             if gw:
                 gateways.append(gw)
         elif request['message'] == 'aggregated':
             for _request in request['params']['requests']:
-                if re.match('(add|remove|modify)-interface', _request['message']):
+                if re.match('modify-interface', _request['message']):
                     gw = _request['params'].get('gateway')
                     if gw:
                         gateways.append(gw)
@@ -665,8 +667,9 @@ class FWROUTER_API:
             ]
 
 
-        req    = request['message']
-        params = request.get('params')
+        req     = request['message']
+        params  = request.get('params')
+        updated = False
 
         multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
 
@@ -678,7 +681,22 @@ class FWROUTER_API:
             req     = 'aggregated'
             params  = { 'requests' : _preprocess_modify_X(request) }
             request = {'message': req, 'params': params}
+            updated = True
             # DON'T RETURN HERE !!! FURTHER PREPROCESSING IS NEEDED !!!
+
+
+        ########################################################################
+        # The code below preprocesses 'add-application' and 'add-multilink-policy'
+        # requests. This preprocessing just adds 'remove-application' and
+        # 'remove-multilink-policy' requests to clean vpp before original
+        # request. This should happen only if vpp was started and
+        # initial configuration was applied to it during start. If that is not
+        # the case, there is nothing to remove yet, so removal will fail.
+        ########################################################################
+        if not self.router_started:
+            if updated:
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+            return request
 
         # 'add-application' preprocessing:
         # 1. The currently configured applications should be removed firstly.
@@ -745,7 +763,6 @@ class FWROUTER_API:
         # We do few passes on requests to find insertion points if needed.
         # It is based on the first appearance of the preprocessor requests.
         #
-        updated  = False
         requests = params['requests']
 
         # Preprocess 'modify-X':
@@ -775,6 +792,7 @@ class FWROUTER_API:
                 if req_name == _request['message']:
                     if indexes[req_name] == -1:
                         indexes[req_name] = idx
+                    break
 
         def _insert_request(requests, idx, req_name, params, updated):
             requests.insert(idx, { 'message': req_name, 'params': params })
@@ -841,13 +859,13 @@ class FWROUTER_API:
                 # insert it as the idx position and delete the original 'remove-multilink-policy'.
                 idx_policy = indexes['remove-multilink-policy']
                 _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
-                requests.delete[idx_policy + 1]
+                del requests[idx_policy + 1]
             if indexes['add-multilink-policy'] < idx_last and indexes['add-multilink-policy'] >= 0:  # We exploit the fact that only one 'add-multilink-policy' is possible
                 # Move 'add-multilink-policy' to the idx_last+1 position:
                 # insert it as the idx_last position and delete the original 'add-multilink-policy'.
                 idx_policy = indexes['add-multilink-policy']
                 _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
-                requests.delete[idx_policy]
+                del requests[idx_policy]
             if indexes['remove-multilink-policy'] == -1:
                 _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
             if indexes['add-multilink-policy'] == -1:
@@ -873,7 +891,8 @@ class FWROUTER_API:
     def _stop_threads(self):
         """Stop all threads.
         """
-        self.router_started = False
+        if self.router_started: # Ensure thread loops will break
+            self.router_started = False
 
         if self.thread_watchdog:
             self.thread_watchdog.join()
@@ -905,6 +924,7 @@ class FWROUTER_API:
         """Handles pre-VPP stop activities.
         :returns: None.
         """
+        self.router_started = False
         self._stop_threads()
         fwutils.reset_dhcpd()
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))

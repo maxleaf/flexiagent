@@ -86,11 +86,15 @@ class FwRouterCfg:
         req     = request['message']
         params  = request.get('params')
 
-        add_req      = re.sub(r'^\w+', 'add', req)
-        add_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[add_req]['module'])
-        add_key_func = getattr(add_module, 'get_request_key')
-        add_req_key  = add_key_func(params)
-        return add_req_key
+        # add-/remove-/modify-X requests use key function defined for 'add-X'.
+        # start-router & stop-router break add-/remove-/modify- convention.
+        if req=='start-router' or req=='stop-router':
+            src_req = 'start-router'
+        else:
+            src_req = re.sub(r'^\w+', 'add', req)
+        key_module  = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
+        key_func    = getattr(key_module, 'get_request_key')
+        return key_func(params)
 
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
