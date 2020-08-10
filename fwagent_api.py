@@ -170,7 +170,7 @@ class FWAGENT_API:
             'dhcp': fwglobals.g.DHCP_LOG_FILE,
             'vpp': fwglobals.g.VPP_LOG_FILE,
             'ospf': fwglobals.g.OSPF_LOG_FILE,
-            'open-vpn': fwglobals.g.ROUTER_OPEN_VPN_LOG_FILE
+            'open-vpn': fwglobals.g.OPENVPN_LOG_FILE
 	    }
         file = dl_map.get(params['filter'], '')
         try:

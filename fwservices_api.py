@@ -20,8 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import fwutils
-import fwglobals
+import services.openvpn
 
 fwservices_api = {
     'install-service':       '_install_service',
@@ -31,12 +30,7 @@ fwservices_api = {
 }
 
 services = {
-    'open-vpn':          {
-        'install': fwutils.install_openvpn_server,
-        'uninstall': fwutils.remove_openvpn_server,
-        'modify': fwutils.configure_openvpn_server,
-        'upgrade': fwutils.install_openvpn_server
-    },
+    'open-vpn': services.openvpn
 }
 
 class FwServices:
@@ -47,7 +41,7 @@ class FwServices:
         """Constructor method.
         """
 
-    def call(self, req, params):
+    def call(self, req):
         """Invokes API specified by the 'req' parameter.
 
         :param req: Request name.
@@ -55,22 +49,26 @@ class FwServices:
 
         :returns: Reply.
         """
-
+        params = req['params']
+        
         service = services.get(params['type'])
         assert service, '%s: "%s" app is not supported' % (req, params['type'])
 
-        handler = fwservices_api.get(req)
+        handler = fwservices_api.get(req['message'])
         assert handler, 'fwservices_api: "%s" request is not supported' % req
 
         handler_func = getattr(self, handler)
         assert handler_func, 'fwservices_api: handler=%s not found for req=%s' % (handler, req)
 
-        reply = handler_func(params)
+        reply = handler_func(service, params)
+
         if reply['ok'] == 0:
-            raise Exception("fwservices_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
+            reply = {'entity':'servicesReply', 'message': "fwservices_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']), 'ok': 0}
+        else:
+            reply = {'entity':'servicesReply', 'message': True, 'ok': 1}
         return reply
 
-    def _install_service(self, params):
+    def _install_service(self, module, params):
         """Install service.
 
         :param params: Parameters from flexiManage.
@@ -78,46 +76,55 @@ class FwServices:
         :returns: Dictionary with information and status code.
         """
         try:
-            services[params['type']]['install'](params['config'])
+            module.install(params['config'])
             reply = {'ok': 1}
         except:
-            services[params['type']]['uninstall']()
+            module.uninstall()
             reply = {'ok': 0}
 
         return reply
 
-    def _uninstall_service(self, params):
+    def _uninstall_service(self, module, params):
         """Uninstall service.
 
         :param params: Parameters from flexiManage.
 
         :returns: Dictionary with information and status code.
         """
-        services[params['type']]['uninstall']()
-        reply = {'ok': 1}
+        try:
+            module.uninstall()
+            reply = {'ok': 1}
+        except:
+            reply = {'ok': 0}
 
         return reply
     
-    def _modify_service(self, params):
+    def _modify_service(self, module, params):
         """Modify service.
 
         :param params: Parameters from flexiManage.
 
         :returns: Dictionary with information and status code.
         """
-        services[params['type']]['modify'](params['config'])
+        try:
+            module.modify(params['config'])
+            reply = {'ok': 1}
+        except:
+            reply = {'ok': 0}
 
-        reply = {'ok': 1}
         return reply
 
-    def _upgrade_service(self, params):
+    def _upgrade_service(self, module, params):
         """Upgrade service.
 
         :param params: Parameters from flexiManage.
 
         :returns: Dictionary with information and status code.
         """
-        services[params['type']]['upgrade'](params['config'])
+        try:
+            module.upgrade(params['config'])
+            reply = {'ok': 1}
+        except:
+            reply = {'ok': 0}
 
-        reply = {'ok': 1}
         return reply

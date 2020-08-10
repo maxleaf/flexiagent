@@ -42,7 +42,7 @@ modules = {
     'fwagent_api':      __import__('fwagent_api'),
     'fwapplications':   __import__('fwapplications'),
     'fwrouter_api':     __import__('fwrouter_api'),
-    'fwservices_api': __import__('fwservices_api'),
+    'fwservices_api':   __import__('fwservices_api'),
     'os_api':           __import__('os_api'),
 }
 
@@ -206,7 +206,7 @@ class Fwglobals:
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
-        self.ROUTER_OPEN_VPN_LOG_FILE     = '/var/log/openvpn/ovpn.log'
+        self.OPENVPN_LOG_FILE    = '/var/log/openvpn/openvpn.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
         self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
@@ -280,14 +280,14 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return
 
-        self.fwagent    = FwAgent(handle_sigterm=False)
-        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
-        self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
-        self.os_api     = OS_API()
+        self.fwagent      = FwAgent(handle_sigterm=False)
+        self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
+        self.agent_api    = FWAGENT_API()
+        self.router_api   = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.os_api       = OS_API()
         self.services_api = FwServices()
-        self.apps       = FwApps(self.APP_REC_DB_FILE)
-        self.policies   = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.apps         = FwApps(self.APP_REC_DB_FILE)
+        self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         
 
         self.router_api.restore_vpp_if_needed()
@@ -308,8 +308,9 @@ class Fwglobals:
         del self.os_api
         del self.router_api
         del self.agent_api
-        del self.fwagent
         del self.services_api
+
+        del self.fwagent
         self.fwagent = None
 
     def __str__(self):
@@ -338,8 +339,8 @@ class Fwglobals:
     def _call_os_api(self, request):
         return self.os_api.call_simple(request)
 
-    def _call_services_api(self, req, params):
-        return self.services_api.call(req, params);
+    def _call_services_api(self, request):        
+        return self.services_api.call(request)
 
     def _call_vpp_api(self, request, result=None):
         return self.router_api.vpp_api.call_simple(request, result)
