@@ -1,0 +1,5 @@
+{
+  "interfaces" :  8,
+  "tunnels":      3,
+  "dhcp-servers": 1
+}
