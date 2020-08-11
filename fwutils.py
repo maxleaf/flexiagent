@@ -96,7 +96,7 @@ def get_device_packet_traces(num_of_packets, timeout):
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
-def get_agent_version(fname):
+def get_device_versions(fname):
     """Get agent version.
 
     :param fname:           Versions file name.
@@ -106,9 +106,9 @@ def get_agent_version(fname):
     try:
         with open(fname, 'r') as stream:
             versions = yaml.load(stream, Loader=yaml.BaseLoader)
-            return versions['components']['agent']['version']
+            return versions
     except:
-        err = "get_agent_version: failed to get agent version: %s" % (format(sys.exc_info()[1]))
+        err = "get_device_versions: failed to get versions: %s" % (format(sys.exc_info()[1]))
         fwglobals.log.error(err)
         return None
 
@@ -128,6 +128,17 @@ def get_machine_id():
         return machine_id.upper()
     except:
         return None
+
+def get_machine_serial():
+    """Get machine serial number.
+
+    :returns: S/N string.
+    """
+    try:
+        serial = subprocess.check_output(['dmidecode', '-s', 'system-serial-number']).decode().split('\n')[0].strip()
+        return str(serial)
+    except:
+        return '0'
 
 def vpp_pid():
     """Get pid of VPP process.
@@ -179,12 +190,19 @@ def get_default_route():
     :returns: Default route.
     """
     try:
-        dgw = os.popen('ip route list match default').read()
-        rip = dgw.split('default via ')[1].split(' ')[0]
-        rdev = dgw.split(' dev ')[1].split(' ')[0]
-        return (rip, rdev)
+        output = os.popen('ip route list match default').read()
+        if output:
+            routes = output.splitlines()
+            if routes:
+                route = routes[0]
+                dev_split = route.split('dev ')
+                rdev = dev_split[1].split(' ')[0] if len(dev_split) > 1 else ''
+                rip_split = route.split('via ')
+                rip = rip_split[1].split(' ')[0] if len(rip_split) > 1 else ''
+                return (rip, rdev)
     except:
         return ("", "")
+    return ("", "")
 
 def get_linux_interface_gateway(if_name):
     """Get gateway.
@@ -210,7 +228,7 @@ def get_linux_interface_gateway(if_name):
 
     return '', ''
 
-def get_interface_address(iface):
+def get_interface_address(if_name):
     """Get interface IP address.
 
     :param iface:        Interface name.
@@ -218,16 +236,19 @@ def get_interface_address(iface):
     :returns: IP address.
     """
     interfaces = psutil.net_if_addrs()
-    if iface not in interfaces:
-        return None
+    if if_name not in interfaces:
+        fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
+        return ''
 
-    addresses = interfaces[iface]
+    addresses = interfaces[if_name]
     for addr in addresses:
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
-    return ''
+
+    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
+    return None
 
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
@@ -424,7 +445,7 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
 
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
-    fwglobals.log.debug(traceback.extract_stack())
+    fwglobals.log.debug(str(traceback.extract_stack()))
     return None
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:
@@ -532,7 +553,7 @@ def vpp_if_name_to_tap(vpp_if_name):
     if taps is None:
         raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
 
-    pattern = '%s -> ([a-zA-Z0-9]+)' % vpp_if_name
+    pattern = '%s -> ([a-zA-Z0-9_]+)' % vpp_if_name
     match = re.search(pattern, taps)
     if match is None:
         return None
@@ -757,7 +778,7 @@ def gre_sub_file(fname):
         if k and v: tres["ipsec-gre-"+k] = "ipsec-gre" + v
     return _sub_file(fname, tres)
 
-def stop_router():
+def stop_vpp():
     """Stop VPP and rebind Linux interfaces.
 
      :returns: Error message and status code.
@@ -786,9 +807,7 @@ def stop_router():
             if drv not in dpdk.dpdk_drivers:
                 dpdk.bind_one(dpdk.devices[d]["Slot"], drv, False)
                 break
-
     fwstats.update_state(False)
-    return {'message':'Router stopped successfully', 'ok':1}
 
 def connect_to_router():
     """Connect to VPP Python API.
@@ -823,9 +842,38 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
-    fwnetplan._delete_netplan_files()
+    fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
+
+def print_router_config(basic=True, full=False, multilink=False, signature=False):
+    """Print router configuration.
+
+     :returns: None.
+     """
+    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
+        if basic:
+            cfg = router_cfg.dumps(full=full, escape=['add-application','add-multilink-policy'])
+        elif multilink:
+            cfg = router_cfg.dumps(full=full, types=['add-application','add-multilink-policy'])
+        elif signature:
+            cfg = router_cfg.get_signature()
+        else:
+            cfg = ''
+        print(cfg)
+
+def dump_router_config(full=False):
+    """Dumps router configuration into list of requests that look exactly
+    as they would look if were received from server.
+
+    :param full: return requests together with translated commands.
+
+    :returns: list of 'add-X' requests.
+    """
+    cfg = []
+    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
+        cfg = router_cfg.dump(full)
+    return cfg
 
 def get_router_state():
     """Check if VPP is running.
@@ -1132,17 +1180,6 @@ def vpp_startup_conf_remove_nat(vpp_config_filename):
         del config['nat']
     fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
 
-def _get_interface_address(pci):
-    """ Get interface ip address from commands DB.
-    """
-    interfaces = fwglobals.g.router_cfg.get_interfaces()
-    for params in interfaces:
-        if params['pci'] != pci:
-            continue
-        addr = params['addr']
-        return addr
-    return None
-
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
@@ -1169,7 +1206,11 @@ def modify_dhcpd(is_add, params):
     dns         = params.get('dns', {})
     mac_assign  = params.get('mac_assign', {})
 
-    address = IPNetwork(_get_interface_address(pci))
+    interfaces = fwglobals.g.router_cfg.get_interfaces(pci=pci)
+    if not interfaces:
+        return (False, "modify_dhcpd: %s was not found" % (pci))
+
+    address = IPNetwork(interfaces[0]['addr'])
     router = str(address.ip)
     subnet = str(address.network)
     netmask = str(address.netmask)
@@ -1257,7 +1298,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop, unused_metric = get_linux_interface_gateway(tap)
+        next_hop, _ = get_linux_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not provided and there is no default gateway")
 
@@ -1274,7 +1315,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     return (True, None)
 
 
-def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl_id=None):
+def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl_id=None, priority=None):
     """Updates VPP with flexiwan policy rules.
     In general, policy rules instruct VPP to route packets to specific interface,
     which is marked with multilink label that noted in policy rule.
@@ -1292,6 +1333,11 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     """
     op = 'add' if add else 'del'
 
+    if add:
+        fwglobals.g.policies.add_policy(policy_id, priority)
+    else:
+        fwglobals.g.policies.remove_policy(policy_id)
+
     if re.match(fallback, 'drop'):
         fallback = 'fallback drop'
 
@@ -1306,7 +1352,7 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     group_id = 1
     for link in links:
         order = ''
-        if re.match(link['order'], 'load-balancing'):
+        if re.match(link.get('order', 'priority'), 'load-balancing'):
             order = 'random'
 
         labels = link['pathlabels']
@@ -1327,10 +1373,11 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
 def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, remove):
     """Attach VPP with flexiwan policy rules.
 
-    :param params: params - rule parameters:
-                        sw_if_index -  Interface index.
-                        policy_id   - the policy id (two byte integer)
-                        remove      - True to remove rule, False to add.
+    :param int_name:  The name of the interface in VPP
+    :param policy_id: The policy id (two byte integer)
+    :param priority:  The priority (integer)
+    :param is_ipv6:   True if policy should be applied on IPv6 packets, False otherwise.
+    :param remove:    True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1355,8 +1402,27 @@ def get_interface_sw_if_index(ip):
     :returns: sw_if_index.
     """
 
-    pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return pci_to_vpp_sw_if_index(pci)
+
+def get_interface_vpp_names(type=None):
+    res = []
+    interfaces = fwglobals.g.router_cfg.get_interfaces()
+    for params in interfaces:
+        if type == None or re.match(type, params['type'], re.IGNORECASE):
+            sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+            if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
+            res.append(if_vpp_name)
+    return res
+
+def get_tunnel_interface_vpp_names():
+    res = []
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for params in tunnels:
+        sw_if_index = vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+        if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
+        res.append(if_vpp_name)
+    return res
 
 def get_interface_gateway(ip):
     """Convert interface src IP address into gateway IP address.
@@ -1479,6 +1545,23 @@ def vpp_set_dhcp_detect(pci, remove):
     return True
 
 
+def tunnel_change_postprocess(add, addr):
+    """Tunnel add/remove postprocessing
+
+    :param params: params - rule parameters:
+                        add -  True if tunnel is added, False otherwise.
+                        addr - loopback address
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    sw_if_index = vpp_ip_to_sw_if_index(addr)
+    if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
+    policies = fwglobals.g.policies.policies_get()
+    remove = not add
+
+    for policy_id, priority in policies.items():
+        vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
+
 # Today (May-2019) message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:
 #   1. 'start-router' aggregation: requests are embedded into 'params' field on some request
@@ -1491,7 +1574,7 @@ def vpp_set_dhcp_detect(pci, remove):
 # request to the first, when the whole operation is considered to be failed.
 # Convert both type of aggregations into same format:
 # {
-#   'message': 'aggregated-router-api',
+#   'message': 'aggregated',
 #   'params' : {
 #                'requests':     <list of aggregated requests>,
 #                'original_msg': <original message>
@@ -1508,19 +1591,10 @@ def fix_aggregated_message_format(msg):
 
     # 'list' aggregation
     if type(msg) == list:
-
-        # Figure out if 'reconnect' appears in one of aggregated messages.
-        # If it does, place it in the new aggregation header.
-        reconnect = False
-        for request in msg:
-            if 'params' in request and 'reconnect' in request['params']:
-                reconnect = True
-                break
-
         return  \
             {
-                'message': 'aggregated-router-api',
-                'params' : { 'requests': msg, 'reconnect': reconnect }
+                'message': 'aggregated',
+                'params' : { 'requests': msg }
             }
 
     # 'start-router' aggregation
@@ -1559,7 +1633,7 @@ def fix_aggregated_message_format(msg):
                     })
             return \
                 {
-                    'message': 'aggregated-router-api',
+                    'message': 'aggregated',
                     'params' : { 'requests': requests }
                 }
 
@@ -1578,7 +1652,7 @@ def fix_aggregated_message_format(msg):
 
         return \
             {
-                'message': 'aggregated-router-api',
+                'message': 'aggregated',
                 'params' : { 'requests': requests }
             }
 

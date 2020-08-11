@@ -116,10 +116,6 @@ def start_router(params=None):
             cmd['cmd']['name']    = "exec"
             cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
             cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
-            cmd['revert'] = {}
-            cmd['revert']['name']    = "exec"
-            cmd['revert']['params']  = [ "sudo netplan apply" ]
-            cmd['revert']['descr']  = "apply netplan configuration"
             cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
@@ -150,7 +146,7 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
 
-    # # Enable NAT in vpp configuration file
+    # Enable NAT in vpp configuration file
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -186,8 +182,9 @@ def start_router(params=None):
     cmd['cmd']['params']  = [ 'sudo systemctl start vpp; if [ -z "$(pgrep vpp)" ]; then exit 1; fi' ]
     cmd['cmd']['descr']   = "start vpp"
     cmd['revert'] = {}
-    cmd['revert']['name']   = "stop_router"
-    cmd['revert']['descr']  = "stop router"
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "stop vpp"
+    cmd['revert']['params'] = { 'module': 'fwutils', 'func': 'stop_vpp' }
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
@@ -213,31 +210,23 @@ def start_router(params=None):
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
-    cmd['cmd']['descr'] = "punt ip brodcast"
+    cmd['cmd']['descr'] = "punt ip broadcast"
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "create Netplan files"
+    cmd['cmd']['descr'] = "backup Linux netplan files"
     cmd['cmd']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_file',
-        'args'  : {'is_add': 1}
+        'func'  : 'backup_linux_netplan_files'
     }
     cmd['revert'] = {}
     cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "remove Netplan files"
+    cmd['revert']['descr'] = "restore linux netplan files"
     cmd['revert']['params']  = {
         'module': 'fwnetplan',
-        'func'  : 'add_del_netplan_file',
-        'args'  : {'is_add': 0}
+        'func'  : 'restore_linux_netplan_files'
     }
-    cmd_list.append(cmd)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = 'exec'
-    cmd['cmd']['params']  = [ 'sudo netplan apply' ]
-    cmd['cmd']['descr']   = "netplan apply"
     cmd_list.append(cmd)
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly

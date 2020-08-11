@@ -72,29 +72,36 @@ class FwRouterCfg:
             del self.db[req_key]
         self.reset_signature()
 
-    def _get_request_key(self, req, params):
-        """Generates uniq key for request out of request name 'req' and
-        request parameters 'params'. To do that uses function defined in the
-        correspondent translator file, e.g. fwtranslate_add_tunnel.py.
+    def _get_request_key(self, request):
+        """Generates uniq key for request out of request name and
+        request parameters. To do that uses the get_request_key() function
+        that MUST be defined in the correspondent translator file,
+        e.g. fwtranslate_add_tunnel.py.
 
         !IMPORTANT!  keep this function internal! No one should be aware of
                      database implementation. If you feel need to expose this
                      function, please consider to add API to this class
                      that encapsulates the needed functionality!
         """
-        src_req      = fwrouter_api.fwrouter_translators[req].get('src', req)  # 'remove-X' requests use key generator of correspondent 'add-X' requests
-        src_module   = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
-        src_key_func = getattr(src_module, fwrouter_api.fwrouter_translators[src_req]['key_func'])
-        src_req_key  = src_key_func(params)
-        return src_req_key
+        req     = request['message']
+        params  = request.get('params')
 
-    def update(self, req, params, cmd_list, executed):
+        # add-/remove-/modify-X requests use key function defined for 'add-X'.
+        # start-router & stop-router break add-/remove-/modify- convention.
+        if req=='start-router' or req=='stop-router':
+            src_req = 'start-router'
+        else:
+            src_req = re.sub(r'^\w+', 'add', req)
+        key_module  = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
+        key_func    = getattr(key_module, 'get_request_key')
+        return key_func(params)
+
+    def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
         requests are not stored but remove the correspondent 'add-X' requests.
 
-        :param req:         The request, e.g. 'add-tunnel'.
-        :param params:      The dictionary with request parameters, e.g. {'id':1}.
+        :param request:     The request received from flexiManage.
         :param cmd_list:    List of commands to be executed in order to fullfil
                             configuration request. The command can invoke VPP API,
                             run Linux shell commands, update internal agent objects,
@@ -104,7 +111,10 @@ class FwRouterCfg:
                             translated but was not executed.
         :returns: None.
         """
-        req_key = self._get_request_key(req, params)
+        req     = request['message']
+        params  = request.get('params')
+        req_key = self._get_request_key(request)
+
         try:
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
@@ -114,51 +124,53 @@ class FwRouterCfg:
             pass
         except Exception as e:
             fwglobals.log.error("FwRouterCfg.update(%s) failed: %s, %s" % \
-                        (req_key, str(e), traceback.format_exc()))
+                        (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
 
-    def get_request_params(self, req, params):
-        """Retrives parameters of the request with name 'req' and parameters
-        'params'. I know that it sounds weired :) This is hack. We use this
-        function to retrieve parameters of the 'add-X' requests stored in DB,
-        when the provided request is correspondent 'remove-X'.
+    def get_request_params(self, request):
+        """Retrives parameters of the request as they are stored in DB.
+        I know that it sounds weired, as request includes parameters in 'params'
+        field :) This is hack. We use this function to retrieve parameters
+        of the 'add-X' requests stored in DB, when the provided request is
+        correspondent 'remove-X'.
         Note:
             - the 'remove-X' requests are not stored in DB
             - the 'remove-X' 'params' is a subset of the 'add-X' 'params',
               which is sufficient to generate DB key.
 
-        :param req:         The name of the 'remove-X' request, e.g. 'remove-tunnel'.
+        :param request:         The name of the 'remove-X' request, e.g. 'remove-tunnel'.
         :param params:      The parameters of the 'remove-X' request.
 
         :returns: the parameters of the correspondent 'add-X' request.
         """
-        req_key = self._get_request_key(req, params)
+        req_key = self._get_request_key(request)
         if not req_key in self.db:
             return None
         return self.db[req_key].get('params')
 
-    def get_request_cmd_list(self, req, params):
+    def get_request_cmd_list(self, request):
         """Retrives translation of the request to list of commands.
 
-        :param req:    The name of the request, e.g. 'remove-tunnel'
-        :param params: The parameters of the request, e.g. {'id':'1'}
+        :param request: The request as it would be received on network,
+                        including name (request['message']) and parmateres
+                        (request['params']) if exist.
 
         :returns: the tuple of the command list and the 'executed' flag
         """
-        req_key = self._get_request_key(req, params)
+        req_key = self._get_request_key(request)
         if not req_key in self.db:
             return (None, None)
         return (self.db[req_key].get('cmd_list'), self.db[req_key].get('executed'))
 
-    def exists(self, req, params=None):
+    def exists(self, request):
         """Check if entry exists in DB.
 
-        :param req:  name of configuration request.
+        :param request: the configuration request as it would be received from flexiManage
 
         :returns: 'True' if request exists and 'False' otherwise.
         """
-        req_key = self._get_request_key(req, params)
+        req_key = self._get_request_key(request)
         res = True if req_key in self.db else False
         return res
 
@@ -215,36 +227,41 @@ class FwRouterCfg:
         :param escape: list of types of configuration requests that should be escaped while dumping
         :param full:   return requests together with translated commands.
         """
-        separators = {
-            'start-router':         "======== START COMMAND =======",
-            'add-interface':        "========== INTERFACES ========",
-            'add-route':            "============ ROUTES ==========",
-            'add-tunnel':           "============ TUNNELS =========",
-            'add-dhcp-config':      "========= DHCP CONFIG ========",
-            'add-application':      "========= APPLICATIONS =======",
-            'add-multilink-policy': "=========== POLICIES ========="
+        sections = {                # Use stairway to ensure section order in
+                                    # output string created by json.dumps()
+                                    #
+            'start-router':         "======= START COMMAND =======",
+            'add-interface':        "======== INTERFACES ========",
+            'add-route':            "========= ROUTES =========",
+            'add-tunnel':           "========== TUNNELS ==========",
+            'add-dhcp-config':      "=========== DHCP CONFIG ===========",
+            'add-application':      "============ APPLICATIONS ============",
+            'add-multilink-policy': "============= POLICIES ============="
         }
 
-        out = '\nsignature: %s\n' % self.db.get('signature')
-
+        out = {}
         prev_msg = { 'message': 'undefined' }
+
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
         for msg in cfg:
-            # Print separator between sections
+            # Add new section
             if msg['message'] != prev_msg['message']:
-                out += separators[msg['message']] + "\n"
                 prev_msg['message'] = msg['message']
+                section_name = sections[msg['message']]
+                out[section_name] = []
 
-            # Print configuration item in section
-            out += "Key: %s\n" % msg['key']
-            out += "%s\n" % json.dumps(msg['params'], sort_keys=True, indent=2)
+            # Add configuration item to section
+            item = {
+                'Key ':   msg['key'],
+                'Params': msg['params']
+            }
             if full:
-                out += "Executed: %s\n" % str(msg['executed'])
-                out += "Commands:\n  %s" % fwutils.yaml_dump(msg['cmd_list'])
-
-        if cfg:
-            out = '\nsignature: %s\n' % self.db.get('signature')
-        return out
+                item.update({'Executed': str(msg['executed'])})
+                item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
+            out[section_name].append(item)
+        if not out:
+            return ''
+        return json.dumps(out, indent=2, sort_keys=True)
 
     def _get_requests(self, req):
         """Retrives list of configuration requests parameters for requests with
@@ -261,13 +278,17 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None):
+    def get_interfaces(self, type=None, pci=None, ip=None):
         interfaces = self._get_requests('add-interface')
-        if not type:
+        if not type and not pci and not ip:
             return interfaces
         for params in interfaces:
-            if not re.match('wan', params['type'], re.IGNORECASE):
-                interfaces.remove(params)   # Use wasteful remove() as number of interfaces is O(1)
+            if type and not re.match(type, params['type'], re.IGNORECASE):
+                interfaces.remove(params)
+            elif pci and pci != params['pci']:
+                interfaces.remove(params)
+            elif ip and not re.match(ip, params['addr']):
+                interfaces.remove(params)
         return interfaces
 
     def get_tunnels(self):
@@ -278,44 +299,26 @@ class FwRouterCfg:
             return self.db['add-multilink-policy']['params']
         return None
 
-    def get_lan_interface_names(self):
-        import fwutils
-        if_names = []
-        interfaces = self.get_interfaces()
-        for params in interfaces:
-            if re.match('lan', params['type'], re.IGNORECASE):
-                sw_if_index = fwutils.pci_to_vpp_sw_if_index(params['pci'])
-                if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
-                if_names.append(if_name)
-        return if_names
-
-    def get_tunnel_interface_names(self):
-        import fwutils
-        if_names = []
-        tunnels = self.get_tunnels()
-        for params in tunnels:
-            sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-            if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
-            if_names.append(if_name)
-        return if_names
+    def get_applications(self):
+        if 'add-application' in self.db:
+            return self.db['add-application']['params']
+        return None
 
     def get_wan_interface_gw(self, ip):
         import fwutils
-        interfaces = self.get_interfaces()
-        for params in interfaces:
-            if re.match('wan', params['type'], re.IGNORECASE):
-                if re.search(ip, params['addr']):
-                    pci = params['pci']
-                    gw  = params.get('gateway')
-                    # If gateway not exist in interface configuration, use default
-                    # This is needed when upgrading from version 1.1.52 to 1.2.X
-                    if not gw:
-                        tap = fwutils.pci_to_tap(pci)
-                        rip, unused_metric = fwutils.get_linux_interface_gateway(tap)
-                        return pci, rip
-                    else:
-                        return pci, gw
-        return (None, None)
+        interfaces = self.get_interfaces(type='wan', ip=ip)
+        if not interfaces:
+            return (None, None)
+        pci = interfaces[0]['pci']
+        gw  = interfaces[0].get('gateway')
+        # If gateway not exist in interface configuration, use default
+        # This is needed when upgrading from version 1.1.52 to 1.2.X
+        if not gw:
+            tap = fwutils.pci_to_tap(pci)
+            rip, _ = fwutils.get_linux_interface_gateway(tap)
+            return pci, rip
+        else:
+            return pci, gw
 
     def get_interface_ips(self, pci_list=None):
         """Fetches IP-s of interfaces stored in the configuration database.
@@ -343,8 +346,8 @@ class FwRouterCfg:
         where both signature and delta are strings.
 
         :param request: the last successfully handled router configuration
-                        request, e.g. add-interface, remove-tunnel, modify-device,
-                        etc. As configuration database signature should reflect
+                        request, e.g. add-interface, remove-tunnel, etc.
+                        As configuration database signature should reflect
                         the latest configuration, it should be updated with this
                         request.
         """
@@ -376,8 +379,8 @@ class FwRouterCfg:
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against
-        the requests stored in the local database and generates delta list that
-        can be used for synchronization of router configuration. This delta list
+        the requests stored in the local database and generates output list that
+        can be used for synchronization of router configuration. This output list
         is called sync-list. It includes sequence of 'remove-X' and 'add-X'
         requests that should be applied to device in order to configure it with
         the configuration, reflected in the input list 'requests'.
@@ -409,40 +412,45 @@ class FwRouterCfg:
         # to store these requests. Accidentally these are exactly same keys
         # dumped by fwglobals.g.router_cfg.dump() used below ;)
         #
-        desired_requests = {}
+        input_requests = {}
         for request in requests:
-            key = self._get_request_key(request['message'], request.get('params'))
-            desired_requests.update(request)
+            key = self._get_request_key(request)
+            input_requests.update({key:request})
 
         # Now dump local configuration in order of 'remove-X' list
         #
-        add_order = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        remove_order = add_order.reverse()
-        delta_list = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+        add_order       = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        remove_order    = add_order[::-1]  # Reverse with no modification of source list :)
+        output_requests = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+
+        same_requests = {}            # Exactly same configuration items, no need to add/remove/modify
+        remove_request_indexes = []   # Indexes of requests in output list that should be removed
 
         # Now go over dumped requests and remove those that present in the input
         # list and that have same parameters. They correspond to configuration
         # items that should be not touched by synchronization. The dumped requests
         # that present in the input list but have different parameters stand
-        # for modifications. They should be added to the delta list as 'remove-X'
+        # for modifications. They should be added to the output list as 'remove-X'
         # and than added again as 'add-X' later as it would be a new configuration
         # item.
         #
-        for (idx, request) in enumerate(delta_list):
+        for (idx, request) in enumerate(output_requests):
             dumped_key = request['key']
-            if dumped_key in desired_requests:
-                dumped_params  = request.get('params')
-                desired_params = desired_requests[dumped_key].get('params')
-                if dumped_params == desired_params:
+            if dumped_key in input_requests:
+                dumped_params = request.get('params')
+                input_params  = input_requests[dumped_key].get('params')
+                if dumped_params == input_params:
                     # Exactly same configuration item should be removed from
-                    # delta list. As well we remove it from input list to avoid
-                    # adding it back to delta list later with 'add-X' requests.
+                    # output list. It should be neither removed nor added nor modified.
+                    # As well note it aside, so it will be not added later, when
+                    # 'add-X' from input list that stands for new items
+                    # will be added to the output list.
                     #
-                    del delta_list[idx]
-                    requests.remove(desired_requests[dumped_key])
+                    remove_request_indexes.append(idx)  # Can't delete from list, while iterating over it, so store it for now
+                    same_requests[dumped_key] = None
                 else:
                     # The modified configuration item should stay in both
-                    # the delta list and the input list. Though in delta list
+                    # the output list and the input list. Though in output list
                     # it should come with 'remove-X' request name.
                     # It should stay in the input list to be added later as 'add-X'.
                     #
@@ -451,51 +459,25 @@ class FwRouterCfg:
                 # The configuration item does not present in the input list.
                 # So it stands for item to be removed.
                 #
-                request['message'] = request['message'].replace('add-', 'remove-')
+                if request['message'] == 'start-router':
+                    remove_request_indexes.append(idx)
+                else:
+                    request['message'] = request['message'].replace('add-', 'remove-')
+
+        for idx in remove_request_indexes[::-1]:
+            del output_requests[idx]
+
 
         # At this point the input list includes 'add-X' requests that stand
         # for new or for modified configuration items.
-        # Just go and add them to the delta list 'as-is'.
+        # Just go and add them to the output list 'as-is'.
         # Note we don't rely on order of requests in the input list, so we go
         # and do double cycling of O(n x m) to ensure proper order.
         for req in add_order:
             for request in requests:
                 if request['message'] == req:
-                    delta_list.append(request)
+                    key = self._get_request_key(request)
+                    if not key in same_requests:  # Don't add requests that should be not removed/added/modified
+                        output_requests.append(request)
 
-        return delta_list
-
-################################################################################
-#    GLOBAL UTILITY FUNCTION
-################################################################################
-
-def dump(full=False):
-    """Dumps router configuration into list of requests that look exactly
-    as they would look if were received from server.
-
-    :param full: return requests together with translated commands.
-
-    :returns: list of configuration requests stored in DB.
-    """
-    cfg = []
-    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        cfg = router_cfg.dump(full)
-    return cfg
-
-def print_basic(full=False):
-    """Prints basic router configuration onto screen: interfaces, routes,
-    tunnels, DHCP, etc. Does not print application identifications and multilink
-    policies.
-
-    :param full: prints requests together with translated commands.
-    """
-    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        print(router_cfg.dumps(full=full, escape=['add-application','add-multilink-policy']))
-
-def print_multilink(full=False):
-    """Prints router multilink configuration onto screen.
-
-    :param full: prints requests together with translated commands.
-    """
-    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        print(router_cfg.dumps(full=full, types=['add-application','add-multilink-policy']))
+        return output_requests

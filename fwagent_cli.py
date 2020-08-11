@@ -58,9 +58,11 @@ class FwagentCli:
         except Pyro4.errors.CommunicationError:
             fwglobals.log.warning("FwagentCli: no daemon Fwagent was found, use local instance")
             self.daemon = None
-            self.agent  = fwagent.Fwagent()
 
     def __enter__(self):
+        if not self.daemon:
+	        fwglobals.g.initialize_agent()
+	        self.agent = fwglobals.g.fwagent
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -72,7 +74,7 @@ class FwagentCli:
             # If we used local instance of Fwagent and not daemon, kill it.
             # Otherwise we might hang up in vpp watchdog,
             # if router was started by cli execution.
-            self.agent.__exit__(exc_type, exc_value, traceback)
+            fwglobals.g.finalize_agent()
 
     def run_loop(self):
         while True:
@@ -90,9 +92,14 @@ class FwagentCli:
                 elif api_str == '\x1b[A' or api_str == '\x1b[B':
                     print('ARROWS ARE NOT SUPPORTED YET ;)')
                 else:
-                    self.execute(api_str)
+                    ret = self.execute(api_str)
+                    if ret['succeeded']:
+                        fwglobals.log.info(self.prompt + 'SUCCESS')
+                    else:
+                        fwglobals.log.info(self.prompt + 'FAILURE')
+                        fwglobals.log.error(self.prompt + ret['error'])
             except Exception as e:
-                print(self.prompt + str(e))
+                print(self.prompt + 'FAILURE: ' + str(e))
 
     def execute(self, api_args):
         """Executes API provided by user with
@@ -113,6 +120,7 @@ class FwagentCli:
                 api_func = getattr(self.agent, api_name)
                 ret = api_func(**api_args)
             return { 'succeeded': True, 'return-value': ret }
+
         except Exception as e:
             return { 'succeeded': False, 'error': str(e) }
 

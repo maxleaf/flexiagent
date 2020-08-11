@@ -1,45 +1,28 @@
 [
 {
   "entity":  "agent",
-  "message": "add-interface",
+  "message": "start-router",
   "params": {
-      "pci":"0000:00:08.00",
-      "addr":"10.0.0.4/24",
-      "gateway": "10.0.0.10",
-      "type":"wan",
-      "multilink": {
-          "labels": [
-              "green",
-              "blue",
-              "red"]
+    "interfaces": [
+      {
+        "pci":"0000:00:08.00",
+        "addr":"10.0.0.4/24",
+        "gateway": "10.0.0.10",
+        "type":"wan",
+        "multilink": {
+            "labels": [
+                "green",
+                "blue",
+                "red"]
+        }
+      },
+      {
+        "pci":"0000:00:09.00",
+        "addr":"192.168.56.101/24",
+        "routing":"ospf",
+        "type":"lan"
       }
-  }
-}
-,
-{
-  "entity":  "agent",
-  "message": "add-interface",
-  "params": {
-      "pci":"0000:00:09.00",
-      "addr":"192.168.56.102/24",
-      "routing":"ospf",
-      "type":"lan"
-  }
-}
-,
-{
-  "entity":  "agent",
-  "message": "add-interface",
-  "params": {
-      "pci":"0000:00:03.00",
-      "addr":"1.0.0.4/24",
-      "gateway": "1.0.0.1",
-      "type":"wan",
-      "multilink": {
-          "labels": [
-              "yellow",
-              "blue"]
-      }
+    ]
   }
 }
 ,
@@ -89,25 +72,25 @@
       "local-sa": {
          "spi": 1030,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "3030aa794f574265564551694d653768",
+         "crypto-key": "1030aa794f574265564551694d653768",
          "integr-alg": "sha1-96",
-         "integr-key": "3030ff4b55523947594d6d3547666b45764e6a58"
+         "integr-key": "1030ff4b55523947594d6d3547666b45764e6a58"
       },
       "remote-sa": {
          "spi": 3010,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "3030aa794f574265564551694d653768",
+         "crypto-key": "3010aa794f574265564551694d653768",
          "integr-alg": "sha1-96",
-         "integr-key": "3030ff4b55523947594d6d3547666b45764e6a58"
+         "integr-key": "3010ff4b55523947594d6d3547666b45764e6a58"
       }
     },
     "loopback-iface": {
-      "addr":"10.100.0.7/31",
-      "mac":"08:00:27:fd:00:07",
+      "addr":"10.100.0.3/31",
+      "mac":"08:00:27:fd:00:03",
       "mtu":1420,
       "routing":"ospf",
       "multilink": {
-        "labels": [ "purple" ]
+        "labels": [ "gray", "black" ]
       }
     }
   }
@@ -118,27 +101,27 @@
   "message": "add-tunnel",
   "params": {
     "src": "10.0.0.4",
-    "dst": "90.0.0.9",
-    "tunnel-id": 9,
+    "dst": "70.0.0.7",
+    "tunnel-id": 7,
     "ipsec": {
       "local-sa": {
-         "spi": 1090,
+         "spi": 1070,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "9030aa794f574265564551694d653768",
+         "crypto-key": "7030aa794f574265564551694d653768",
          "integr-alg": "sha1-96",
-         "integr-key": "9030ff4b55523947594d6d3547666b45764e6a58"
+         "integr-key": "7030ff4b55523947594d6d3547666b45764e6a58"
       },
       "remote-sa": {
-         "spi": 9010,
+         "spi": 7010,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "9010aa794f574265564551694d653768",
+         "crypto-key": "7010aa794f574265564551694d653768",
          "integr-alg": "sha1-96",
-         "integr-key": "9010ff4b55523947594d6d3547666b45764e6a58"
+         "integr-key": "7010ff4b55523947594d6d3547666b45764e6a58"
       }
     },
     "loopback-iface": {
-      "addr":"10.100.0.9/31",
-      "mac":"08:00:27:fd:00:09",
+      "addr":"10.100.0.7/31",
+      "mac":"08:00:27:fd:00:07",
       "mtu":1420,
       "routing":"ospf",
       "multilink": {
@@ -154,31 +137,50 @@
   "params": {
     "applications": [
       {
+        "name": "echo",
+        "id": "1",
+        "category": "management",
+        "serviceClass": "oam",
+        "importance": "medium",
+        "description": "Echo Protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "7"
+          },
+          {
+            "protocol": "udp",
+            "ports": "7"
+          }
+        ],
+        "modified": false
+      },
+      {
         "name": "daytime",
         "id": "3",
         "category": "management",
         "serviceClass": "network-control",
-        "importance": "high",
+        "importance": "medium",
         "description": "Daytime Protocol",
         "rules": [
           {
             "protocol": "tcp",
-            "ports": "18"
+            "ports": "13"
           },
           {
             "protocol": "udp",
-            "ports": "28"
+            "ports": "13"
           }
         ],
-        "modified": true
+        "modified": false
       },
       {
-        "name": "new_ssh",
-        "id": "55",
+        "name": "ssh",
+        "id": "5",
         "category": "remote_access",
         "serviceClass": "default",
-        "importance": "low",
-        "description": "New Secure Shell (NSSH)",
+        "importance": "high",
+        "description": "Secure Shell (SSH)",
         "rules": [
           {
             "protocol": "tcp",
@@ -218,20 +220,65 @@
         "modified": false
       },
       {
-        "name": "dns",
-        "id": "11",
+        "name": "time",
+        "id": "8",
         "category": "management",
         "serviceClass": "network-control",
-        "importance": "high",
-        "description": "Domain Name System (DNS)",
+        "importance": "medium",
+        "description": "Time Protocol",
         "rules": [
           {
             "protocol": "tcp",
-            "ports": "53"
+            "ports": "37"
           },
           {
             "protocol": "udp",
-            "ports": "53"
+            "ports": "37"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "whois",
+        "id": "9",
+        "category": "network",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "WHOIS protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "43"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "gopher",
+        "id": "12",
+        "category": "file-sharing",
+        "serviceClass": "default",
+        "importance": "low",
+        "description": "Gopher protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "70"
+          }
+        ],
+        "modified": false
+      },
+      {
+        "name": "finger",
+        "id": "13",
+        "category": "management",
+        "serviceClass": "default",
+        "importance": "medium",
+        "description": "Finger protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "79"
           }
         ],
         "modified": false
@@ -398,7 +445,7 @@
         "priority": 0,
         "classification": {
           "prefix": {
-            "ip": "4.4.4.4/32",
+            "ip": "8.8.8.8/32",
             "ports": "",
             "protocol": ""
           }
@@ -407,10 +454,14 @@
           "links": [
             {
               "pathlabels": [ "green" , "blue" ],
+              "order": "load-balance"
+            },
+            {
+              "pathlabels": [ "blue" ],
               "order": "priority"
             }
           ],
-          "order": "priority",
+          "order": "load-balance",
           "fallback": "by-destination"
         }
       },
@@ -434,22 +485,22 @@
         }
       },
       {
-        "id": "4",
-        "priority": 4,
+        "id": "3",
+        "priority": 1,
         "classification": {
           "application": {
-            "importance": "high"
+            "importance": "low"
           }
         },
         "action": {
           "links": [
             {
-              "pathlabels": [ "pink" , "brown" ],
-              "order": "priority"
+              "pathlabels": [ "orange" ],
+              "order": "load-balance"
             }
           ],
-          "order": "load-balance",
-          "fallback": "by-destination"
+          "order": "priority",
+          "fallback": "drop"
         }
       }
     ]
@@ -461,18 +512,11 @@
   "message": "add-dhcp-config",
   "params": {
 	"interface": "0000:00:09.00",
-    "range_start": "20.20.20.200",
-    "range_end": "20.20.20.250",
+    "range_start": "20.20.20.100",
+    "range_end": "20.20.20.150",
     "dns": [
-		"8.8.4.4",
 		"8.8.8.8"
-    ],
-    "mac_assign": []
+    ]
   }
 }  
-,
-{
-  "entity":  "agent",
-  "message": "start-router"
-}
 ]

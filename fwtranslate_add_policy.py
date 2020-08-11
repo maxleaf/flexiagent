@@ -99,7 +99,7 @@ def reset_policy_id():
     global policy_index
     policy_index = 0
 
-def _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list):
+def _add_policy_rule(policy_id, priority, links, acl_id, fallback, order, cmd_list):
     """Translates single policy rule into commands to be applied to VPP.
 
      :param params:    policy rule parameters received from flexiManage.
@@ -115,7 +115,8 @@ def _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list):
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
                     'args'  : { 'add': True, 'links': links, 'policy_id': policy_id,
-                                'fallback': fallback, 'order': order, 'acl_id': acl_id }
+                                'fallback': fallback, 'order': order, 'acl_id': acl_id,
+                                'priority': priority}
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -123,13 +124,13 @@ def _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list):
     cmd['revert']['params'] = {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_policy_rule',
-                    'args'  : { 'add':False, 'links': links, 'policy_id': policy_id,
+                    'args'  : { 'add': False, 'links': links, 'policy_id': policy_id,
                                 'fallback': fallback, 'order': order, 'acl_id': acl_id }
     }
     cmd_list.append(cmd)
     return cmd_list
 
-def _add_policy_rule_from_cache_key(policy_id, links, cache_key, fallback, order, cmd_list):
+def _add_policy_rule_from_cache_key(policy_id, priority, links, cache_key, fallback, order, cmd_list):
     """Translates single policy rule into commands to be applied to VPP.
 
      :param params:    policy rule parameters received from flexiManage.
@@ -145,7 +146,7 @@ def _add_policy_rule_from_cache_key(policy_id, links, cache_key, fallback, order
                     'module': 'fwutils',
                     'func':   'vpp_multilink_update_policy_rule',
                     'args'  : { 'add': True, 'links': links, 'policy_id': policy_id,
-                                'fallback': fallback, 'order': order },
+                                'fallback': fallback, 'order': order, 'priority': priority },
                     'substs' : [{'add_param': 'acl_id', 'val_by_key': cache_key}]
     }
     cmd['revert'] = {}
@@ -191,7 +192,7 @@ def _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list):
     }
     cmd_list.append(cmd)
 
-def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list):
+def _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list):
     """Generate attach policy commands.
 
      :param policy_id:   Policy id.
@@ -202,10 +203,10 @@ def _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip
     """
     is_ipv6 = 0
 
-    for int_name in lan_pci_list:
+    for int_name in lan_vpp_name_list:
         _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list)
 
-    for int_name in loopback_ip_list:
+    for int_name in loopback_vpp_name_list:
         _attach_policy(int_name, policy_id, priority, is_ipv6, cmd_list)
 
 def _add_acl(params, cmd_list, cache_key):
@@ -247,28 +248,16 @@ def add_policy(params):
      :returns: List of commands.
     """
     cmd_list = []
-    lan_pci_list = fwglobals.g.router_cfg.get_lan_interface_names()
-    loopback_ip_list = fwglobals.g.router_cfg.get_tunnel_interface_names()
+    lan_vpp_name_list      = fwutils.get_interface_vpp_names(type='lan')
+    loopback_vpp_name_list = fwutils.get_tunnel_interface_vpp_names()
 
     policy_acl_ids = set()
 
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['descr']  = "remove-multilink-policy"
-    cmd['cmd']['params'] = {
-                            'object': 'fwglobals.g.router_api',
-                            'func'  : 'call',
-                            'args'  : { 'req' : 'remove-multilink-policy' }
-                           }
-    cmd_list.append(cmd)
-
     for rule in params['rules']:
         priority = rule['priority']
-        fallback = rule['action']['fallback']
-        order = rule['action']['order']
-        links = rule['action']['links']
+        fallback = rule['action'].get('fallback', 'by-destination')
+        order    = rule['action'].get('order', 'priority')
+        links    = rule['action']['links']
 
         classification = rule['classification']
         app = classification.get('application', None)
@@ -277,8 +266,8 @@ def add_policy(params):
         if prefix:
             _add_acl(prefix, cmd_list, 'acl_index')
             policy_id = _generate_policy_id()
-            _add_policy_rule_from_cache_key(policy_id, links, 'acl_index', fallback, order, cmd_list)
-            _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+            _add_policy_rule_from_cache_key(policy_id, priority, links, 'acl_index', fallback, order, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list)
 
         elif app:
             id = app.get('appId', None)
@@ -292,14 +281,14 @@ def add_policy(params):
                 if acl_id in policy_acl_ids:
                     continue
                 policy_id = _generate_policy_id()
-                _add_policy_rule(policy_id, links, acl_id, fallback, order, cmd_list)
-                _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+                _add_policy_rule(policy_id, priority, links, acl_id, fallback, order, cmd_list)
+                _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list)
                 policy_acl_ids.add(acl_id)
 
         else:
             policy_id = _generate_policy_id()
-            _add_policy_rule(policy_id, links, None, fallback, order, cmd_list)
-            _attach_policy_lans_loopbacks(policy_id, priority, lan_pci_list, loopback_ip_list, cmd_list)
+            _add_policy_rule(policy_id, priority, links, None, fallback, order, cmd_list)
+            _attach_policy_lans_loopbacks(policy_id, priority, lan_vpp_name_list, loopback_vpp_name_list, cmd_list)
 
     return cmd_list
 

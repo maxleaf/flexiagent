@@ -92,10 +92,12 @@ def add_interface(params):
     ######################################################################
 
     # Add interface section into Netplan configuration file
-    gw = params.get('gateway', None)
+    gw     = params.get('gateway', None)
+    metric = params.get('metric', 0)
+    dhcp   = params.get('dhcp', 'no')
 
     # enable DHCP packets detection in VPP
-    if params.get('dhcp','') == 'yes':
+    if dhcp == 'yes':
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']   = "python"
@@ -126,8 +128,8 @@ def add_interface(params):
                           'pci'   : iface_pci,
                           'ip'    : iface_addr,
                           'gw'    : gw,
-                          'metric': params.get('metric'),
-                          'dhcp'  : params.get('dhcp')
+                          'metric': metric,
+                          'dhcp'  : dhcp
                          }
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -141,8 +143,8 @@ def add_interface(params):
                           'pci'   : iface_pci,
                           'ip'    : iface_addr,
                           'gw'    : gw,
-                          'metric': params.get('metric'),
-                          'dhcp'  : params.get('dhcp')
+                          'metric': metric,
+                          'dhcp'  : dhcp
                 }
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"

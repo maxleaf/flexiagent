@@ -1,22 +1,11 @@
 [
 {
 	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
 	"message": "start-router",
 	"params": {
 	"interfaces": [
 	   {
 		"pci": "0000:00:03.00",
-		"addr": "192.168.0.105/24",
 		"type":"wan",
 	        "dhcp":"yes"
 	   },
@@ -28,76 +17,15 @@
 	   },
 	   {
 		"pci": "0000:00:09.00",
-		"addr": "50.50.50.1/24",
-		"routing":"ospf",
-		"type":"lan"
+		"type":"wan",
+	        "dhcp":"yes"
+	   },
+	   {
+		"pci": "0000:00:0a.00",
+		"type":"wan",
+	        "dhcp":"yes"
 	   }
 	   ]
 	}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-stats",
-	"params": {}
-},
-{
-	"entity": "agent",
-	"message": "get-device-info",
-	"params": {}
 }
 ]
