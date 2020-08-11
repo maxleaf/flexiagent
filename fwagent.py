@@ -1070,17 +1070,17 @@ if __name__ == '__main__':
     parser_reset = subparsers.add_parser('reset', help='Reset device: clear router configuration and remove device registration')
     parser_reset.add_argument('-s', '--soft', action='store_true',
                         help="clean router configuration only, device remains registered")
-    parser_reset.add_argument('-q', '--quite', action='store_true',
+    parser_reset.add_argument('-q', '--quiet', action='store_true',
                         help="don't print info onto screen, print into syslog only")
     parser_stop = subparsers.add_parser('stop', help='Stop router and reset interfaces')
     parser_stop.add_argument('-s', '--reset_softly', action='store_true',
                         help="reset router softly: clean router configuration")
     parser_stop.add_argument('-r', '--dont_stop_vpp', action='store_true',
                         help="stop agent connection loop only")
-    parser_stop.add_argument('-q', '--quite', action='store_true',
+    parser_stop.add_argument('-q', '--quiet', action='store_true',
                         help="don't print info onto screen, print into syslog only")
     parser_start = subparsers.add_parser('start', help='Resumes daemon connection loop if it was stopped by "fwagent stop"')
-    parser_start.add_argument('-q', '--quite', action='store_true',
+    parser_start.add_argument('-q', '--quiet', action='store_true',
                         help="don't print info onto screen, print into syslog only")
     parser_start.add_argument('-r', '--start_router', action='store_true',
                         help="start router before loop is started")
@@ -1108,7 +1108,7 @@ if __name__ == '__main__':
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
-    if hasattr(args, 'quite') and args.quite:
+    if hasattr(args, 'quiet') and args.quiet:
         fwglobals.log.set_target(to_syslog=True, to_terminal=False)
 
     fwglobals.log.debug("---> exec " + str(args), to_terminal=False)

@@ -435,7 +435,7 @@ class Fwglobals:
             if reply['ok'] == 1 and handler.get('sign', False):
                 # Update the configuration signature
                 self.router_cfg.update_signature(received_msg)
-                # Add the updated signatire to the reply, so server could be quite
+                # Add the updated signatire to the reply, so server could be quiet
                 reply['router-cfg-hash'] = self.router_cfg.get_signature()
 
             return reply

@@ -56,9 +56,9 @@ class TestFwagent:
         if daemon_pid:
             os.system('kill -9 %s' % daemon_pid)                # Ensure daemon by previous failed test does not run
         if vpp_does_run():
-            os.system('%s stop --quite' % self.fwagent_py)      # Stop vpp and restore interfaces back to Linux
-        os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
-        os.system('%s -s' % self.fwkill_py)                     # The kill shot - ensure vpp does not run
+            os.system('%s stop --quiet' % self.fwagent_py)      # Stop vpp and restore interfaces back to Linux
+        os.system('%s reset --soft --quiet' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+        os.system('%s --clean_cfg --quiet' % self.fwkill_py)    # The kill shot - ensure vpp does not run
         if traceback:
             print("!!!! TestFwagent got exception !!!")
             tb.print_tb(traceback)
