@@ -1,0 +1,127 @@
+{
+  "entity": "agent",
+  "message": "aggregated",
+  "params": {
+    "requests": [
+        {
+          "entity":  "agent",
+          "message": "remove-tunnel",
+          "params": {
+            "src": "10.0.0.4",
+            "dst": "20.0.0.4",
+            "tunnel-id": 1,
+            "ipsec": {
+              "local-sa": {
+                 "spi": 1020,
+                 "crypto-alg": "aes-cbc-128",
+                 "crypto-key": "1020aa794f574265564551694d653768",
+                 "integr-alg": "sha1-96",
+                 "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+              },
+              "remote-sa": {
+                 "spi": 2010,
+                 "crypto-alg": "aes-cbc-128",
+                 "crypto-key": "2010aa794f574265564551694d653768",
+                 "integr-alg": "sha1-96",
+                 "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+              }
+            },
+            "loopback-iface": {
+              "addr":"10.100.0.1/31",
+              "mac":"08:00:27:fd:00:02",
+              "mtu":1420,
+              "routing":"ospf",
+              "multilink": {
+                "labels": [ "brown", "gray" ]
+              }
+            }
+          }
+        }
+        ,
+        {
+          "entity":  "agent",
+          "message": "add-tunnel",
+          "params": {
+            "src": "10.0.0.4",
+            "dst": "20.0.0.4",
+            "tunnel-id": 1,
+            "ipsec": {
+              "local-sa": {
+                 "spi": 1020,
+                 "crypto-alg": "aes-cbc-128",
+                 "crypto-key": "1020aa794f574265564551694d653768",
+                 "integr-alg": "sha1-96",
+                 "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+              },
+              "remote-sa": {
+                 "spi": 2010,
+                 "crypto-alg": "aes-cbc-128",
+                 "crypto-key": "2010aa794f574265564551694d653768",
+                 "integr-alg": "sha1-96",
+                 "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+              }
+            },
+            "loopback-iface": {
+              "addr":"10.100.0.1/31",
+              "mac":"08:00:27:fd:00:02",
+              "mtu":1420,
+              "routing":"ospf",
+              "multilink": {
+                "labels": [ "brown", "gray" ]
+              }
+            }
+          }
+        }
+        ,
+        {
+          "entity":  "agent",
+          "message": "remove-interface",
+          "params": {
+              "pci":"0000:00:09.00",
+              "addr":"192.168.56.102/24",
+              "routing":"ospf",
+              "type":"lan"
+          }
+        }
+        ,
+        {
+          "entity":  "agent",
+          "message": "add-interface",
+          "params": {
+              "pci":"0000:00:09.00",
+              "addr":"192.168.56.102/24",
+              "routing":"ospf",
+              "type":"lan"
+          }
+        }
+        ,
+        {
+          "entity": "agent",
+          "message": "add-multilink-policy",
+          "params": {
+            "id": "aaaabbbbcccc",
+            "rules": [
+              {
+                "id": "1",
+                "priority": 0,
+                "classification": {
+                  "prefix": {
+                    "ip": "4.4.4.4/32",
+                    "ports": "5060",
+                    "protocol": "udp"
+                  }
+                },
+                "action": {
+                  "links": [
+                    {
+                      "pathlabels": [ "orange" ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+    ]
+  }
+}

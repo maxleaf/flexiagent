@@ -146,7 +146,7 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
 
-    # # Enable NAT in vpp configuration file
+    # Enable NAT in vpp configuration file
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"

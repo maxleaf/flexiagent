@@ -36,6 +36,7 @@ class TestFwagent:
     def __init__(self):
         code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
+        self.fwkill_py  = 'python ' + os.path.join(code_root, 'tools', 'common', 'fwkill.py')
         self.log_start_time = get_log_time()
 
     def __enter__(self):
@@ -57,6 +58,7 @@ class TestFwagent:
         if vpp_does_run():
             os.system('%s stop --quite' % self.fwagent_py)      # Stop vpp and restore interfaces back to Linux
         os.system('%s reset --soft --quite' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+        os.system('%s -s' % self.fwkill_py)                     # The kill shot - ensure vpp does not run
         if traceback:
             print("!!!! TestFwagent got exception !!!")
             tb.print_tb(traceback)

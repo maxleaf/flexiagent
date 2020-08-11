@@ -1,0 +1,247 @@
+{
+  "entity": "agent",
+  "message": "aggregated",
+  "params": {
+    "requests": [
+		{
+		  "entity": "agent",
+		  "message": "remove-dhcp-config",
+		  "params": {
+			"interface": "0000:00:09.00",
+		    "range_start": "40.40.40.04",
+		    "range_end": "40.40.40.40",
+		    "dns": [ "8.8.8.8" ]
+		  }
+		}
+		,
+		{
+		  "entity": "agent",
+		  "message": "add-dhcp-config",
+		  "params": {
+			"interface": "0000:00:09.00",
+		    "range_start": "20.20.20.200",
+		    "range_end": "20.20.20.250",
+		    "dns": [
+			"8.8.4.4",
+			"8.8.8.8"
+		    ],
+		    "mac_assign": []
+		  }
+		}  
+		,
+		{
+		  "entity": "agent",
+		  "message": "remove-multilink-policy",
+		  "params": {
+			"id": "aaaabbbbcccc",
+			"rules": [
+			  {
+				"id": "1",
+				"priority": 0,
+				"classification": {
+				  "prefix": {
+					"ip": "4.4.4.4/32",
+					"ports": "5060",
+					"protocol": "udp"
+				  }
+				},
+				"action": {
+				  "links": [
+					{
+					  "pathlabels": [ "orange" ]
+					}
+				  ]
+				}
+			  }
+			]
+		  }
+		}
+		,
+		{
+		  "entity": "agent",
+		  "message": "add-multilink-policy",
+		  "params": {
+			"id": "5ed4127aa81d8258b96b4853",
+			"rules": [
+			  {
+				"id": "1",
+				"priority": 0,
+				"classification": {
+				  "prefix": {
+					"ip": "8.8.4.4/32"
+				  }
+				},
+				"action": {
+				  "links": [
+					{
+					  "pathlabels": [ "green" ]
+					}
+				  ]
+				}
+			  }
+			]
+		  }
+		}
+		,
+		{
+		  "entity": "agent",
+		  "message": "remove-application",
+		  "params": {
+			"applications": [
+			  {
+				"name": "nighttime",
+				"id": "3",
+				"category": "management",
+				"serviceClass": "network-control",
+				"importance": "low",
+				"description": "Nighttime Protocol",
+				"rules": [
+				  {
+					"protocol": "udp",
+					"ports": "28"
+				  }
+				]
+			  }
+			]
+		  }
+		}
+		,
+		{
+		  "entity": "agent",
+		  "message": "add-application",
+		  "params": {
+			"applications": [
+			  {
+				"name": "new_ssh",
+				"id": "55",
+				"category": "remote_access",
+				"serviceClass": "default",
+				"importance": "low",
+				"description": "New Secure Shell (NSSH)",
+				"rules": [
+				  {
+					"protocol": "tcp",
+					"ports": "22"
+				  }
+				],
+				"modified": false
+			  },
+			  {
+				"name": "telnet",
+				"id": "6",
+				"category": "remote_access",
+				"serviceClass": "default",
+				"importance": "medium",
+				"description": "Telnet protocol",
+				"rules": [
+				  {
+					"protocol": "tcp",
+					"ports": "22"
+				  }
+				],
+				"modified": false
+			  }
+            ]
+		  }
+		}
+		,
+		{
+		  "entity":  "agent",
+		  "message": "remove-tunnel",
+		  "params": {
+			"src": "10.0.0.6",
+			"dst": "20.0.0.4",
+			"tunnel-id": 1,
+			"ipsec": {
+			  "local-sa": {
+				 "spi": 1020,
+				 "crypto-alg": "aes-cbc-128",
+				 "crypto-key": "1020aa794f574265564551694d653768",
+				 "integr-alg": "sha1-96",
+				 "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+			  },
+			  "remote-sa": {
+				 "spi": 2010,
+				 "crypto-alg": "aes-cbc-128",
+				 "crypto-key": "2010aa794f574265564551694d653768",
+				 "integr-alg": "sha1-96",
+				 "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+			  }
+			},
+			"loopback-iface": {
+			  "addr":"10.100.0.1/31",
+			  "mac":"08:00:27:fd:00:02",
+			  "mtu":1420,
+			  "routing":"ospf",
+			  "multilink": {
+				"labels": [ "brown", "gray" ]
+			  }
+			}
+		  }
+		}
+		,
+		{
+		  "entity":  "agent",
+		  "message": "modify-interface",
+		  "params": {
+			  "pci":"0000:00:09.00",
+			  "addr":"192.168.56.102/24",
+		      "routing":"ospf",
+		      "type":"lan"
+		  }
+		}
+		,
+		{
+		  "entity":  "agent",
+		  "message": "modify-interface",
+		  "params": {
+			  "pci":"0000:00:08.00",
+			  "addr":"10.0.0.4/24",
+			  "gateway": "10.0.0.10",
+			  "type":"wan",
+			  "multilink": {
+				  "labels": [
+					  "green",
+					  "blue",
+					  "red"]
+			  }
+		  }
+		}
+		,
+		{
+		  "entity":  "agent",
+		  "message": "add-tunnel",
+		  "params": {
+			"src": "10.0.0.4",
+			"dst": "20.0.0.4",
+			"tunnel-id": 1,
+			"ipsec": {
+			  "local-sa": {
+				 "spi": 1020,
+				 "crypto-alg": "aes-cbc-128",
+				 "crypto-key": "1020aa794f574265564551694d653768",
+				 "integr-alg": "sha1-96",
+				 "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+			  },
+			  "remote-sa": {
+				 "spi": 2010,
+				 "crypto-alg": "aes-cbc-128",
+				 "crypto-key": "2010aa794f574265564551694d653768",
+				 "integr-alg": "sha1-96",
+				 "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+			  }
+			},
+			"loopback-iface": {
+			  "addr":"10.100.0.1/31",
+			  "mac":"08:00:27:fd:00:02",
+			  "mtu":1420,
+			  "routing":"ospf",
+			  "multilink": {
+				"labels": [ "brown", "gray" ]
+			  }
+			}
+		  }
+		}
+	]
+  }
+}
