@@ -22,13 +22,6 @@
 
 import services.openvpn
 
-fwservices_api = {
-    'install-service':       '_install_service',
-    'uninstall-service':     '_uninstall_service',
-    'modify-service':        '_modify_service',
-    'upgrade-service':       '_upgrade_service',    
-}
-
 services = {
     'open-vpn': services.openvpn
 }
@@ -49,82 +42,40 @@ class FwServices:
 
         :returns: Reply.
         """
+        message = req['message']
         params = req['params']
+        service_type = params['type']
         
-        service = services.get(params['type'])
-        assert service, '%s: "%s" app is not supported' % (req, params['type'])
-
-        handler = fwservices_api.get(req['message'])
-        assert handler, 'fwservices_api: "%s" request is not supported' % req
-
-        handler_func = getattr(self, handler)
-        assert handler_func, 'fwservices_api: handler=%s not found for req=%s' % (handler, req)
-
-        reply = handler_func(service, params)
+        service = services.get(service_type)
+        assert service, '%s: "%s" service is not supported' % (message, service_type)
+        
+        reply = {'ok': 1}
+        if (message == 'install-service'):
+            try:
+                service.install(params['config'])
+            except:
+                service.uninstall()
+                reply = {'ok': 0}
+        elif message == 'uninstall-service':
+            try:
+                service.uninstall()
+            except:
+                reply = {'ok': 0}
+        elif message == 'modify-service':
+            try:
+                service.modify(params['config'])
+            except:
+                reply = {'ok': 0}
+        elif message == 'upgrade-service':
+            try:
+                service.upgrade(params['config'])
+            except:
+                reply = {'ok': 0}
+        else:
+            reply = {'ok': 0}
 
         if reply['ok'] == 0:
-            reply = {'entity':'servicesReply', 'message': "fwservices_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']), 'ok': 0}
+            reply = {'entity':'servicesReply', 'message': False, 'ok': 0}
         else:
             reply = {'entity':'servicesReply', 'message': True, 'ok': 1}
-        return reply
-
-    def _install_service(self, module, params):
-        """Install service.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        try:
-            module.install(params['config'])
-            reply = {'ok': 1}
-        except:
-            module.uninstall()
-            reply = {'ok': 0}
-
-        return reply
-
-    def _uninstall_service(self, module, params):
-        """Uninstall service.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        try:
-            module.uninstall()
-            reply = {'ok': 1}
-        except:
-            reply = {'ok': 0}
-
-        return reply
-    
-    def _modify_service(self, module, params):
-        """Modify service.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        try:
-            module.modify(params['config'])
-            reply = {'ok': 1}
-        except:
-            reply = {'ok': 0}
-
-        return reply
-
-    def _upgrade_service(self, module, params):
-        """Upgrade service.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with information and status code.
-        """
-        try:
-            module.upgrade(params['config'])
-            reply = {'ok': 1}
-        except:
-            reply = {'ok': 0}
-
         return reply

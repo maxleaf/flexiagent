@@ -26,9 +26,6 @@ import fwglobals
 import subprocess
 from netaddr import IPNetwork, IPAddress
 
-def upgrade(params):
-    return install(params)
-
 def install(params):
     """Install Open VPN server on host.
     In general, policy rules instruct VPP to route packets to specific interface,
@@ -45,7 +42,7 @@ def install(params):
         version = 'stable'
     else:
         version = 'stable'
-    
+
     os.system('mkdir -p /etc/openvpn')
     os.system('mkdir -p /etc/openvpn/server')
     os.system('mkdir -p /etc/openvpn/client')
@@ -156,6 +153,9 @@ def uninstall():
         return (False, msg)
 
     return (True, None) 
+
+def upgrade(params):
+    return install(params)
 
 def configure_server_file(params):
 
