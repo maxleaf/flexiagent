@@ -180,7 +180,7 @@ class FWROUTER_API:
 
         # If vpp runs already, or if management didn't request to start it, return.
         vpp_runs = fwutils.vpp_does_run()
-        vpp_should_be_started = fwglobals.g.router_cfg.exists('start-router')
+        vpp_should_be_started = fwglobals.g.router_cfg.exists({'message': 'start-router'})
         if vpp_runs or not vpp_should_be_started:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
@@ -254,7 +254,11 @@ class FWROUTER_API:
         # The preprocessing adds the simulated 'remove-application' request to the
         # the real received 'add-application' forming thus new aggregation request.
         #
-        request = self._preprocess_request(request)
+        new_request = self._preprocess_request(request)
+        if not new_request:
+            fwglobals.log.debug("FWROUTER_API::call: ignore no-op request %s" % json.dumps(request))
+            return { 'ok': 1, 'message':'request has no impact' }
+        request = new_request
 
         # Stop vpp if it should be restarted.
         #
@@ -316,22 +320,7 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
-        # Go over all remove-* requests and replace their parameters
-        # with parameters of the corresponding add-* requests that are stored in request database.
-        # Usually the remove-* request has only partial set of parameters
-        # received with correspondent add-* request. That makes it impossible
-        # to revert remove-* request if one of the subsequent requests
-        # in the aggregated request fails and as a result of this whole aggregated request is rollback-ed.
-        # For example, 'remove-interface' has 'pci' parameter only, and has no IP, LAN/WAN type, etc.
         fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
-        for request in requests:
-            try:
-                if re.match('remove-', request['message']):
-                    request['params'] = fwglobals.g.router_cfg.get_request_params(request)
-            except Exception as e:
-                fwglobals.log.excep("_call_aggregated: failed to fetch params for %s: %s " % (json.dumps(request), str(e)))
-                raise e
-
 
         for (idx, request) in enumerate(requests):
             try:
@@ -671,7 +660,37 @@ class FWROUTER_API:
         params  = request.get('params')
         updated = False
 
-        multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
+        # First of all ensure that received 'remove-X' and 'modify-X' 
+        # stand for existing configuration item.
+        # 
+        if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(request):
+            fwglobals.log.debug("_preprocess_request: no configuration was found for %s" % json.dumps(request))
+            return None
+        elif req == 'aggregated':
+            requests = [ r for r in params['requests'] if \
+                            not re.match('(remove-|modify-)', r['message']) or \
+                            (re.match('(remove-|modify-)', r['message']) and fwglobals.g.router_cfg.exists(r)) ]
+            if not requests:
+                fwglobals.log.debug("_preprocess_request: no configuration was found for %s" % json.dumps(request))
+                return None
+            if len(requests) < len(params['requests']):
+                fwglobals.log.debug("_preprocess_request: stripped no-op remove-X/modify-X-s: %s" % json.dumps(request))
+            params['requests'] = requests
+
+        # For aggregated request go over all remove-X requests and replace their
+        # parameters with current configuration for X stored in database.
+        # The remove-* request might have partial set of parameters only.
+        # For example, 'remove-interface' has 'pci' parameter only and
+        # has no IP, LAN/WAN type, etc.
+        # That makes it impossible to revert these partial remove-X requests
+        # on aggregated message rollback that might happen due to failure in
+        # in one of the subsequent  requests in the aggregation list.
+        #
+        if req == 'aggregated':
+            for _request in params['requests']:
+                if re.match('remove-', _request['message']):
+                    _request['params'] = fwglobals.g.router_cfg.get_request_params(_request)
+
 
         # 'modify-X' preprocessing:
         #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
@@ -697,6 +716,8 @@ class FWROUTER_API:
             if updated:
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
             return request
+
+        multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
 
         # 'add-application' preprocessing:
         # 1. The currently configured applications should be removed firstly.

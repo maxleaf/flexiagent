@@ -163,14 +163,14 @@ class FwRouterCfg:
             return (None, None)
         return (self.db[req_key].get('cmd_list'), self.db[req_key].get('executed'))
 
-    def exists(self, req_name, params=None):
+    def exists(self, request):
         """Check if entry exists in DB.
 
-        :param req:  name of configuration request.
+        :param request: the configuration request as it would be received from flexiManage
 
         :returns: 'True' if request exists and 'False' otherwise.
         """
-        req_key = self._get_request_key({'message': req_name, 'params': params})
+        req_key = self._get_request_key(request)
         res = True if req_key in self.db else False
         return res
 
