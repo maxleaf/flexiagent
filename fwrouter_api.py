@@ -228,7 +228,19 @@ class FWROUTER_API:
         """
         fwglobals.log.debug("FWROUTER_API::call: %s" % json.dumps(request))
 
-        # First of all find out if:
+        dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
+
+        # First of all remove strip out requests that have no impact
+        # on configuration, like 'remove-X' for not existing configuration
+        # items and 'add-X' for existing configuration items.
+        #
+        new_request = self._strip_noop_request(request)
+        if not new_request:
+            fwglobals.log.debug("FWROUTER_API::call: ignore no-op request: %s" % json.dumps(request))
+            return { 'ok': 1, 'message':'request has no impact' }
+        request = new_request
+
+        # Now find out if:
         # 1. VPP should be restarted as a result of request execution.
         #    It should be restarted on addition/removal interfaces in order
         #    to capture new interface /release old interface back to Linux.
@@ -251,11 +263,7 @@ class FWROUTER_API:
         # The preprocessing adds the simulated 'remove-application' request to the
         # the real received 'add-application' forming thus new aggregation request.
         #
-        new_request = self._preprocess_request(request)
-        if not new_request:
-            fwglobals.log.debug("FWROUTER_API::call: ignore no-op request %s" % json.dumps(request))
-            return { 'ok': 1, 'message':'request has no impact' }
-        request = new_request
+        request = self._preprocess_request(request)
 
         # Stop vpp if it should be restarted.
         #
@@ -265,7 +273,7 @@ class FWROUTER_API:
         # Finally handle the request
         #
         if request['message'] == 'aggregated':
-            reply = self._call_aggregated(request['params']['requests'])
+            reply = self._call_aggregated(request['params']['requests'], dont_revert_on_failure)
         else:
             reply = self._call_simple(request)
 
@@ -308,12 +316,17 @@ class FWROUTER_API:
         return reply
 
 
-    def _call_aggregated(self, requests):
+    def _call_aggregated(self, requests, dont_revert_on_failure=False):
         """Execute multiple requests.
         It do that as an atomic operation,
         i.e. if one of requests fails, all the previous are reverted.
 
-        :param requests:         Request list.
+        :param requests:    Request list.
+        :param dont_revert_on_failure:  If True the succeeded requests in list
+                            will not be reverted on failure of any request.
+                            This bizare logic is used for device sync feature,
+                            where there is no need to restore configuration,
+                            as it is out of sync with the flexiManage.
 
         :returns: Status codes dictionary.
         """
@@ -324,6 +337,8 @@ class FWROUTER_API:
                 fwglobals.log.debug("_call_aggregated: executing request %s" % (json.dumps(request)))
                 self._call_simple(request)
             except Exception as e:
+                if dont_revert_on_failure:
+                    raise e
                 # Revert previously succeeded simple requests
                 fwglobals.log.error("_call_aggregated: failed to execute %s. reverting previous requests..." % json.dumps(request))
                 for request in reversed(requests[0:idx]):
@@ -337,7 +352,7 @@ class FWROUTER_API:
                         fwglobals.log.excep("%s: %s" % (err_str, format(e)))
                         self._set_router_failure(err_str)
                         pass
-                raise
+                raise e
 
         fwglobals.log.debug("FWROUTER_API: === end handling aggregated request ===")
         return {'ok':1}
@@ -553,6 +568,45 @@ class FWROUTER_API:
                     fwglobals.log.excep(err_str)
                     self._set_router_failure("_revert: failed to revert '%s'" % t['cmd']['descr'])
 
+    def _strip_noop_request(self, request):
+        """Checks if the request has no impact on configuration.
+        For example, the 'remove-X'/'modify-X' for not existing configuration
+        item or 'add-X' request for existing configuration item.
+
+        :param request: The request received from flexiManage.
+
+        :returns: request after stripping out no impact reqeuests.
+        """
+        def _should_be_stripped(_request):
+            req    = _request['message']
+            params = _request['message']
+
+            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
+                return True
+            elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
+                # Ensure this is actaully not modification request :)
+                curr_params = fwglobals.g.router_cfg.get_request_params(_request)
+                if params == curr_params:
+                    return True
+            return False
+
+        if request['message'] != 'aggregated':
+            if _should_be_stripped(request):
+                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
+                return None
+        else:  # aggregated request
+            requests = []
+            for _request in request['params']['requests']:
+                if _should_be_stripped(_request) == False:
+                    requests.append(_request)
+            if not requests:
+                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
+                return None
+            if len(requests) < len(request['params']['requests']):
+                fwglobals.log.debug("_strip_noop_request: aggragation after strip: %s" % json.dumps(requests))
+            request['params']['requests'] = requests
+        return request
+
     def _analyze_request(self, request):
         """Analyzes received request either simple or aggregated in order to
         deduce if some special actions, like router restart, are needed as a
@@ -656,23 +710,6 @@ class FWROUTER_API:
         req     = request['message']
         params  = request.get('params')
         updated = False
-
-        # First of all ensure that received 'remove-X' and 'modify-X' stand for
-        # existing configuration item.
-        #
-        if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(request):
-            fwglobals.log.debug("_preprocess_request: no configuration was found for %s" % json.dumps(request))
-            return None
-        elif req == 'aggregated':
-            requests = [ r for r in params['requests'] if \
-                            not re.match('(remove-|modify-)', r['message']) or \
-                            (re.match('(remove-|modify-)', r['message']) and fwglobals.g.router_cfg.exists(r)) ]
-            if not requests:
-                fwglobals.log.debug("_preprocess_request: no configuration was found for %s" % json.dumps(request))
-                return None
-            if len(requests) < len(params['requests']):
-                fwglobals.log.debug("_preprocess_request: stripped no-op remove-X/modify-X-s: %s" % json.dumps(request))
-            params['requests'] = requests
 
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.

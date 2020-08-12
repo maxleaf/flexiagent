@@ -33,7 +33,11 @@ def test():
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     for t in test_cases:
         with fwtests.TestFwagent() as agent:
+
+            if idx == 0:
+                print("")
             print("   " + os.path.basename(t))
+
             (ok,_) = agent.cli('-f %s' % t)
             assert ok, "%s failed" % t
 
