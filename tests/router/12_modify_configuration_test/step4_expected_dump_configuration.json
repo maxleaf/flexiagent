@@ -1,13 +1,13 @@
 {
   "======= START COMMAND =======": [
     {
-      "Key ": "start-router", 
+      "Key": "start-router", 
       "Params": null
     }
   ], 
   "======== INTERFACES ========": [
     {
-      "Key ": "add-interface:0000:00:08.00", 
+      "Key": "add-interface:0000:00:08.00", 
       "Params": {
         "addr": "10.0.0.4/24", 
         "gateway": "10.0.0.10", 
@@ -25,7 +25,7 @@
   ], 
   "========== TUNNELS ==========": [
     {
-      "Key ": "add-tunnel:2", 
+      "Key": "add-tunnel:2", 
       "Params": {
         "dst": "30.0.0.4", 
         "ipsec": {
@@ -61,7 +61,7 @@
       }
     }, 
     {
-      "Key ": "add-tunnel:7", 
+      "Key": "add-tunnel:7", 
       "Params": {
         "dst": "70.0.0.7", 
         "ipsec": {
@@ -96,7 +96,7 @@
       }
     }, 
     {
-      "Key ": "add-tunnel:1", 
+      "Key": "add-tunnel:1", 
       "Params": {
         "dst": "20.0.0.4", 
         "ipsec": {
@@ -136,7 +136,7 @@
 {
   "============ APPLICATIONS ============": [
     {
-      "Key ": "add-application", 
+      "Key": "add-application", 
       "Params": {
         "applications": [
           {
@@ -159,7 +159,7 @@
   ], 
   "============= POLICIES =============": [
     {
-      "Key ": "add-multilink-policy", 
+      "Key": "add-multilink-policy", 
       "Params": {
         "id": "aaaabbbbcccc", 
         "rules": [

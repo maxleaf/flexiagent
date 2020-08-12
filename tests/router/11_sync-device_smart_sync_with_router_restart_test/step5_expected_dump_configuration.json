@@ -1,7 +1,7 @@
 {
   "======= START COMMAND =======": [
     {
-      "Key ": "start-router", 
+      "Key": "start-router", 
       "Params": null
     }
   ]
@@ -9,7 +9,7 @@
 {
   "============ APPLICATIONS ============": [
     {
-      "Key ": "add-application", 
+      "Key": "add-application", 
       "Params": {
         "applications": [
           {

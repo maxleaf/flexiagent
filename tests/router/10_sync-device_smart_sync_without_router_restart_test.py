@@ -82,6 +82,8 @@ def test():
                 print("")
             print("   " + os.path.basename(step))
 
+            step_start_time = fwtests.get_log_time()
+
             # Inject request.
             # Note the first request comes with 'daemon=True' to leave agent
             # running on background, so it could receive further injects.
@@ -129,6 +131,16 @@ def test():
                 lines = agent.grep_log('router was started: vpp_pid=', print_findings=False)
                 assert len(lines) == 1, "log has not expected number of VPP starts: %d:%s" % \
                                         (len(lines), '\n'.join(lines))
+
+                # Ensure that smart sync is indeed smart: it should reconfigure
+                # only delta between 'sync-device' content and current
+                # configuration. Step6 modifies 3 tunnels. So we should see 6
+                # executed requests in log: 3 'remove-tunnel'-s and 3 'add-tunnel'-s.
+                #
+                if idx == 5:  # step6_cfg_modify_tunnels_only.cli
+                    lines = agent.grep_log('FWROUTER_API: === start execution of ', print_findings=False, since=step_start_time)
+                    assert len(lines) == 6, "log has not expected number of sync requests: %d:%s" % \
+                                            (len(lines), '\n'.join(lines))
 
 if __name__ == '__main__':
     test()

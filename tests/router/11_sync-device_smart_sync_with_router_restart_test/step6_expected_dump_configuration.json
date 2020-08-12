@@ -1,13 +1,13 @@
 {
   "======= START COMMAND =======": [
     {
-      "Key ": "start-router", 
+      "Key": "start-router", 
       "Params": null
     }
   ], 
   "======== INTERFACES ========": [
     {
-      "Key ": "add-interface:0000:00:08.00", 
+      "Key": "add-interface:0000:00:08.00", 
       "Params": {
         "addr": "10.0.0.4/24", 
         "gateway": "10.0.0.10", 
@@ -23,7 +23,7 @@
       }
     }, 
     {
-      "Key ": "add-interface:0000:00:09.00", 
+      "Key": "add-interface:0000:00:09.00", 
       "Params": {
         "addr": "192.168.56.102/24", 
         "pci": "0000:00:09.00", 
@@ -36,7 +36,7 @@
 {
   "============ APPLICATIONS ============": [
     {
-      "Key ": "add-application", 
+      "Key": "add-application", 
       "Params": {
         "applications": [
           {

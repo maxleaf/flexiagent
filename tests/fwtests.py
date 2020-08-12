@@ -111,8 +111,11 @@ class TestFwagent:
         out = subprocess.check_output(cmd, shell=True)
         return out.rstrip()
 
-    def grep_log(self, pattern, print_findings=True):
+    def grep_log(self, pattern, print_findings=True, since=None):
         found = []
+        if not since:
+            since = self.log_start_time
+
         grep_cmd = "sudo egrep '%s' /var/log/flexiwan/agent.log" % pattern
         try:
             out = subprocess.check_output(grep_cmd, shell=True)
@@ -121,7 +124,7 @@ class TestFwagent:
                 for line in lines:
                     # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
                     line_time = get_log_line_time(line)
-                    if line_time > self.log_start_time:
+                    if line_time >= since:
                         found.append(line)
                 if found and print_findings:
                     for line in found:

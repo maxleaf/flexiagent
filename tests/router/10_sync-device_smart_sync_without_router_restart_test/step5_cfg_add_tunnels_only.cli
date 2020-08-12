@@ -12,12 +12,7 @@
 			  "addr":"10.0.0.4/24",
 			  "gateway": "10.0.0.10",
 			  "type":"wan",
-			  "multilink": {
-				  "labels": [
-					  "green",
-					  "blue",
-					  "red"]
-			  }
+              "multilink": { "labels": [ "green" ] }
 		  }
 		}
 		,
