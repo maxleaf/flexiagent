@@ -81,12 +81,13 @@ class OS_DECODERS:
                 'dhcp':'',
                 'gateway':'',
                 'metric': '',
+                'internet_source':  ''
             }
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
             
             if isWifi:
-                daddr['wifi'] = isWifi
+                daddr['internet_source'] = 'wifi'
                 daddr['driver'] = fwutils.get_wifi_interface_driver(nicname)
 
                 

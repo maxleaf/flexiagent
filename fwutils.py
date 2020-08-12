@@ -1441,10 +1441,12 @@ def get_reconfig_hash():
     vpp_run = vpp_does_run()
 
     for wan in wan_list:
-        name = pci_to_linux_iface(wan['pci'])
+        name = None
+        if 'pci' in wan and wan['pci'] != '':
+            name = pci_to_linux_iface(wan['pci'])
 
-        if name is None and vpp_run:
-            name = pci_to_tap(wan['pci'])
+            if name is None and vpp_run:
+                name = pci_to_tap(wan['pci'])
 
         if name is None:
             return ''
@@ -1683,7 +1685,6 @@ def get_wifi_interface_driver(interface_name):
         cmd = 'ethtool -i %s' % interface_name        
         out = subprocess.check_output(cmd, shell=True).splitlines()
         vals = out[0].decode().split("driver: ", 1)
-        print('vals=%s' % vals[-1])
         return vals[-1]
     except subprocess.CalledProcessError:
         return ''   
