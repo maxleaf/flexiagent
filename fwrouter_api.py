@@ -842,11 +842,15 @@ class FWROUTER_API:
             'add-multilink-policy'    : -1
         }
 
+        reinstall_multilink_policy = True
+
         for (idx , _request) in enumerate(requests):
             for req_name in indexes:
                 if req_name == _request['message']:
                     if indexes[req_name] == -1:
                         indexes[req_name] = idx
+                    if req_name == 'remove-multilink-policy':
+                        reinstall_multilink_policy = False
                     break
 
         def _insert_request(requests, idx, req_name, params, updated):
@@ -887,10 +891,10 @@ class FWROUTER_API:
                 # it is not supported yet ;) Implement on demand
                 raise Exception("_preprocess_request: 'remove-multilink-policy' was found after 'add-multilink-policy': NOT SUPPORTED")
 
-        # Now preprocess 'add/remove-application':
-        # reinstall multilink policy if exists:
-        # - remove policy before the first appearance of one of preprocessing requests
-        # - add policy at the end of request list
+        # Now preprocess 'add/remove-application' and 'add/remove-interface':
+        # reinstall multilink policy if:
+        # - any of 'add/remove-application', 'add/remove-interface' appears in request
+        # - the original request does not have 'remove-multilink-policy'
         #
         if multilink_policy_params:
             # Firstly find the right place to insert the 'remove-multilink-policy'.
@@ -915,15 +919,15 @@ class FWROUTER_API:
                 idx_policy = indexes['remove-multilink-policy']
                 _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
                 del requests[idx_policy + 1]
-            if indexes['add-multilink-policy'] < idx_last and indexes['add-multilink-policy'] >= 0:  # We exploit the fact that only one 'add-multilink-policy' is possible
-                # Move 'add-multilink-policy' to the idx_last+1 position:
-                # insert it as the idx_last position and delete the original 'add-multilink-policy'.
+            if indexes['add-multilink-policy'] > -1 and indexes['add-multilink-policy'] < idx_last:  # We exploit the fact that only one 'add-multilink-policy' is possible
+                # Move 'add-multilink-policy' to the idx_last+1 position to be after all other 'add-X':
+                # insert it at the idx_last position and delete the original 'add-multilink-policy'.
                 idx_policy = indexes['add-multilink-policy']
                 _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
                 del requests[idx_policy]
             if indexes['remove-multilink-policy'] == -1:
                 _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
-            if indexes['add-multilink-policy'] == -1:
+            if indexes['add-multilink-policy'] == -1 and reinstall_multilink_policy:
                 _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
 
         if updated:
