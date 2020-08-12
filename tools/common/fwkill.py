@@ -28,6 +28,8 @@
 # -> unbinds network interfaces
 # -> reverts netplan config files
 # -> reverts VPP startup config file
+# If argument '-s' was provided:
+# -> clean router configuration database
 
 import os
 import sys
@@ -38,16 +40,16 @@ import fwglobals
 import fwutils
 import fwnetplan
 
-VPP_CONFIG_FILE = '/etc/vpp/startup.conf'
-
 def main():
     """Entry point.
     """
     print ("Shutting down flexiwan-router...")
+    fwglobals.initialize()
     os.system('systemctl stop flexiwan-router')
     fwutils.stop_vpp()
     fwnetplan.restore_linux_netplan_files()
-    fwutils.vpp_startup_conf_remove_nat(VPP_CONFIG_FILE)
+    if '-s' in sys.argv:
+        fwutils.reset_router_config()
     print ("Done.")
 
 if __name__ == '__main__':
