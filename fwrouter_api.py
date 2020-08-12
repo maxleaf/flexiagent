@@ -112,16 +112,11 @@ class FWROUTER_API:
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
                     fwglobals.log.debug("watchdog: initiate restore")
 
-                    self.vpp_api.disconnect()       # Reset connection to vpp to force connection renewal
-                    restored = self.restore_vpp_if_needed()  # Rerun VPP and apply configuration
+                    self.vpp_api.disconnect()   # Reset connection to vpp to force connection renewal
+                    self.router_started = False # Reset state so configuration will applied correctly (no simulated remove-X-s)
+                    self._restore_vpp()         # Rerun VPP and apply configuration
 
-                    if not restored:                # If some magic happened and vpp is alive without restore, connect back to VPP
-                        if fwutils.vpp_does_run():
-                            fwglobals.log.debug("watchdog: vpp is alive with no restore!!! (pid=%s)" % str(fwutils.vpp_pid))
-                            self.vpp_api.connect()
-                        fwglobals.log.debug("watchdog: no need to restore")
-                    else:
-                        fwglobals.log.debug("watchdog: restore finished")
+                    fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
                 fwglobals.log.error("watchdog: exception: %s" % str(e))
                 pass
@@ -192,7 +187,10 @@ class FWROUTER_API:
                 fwnetplan._set_netplan_filename(netplan_files)
             return False
 
-        # Now start router.
+        self._restore_vpp()
+        return True
+
+    def _restore_vpp(self):
         fwglobals.log.info("===restore vpp: started===")
         try:
             with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
@@ -204,7 +202,6 @@ class FWROUTER_API:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
             self._set_router_failure("failed to restore vpp configuration")
         fwglobals.log.info("====restore vpp: finished===")
-        return True
 
     def start_router(self):
         """Execute start router command.
@@ -660,9 +657,9 @@ class FWROUTER_API:
         params  = request.get('params')
         updated = False
 
-        # First of all ensure that received 'remove-X' and 'modify-X' 
-        # stand for existing configuration item.
-        # 
+        # First of all ensure that received 'remove-X' and 'modify-X' stand for
+        # existing configuration item.
+        #
         if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(request):
             fwglobals.log.debug("_preprocess_request: no configuration was found for %s" % json.dumps(request))
             return None
@@ -1008,7 +1005,7 @@ class FWROUTER_API:
         ]
         messages = fwglobals.g.router_cfg.dump(types=types)
         for msg in messages:
-            reply = fwglobals.g.handle_request(msg)
+            reply = fwglobals.g.router_api.call(msg)
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 

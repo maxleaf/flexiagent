@@ -56,9 +56,8 @@ class TestFwagent:
         if daemon_pid:
             os.system('kill -9 %s' % daemon_pid)                # Ensure daemon by previous failed test does not run
         if vpp_does_run():
-            os.system('%s stop --quiet' % self.fwagent_py)      # Stop vpp and restore interfaces back to Linux
+            os.system('%s --quiet' % self.fwkill_py)            # The kill shot - ensure vpp does not run
         os.system('%s reset --soft --quiet' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
-        os.system('%s --clean_cfg --quiet' % self.fwkill_py)    # The kill shot - ensure vpp does not run
         if traceback:
             print("!!!! TestFwagent got exception !!!")
             tb.print_tb(traceback)
@@ -130,6 +129,26 @@ class TestFwagent:
         except subprocess.CalledProcessError:
             pass   # 'egrep' returns failure on no match!
         return found
+
+    def wait_log_line(self, pattern, timeout=1):
+        '''Periodically greps agent log for pattern until the pattern is found.
+
+        :param pattern: the pattern for grep.
+        :param timeout: how much seconds wait for pattern to appear in log.
+
+        :returns: True on success, False if pattern was not found.
+        '''
+        # If 'cfg_to_check' is a file, convert it into list of tuples.
+        #
+        to = timeout
+        found = self.grep_log(pattern, print_findings=False)
+        while not found and timeout > 0:
+            time.sleep(1)
+            timeout -= 1
+            found = self.grep_log(pattern, print_findings=False)
+        if timeout == 0:
+            return False
+        return True
 
 
 def vpp_does_run():
@@ -281,20 +300,6 @@ def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
     if not configured:  # If failed - run again, this time with print_error=True
         configured = vpp_is_configured(cfg_to_check, print_error=True)
     return configured
-
-
-def wait_fwagent_exit(timeout=1000000):
-    for p in psutil.process_iter(attrs=['pid', 'cmdline']):
-        found = [True for cmd_arg in p.info['cmdline'] if 'fwagent.py' in cmd_arg]
-        if found:
-            p.terminate()
-            (_, alive) = psutil.wait_procs([p], timeout=timeout)
-            for p in alive:
-                p.kill()
-                print("ERROR: wait_fwagent_exit: %s: %s" % (p.info['pid'], str(p)))
-                print("ERROR: wait_fwagent_exit: return on timeout (%s): %s" % (str(timeout), p.info['pid']))
-                return False
-    return True
 
 def file_exists(filename, check_size=True):
     try:
