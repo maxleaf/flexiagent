@@ -47,7 +47,6 @@ os_api_defs = {
     'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
     'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'stop_router':{'module':'fwutils', 'api':'stop_router', 'decode':'default'},
     'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
     'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
 }
@@ -126,14 +125,16 @@ class OS_API:
         """
         self.decoders = OS_DECODERS()
 
-    def call_simple(self, req, params=None):
+    def call_simple(self, request):
         """Handle a request from os_api_defs.
 
-        :param req: Request name.
-        :param params: Parameters from flexiManage.
+        :param request: The request received from flexiManage.
 
         :returns: Reply with status and error message.
         """
+        req    = request['message']
+        params = request.get('params')
+
         api_defs = os_api_defs.get(req)
         if api_defs == None:
             reply = {'entity':'osReply', 'message':'API Error', 'ok':0}

@@ -7,6 +7,7 @@
       {
         "pci":"0000:00:08.00",
         "addr":"8.8.1.1/24",
+        "gateway": "8.8.1.254",
         "type":"wan"
       },
       {
@@ -58,11 +59,9 @@
     "modify_interfaces": {
       "interfaces": [
         {
-          "pci": "0000:00:09.00",
-          "addr": "70.70.70.70/24",
-          "addr6": "",
-          "routing": "OSPF",
-          "type": "LAN"
+          "pci": "0000:00:08.00",
+          "addr": "8.8.4.4/24",
+          "type": "WAN"
         }
       ]
     }
