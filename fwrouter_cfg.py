@@ -384,18 +384,6 @@ class FwRouterCfg:
         is called sync-list. It includes sequence of 'remove-X' and 'add-X'
         requests that should be applied to device in order to configure it with
         the configuration, reflected in the input list 'requests'.
-            Order of requests in the sync-list is important for proper
-        configuration of VPP! The list should start with the 'remove-X' requests
-        in order to remove not needed configuration items and to modify existing
-        configuration in following order:
-            [ 'add-multilink-policy', 'add-application', 'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
-        Than the sync-list should include the 'add-X' requests to add missing
-        configuration items or to complete modification of existing configuration
-        items. The 'add-X' requests should be added in order opposite to the
-        'remove-X' requests:
-            [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        Note the modification is broken into pair of correspondent 'remove-X' and
-        'add-X' requests.
 
         :param requests: list of requests that reflects the desired configuration.
                          The requests are in formant of flexiManage<->flexiEdge
@@ -426,9 +414,7 @@ class FwRouterCfg:
         # list as 'remove-X' with dumped parameters and than added again as
         # 'add-X' but with new parameters found in input list.
         #
-        add_order       = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        remove_order    = add_order[::-1]  # Reverse with no modification of source list :)
-        dumped_requests = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+        dumped_requests = fwglobals.g.router_cfg.dump(keys=True)
         output_requests = []
 
         for dumped_request in dumped_requests:
@@ -467,12 +453,7 @@ class FwRouterCfg:
         # At this point the input list includes 'add-X' requests that stand
         # for new or for modified configuration items.
         # Just go and add them to the output list 'as-is'.
-        # Note we don't rely on order of requests in the input list, so we go
-        # and do double cycling of O(n*m) to ensure proper order.
         #
-        for req_name in add_order:
-            for _request in input_requests.values():
-                if _request['message'] == req_name:
-                    output_requests.append(_request)
+        output_requests += input_requests.values()
 
         return output_requests

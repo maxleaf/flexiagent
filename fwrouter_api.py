@@ -813,26 +813,54 @@ class FWROUTER_API:
         if req != 'aggregated':
             return request
 
-        # Now perform same preprocessing for aggregated requests, either
+
+        ########################################################################
+        # Handle 'aggregated' request.
+        # Perform same preprocessing for aggregated requests, either
         # original or created above.
-        # We do few passes on requests to find insertion points if needed.
-        # It is based on the first appearance of the preprocessor requests.
-        #
-        requests = params['requests']
+        ########################################################################
 
         # Preprocess 'modify-X':
         #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
         #     Implement real modification on demand :)
         #
         new_requests = []
-        for _request in requests:
+        for _request in params['requests']:
             if re.match('modify-', _request['message']):
                 new_requests += _preprocess_modify_X(_request)
             else:
                 new_requests.append(_request)
         params['requests'] = new_requests
+
+        # Go over all requests and rearrange them, as order of requests is
+        # important for proper configuration of VPP!
+        # The list should start with the 'remove-X' requests in following order:
+        #   [ 'add-multilink-policy', 'add-application', 'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
+        # Than the 'add-X' requests should follow in opposite order:
+        #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        #
+        add_order    = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
+        remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
+        remove_order.append('stop-router')
+        remove_order.reverse()
+        requests     = []
+        for req_name in remove_order:
+            for _request in params['requests']:
+                if re.match(req_name, _request['message']):
+                    requests.append(_request)
+        for req_name in add_order:
+            for _request in params['requests']:
+                if re.match(req_name, _request['message']):
+                    requests.append(_request)
+        if requests != params['requests']:
+            fwglobals.log.debug("_preprocess_request: rearranged aggregation: %s" % json.dumps(requests))
+            params['requests'] = requests
         requests = params['requests']
 
+
+        # We do few passes on requests to find insertion points if needed.
+        # It is based on the first appearance of the preprocessor requests.
+        #
         indexes = {
             'remove-interface'        : -1,
             'add-interface'           : -1,
