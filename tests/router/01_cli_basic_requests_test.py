@@ -31,7 +31,7 @@ import fwtests
 def test():
     tests_path = __file__.replace('.py', '')
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
-    for t in test_cases:
+    for (idx,t) in enumerate(test_cases):
         with fwtests.TestFwagent() as agent:
 
             if idx == 0:

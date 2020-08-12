@@ -68,41 +68,6 @@
       }
     }, 
     {
-      "Key": "add-tunnel:7", 
-      "Params": {
-        "dst": "70.0.0.7", 
-        "ipsec": {
-          "local-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "9030aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "9030ff4b55523947594d6d3547666b45764e6a58", 
-            "spi": 1090
-          }, 
-          "remote-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "9010aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "9010ff4b55523947594d6d3547666b45764e6a58", 
-            "spi": 9010
-          }
-        }, 
-        "loopback-iface": {
-          "addr": "10.100.0.9/31", 
-          "mac": "08:00:27:fd:00:09", 
-          "mtu": 1420, 
-          "multilink": {
-            "labels": [
-              "orange"
-            ]
-          }, 
-          "routing": "ospf"
-        }, 
-        "src": "10.0.0.4", 
-        "tunnel-id": 7
-      }
-    }, 
-    {
       "Key": "add-tunnel:2", 
       "Params": {
         "dst": "30.0.0.4", 
@@ -135,6 +100,41 @@
         }, 
         "src": "10.0.0.4", 
         "tunnel-id": 2
+      }
+    }, 
+    {
+      "Key": "add-tunnel:7", 
+      "Params": {
+        "dst": "70.0.0.7", 
+        "ipsec": {
+          "local-sa": {
+            "crypto-alg": "aes-cbc-128", 
+            "crypto-key": "9030aa794f574265564551694d653768", 
+            "integr-alg": "sha1-96", 
+            "integr-key": "9030ff4b55523947594d6d3547666b45764e6a58", 
+            "spi": 1090
+          }, 
+          "remote-sa": {
+            "crypto-alg": "aes-cbc-128", 
+            "crypto-key": "9010aa794f574265564551694d653768", 
+            "integr-alg": "sha1-96", 
+            "integr-key": "9010ff4b55523947594d6d3547666b45764e6a58", 
+            "spi": 9010
+          }
+        }, 
+        "loopback-iface": {
+          "addr": "10.100.0.9/31", 
+          "mac": "08:00:27:fd:00:09", 
+          "mtu": 1420, 
+          "multilink": {
+            "labels": [
+              "orange"
+            ]
+          }, 
+          "routing": "ospf"
+        }, 
+        "src": "10.0.0.4", 
+        "tunnel-id": 7
       }
     }
   ], 

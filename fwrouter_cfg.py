@@ -203,9 +203,10 @@ class FwRouterCfg:
                 types.remove(t)
 
         # The dump is O(num_types x n) - improve that on demand!
-        cfg = []
+        cfg     = []
+        db_keys = sorted(self.db.keys())  # The key order might be affected by dictionary content, so sort it
         for req in types:
-            for key in self.db:
+            for key in db_keys:
                 if re.match(req, key):
                     request = {
                         'message': self.db[key].get('request',""),
