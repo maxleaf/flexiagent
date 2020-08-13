@@ -1659,6 +1659,30 @@ def fix_aggregated_message_format(msg):
 
     return msg  # No conversion is needed
 
+def get_available_access_points(interface_name):
+    """Get WIFI available access points.                            
+
+    :param interface_name: Interface name to get.
+
+    :returns: string array of essids
+    """    
+    #   -i wlxd0374523abfb
+    access_points = []
+
+    def clean(n): 
+        n = n.replace('"', '')
+        n = n.strip()
+        n = n.split(':')[-1]
+        return n
+  
+    try:
+        cmd = 'iwlist %s scan | grep ESSID' % interface_name        
+        access_points = subprocess.check_output(cmd, shell=True).splitlines()
+        access_points = map(clean, access_points)         
+        return access_points
+    except subprocess.CalledProcessError:
+        return access_points
+
 def is_wifi_interface(interface_name):
     """Check if interface is WIFI.                            
 

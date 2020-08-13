@@ -33,15 +33,16 @@ import fwstats
 import fwutils
 
 fwagent_api = {
-    'get-device-info':          '_get_device_info',
-    'get-device-stats':         '_get_device_stats',
-    'get-device-logs':          '_get_device_logs',
-    'get-device-packet-traces': '_get_device_packet_traces',
-    'get-device-os-routes':     '_get_device_os_routes',
-    'get-router-config':        '_get_router_config',
-    'upgrade-device-sw':        '_upgrade_device_sw',
-    'reset-device':             '_reset_device_soft',
-    'sync-device':              '_sync_device'
+    'get-device-info':                  '_get_device_info',
+    'get-device-stats':                 '_get_device_stats',
+    'get-device-logs':                  '_get_device_logs',
+    'get-device-packet-traces':         '_get_device_packet_traces',
+    'get-device-os-routes':             '_get_device_os_routes',
+    'get-router-config':                '_get_router_config',
+    'upgrade-device-sw':                '_upgrade_device_sw',
+    'reset-device':                     '_reset_device_soft',
+    'sync-device':                      '_sync_device',
+    'get-wifi-available-access-points': '_get_wifi_available_access_points'
 }
 
 class FWAGENT_API:
@@ -346,3 +347,14 @@ class FWAGENT_API:
         fwglobals.g.router_cfg.reset_signature()
         fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
         return {'ok': 1}
+
+    def _get_wifi_available_access_points(self, params):
+        fwglobals.log.info("FWAGENT_API: _get_wifi_available_access_points STARTED")
+        
+        try:
+            access_points = fwutils.get_available_access_points(params['interfaceName'])
+            return {'message': access_points, 'ok': 1}
+        except:
+            raise Exception("_get_device_logs: failed to get available access points: %s" % format(sys.exc_info()[1]))
+
+

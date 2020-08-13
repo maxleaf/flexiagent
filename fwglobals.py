@@ -56,15 +56,16 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'get-device-info':              {'name': '_call_agent_api'},
-    'get-device-stats':             {'name': '_call_agent_api'},
-    'get-device-logs':              {'name': '_call_agent_api'},
-    'get-device-packet-traces':     {'name': '_call_agent_api'},
-    'get-device-os-routes':         {'name': '_call_agent_api'},
-    'get-router-config':            {'name': '_call_agent_api'},
-    'upgrade-device-sw':            {'name': '_call_agent_api'},
-    'reset-device':                 {'name': '_call_agent_api'},
-    'sync-device':                  {'name': '_call_agent_api'},
+    'get-device-info':                   {'name': '_call_agent_api'},
+    'get-device-stats':                  {'name': '_call_agent_api'},
+    'get-device-logs':                   {'name': '_call_agent_api'},
+    'get-device-packet-traces':          {'name': '_call_agent_api'},
+    'get-device-os-routes':              {'name': '_call_agent_api'},
+    'get-router-config':                 {'name': '_call_agent_api'},
+    'upgrade-device-sw':                 {'name': '_call_agent_api'},
+    'reset-device':                      {'name': '_call_agent_api'},
+    'sync-device':                       {'name': '_call_agent_api'},
+    'get-wifi-available-access-points':  {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
