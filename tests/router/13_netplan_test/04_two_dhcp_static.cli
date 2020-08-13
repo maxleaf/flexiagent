@@ -1,0 +1,26 @@
+[
+    {
+        "entity": "agent",
+        "message": "modify-device",
+        "params": {
+            "modify_router": {
+                "assign": [
+                    {
+                        "pci": "0000:00:07.00",
+                        "dhcp": "yes",
+                        "addr": "10.0.5.147/24",
+                        "addr6": "fe80::824:49ff:fe84:4111/64",
+                        "gateway": "",
+                        "metric": "",
+                        "routing": "NONE",
+                        "type": "WAN",
+                        "multilink": {
+                            "labels": []
+                        }
+                    }
+                ]
+            },
+            "reconnect": true
+        }
+    }
+]
