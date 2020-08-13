@@ -13,7 +13,9 @@
         "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
-            "green"
+            "green", 
+            "blue", 
+            "red"
           ]
         }, 
         "pci": "0000:00:08.00", 
@@ -34,7 +36,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
-        "dst": "100.0.0.4", 
+        "dst": "20.0.0.4", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -68,16 +70,16 @@
       }
     }, 
     {
-      "Key": "add-tunnel:2", 
+      "Key": "add-tunnel:12", 
       "Params": {
-        "dst": "30.0.0.4", 
+        "dst": "12.0.0.4", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
             "crypto-key": "3030aa794f574265564551694d653768", 
             "integr-alg": "sha1-96", 
             "integr-key": "3030ff4b55523947594d6d3547666b45764e6a58", 
-            "spi": 3030
+            "spi": 1030
           }, 
           "remote-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -99,7 +101,7 @@
           "routing": "ospf"
         }, 
         "src": "10.0.0.4", 
-        "tunnel-id": 2
+        "tunnel-id": 12
       }
     }, 
     {
@@ -123,7 +125,7 @@
           }
         }, 
         "loopback-iface": {
-          "addr": "10.100.0.8/31", 
+          "addr": "10.100.0.9/31", 
           "mac": "08:00:27:fd:00:09", 
           "mtu": 1420, 
           "multilink": {

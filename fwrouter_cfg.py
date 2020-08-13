@@ -203,9 +203,10 @@ class FwRouterCfg:
                 types.remove(t)
 
         # The dump is O(num_types x n) - improve that on demand!
-        cfg = []
+        cfg     = []
+        db_keys = sorted(self.db.keys())  # The key order might be affected by dictionary content, so sort it
         for req in types:
-            for key in self.db:
+            for key in db_keys:
                 if re.match(req, key):
                     request = {
                         'message': self.db[key].get('request',""),
@@ -252,7 +253,7 @@ class FwRouterCfg:
 
             # Add configuration item to section
             item = {
-                'Key ':   msg['key'],
+                'Key':    msg['key'],
                 'Params': msg['params']
             }
             if full:
@@ -384,18 +385,6 @@ class FwRouterCfg:
         is called sync-list. It includes sequence of 'remove-X' and 'add-X'
         requests that should be applied to device in order to configure it with
         the configuration, reflected in the input list 'requests'.
-            Order of requests in the sync-list is important for proper
-        configuration of VPP! The list should start with the 'remove-X' requests
-        in order to remove not needed configuration items and to modify existing
-        configuration in following order:
-            [ 'add-multilink-policy', 'add-application', 'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
-        Than the sync-list should include the 'add-X' requests to add missing
-        configuration items or to complete modification of existing configuration
-        items. The 'add-X' requests should be added in order opposite to the
-        'remove-X' requests:
-            [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        Note the modification is broken into pair of correspondent 'remove-X' and
-        'add-X' requests.
 
         :param requests: list of requests that reflects the desired configuration.
                          The requests are in formant of flexiManage<->flexiEdge
@@ -417,67 +406,55 @@ class FwRouterCfg:
             key = self._get_request_key(request)
             input_requests.update({key:request})
 
-        # Now dump local configuration in order of 'remove-X' list
+        # Now dump local configuration in order of 'remove-X' list.
+        # We will go over dumped requests and filter out requests that present
+        # in the input list and that have same parameters. They correspond to
+        # configuration items that should be not touched by synchronization.
+        # The dumped requests that present in the input list but have different
+        # parameters stand for modifications. They should be added to the output
+        # list as 'remove-X' with dumped parameters and than added again as
+        # 'add-X' but with new parameters found in input list.
         #
-        add_order       = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
-        remove_order    = add_order[::-1]  # Reverse with no modification of source list :)
-        output_requests = fwglobals.g.router_cfg.dump(types=remove_order, keys=True)
+        dumped_requests = fwglobals.g.router_cfg.dump(keys=True)
+        output_requests = []
 
-        same_requests = {}            # Exactly same configuration items, no need to add/remove/modify
-        remove_request_indexes = []   # Indexes of requests in output list that should be removed
-
-        # Now go over dumped requests and remove those that present in the input
-        # list and that have same parameters. They correspond to configuration
-        # items that should be not touched by synchronization. The dumped requests
-        # that present in the input list but have different parameters stand
-        # for modifications. They should be added to the output list as 'remove-X'
-        # and than added again as 'add-X' later as it would be a new configuration
-        # item.
-        #
-        for (idx, request) in enumerate(output_requests):
-            dumped_key = request['key']
+        for dumped_request in dumped_requests:
+            dumped_key = dumped_request['key']
             if dumped_key in input_requests:
-                dumped_params = request.get('params')
+                # The configuration item presents in the input list.
+                #
+                dumped_params = dumped_request.get('params')
                 input_params  = input_requests[dumped_key].get('params')
                 if dumped_params == input_params:
-                    # Exactly same configuration item should be removed from
-                    # output list. It should be neither removed nor added nor modified.
-                    # As well note it aside, so it will be not added later, when
-                    # 'add-X' from input list that stands for new items
-                    # will be added to the output list.
+                    # The configuration item has exactly same parameters.
+                    # It does not require sync, so remove it from input list.
                     #
-                    remove_request_indexes.append(idx)  # Can't delete from list, while iterating over it, so store it for now
-                    same_requests[dumped_key] = None
+                    del input_requests[dumped_key]
                 else:
-                    # The modified configuration item should stay in both
-                    # the output list and the input list. Though in output list
-                    # it should come with 'remove-X' request name.
-                    # It should stay in the input list to be added later as 'add-X'.
+                    # The configuration item should be modified.
+                    # So add the correspondent 'remove-X' request with current
+                    # parameters to the output list and later in this function
+                    # we will add the correspondent 'add-X' request with new
+                    # parameters out of the input list.
                     #
-                    request['message'] = request['message'].replace('add-', 'remove-')
+                    dumped_request['message'] = dumped_request['message'].replace('add-', 'remove-')
+                    output_requests.append(dumped_request)
             else:
                 # The configuration item does not present in the input list.
-                # So it stands for item to be removed.
+                # So it stands for item to be removed. Add correspondent request
+                # to the output list.
+                # Ignore 'start-router', 'stop-router', etc as they are not
+                # an configuration items.
                 #
-                if request['message'] == 'start-router':
-                    remove_request_indexes.append(idx)
-                else:
-                    request['message'] = request['message'].replace('add-', 'remove-')
-
-        for idx in remove_request_indexes[::-1]:
-            del output_requests[idx]
+                if not re.search('(start|stop)-router', dumped_request['message']):
+                    dumped_request['message'] = dumped_request['message'].replace('add-', 'remove-')
+                    output_requests.append(dumped_request)
 
 
         # At this point the input list includes 'add-X' requests that stand
         # for new or for modified configuration items.
         # Just go and add them to the output list 'as-is'.
-        # Note we don't rely on order of requests in the input list, so we go
-        # and do double cycling of O(n x m) to ensure proper order.
-        for req in add_order:
-            for request in requests:
-                if request['message'] == req:
-                    key = self._get_request_key(request)
-                    if not key in same_requests:  # Don't add requests that should be not removed/added/modified
-                        output_requests.append(request)
+        #
+        output_requests += input_requests.values()
 
         return output_requests

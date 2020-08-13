@@ -51,7 +51,7 @@ cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 ######################################################################
 def flow_01():
     with fwtests.TestFwagent() as agent:
-	
+
         (ok, _) = agent.cli('-f %s' % cli_add_config_file)
         assert ok
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
@@ -82,7 +82,7 @@ def flow_01():
 ######################################################################
 def flow_02():
     with fwtests.TestFwagent() as agent:
-	
+
         (ok, _) = agent.cli('-f %s' % cli_add_config_file)
         assert ok
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
@@ -107,7 +107,7 @@ def flow_02():
 ######################################################################
 def flow_03():
     with fwtests.TestFwagent() as agent:
-	
+
         (ok, _) = agent.cli('-f %s' % cli_add_config_file)
         assert ok
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
@@ -121,6 +121,7 @@ def flow_03():
         assert fwtests.vpp_is_configured([('interfaces', 0),('tunnels', 0)])
 
 def test():
+    print("")
     print("    flow_01")
     flow_01()
     print("    flow_02")

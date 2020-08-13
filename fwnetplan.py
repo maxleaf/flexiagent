@@ -21,7 +21,6 @@
 ################################################################################
 
 import glob
-import hashlib
 import os
 import time
 import subprocess
