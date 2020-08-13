@@ -25,7 +25,6 @@ import os
 import re
 import sys
 import shutil
-import pdb
 
 code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
 test_root = code_root + '/tests/'
@@ -38,7 +37,6 @@ cli_start_router_file = os.path.join(cli_path, 'start-router.cli')
 multiple_netplan = os.path.join(cli_path, 'multiple_netplans/')
 
 def test():
-    pdb.set_trace()
     tests_path = __file__.replace('.py', '')
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     yaml_config = sorted(glob.glob('%s/*.yaml' % tests_path))
