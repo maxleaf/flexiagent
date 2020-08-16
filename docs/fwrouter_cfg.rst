@@ -1,7 +1,7 @@
-fwdb\_requests module
+fwrouter\_cfg module
 =====================
 
-.. automodule:: fwdb_requests
+.. automodule:: fwrouter_cfg
     :members:
     :undoc-members:
     :show-inheritance:

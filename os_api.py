@@ -23,6 +23,7 @@
 from netaddr import IPAddress
 import psutil
 import json
+import fwnetplan
 import fwutils
 import fwstats
 import os
@@ -46,7 +47,6 @@ os_api_defs = {
     'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
     'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'stop_router':{'module':'fwutils', 'api':'stop_router', 'decode':'default'},
     'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
     'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
 }
@@ -62,26 +62,35 @@ class OS_DECODERS:
         :returns: Array of interface descriptions.
         """
         out = []
+
         for nicname, addrs in inp.items():
             pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] != "":
-                daddr = {
-                            'name':nicname, 
-                            'pciaddr':pciaddr[0], 
-                            'driver':pciaddr[1], 
-                            'MAC':'', 
-                            'IPv4':'',
-                            'IPv4Mask':'', 
-                            'IPv6':'',
-                            'IPv6Mask':''
-                        }
-                for addr in addrs:
-                    addr_af_name = fwutils.af_to_name(addr.family)
-                    daddr[addr_af_name] = addr.address.split('%')[0]
-                    if addr.netmask != None:
-                        daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-                out.append(daddr)
+            if pciaddr[0] == "":
+                continue
+            daddr = {
+                        'name':nicname,
+                        'pciaddr':pciaddr[0],
+                        'driver':pciaddr[1],
+                        'MAC':'',
+                        'IPv4':'',
+                        'IPv4Mask':'',
+                        'IPv6':'',
+                        'IPv6Mask':'',
+                        'dhcp':'',
+                        'gateway':'',
+                        'metric': '',
+                    }
+            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
+            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
+            for addr in addrs:
+                addr_af_name = fwutils.af_to_name(addr.family)
+                daddr[addr_af_name] = addr.address.split('%')[0]
+                if addr.netmask != None:
+                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
+            out.append(daddr)
         return (out,1)
+
     def execd(self, handle):
         """Read from a descriptor.
 
@@ -107,14 +116,16 @@ class OS_API:
         """
         self.decoders = OS_DECODERS()
 
-    def call_simple(self, req, params=None):
+    def call_simple(self, request):
         """Handle a request from os_api_defs.
 
-        :param req: Request name.
-        :param params: Parameters from flexiManage.
+        :param request: The request received from flexiManage.
 
         :returns: Reply with status and error message.
         """
+        req    = request['message']
+        params = request.get('params')
+
         api_defs = os_api_defs.get(req)
         if api_defs == None:
             reply = {'entity':'osReply', 'message':'API Error', 'ok':0}

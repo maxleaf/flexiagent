@@ -20,7 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import copy
 import os
 
 import fwutils
@@ -33,46 +32,23 @@ def _change_dhcpd_conf(params, cmd_list):
 
     :returns: None.
     """
-    params['is_add'] = 1
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['params'] = {
-        'module': 'fwutils',
-        'func': 'modify_dhcpd',
-        'args': {'params': params}
-    }
-    revert_params = copy.deepcopy(params)
-    revert_params['is_add'] = 0
-    cmd['cmd']['descr'] = "modify dhcpd config file"
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "update dhcpd config file"
+    cmd['cmd']['params']    = {
+                                'module': 'fwutils',
+                                'func':   'modify_dhcpd',
+                                'args':   { 'is_add': 1, 'params': params }
+                              }
     cmd['revert'] = {}
-    cmd['revert']['name'] = 'python'
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "clean dhcpd config file"
     cmd['revert']['params'] = {
-        'module': 'fwutils',
-        'func': 'modify_dhcpd',
-        'args': {'params': revert_params}
-    }
-    cmd['revert']['descr'] = "clean dhcpd config file"
-
-    cmd_list.append(cmd)
-
-
-def _punt_ip_broadcast(cmd_list):
-    """Add ip route to punt ip broadcast.
-
-    :param cmd_list:            List of commands.
-
-    :returns: None.
-    """
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
-    cmd['cmd']['descr'] = "punt ip brodcast"
-    cmd['revert'] = {}
-    cmd['revert']['name'] = 'exec'
-    cmd['revert']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via drop"]
-    cmd['revert']['descr'] = "drop ip broadcast"
+                                'module': 'fwutils',
+                                'func':   'modify_dhcpd',
+                                'args':   { 'is_add': 0, 'params': params }
+                              }
     cmd_list.append(cmd)
 
 
@@ -105,7 +81,6 @@ def add_dhcp_config(params):
     cmd_list = []
 
     _change_dhcpd_conf(params, cmd_list)
-    _punt_ip_broadcast(cmd_list)
     _restart_dhcp_server(cmd_list)
 
     return cmd_list

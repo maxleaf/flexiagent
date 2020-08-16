@@ -1,0 +1,300 @@
+[
+{
+  "entity": "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+      {
+        "pci":"0000:00:08.00",
+        "addr":"10.0.0.4/24",
+        "gateway": "10.0.0.10",
+        "type":"wan"
+      },
+      {
+        "pci":"0000:00:09.00",
+        "addr":"192.168.56.101/24",
+        "gateway": "192.168.56.1",
+        "type":"wan",
+        "routing":"ospf"
+      }
+    ]
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-route",
+  "params": {
+      "addr": "9.9.9.9",
+	  "via": "192.168.56.1",
+      "pci":"0000:00:09.00"
+    }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-application",
+  "params": {
+    "applications": [
+      {
+        "name": "echo",
+        "id": "1",
+        "category": "management",
+        "serviceClass": "oam",
+        "importance": "medium",
+        "description": "Echo Protocol",
+        "rules": [
+          {
+            "protocol": "tcp",
+            "ports": "7"
+          },
+          {
+            "protocol": "udp",
+            "ports": "7"
+          }
+        ],
+        "modified": false
+      }
+	]
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-multilink-policy",
+  "params": {
+    "id": "5ed4127aa81d8258b96b4853",
+    "rules": [
+      {
+        "id": "1",
+        "priority": 0,
+        "classification": {
+          "prefix": {
+            "ip": "8.8.8.8/32",
+            "ports": "",
+            "protocol": ""
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "green" , "blue" ],
+              "order": "load-balance"
+            },
+            {
+              "pathlabels": [ "blue" ],
+              "order": "priority"
+            }
+          ],
+          "order": "load-balance",
+          "fallback": "by-destination"
+        }
+      }
+	]
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-dhcp-config",
+  "params": {
+	"interface": "0000:00:09.00",
+    "range_start": "20.20.20.100",
+    "range_end": "20.20.20.150",
+    "dns": [
+		"8.8.8.8"
+    ]
+  }
+}  
+,
+{
+  "entity":  "agent",
+  "message": "remove-tunnel",
+  "params": {
+    "src": "10.0.0.4",
+    "dst": "70.0.0.7",
+    "tunnel-id": 7,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1070,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "7030aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "7030ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 7010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "7010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "7010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.7/31",
+      "mac":"08:00:27:fd:00:07",
+      "mtu":1420,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "orange" ]
+      }
+    }
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-interface",
+  "params": {
+    "pci":"0000:00:20.00",
+    "addr":"20.0.0.20/24",
+    "gateway": "20.0.0.200",
+    "type":"wan"
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "aggregated",
+  "params": {
+	"requests": [
+        {
+          "entity": "agent",
+          "message": "remove-route",
+          "params": {
+            "addr": "9.9.9.9",
+            "via": "192.168.56.1",
+            "pci":"0000:00:09.00"
+          }
+        }
+        ,
+        {
+          "entity": "agent",
+          "message": "remove-application",
+          "params": {
+            "applications": [
+              {
+                "name": "echo",
+                "id": "1",
+                "category": "management",
+                "serviceClass": "oam",
+                "importance": "medium",
+                "description": "Echo Protocol",
+                "rules": [
+                  {
+                    "protocol": "tcp",
+                    "ports": "7"
+                  },
+                  {
+                    "protocol": "udp",
+                    "ports": "7"
+                  }
+                ],
+                "modified": false
+              }
+            ]
+          }
+        }
+        ,
+        {
+          "entity": "agent",
+          "message": "remove-multilink-policy",
+          "params": {
+            "id": "5ed4127aa81d8258b96b4853",
+            "rules": [
+              {
+                "id": "1",
+                "priority": 0,
+                "classification": {
+                  "prefix": {
+                    "ip": "8.8.8.8/32",
+                    "ports": "",
+                    "protocol": ""
+                  }
+                },
+                "action": {
+                  "links": [
+                    {
+                      "pathlabels": [ "green" , "blue" ],
+                      "order": "load-balance"
+                    },
+                    {
+                      "pathlabels": [ "blue" ],
+                      "order": "priority"
+                    }
+                  ],
+                  "order": "load-balance",
+                  "fallback": "by-destination"
+                }
+              }
+            ]
+          }
+        }
+        ,
+        {
+          "entity": "agent",
+          "message": "remove-dhcp-config",
+          "params": {
+            "interface": "0000:00:09.00",
+            "range_start": "20.20.20.100",
+            "range_end": "20.20.20.150",
+            "dns": [
+                "8.8.8.8"
+            ]
+          }
+        }  
+        ,
+        {
+          "entity":  "agent",
+          "message": "remove-tunnel",
+          "params": {
+            "src": "10.0.0.4",
+            "dst": "70.0.0.7",
+            "tunnel-id": 7,
+            "ipsec": {
+              "local-sa": {
+                 "spi": 1070,
+                 "crypto-alg": "aes-cbc-128",
+                 "crypto-key": "7030aa794f574265564551694d653768",
+                 "integr-alg": "sha1-96",
+                 "integr-key": "7030ff4b55523947594d6d3547666b45764e6a58"
+              },
+              "remote-sa": {
+                 "spi": 7010,
+                 "crypto-alg": "aes-cbc-128",
+                 "crypto-key": "7010aa794f574265564551694d653768",
+                 "integr-alg": "sha1-96",
+                 "integr-key": "7010ff4b55523947594d6d3547666b45764e6a58"
+              }
+            },
+            "loopback-iface": {
+              "addr":"10.100.0.7/31",
+              "mac":"08:00:27:fd:00:07",
+              "mtu":1420,
+              "routing":"ospf",
+              "multilink": {
+                "labels": [ "orange" ]
+              }
+            }
+          }
+        }
+        ,
+        {
+          "entity": "agent",
+          "message": "remove-interface",
+          "params": {
+            "pci":"0000:00:20.00",
+            "addr":"20.0.0.20/24",
+            "gateway": "20.0.0.200",
+            "type":"wan"
+          }
+        }
+      ]
+	}
+}
+,
+{
+  "entity": "agent",
+  "message": "stop-router"
+}
+]

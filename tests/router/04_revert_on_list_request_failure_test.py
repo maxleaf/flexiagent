@@ -35,12 +35,16 @@ cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 def test():
     tests_path = __file__.replace('.py', '')
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
-    for t in test_cases:
+    for (idx, t) in enumerate(test_cases):
         with fwtests.TestFwagent() as agent:
+
+            if idx == 0:
+                print("")
             print("   " + os.path.basename(t))
 
             # Load router configuration with spoiled lists
-            agent.cli('--ignore_errors -f %s' % t)
+            agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
+
             # Ensure that spoiled lists were reverted completely
             configured = fwtests.wait_vpp_to_be_configured([('interfaces', 0),('tunnels', 0)], timeout=30)
             assert configured

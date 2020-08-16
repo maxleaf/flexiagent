@@ -26,6 +26,8 @@ import sys
 import os
 import re
 from shutil import copyfile
+import subprocess
+import time
 import fwglobals
 import fwstats
 import fwutils
@@ -36,10 +38,10 @@ fwagent_api = {
     'get-device-logs':          '_get_device_logs',
     'get-device-packet-traces': '_get_device_packet_traces',
     'get-device-os-routes':     '_get_device_os_routes',
-    'handle-request':           '_handle_request',
     'get-router-config':        '_get_router_config',
     'upgrade-device-sw':        '_upgrade_device_sw',
-    'reset-device':             '_reset_device_soft'
+    'reset-device':             '_reset_device_soft',
+    'sync-device':              '_sync_device'
 }
 
 class FWAGENT_API:
@@ -49,14 +51,16 @@ class FWAGENT_API:
        connection using JSON requests.
        For list of available APIs see the 'fwagent_api' variable.
     """
-    def call(self, req, params):
+    def call(self, request):
         """Invokes API specified by the 'req' parameter.
 
-        :param req: Request name.
-        :param params: Parameters from flexiManage.
+        :param request: The request received from flexiManage.
 
         :returns: Reply.
         """
+        req    = request['message']
+        params = request.get('params')
+
         handler = fwagent_api.get(req)
         assert handler, 'fwagent_api: "%s" request is not supported' % req
 
@@ -69,32 +73,26 @@ class FWAGENT_API:
         return reply
 
     def _prepare_tunnel_info(self, tunnel_ids):
-        db_requests = fwglobals.g.router_api.db_requests
         tunnel_info = []
-        for key in db_requests.db:
+        tunnels = fwglobals.g.router_cfg.get_tunnels()
+        for params in tunnels:
             try:
-                if re.match('add-tunnel', key):
-                    (req, params) = db_requests.fetch_request(key)
-                    tunnel_id = params["tunnel-id"]
-                    if tunnel_id in tunnel_ids:
-                        local_sa = params["ipsec"]["local-sa"]
-                        remote_sa = params["ipsec"]["remote-sa"]
-                        # key1-key4 are the crypto keys stored in
-                        # the management for each tunnel
-                        tunnel_info.append({
-                            "id": str(tunnel_id),
-                            "key1": local_sa["crypto-key"],
-                            "key2": local_sa["integr-key"],
-                            "key3": remote_sa["crypto-key"],
-                            "key4": remote_sa["integr-key"]
-                        })
+                tunnel_id = params["tunnel-id"]
+                if tunnel_id in tunnel_ids:
+                    # key1-key4 are the crypto keys stored in
+                    # the management for each tunnel
+                    tunnel_info.append({
+                        "id": str(tunnel_id),
+                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
+                        "key2": params["ipsec"]["local-sa"]["integr-key"],
+                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
+                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
+                    })
 
             except Exception as e:
                 fwglobals.log.excep("failed to create tunnel information %s" % str(e))
                 raise e
-        
         return tunnel_info
-        
 
     def _get_device_info(self, params):
         """Get device information.
@@ -110,18 +108,11 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwglobals.g.handle_request('interfaces')['message']
-            utils_default_route = fwutils.get_default_route()
-            default_route = {
-                "addr": "default",
-                "via": utils_default_route[0],
-                "pci": fwutils.linux_to_pci_addr(utils_default_route[1])[0]
-                }
-            info['network']['routes'] = [ default_route ]
+            info['network']['interfaces'] = fwglobals.g.handle_request({ 'message': 'interfaces'})['message']
+            info['reconfig'] = fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
-                
             return {'message': info, 'ok': 1}
         except:
             raise Exception("_get_device_info: failed to get device info: %s" % format(sys.exc_info()[1]))
@@ -134,6 +125,10 @@ class FWAGENT_API:
         :returns: Dictionary with statistics.
         """
         reply = fwstats.get_stats()
+
+        # Add router configuration hash to assist database synchronization feature
+        reply['router-cfg-hash'] = fwglobals.g.router_cfg.get_signature()
+
         return reply
 
     def _upgrade_device_sw(self, params):
@@ -234,32 +229,120 @@ class FWAGENT_API:
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwutils.get_router_config()
-        reply = {'ok': 1, 'message': configs if configs != None else {}}
+        configs = fwutils.dump_router_config()
+        reply = {'ok': 1, 'message': configs if configs else {}}
         return reply
 
-    def _reset_device_soft(self, params):
+    def _reset_device_soft(self, params=None):
         """Soft reset device configuration.
 
         :param params: Parameters from flexiManage.
 
         :returns: Dictionary with status code.
         """
-
-        # VPP must be stopped before resetting the configuration
-        fwglobals.g.handle_request('stop-router')
+        if fwglobals.g.router_api.router_started:
+            fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_router_config()
-        return {'ok': 1, 'message': {}}
+        return {'ok': 1}
 
-    def _handle_request(self, params):
-        """Handle a request from request_handlers of fwglobals.
+    def _sync_device(self, params):
+        """Handles the 'sync-device' request: synchronizes VPP state
+        to the configuration stored on flexiManage. During synchronization
+        all interfaces, tunnels, routes, etc, that do not appear
+        in the received 'sync-device' request are removed, all entities
+        that do appear in the request but do not appear on device are added
+        and all entities that appear in both but are different are modified.
+        The same entities are ignored.
 
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with status and error message.
+        :param params: Request parameters received from flexiManage:
+                        {
+                          'router-cfg-hash': <the signature of the device
+                                    configuration stored on flexiManage>
+                          'requests': <list of 'add-X' requests that represent
+                                    device configuration stored on flexiManage>
+                        }
+        :returns: Dictionary with status code.
         """
-        try:
-            reply = fwglobals.g.handle_request(params['request'], params.get('params'))
-            return reply
-        except Exception as e:
-            return {'ok': 0, 'message': str(e)}
+        fwglobals.log.info("FWAGENT_API: _sync_device STARTED")
+
+        # Check if there is a need to sync at all.
+        # It might be race between receiving sync-device request from server
+        # and sending success reply to the previous request, so server might
+        # deduce that we out of sync, when we are OK.
+        # So we ensure that the configuration signature received from server
+        # differs from the one of the current configuration. If it is not,
+        # we are OK - simply return.
+        #
+        remote_signature = params['router-cfg-hash']
+        local_signature  = fwglobals.g.router_cfg.get_signature()
+        fwglobals.log.debug(
+            "FWAGENT_API: _sync_device: cfg signature: received=%s, stored=%s" %
+            (remote_signature, local_signature))
+        if remote_signature == local_signature:
+            fwglobals.log.info("FWAGENT_API: _sync_device: no need to sync")
+            fwglobals.g.router_cfg.reset_signature()
+            return {'ok': 1}
+
+        # Now go over configuration requests received within sync-device request,
+        # intersect them against the requests stored locally and generate new list
+        # of remove-X and add-X requests that should take device to configuration
+        # received with the sync-device.
+        #
+        sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
+        fwglobals.log.debug("FWAGENT_API: _sync_device: sync-list: %s" % \
+                            json.dumps(sync_list, indent=2, sort_keys=True))
+        if not sync_list:
+            fwglobals.log.info("FWAGENT_API: _sync_device: sync_list is empty, no need to sync")
+            fwglobals.g.router_cfg.reset_signature()
+            if params.get('type', '') != 'full-sync':
+                return {'ok': 1}   # Return if there is no full sync enforcement
+
+        # Finally update configuration.
+        # Firstly try smart sync - apply sync-list modifications only.
+        # If that fails, go with full sync - reset configuration and apply sync-device list
+        #
+        if sync_list:
+            fwglobals.log.debug("FWAGENT_API: _sync_device: start smart sync")
+            sync_request = {
+                'message':   'aggregated',
+                'params':    { 'requests': sync_list },
+                'internals': { 'dont_revert_on_failure': True }
+            }
+            reply = fwglobals.g.router_api.call(sync_request)
+
+            # If smart sync succeeded and there is no 'full-sync' enforcement
+            # in message, finish sync procedure and return.
+            # Note today the 'full-sync' enforcement is needed for testing only.
+            #
+            if reply['ok'] == 1 and params.get('type', '') != 'full-sync':
+                fwglobals.g.router_cfg.reset_signature()
+                fwglobals.log.debug("FWAGENT_API: _sync_device: smart sync succeeded")
+                fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+                return {'ok': 1}
+
+        # At this point we have to perform full sync.
+        # This is due to either smart sync failure or full sync enforcement.
+        #
+        fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
+        restart_router = False
+        if fwglobals.g.router_api.router_started:
+            restart_router = True
+            fwglobals.g.router_api.call({'message': 'stop-router'})
+
+        self._reset_device_soft()                       # Wipe out the configuration database
+        request = {                                     # Cast 'sync-device' to 'aggregated'
+            'message':   'aggregated',
+            'params':    { 'requests': params['requests'] },
+            'internals': { 'dont_revert_on_failure': True }
+        }
+        reply = fwglobals.g.router_api.call(request)    # Apply finally the received configuration
+        if reply['ok'] == 0:
+            raise Exception(" _sync_device: full sync failed: " + str(reply.get('message')))
+
+        if restart_router:
+            fwglobals.g.router_api.call({'message': 'start-router'})
+        fwglobals.log.debug("FWAGENT_API: _sync_device: full sync succeeded")
+
+        fwglobals.g.router_cfg.reset_signature()
+        fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+        return {'ok': 1}

@@ -63,7 +63,9 @@ soft_checkers = [
     { 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
     { 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
     { 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
+    { 'soft_check_default_routes_metric'         : { 'severity': 'critical' }},
     { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
+    { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
@@ -140,12 +142,12 @@ def check_hard_configuration(checker, check_only):
         report_checker_result(result, severity, checker_name, description)
     return succeeded
 
-def check_soft_configuration(checker, fix=False, quite=False):
+def check_soft_configuration(checker, fix=False, quiet=False):
     """Check hard configuration.
 
     :param checker:         Checker name.
     :param fix:             Fix problem.
-    :param quite:           Do not prompt user.
+    :param quiet:           Do not prompt user.
 
     :returns: 'True' if succeeded.
     """
@@ -172,11 +174,11 @@ def check_soft_configuration(checker, fix=False, quite=False):
             # If parameter is adjustable and interactive mode was chosen,
             # fix the parameter even if result is OK. This is to provide
             # user with ability to change default configuration.
-            if result and not quite and interactive == 'optional':
+            if result and not quiet and interactive == 'optional':
                 go_and_fix = True
 
             # Don't fix if silent was specified but user interaction is required
-            if not result and quite and interactive == 'must':
+            if not result and quiet and interactive == 'must':
                go_and_fix = False
 
         if not go_and_fix:
@@ -184,7 +186,7 @@ def check_soft_configuration(checker, fix=False, quite=False):
                 succeeded = False
             continue
 
-        if quite:
+        if quiet:
             result = checker_func(fix=True, silently=True, prompt=prompt)
             report_checker_result(result, severity, checker_name)
         else:
@@ -240,9 +242,9 @@ def main(args):
                 print('')
             return (soft_status_code | hard_status_code)
 
-        if args.quite:
+        if args.quiet:
             # In silent mode just go and configure needed stuff
-            success = check_soft_configuration(checker, fix=True, quite=True)
+            success = check_soft_configuration(checker, fix=True, quiet=True)
             soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
             return  (soft_status_code | hard_status_code)
 
@@ -265,10 +267,10 @@ def main(args):
                 success = check_soft_configuration(checker, fix=False)
             elif choice == '3':
             	print('')
-                success = check_soft_configuration(checker, fix=True, quite=True)
+                success = check_soft_configuration(checker, fix=True, quiet=True)
             elif choice == '4':
             	print('')
-                success = check_soft_configuration(checker, fix=True, quite=False)
+                success = check_soft_configuration(checker, fix=True, quiet=False)
             else:
                 success = True
 
@@ -285,7 +287,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
     parser.add_argument('-c', '--check_only', action='store_true',
                         help="check configuration and exit")
-    parser.add_argument('-q', '--quite', action='store_true',
+    parser.add_argument('-q', '--quiet', action='store_true',
                         help="adjust system configuration silently")
     parser.add_argument('-r', '--hard_only', action='store_true',
                         help="check hard configuration only")

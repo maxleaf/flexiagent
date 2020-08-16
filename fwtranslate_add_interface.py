@@ -24,6 +24,7 @@ import os
 import re
 
 import fwglobals
+import fwnetplan
 import fwtranslate_revert
 import fwutils
 
@@ -47,13 +48,12 @@ import fwutils
 #    01. sudo vppctl set int state 0000:00:08.00 up
 #    02. sudo vppctl set int ip address 0000:00:08.00 192.168.56.107/24
 #
-#    2.Linux_sh2.sh
+#    2.Netplan config
 #    ------------------------------------------------------------
-#    03. sudo ip addr add 192.168.56.107/24 dev 0000:00:08.00
-#    04. sudo ip link set dev 0000:00:08.00 up
+#    03. add interface section into configuration file
 #
 #    3. Add interface address to ospfd.conf for FRR
-#    06. add 'network 192.168.56.107/24 area 0.0.0.0' line:
+#    04. add 'network 192.168.56.107/24 area 0.0.0.0' line:
 #    ------------------------------------------------------------
 #    hostname ospfd
 #    password zebra
@@ -77,8 +77,10 @@ def add_interface(params):
     cmd_list = []
 
     iface_pci  = params['pci']
-    iface_addr = params['addr']
-    iface_addr_bytes, _ = fwutils.ip_str_to_bytes(params['addr'])
+    iface_addr = params.get('addr', '')
+    iface_addr_bytes = ''
+    if iface_addr:
+        iface_addr_bytes, _ = fwutils.ip_str_to_bytes(iface_addr)
 
     ######################################################################
     #  NO NEED TO SET IP AND UP/DOWN STATE IN VPP !
@@ -88,63 +90,66 @@ def add_interface(params):
     #  Note, as on Nov-2019 the opposite direction doesn't work,
     #  delete address in VPP doesn't delete it in Linux ?)
     ######################################################################
-    #
-    # # interface.api.json: sw_interface_add_del_address (_vl_msg_id, client_index, context, sw_if_index, is_add, is_ipv6, del_all,  address_length, address, crc=0x7b583179)
-    # # Add address before set_flags(UP)! Otherwise if add_address fails due to existing IP the revert of set_flags(UP) will down the interface
-    # cmd = {}
-    # cmd['cmd'] = {}
-    # cmd['cmd']['name']    = "sw_interface_add_del_address"
-    # cmd['cmd']['descr']   = "set %s to interface %s" % (iface_addr, iface_pci)
-    # cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-    #                             'is_add':1, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
-    # cmd['revert'] = {}
-    # cmd['revert']['name']   = "sw_interface_add_del_address"
-    # cmd['revert']['descr']  = "set %s to interface %s" % (iface_addr, iface_pci)
-    # cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-    #                             'is_add':0, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
-    # cmd_list.append(cmd)
-    #
-    # # interface.api.json: sw_interface_set_flags (_vl_msg_id, client_index, context, sw_if_index, admin_up_down, crc=0x555485f5)
-    # # * 'sw_if_index' is fetched from running VPP, so we use pci name of interface '0000:00:08.00' to note it now,
-    # # and we use 'substs' element in run time to resolve it and to substitute before the 'cmd' is executed.
-    # cmd = {}
-    # cmd['cmd'] = {}
-    # cmd['cmd']['name']    = "sw_interface_set_flags"
-    # cmd['cmd']['descr']   = "UP interface %s" % iface_pci
-    # cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-    #                             'admin_up_down':1 }
-    # cmd['revert'] = {}
-    # cmd['revert']['name']    = "sw_interface_set_flags"
-    # cmd['revert']['descr']   = "DOWN interface %s" % iface_pci
-    # cmd['revert']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-    #                             'admin_up_down':0 }
-    # cmd_list.append(cmd)
 
+    # Add interface section into Netplan configuration file
+    gw     = params.get('gateway', None)
+    metric = params.get('metric', 0)
+    dhcp   = params.get('dhcp', 'no')
 
-    # Create commands that configure tap interfaces in Linux,
-    # that were created by 'enable tap-inject' command:
-    #   sudo ip addr add 192.168.56.107/24 dev 0000:00:08.00
-    #   sudo ip link set dev 0000:00:08.00 up
+    # enable DHCP packets detection in VPP
+    if dhcp == 'yes':
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['descr']  = "Enable DHCP detect"
+        cmd['cmd']['params'] = {
+                        'module': 'fwutils',
+                        'func': 'vpp_set_dhcp_detect',
+                        'args': {'pci': iface_pci, 'remove': False}
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "Disable DHCP detect"
+        cmd['revert']['params'] = {
+                        'module': 'fwutils',
+                        'func': 'vpp_set_dhcp_detect',
+                        'args': {'pci': iface_pci, 'remove': True}
+        }
+        cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_set_flags (_vl_msg_id, client_index, context, sw_if_index, admin_up_down, crc=0x555485f5)
-    # * 'sw_if_index' is fetched from running VPP, so we use pci name of interface '0000:00:08.00' to note it now,
-    # and we use 'substs' element in run time to resolve it and to substitute before the 'cmd' is executed.
-    #
-    # "if [ -z "$(ip addr | grep \'inet %s\')" ]" ensures that address was not configured yet by netplan.
-    # Otherwise we will get "RTNETLINK answers: File exists" error.
-    #
+    # add interface into netplan configuration
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']   = "exec"
-    cmd['cmd']['descr']  = "set %s to interface %s in Linux" % (iface_addr, iface_pci)
-    cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                                'if [ -z "$(ip addr | grep \'inet %s\')" ]; then sudo ip addr add %s dev DEV-STUB; fi' % (iface_addr, iface_addr) ]
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+                'module': 'fwnetplan',
+                'func': 'add_remove_netplan_interface',
+                'args': { 'is_add': 1,
+                          'pci'   : iface_pci,
+                          'ip'    : iface_addr,
+                          'gw'    : gw,
+                          'metric': metric,
+                          'dhcp'  : dhcp
+                         }
+    }
+    cmd['cmd']['descr'] = "add interface into netplan config file"
     cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "del %s from interface %s in Linux" % (iface_addr, iface_pci)
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-                               "sudo ip addr del %s dev DEV-STUB" % (iface_addr) ]
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+                'module': 'fwnetplan',
+                'func': 'add_remove_netplan_interface',
+                'args': {
+                          'is_add': 0,
+                          'pci'   : iface_pci,
+                          'ip'    : iface_addr,
+                          'gw'    : gw,
+                          'metric': metric,
+                          'dhcp'  : dhcp
+                }
+    }
+    cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "exec"
@@ -159,7 +164,7 @@ def add_interface(params):
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
-    if 'multilink' in params and 'labels' in params['multilink']:
+    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
         labels = params['multilink']['labels']
         if len(labels) > 0:
             cmd = {}
@@ -170,7 +175,7 @@ def add_interface(params):
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
-                                        'next_hop': params.get('gateway'),
+                                        'next_hop': gw,
                                         'dev':      iface_pci,
                                         'remove':   False
                                       }
@@ -182,7 +187,7 @@ def add_interface(params):
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
-                                        'next_hop': params.get('gateway'),
+                                        'next_hop': gw,
                                         'dev':      iface_pci,
                                         'remove':   True
                                       }
@@ -225,19 +230,20 @@ def add_interface(params):
         vxlan_port = 4789
         udp_proto = 17
 
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-        cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                        'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
-        cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-        cmd['revert'] = {}
-        cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-        cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                        'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
-        cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+        if iface_addr_bytes:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
+            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
+            cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+            cmd['revert'] = {}
+            cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
+            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
+            cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
 
-        cmd_list.append(cmd)
+            cmd_list.append(cmd)
 
     # On LAN interfaces run
     #   'set interface nat44 in GigabitEthernet0/8/0 output-feature'

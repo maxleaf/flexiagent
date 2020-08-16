@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import json
 import os
 import Pyro4
@@ -28,19 +29,20 @@ import time
 import traceback
 import yaml
 
+from fwagent import FwAgent
 from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
-from fwapplications_api import FwApps
-from fwpolicies_api import FwPolicies
+from fwapplications import FwApps
+from fwpolicies import FwPolicies
+from fwrouter_cfg import FwRouterCfg
 
 modules = {
-    'fwagent_api':  __import__('fwagent_api'),
-    'fwapps_api':   __import__('fwapplications_api'),
-    'fwpolicy_api': __import__('fwpolicies_api'),
-    'fwrouter_api': __import__('fwrouter_api'),
-    'os_api':       __import__('os_api'),
+    'fwagent_api':      __import__('fwagent_api'),
+    'fwapplications':   __import__('fwapplications'),
+    'fwrouter_api':     __import__('fwrouter_api'),
+    'os_api':           __import__('os_api'),
 }
 
 request_handlers = {
@@ -54,41 +56,33 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'handle-request':               '_call_agent_api',
-    'get-device-info':              '_call_agent_api',
-    'get-device-stats':             '_call_agent_api',
-    'get-device-logs':              '_call_agent_api',
-    'get-device-packet-traces':     '_call_agent_api',
-    'get-device-os-routes':         '_call_agent_api',
-    'get-router-config':            '_call_agent_api',
-    'upgrade-device-sw':            '_call_agent_api',
-    'reset-device':                 '_call_agent_api',
-
-    # Applications API
-    'add-app-info':                 '_call_apps_api',
-    'remove-app-info':              '_call_apps_api',
-
-    # Policy API
-    'add-policy-info':              '_call_policy_api',
-    'remove-policy-info':           '_call_policy_api',
+    'get-device-info':              {'name': '_call_agent_api'},
+    'get-device-stats':             {'name': '_call_agent_api'},
+    'get-device-logs':              {'name': '_call_agent_api'},
+    'get-device-packet-traces':     {'name': '_call_agent_api'},
+    'get-device-os-routes':         {'name': '_call_agent_api'},
+    'get-router-config':            {'name': '_call_agent_api'},
+    'upgrade-device-sw':            {'name': '_call_agent_api'},
+    'reset-device':                 {'name': '_call_agent_api'},
+    'sync-device':                  {'name': '_call_agent_api'},
 
     # Router API
-    'start-router':                 '_call_router_api',
-    'stop-router':                  '_call_router_api',
-    'reset-router':                 '_call_router_api',
-    'add-interface':                '_call_router_api',
-    'remove-interface':             '_call_router_api',
-    'add-route':                    '_call_router_api',
-    'remove-route':                 '_call_router_api',
-    'add-tunnel':                   '_call_router_api',
-    'remove-tunnel':                '_call_router_api',
-    'modify-device':                '_call_router_api',
-    'add-dhcp-config':              '_call_router_api',
-    'remove-dhcp-config':           '_call_router_api',
-    'add-application':              '_call_router_api',
-    'remove-application':           '_call_router_api',
-    'add-multilink-policy':        '_call_router_api',
-    'remove-multilink-policy':     '_call_router_api',
+    'aggregated':                   {'name': '_call_router_api', 'sign': True},
+    'start-router':                 {'name': '_call_router_api', 'sign': True},
+    'stop-router':                  {'name': '_call_router_api', 'sign': True},
+    'add-interface':                {'name': '_call_router_api', 'sign': True},
+    'remove-interface':             {'name': '_call_router_api', 'sign': True},
+    'modify-interface':             {'name': '_call_router_api', 'sign': True},
+    'add-route':                    {'name': '_call_router_api', 'sign': True},
+    'remove-route':                 {'name': '_call_router_api', 'sign': True},
+    'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
+    'remove-tunnel':                {'name': '_call_router_api', 'sign': True},
+    'add-dhcp-config':              {'name': '_call_router_api', 'sign': True},
+    'remove-dhcp-config':           {'name': '_call_router_api', 'sign': True},
+    'add-application':              {'name': '_call_router_api', 'sign': True},
+    'remove-application':           {'name': '_call_router_api', 'sign': True},
+    'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
+    'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
 
     ##############################################################
     # INTERNAL API-s
@@ -103,48 +97,47 @@ request_handlers = {
     ##############################################################
 
     # OS API
-    'interfaces':                   '_call_os_api',
-    'cpuutil':                      '_call_os_api',
-    'exec':                         '_call_os_api',
-    'savefile':                     '_call_os_api',
-    'pcisub':                       '_call_os_api',
-    'tapsub':                       '_call_os_api',
-    'gresub':                       '_call_os_api',
-    'ifcount':                      '_call_os_api',
-    'ifstats':                      '_call_os_api',
-    'stop_router':                  '_call_os_api',
-    'connect_to_router':            '_call_os_api',
-    'disconnect_from_router':       '_call_os_api',
+    'interfaces':                   {'name': '_call_os_api'},
+    'cpuutil':                      {'name': '_call_os_api'},
+    'exec':                         {'name': '_call_os_api'},
+    'savefile':                     {'name': '_call_os_api'},
+    'pcisub':                       {'name': '_call_os_api'},
+    'tapsub':                       {'name': '_call_os_api'},
+    'gresub':                       {'name': '_call_os_api'},
+    'ifcount':                      {'name': '_call_os_api'},
+    'ifstats':                      {'name': '_call_os_api'},
+    'connect_to_router':            {'name': '_call_os_api'},
+    'disconnect_from_router':       {'name': '_call_os_api'},
 
     # VPP API
-    'abf_itf_attach_add_del':       '_call_vpp_api',
-    'abf_policy_add_del':           '_call_vpp_api',
-    'acl_add_replace':              '_call_vpp_api',
-    'acl_del':                      '_call_vpp_api',
-    'bridge_domain_add_del':        '_call_vpp_api',
-    'create_loopback_instance':     '_call_vpp_api',
-    'delete_loopback':              '_call_vpp_api',
-    'ipsec_gre_add_del_tunnel':     '_call_vpp_api',
-    'ipsec_sad_add_del_entry':      '_call_vpp_api',
-    'ipsec_spd_add_del':            '_call_vpp_api',
-    'ipsec_interface_add_del_spd':  '_call_vpp_api',
-    'ipsec_spd_add_del_entry':      '_call_vpp_api',
-    'l2_flags':                     '_call_vpp_api',
-    'nat44_add_del_interface_addr':             '_call_vpp_api',
-    'nat44_interface_add_del_output_feature':   '_call_vpp_api',
-    'nat44_forwarding_enable_disable':          '_call_vpp_api',
-    'nat44_add_del_identity_mapping':           '_call_vpp_api',
-    'sw_interface_add_del_address': '_call_vpp_api',
-    'sw_interface_set_flags':       '_call_vpp_api',
-    'sw_interface_set_l2_bridge':   '_call_vpp_api',
-    'sw_interface_set_mac_address': '_call_vpp_api',
-    'sw_interface_set_mtu':         '_call_vpp_api',
-    'vmxnet3_create':               '_call_vpp_api',
-    'vmxnet3_delete':               '_call_vpp_api',
-    'vxlan_add_del_tunnel':         '_call_vpp_api',
+    'abf_itf_attach_add_del':       {'name': '_call_vpp_api'},
+    'abf_policy_add_del':           {'name': '_call_vpp_api'},
+    'acl_add_replace':              {'name': '_call_vpp_api'},
+    'acl_del':                      {'name': '_call_vpp_api'},
+    'bridge_domain_add_del':        {'name': '_call_vpp_api'},
+    'create_loopback_instance':     {'name': '_call_vpp_api'},
+    'delete_loopback':              {'name': '_call_vpp_api'},
+    'ipsec_gre_add_del_tunnel':     {'name': '_call_vpp_api'},
+    'ipsec_sad_add_del_entry':      {'name': '_call_vpp_api'},
+    'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
+    'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
+    'ipsec_spd_add_del_entry':      {'name': '_call_vpp_api'},
+    'l2_flags':                     {'name': '_call_vpp_api'},
+    'nat44_add_del_interface_addr':             {'name': '_call_vpp_api'},
+    'nat44_interface_add_del_output_feature':   {'name': '_call_vpp_api'},
+    'nat44_forwarding_enable_disable':          {'name': '_call_vpp_api'},
+    'nat44_add_del_identity_mapping':           {'name': '_call_vpp_api'},
+    'sw_interface_add_del_address': {'name': '_call_vpp_api'},
+    'sw_interface_set_flags':       {'name': '_call_vpp_api'},
+    'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
+    'sw_interface_set_mac_address': {'name': '_call_vpp_api'},
+    'sw_interface_set_mtu':         {'name': '_call_vpp_api'},
+    'vmxnet3_create':               {'name': '_call_vpp_api'},
+    'vmxnet3_delete':               {'name': '_call_vpp_api'},
+    'vxlan_add_del_tunnel':         {'name': '_call_vpp_api'},
 
     # Python API
-    'python':                       '_call_python_api'
+    'python':                       {'name': '_call_python_api'}
 }
 
 global g_initialized
@@ -202,22 +195,25 @@ class Fwglobals:
         self.FWAGENT_CONF_FILE   = self.DATA_PATH + 'fwagent_conf.yaml'  # Optional, if not present, defaults are taken
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'
         self.VERSIONS_FILE       = self.DATA_PATH + '.versions.yaml'
-        self.SQLITE_DB_FILE      = self.DATA_PATH + '.requests.sqlite'
+        self.ROUTER_CFG_FILE     = self.DATA_PATH + '.requests.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
-        self.DHCP_LOG_FILE     = '/var/log/dhcpd.log'
-        self.VPP_LOG_FILE     = '/var/log/vpp/vpp.log'
-        self.OSPF_LOG_FILE     = '/var/log/frr/ospfd.log'
+        self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
+        self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
+        self.OSPF_LOG_FILE       = '/var/log/frr/ospfd.log'
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
-        self.VPP_CONFIG_FILE_BACKUP = '/etc/vpp/startup.conf.orig'
+        self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
-        self.DHCPD_CONFIG_FILE = '/etc/dhcp/dhcpd.conf'
-        self.APP_REC_DB_FILE = self.DATA_PATH + '.app_rec.sqlite'
-        self.MULTILINK_DB_FILE = self.DATA_PATH + '.multilink.sqlite'
+        self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
+        self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
+        self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
+        self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
+        self.NETPLAN_FILES       = {}
+        self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
@@ -225,6 +221,12 @@ class Fwglobals:
         self.WS_STATUS_CODE_NOT_APPROVED = 403
         self.WS_STATUS_DEVICE_CHANGE     = 900
         self.WS_STATUS_LOCAL_ERROR       = 999
+        # Cache to save various global data
+        self.AGENT_CACHE = {}
+        # PCI to VPP names, assuming names and PCI are unique and not changed during operation
+        self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
+        self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
+        self.fwagent = None
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -235,6 +237,12 @@ class Fwglobals:
             if re.match("WS_STATUS_", a):
                 self.ws_reconnect_status_codes.append(getattr(self, a))
 
+    def get_cache_data(self, key):
+        """get the cache data for a given key
+
+        :returns: data for a given key, None if key does not exist
+        """
+        return self.AGENT_CACHE.get(key)
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
@@ -256,24 +264,42 @@ class Fwglobals:
             #     if isinstance(val, (int, float, str, unicode)):
             #         log.debug("  %s: %s" % (a, str(val)), to_terminal=False)
 
-    def initialize(self):
-        """Initialize agent, router and OS API.
-        Restore VPP if needed.
-
-        :returns: None.
+    def initialize_agent(self):
+        """Initialize singleton object. Restore VPP if needed.
         """
+        if self.fwagent:
+            global log
+            log.warning('Fwglobals.initialize_agent: agent exists')
+            return
+
+        self.fwagent    = FwAgent(handle_sigterm=False)
+        self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.agent_api  = FWAGENT_API()
-        self.router_api = FWROUTER_API(self.SQLITE_DB_FILE, self.MULTILINK_DB_FILE)
+        self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)
         self.os_api     = OS_API()
-        self.apps_api   = FwApps(self.APP_REC_DB_FILE)
-        self.policy_api = FwPolicies()
+        self.apps       = FwApps(self.APP_REC_DB_FILE)
+        self.policies   = FwPolicies(self.POLICY_REC_DB_FILE)
 
         self.router_api.restore_vpp_if_needed()
 
-    def finalize(self):
+    def finalize_agent(self):
         """Destructor method
         """
+        if not self.fwagent:
+            global log
+            log.warning('Fwglobals.finalize_agent: agent does not exists')
+            return
+
         self.router_api.finalize()
+        self.fwagent.finalize()
+        self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+        del self.apps
+        del self.policies
+        del self.os_api
+        del self.router_api
+        del self.agent_api
+        del self.fwagent
+        self.fwagent = None
 
     def __str__(self):
         """Get string representation of configuration.
@@ -292,37 +318,66 @@ class Fwglobals:
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)
 
-    def _call_agent_api(self, req, params):
-        return self.agent_api.call(req, params)
+    def _call_agent_api(self, request):
+        return self.agent_api.call(request)
 
-    def _call_apps_api(self, req, params):
-        return self.apps_api.call(req, params)
+    def _call_router_api(self, request):
+        return self.router_api.call(request)
 
-    def _call_policy_api(self, req, params):
-        return self.policy_api.call(req, params)
+    def _call_os_api(self, request):
+        return self.os_api.call_simple(request)
 
-    def _call_router_api(self, req, params):
-        return self.router_api.call(req, params)
+    def _call_vpp_api(self, request, result=None):
+        return self.router_api.vpp_api.call_simple(request, result)
 
-    def _call_os_api(self, req, params):
-        return self.os_api.call_simple(req, params)
-
-    def _call_vpp_api(self, req, params, result=None):
-        return self.router_api.vpp_api.call_simple(req, params, result)
-
-    def _call_python_api(self, req, params):
-        module = __import__(params['module'])
-        func   = getattr(module, params['func'])
-        args   = params.get('args')
+    def _call_python_api(self, request):
+        func = self._call_python_api_get_func(request['params'])
+        args = request['params'].get('args')
         if args:
-            ok, ret = func(args)
+            ret = func(**args)
         else:
-            ok, ret = func()
+            ret = func()
+        (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
-            log.error('_call_python_api: %s(%s) failed: %s' % \
-                    (params['func'], json.dumps(args), ret))
-        reply = {'ok':ok, 'message':ret}
+            func_str = request['params'].get('func')
+            args_str = json.dumps(args) if args else ""
+            log.error('_call_python_api: %s(%s) failed: %s' % (func_str, args_str, val))
+        reply = {'ok':ok, 'message':val}
         return reply
+
+    def _call_python_api_get_func(self, params):
+        if 'module' in params:
+            func = getattr(__import__(params['module']), params['func'])
+        elif 'object' in params:
+            if params['object'] == 'fwglobals.g':
+                func = getattr(self, params['func'])
+            elif params['object'] == 'fwglobals.g.router_api':
+                func = getattr(self.router_api, params['func'])
+            elif params['object'] == 'fwglobals.g.apps':
+                func = getattr(self.apps, params['func'])
+            else:
+                raise Exception("object '%s' is not supported" % (params['object']))
+        else:
+            raise Exception("neither 'module' nor 'object' was provided for '%s'" % (params['func']))
+        return func
+
+    def _call_python_api_parse_result(self, ret):
+        val = None
+        if ret is None:
+            ok  = 1
+        elif type(ret) == tuple:
+            ok  = ret[0]
+            val = ret[1]
+        elif type(ret) == dict:
+            ok  = ret.get('ok', 0)
+            val = ret.get('ret')
+        elif type(ret) == bool:
+            ok = 1 if ret else 0
+        else:
+            ok = 0
+            val = '_call_python_api_parse_result: unsupported type of return: %s' % type(ret)
+        return (ok, val)
+
 
     # result - how to store result of command.
     #          It is dict of {<attr> , <cache>, <cache key>}.
@@ -332,38 +387,70 @@ class Fwglobals:
     #          For example, it might contain pattern for grep to be run
     #          on command output.
     #
-    def handle_request(self, req, params=None, result=None):
+    def handle_request(self, request, result=None, received_msg=None):
         """Handle request.
 
-        :param params:    Parameters from flexiManage.
-        :param result:    Place for result.
+        :param request:      The request received from flexiManage.
+        :param result:       Place for result.
+        :param received_msg: The original message received from flexiManage.
 
         :returns: Dictionary with error string and status code.
         """
-
         try:
-            handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+            req    = request['message']
+            params = request.get('params')
 
-            handler_func = getattr(self, handler)
-            assert handler_func, 'fwglobals: handler=%s not found for req=%s' % (handler, req)
-
-            if result is None:
-                reply = handler_func(req, params)
+            if req != 'aggregated':
+                handler = request_handlers.get(req)
+                assert handler, 'fwglobals: "%s" request is not supported' % req
             else:
-                reply = handler_func(req, params, result)
+                # In case of aggregated request use the first request in aggregation
+                # to deduce the handler function.
+                # Note the aggregation might include requests of the same type
+                # only, e.g. Router API (add-tunnel, remove-application, etc)
+                #
+                handler = request_handlers.get(params['requests'][0]['message'])
+                assert handler, 'fwglobals: aggregation with "%s" request is not supported' % \
+                    params['requests'][0]['message']
+
+            # Keep copy of the request aside for signature purposes,
+            # as the original request might by modified by preprocessing.
+            #
+            if handler.get('sign', False) and received_msg is None:
+                received_msg = copy.deepcopy(request)
+            
+            handler_func = getattr(self, handler.get('name'))
+            if result is None:
+                reply = handler_func(request)
+            else:
+                reply = handler_func(request, result)
             if reply['ok'] == 0:
                 if 'usage' in params and params['usage'] != 'precondition':  # Don't generate error if precondition fails
                     myCmd = 'sudo vppctl api trace save error.api'
                     os.system(myCmd)
                     raise Exception(reply['message'])
 
+            # On router configuration request, e.g. add-interface,
+            # remove-tunnel, etc. update the configuration database
+            # signature. This is needed to assists the database synchronization
+            # feature that keeps the configuration set by user on the flexiManage
+            # in sync with the one stored on the flexiEdge device.
+            # Note we do that here, as at this point we handle configuration
+            # request that was received from flexiManage and that was not
+            # generated locally.
+            #
+            if reply['ok'] == 1 and handler.get('sign', False):
+                # Update the configuration signature
+                self.router_cfg.update_signature(received_msg)
+                # Add the updated signatire to the reply, so server could be quiet
+                reply['router-cfg-hash'] = self.router_cfg.get_signature()
+
             return reply
 
         except Exception as e:
             global log
-            err_str = "%s(%s): %s" % (req, format(params), str(e))
-            log.error(err_str + ': %s' % traceback.format_exc())
+            err_str = "%s(%s): %s" % (str(e), req, format(params))
+            log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}
             return reply
 

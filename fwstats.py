@@ -24,8 +24,10 @@
 import fwutils
 import time
 import loadsimulator
+import psutil
 
 from fwtunnel_stats import tunnel_stats_get
+import fwglobals
 
 # Globals
 # Keep updates up to 1 hour ago
@@ -38,7 +40,7 @@ updates_list = []
 vpp_pid = ''
 
 # Keeps last stats
-stats = {'ok':0, 'running':False, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0}
+stats = {'ok':0, 'running':False, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0}
 
 def update_stats():
     """Update statistics dictionary using values retrieved from VPP interfaces.
@@ -64,22 +66,38 @@ def update_stats():
         # Update info if previous stats valid
         if prev_stats['ok'] == 1:
             if_bytes = {}
+            tunnel_bytes = {}
+            tunnel_stats = tunnel_stats_get()
             for intf, counts in stats['last'].items():
+                if (intf.startswith('ipsec-gre') or
+                    intf.startswith('loop')): continue
                 prev_stats_if = prev_stats['last'].get(intf, None)
                 if prev_stats_if != None:
                     rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])
                     rx_pkts  = 1.0 * (counts['rx_pkts'] - prev_stats_if['rx_pkts'])
                     tx_bytes = 1.0 * (counts['tx_bytes'] - prev_stats_if['tx_bytes'])
                     tx_pkts  = 1.0 * (counts['tx_pkts'] - prev_stats_if['tx_pkts'])
-                    if_bytes[intf] = {
-                            'rx_bytes': rx_bytes, 
+                    calc_stats = {
+                            'rx_bytes': rx_bytes,
                             'rx_pkts': rx_pkts,
-                            'tx_bytes': tx_bytes, 
+                            'tx_bytes': tx_bytes,
                             'tx_pkts': tx_pkts
                         }
+                    if (intf.startswith('vxlan_tunnel')):
+                        vxlan_id = int(intf[12:])
+                        tunnel_id = vxlan_id/2
+                        t_stats = tunnel_stats.get(tunnel_id)
+                        if t_stats:
+                            t_stats.update(calc_stats)
+                    else:
+                        # For other interfaces try to get pci index
+                        pci = fwutils.vpp_if_name_to_pci(intf)
+                        if pci:
+                            if_bytes[pci] = calc_stats
+
 
             stats['bytes'] = if_bytes
-            stats['tunnel_stats'] = tunnel_stats_get()
+            stats['tunnel_stats'] = tunnel_stats
             stats['period'] = stats['time'] - prev_stats['time']
             stats['running'] = True if fwutils.vpp_does_run() else False
     else:
@@ -89,15 +107,48 @@ def update_stats():
     # remove the oldest update before pushing the new one
     if len(updates_list) is UPDATE_LIST_MAX_SIZE:
         updates_list.pop(0)
-    
+
     updates_list.append({
             'ok': stats['ok'], 
             'running': stats['running'], 
             'stats': stats['bytes'], 
             'period': stats['period'],
             'tunnel_stats': stats['tunnel_stats'],
+            'health': get_system_health(),
             'utc': time.time()
         })
+
+def get_system_health():
+    # Get CPU info
+    try:
+        cpu_stats = psutil.cpu_percent(percpu = True)
+    except Exception as e:
+        fwglobals.log.excep("Error getting cpu stats: %s" % str(e))
+        cpu_stats = [0]
+    # Get memory info
+    try:
+        memory_stats = psutil.virtual_memory().percent
+    except Exception as e:
+        fwglobals.log.excep("Error getting memory stats: %s" % str(e))
+        memory_stats = 0
+    # Get disk info
+    try:
+        disk_stats = psutil.disk_usage('/').percent
+    except Exception as e:
+        fwglobals.log.excep("Error getting disk stats: %s" % str(e))
+        disk_stats = 0
+    # Get temperature info
+    try:
+        temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
+        all_temp = psutil.sensors_temperatures()
+        for ttype, templist in all_temp.items():
+            for temp in templist:
+                if temp.current > temp_stats['value']:
+                    temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}
+    except Exception as e:
+        fwglobals.log.excep("Error getting temperature stats: %s" % str(e))
+
+    return {'cpu': cpu_stats, 'mem': memory_stats, 'disk': disk_stats, 'temp': temp_stats}
 
 def get_stats():
     """Return a new statistics dictionary.
@@ -107,7 +158,9 @@ def get_stats():
     res_update_list = list(updates_list)
     del updates_list[:]
 
-    # If the list of updates is empty, append a dummy update to 
+    reconfig = fwutils.get_reconfig_hash()
+
+    # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
     # the last element in the list with the current status of the router
     if loadsimulator.g.enabled():
@@ -125,16 +178,20 @@ def get_stats():
             'stateReason': reason,
             'stats': {},
             'tunnel_stats': {},
+            'health': {},
             'period': 0,
-            'utc': time.time()
+            'utc': time.time(),
+            'reconfig': reconfig
         })
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
+        res_update_list[-1]['reconfig'] = reconfig
+        res_update_list[-1]['health'] = get_system_health()
 
     return {'message': res_update_list, 'ok': 1}
-    
+
 def update_state(new_state):
     """Update router state field.
 
@@ -150,4 +207,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False}

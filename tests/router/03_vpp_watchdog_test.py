@@ -39,12 +39,10 @@ cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 def test():
     with fwtests.TestFwagent() as agent:
 
-        fwagent_run_time = 60
-
-        (ok, _) = agent.cli('-f %s' % cli_start_router_add_tunnel_file, bg_time=fwagent_run_time)
+        (ok, _) = agent.cli('-f %s' % cli_start_router_add_tunnel_file, daemon=True)
         assert ok
 
-        started = fwtests.wait_vpp_to_start(timeout=30)
+        started = fwtests.wait_vpp_to_start(timeout=40)
         assert started
 
         configured = fwtests.wait_vpp_to_be_configured([('interfaces', 6),('tunnels', 2)], timeout=30)
@@ -58,22 +56,23 @@ def test():
         time.sleep(1)
 
         # Ensure that watchdog detected vpp crash and restarted it
-        started = fwtests.wait_vpp_to_start(timeout=20)
+        started = fwtests.wait_vpp_to_start(timeout=40)
         assert started
         vpp_pid_after = fwtests.vpp_pid()
         assert vpp_pid_after != vpp_pid_before, "pid before kill %s, pid after kill %s" % (vpp_pid_before, vpp_pid_after)
+
+        # Ensure that restore finished
+        restored = agent.wait_log_line("restore finished", timeout=10)
+        assert restored
 
         # Ensure that configuration was restored
         configured = fwtests.wait_vpp_to_be_configured([('interfaces', 6),('tunnels', 2)], timeout=30)
         assert configured
 
-        # Clean up - wait until background fwagent exits
-        exited = fwtests.wait_fwagent_exit(timeout=fwagent_run_time)
-        assert exited
-
         # Stop router
         (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
         assert ok
+
 
 if __name__ == '__main__':
     test()
