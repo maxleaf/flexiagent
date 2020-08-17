@@ -42,7 +42,8 @@ fwagent_api = {
     'upgrade-device-sw':                '_upgrade_device_sw',
     'reset-device':                     '_reset_device_soft',
     'sync-device':                      '_sync_device',
-    'get-wifi-available-access-points': '_get_wifi_available_access_points'
+    'get-wifi-available-access-points': '_get_wifi_available_access_points',
+    'connect-to-wifi':                  '_connect_to_wifi'
 }
 
 class FWAGENT_API:
@@ -353,8 +354,19 @@ class FWAGENT_API:
         
         try:
             access_points = fwutils.get_available_access_points(params['interfaceName'])
+            fwglobals.log.info("FWAGENT_API: _get_wifi_available_access_points FINISHED")
             return {'message': access_points, 'ok': 1}
         except:
             raise Exception("_get_device_logs: failed to get available access points: %s" % format(sys.exc_info()[1]))
+
+    def _connect_to_wifi(self, params):
+        fwglobals.log.info("FWAGENT_API: _connect_to_wifi STARTED")
+        
+        try:
+            result = fwutils.connect_to_wifi(params)
+            fwglobals.log.info("FWAGENT_API: _connect_to_wifi FINISHED")
+            return {'message': result, 'ok': result}
+        except:
+            raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
 
 

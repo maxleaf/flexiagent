@@ -1674,6 +1674,10 @@ def get_available_access_points(interface_name):
         n = n.strip()
         n = n.split(':')[-1]
         return n
+
+    # make sure the interface is up
+    cmd = 'ip link set dev %s up' % interface_name
+    subprocess.check_output(cmd, shell=True)
   
     try:
         cmd = 'iwlist %s scan | grep ESSID' % interface_name        
@@ -1682,6 +1686,23 @@ def get_available_access_points(interface_name):
         return access_points
     except subprocess.CalledProcessError:
         return access_points
+
+def connect_to_wifi(params):
+    print(params)
+    interface_name = params['interfaceName']
+    essid = params['essid']
+    password = params['password']
+    
+    # wpa_passphrase_output = subprocess.check_output('cmd', shell=True)
+    cmd = "wpa_supplicant -B -i %s -c <(wpa_passphrase %s %s) -Dwext" % (interface_name, essid, password)
+    print(cmd)
+    try:
+        output = subprocess.check_output(cmd, shell=False)
+        print("output=%s" % output)
+        return True
+    except subprocess.CalledProcessError:
+        print("ERROR")
+        return False  
 
 def is_wifi_interface(interface_name):
     """Check if interface is WIFI.                            
