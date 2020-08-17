@@ -41,8 +41,7 @@ fwagent_api = {
     'get-router-config':        '_get_router_config',
     'upgrade-device-sw':        '_upgrade_device_sw',
     'reset-device':             '_reset_device_soft',
-    'sync-device':              '_sync_device',
-    'modify-device':            '_modify_device'
+    'sync-device':              '_sync_device'
 }
 
 class FWAGENT_API:
@@ -290,268 +289,60 @@ class FWAGENT_API:
         # received with the sync-device.
         #
         sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
+        fwglobals.log.debug("FWAGENT_API: _sync_device: sync-list: %s" % \
+                            json.dumps(sync_list, indent=2, sort_keys=True))
         if not sync_list:
             fwglobals.log.info("FWAGENT_API: _sync_device: sync_list is empty, no need to sync")
             fwglobals.g.router_cfg.reset_signature()
             if params.get('type', '') != 'full-sync':
                 return {'ok': 1}   # Return if there is no full sync enforcement
 
-        # Find out if sync goes to remove or to add new interfaces.
-        # In this case the vpp should be restarted in order to release/capture
-        # correspondent devices.
-        # Note the modified interfaces do not require restart, so we should
-        # filter out 'remove-interface' requests that have correspondent 'add-
-        # interface' requests. The criteria for match is pci.
-        #
-        restart_router = False
-        if fwglobals.g.router_api.router_started:
-            interfaces = {}
-            for request in sync_list:
-                if re.search('-interface', request['message']):
-                    pci = request['params']['pci']
-                    if pci in interfaces:
-                        del interfaces[pci]
-                    else:
-                        interfaces[pci] = None
-            restart_router = bool(interfaces)  # True if dict is not empty, o/w False
-
-        # Remember if router is running before we start smart sync, as it might stop it
-        restart_router_after_reset = fwglobals.g.router_api.router_started
-
         # Finally update configuration.
         # Firstly try smart sync - apply sync-list modifications only.
         # If that fails, go with full sync - reset configuration and apply sync-device list
         #
-        try:
+        if sync_list:
             fwglobals.log.debug("FWAGENT_API: _sync_device: start smart sync")
-            fwglobals.log.debug("FWAGENT_API: _sync_device: sync-list: %s" % \
-                                json.dumps(sync_list, indent=2, sort_keys=True))
+            sync_request = {
+                'message':   'aggregated',
+                'params':    { 'requests': sync_list },
+                'internals': { 'dont_revert_on_failure': True }
+            }
+            reply = fwglobals.g.router_api.call(sync_request)
 
-            # Stop router if needed
-            if restart_router:
-                reply = fwglobals.g.router_api.call({'message':'stop-router'})
-                if reply['ok'] == 0:
-                    raise Exception(" _sync_device: stop-router failed: " + str(reply.get('message')))
-
-            # Update configuration.
-            # We use aggregated message for that as preprocessing of the sync-list
-            # requests might be needed. For example, if sync-list includes
-            # multiple 'add-tunnel'/'remove-tunnel', the multiling policy should
-            # be reinstalled. And that should be done only once for whole sync-list.
+            # If smart sync succeeded and there is no 'full-sync' enforcement
+            # in message, finish sync procedure and return.
+            # Note today the 'full-sync' enforcement is needed for testing only.
             #
-            reply = fwglobals.g.router_api.call({'message':'aggregated-router-api', 'params': {'requests': sync_list}} )
-            if reply['ok'] == 0:
-                raise Exception(" _sync_device: smart sync failed: " + str(reply.get('message')))
+            if reply['ok'] == 1 and params.get('type', '') != 'full-sync':
+                fwglobals.g.router_cfg.reset_signature()
+                fwglobals.log.debug("FWAGENT_API: _sync_device: smart sync succeeded")
+                fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+                return {'ok': 1}
 
-            # Start router if needed
-            if restart_router:
-                reply = fwglobals.g.router_api.call({'message':'start-router'})
-                if reply['ok'] == 0:
-                    raise Exception(" _sync_device: start-router failed: " + str(reply.get('message')))
-
-            smart_sync_failed = False
-            fwglobals.log.debug("FWAGENT_API: _sync_device: start smart succeeded")
-
-        except Exception as e:
-            fwglobals.log.error("FWAGENT_API: _sync_device: smart sync failed: %s" % str(e))
-            smart_sync_failed = True
-
-        # Perform full sync if smart sync failed or if full sync is enforced
-        # by special attribute in 'sync-device' request.
+        # At this point we have to perform full sync.
+        # This is due to either smart sync failure or full sync enforcement.
         #
-        if smart_sync_failed or params.get('type', '') == 'full-sync':
-            fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
-            self._reset_device_soft()
-            for request in params['requests']:
-                reply = fwglobals.g.router_api.call(request)
-                if reply['ok'] == 0:
-                    error = request['message'] + ': ' + str(reply.get('message'))
-                    fwglobals.log.error("FWAGENT_API: _sync_device: full sync failed: %s" % error)
-                    raise Exception(error)
-            if restart_router_after_reset:
-                fwglobals.g.router_api.call({'message':'start-router'})
-            fwglobals.log.debug("FWAGENT_API: _sync_device: full sync succeeded")
+        fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
+        restart_router = False
+        if fwglobals.g.router_api.router_started:
+            restart_router = True
+            fwglobals.g.router_api.call({'message': 'stop-router'})
+
+        self._reset_device_soft()                       # Wipe out the configuration database
+        request = {                                     # Cast 'sync-device' to 'aggregated'
+            'message':   'aggregated',
+            'params':    { 'requests': params['requests'] },
+            'internals': { 'dont_revert_on_failure': True }
+        }
+        reply = fwglobals.g.router_api.call(request)    # Apply finally the received configuration
+        if reply['ok'] == 0:
+            raise Exception(" _sync_device: full sync failed: " + str(reply.get('message')))
+
+        if restart_router:
+            fwglobals.g.router_api.call({'message': 'start-router'})
+        fwglobals.log.debug("FWAGENT_API: _sync_device: full sync succeeded")
 
         fwglobals.g.router_cfg.reset_signature()
         fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
         return {'ok': 1}
-
-
-    def _modify_device(self, params):
-        """Handles modify-device request: modifies interfaces, tunnels, routes
-        and other configuration entities received within 'modify-device' request.
-        To do that this function create pair of 'remove-X' and 'add-X' requests
-        for every entity found in the request. Than it forms list of these requests
-        where at the first place are located the 'remove-X' requests and after
-        them go the 'add-X' requests. The order of 'remove-X' and 'add-X' is
-        important, as some configurations entities depends on others. For example,
-        the tunnels use interfaces, the routes might use tunnels, etc.
-        The order of 'remove-X' is exactly opposite to the order of 'add-X'.
-
-        :param params: Request parameters received from flexiManage:
-                        {
-                          'modify_router':
-                            {
-                              'unassign': <list of interfaces that should be removed from VPP>
-                              'assign': <list of interfaces that should be added to VPP>
-                            }
-                          'modify_interfaces':
-                            { 'interfaces': <list of interfaces to be modified> }
-                          'modify_routes':
-                            { 'routes': <list of routes to be modified> }
-                          'modify_dhcp_config':
-                            { 'dhcp_configs': <list of DHCP servers to be modified> }
-                          'modify_app':
-                            { 'apps': <list of mulitlink applications to be modified> }
-                          'modify_policy':
-                            { 'policies': <list of mulitlink policy rules to be modified> }
-                        }
-
-        :returns: Dictionary with status code.
-        """
-        def _modify_device_entity(entities, entity_name):
-            add     = []
-            remove  = []
-            add_req    = 'add-' + entity_name
-            remove_req = 'remove-' + entity_name
-            for params in entities:
-                # Add 'remove-X' request only if entity exists in configuration
-                if fwglobals.g.router_cfg.exists(add_req, params):
-                    remove.append({ 'message': remove_req, 'params':  params })
-                # Add 'add-X' request
-                add.append({ 'message': add_req, 'params':  params })
-            return (add, remove)
-
-        def _modify_device_router(modify_router_params):
-            add     = []
-            remove  = []
-            for params in modify_router_params.get('unassign', []):
-                # Add 'remove-X' request only if entity exists in configuration
-                if fwglobals.g.router_cfg.exists('add-interface', params):
-                    remove.append({'message': 'remove-interface', 'params': params})
-            for params in modify_router_params.get('assign', []):
-                add.append({'message': 'remove-interface', 'params': params})
-            return (add, remove)
-
-        def _modify_device_routes(entities, entity_name):
-            add     = []
-            remove  = []
-            for params in entities:
-                # Add 'remove-X' request only if entity exists in configuration,
-                # and only if 'modify-routes' element has 'old_route' parameter.
-                if params['old_route']:
-                    remove_route_params = {k:v for k,v in params.items() if k != 'new_route'}
-                    remove_route_params['via'] = remove_route_params.pop('old_route')
-                    if fwglobals.g.router_cfg.exists('add-route', remove_route_params):
-                        remove.append({'message': 'remove-route', 'params':  remove_route_params})
-                # Add 'add-X' request only if 'modify-routes' element has 'new_route' parameter.
-                if params['new_route'] != '':
-                    add_route_params = {k:v for k,v in params.items() if k != 'old_route'}
-                    add_route_params['via'] = add_route_params.pop('new_route')
-                    add.append({'message': 'add-route', 'params':  add_route_params})
-            return (add, remove)
-
-
-        fwglobals.log.info("FWAGENT_API: _modify_device STARTED")
-
-        # Handle inconsistency in section / list / entity names.
-        # Order of elements is order of execution of 'add-X' requests.
-        #
-        sections = [
-          ('modify_router',     None,           None),
-          ('modify_interfaces', 'interfaces',   'interface'),
-          ('modify_routes',     'routes',       'route'),
-          ('modify_dhcp_config','dhcp_configs', 'dhcp-config'),
-          ('modify_app',        'apps',         'application'),
-          ('modify_policy',     'policies',     'multilink-policy')
-        ]
-
-        ########################################################################
-        # Firstly generate list of 'remove-X' and 'add-X' requests to be executed
-        # to modify device configuration out of 'modify-device' data.
-        # We call this list the 'modify list'.
-        ########################################################################
-
-        list_additions = []
-        list_removals  = []
-
-        for (section_name, list_name, entity_name) in sections:
-            if section_name in params:
-                # 'modify_routes' and 'modify_router' require special handling
-                if section_name == 'modify_router':
-                    (additions, removals) = _modify_device_router(params[section_name])
-                elif section_name == 'modify_routes':
-                    (additions, removals) = _modify_device_routes(params[section_name][list_name], entity_name)
-                else:
-                    (additions, removals) = _modify_device_entity(params[section_name][list_name], entity_name)
-                # Update final lists
-                list_additions.extend(additions)    # Tail
-                list_removals[0:0] = removals       # Head
-
-        ########################################################################
-        # Now go and modify device configuration.
-        # We do that by simulating receiving the aggregated router configuration
-        # request, so if one of modification fails the previous will be reverted.
-        ########################################################################
-
-        # Restart router is needed, if there interfaces to be assigned to VPP
-        # or to be unassigned. The assignment/un-assignment causes modification
-        # of the /etc/vpp/startup.conf file, that in turns requires VPP restart.
-        #
-        should_restart_router = False
-        if fwglobals.g.router_cfg.exists('start-router'):
-            if 'modify_router' in params:
-                if ('assign' in params['modify_router']) or ('unassign' in params['modify_router']):
-                    should_restart_router = True
-
-        if should_restart_router:
-            fwglobals.g.router_api.call({'message':'stop-router'})
-
-        # Finally modify device!
-        # Note we use fwglobals.g.handle_request() and not the fwglobals.g.router_api.call()
-        # in order to enforce update of configuration signature.
-        #
-        reply = fwglobals.g.handle_request(
-            {
-			  'message': 'aggregated-router-api',
-              'params':  { 'requests': list_removals + list_additions }
-            },
-            received_msg={ 'message': 'modify-device', 'params': params })
-
-        if should_restart_router:
-            fwglobals.g.router_api.call({'message':'start-router'})
-
-        fwglobals.log.info("FWAGENT_API: _modify_device FINISHED (ok=%d)" % reply['ok'])
-
-
-        ########################################################################
-        # Workaround for following problem:
-        # if 'modify-device' request causes change in IP or in GW of WAN interface,
-        # the 'remove-interface' part of modification removes GW from the Linux
-        # neighbor table, but the consequent 'add-interface' does not add it back.
-        # As a result the VPP FIB is stuck with DROP rule for that interface,
-        # and traffic on that interface is dropped.
-        # The workaround below enforces Linux to update the neighbor table with
-        # the latest GW-s. That results in VPPSB to propagate the ARP information
-        # into VPP FIB.
-        # Note we do this even if 'modify-device' failed, as before failure
-        # it might succeed to remove few interfaces.
-        ########################################################################
-        added_gateways = []
-        for request in list_additions:
-            if request['message'] == 'add-interface' and \
-               request['params'].get('type', '').lower() == 'wan' and \
-               request['params'].get('gateway') != None:
-                added_gateways.append(request['params']['gateway'])
-        if added_gateways:
-            # Delay 5 seconds to make sure Linux interfaces were initialized
-            time.sleep(5)
-            for gw in added_gateways:
-                try:
-                    cmd = 'ping -c 3 %s' % gw
-                    output = subprocess.check_output(cmd, shell=True)
-                    fwglobals.log.debug("FWAGENT_API: _modify_device: %s: %s" % (cmd, output))
-                except Exception as e:
-                    fwglobals.log.debug("FWAGENT_API: _modify_device: %s: %s" % (cmd, str(e)))
-
-        return reply

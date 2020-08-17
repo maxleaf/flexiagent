@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import json
 import os
 import Pyro4
@@ -64,14 +65,14 @@ request_handlers = {
     'upgrade-device-sw':            {'name': '_call_agent_api'},
     'reset-device':                 {'name': '_call_agent_api'},
     'sync-device':                  {'name': '_call_agent_api'},
-    'modify-device':                {'name': '_call_agent_api', 'sign': True},
 
     # Router API
-    'aggregated-router-api':        {'name': '_call_router_api', 'sign': True},
+    'aggregated':                   {'name': '_call_router_api', 'sign': True},
     'start-router':                 {'name': '_call_router_api', 'sign': True},
     'stop-router':                  {'name': '_call_router_api', 'sign': True},
     'add-interface':                {'name': '_call_router_api', 'sign': True},
     'remove-interface':             {'name': '_call_router_api', 'sign': True},
+    'modify-interface':             {'name': '_call_router_api', 'sign': True},
     'add-route':                    {'name': '_call_router_api', 'sign': True},
     'remove-route':                 {'name': '_call_router_api', 'sign': True},
     'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
@@ -396,14 +397,29 @@ class Fwglobals:
 
         :returns: Dictionary with error string and status code.
         """
-
         try:
             req    = request['message']
             params = request.get('params')
 
-            handler = request_handlers.get(request['message'])
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+            if req != 'aggregated':
+                handler = request_handlers.get(req)
+                assert handler, 'fwglobals: "%s" request is not supported' % req
+            else:
+                # In case of aggregated request use the first request in aggregation
+                # to deduce the handler function.
+                # Note the aggregation might include requests of the same type
+                # only, e.g. Router API (add-tunnel, remove-application, etc)
+                #
+                handler = request_handlers.get(params['requests'][0]['message'])
+                assert handler, 'fwglobals: aggregation with "%s" request is not supported' % \
+                    params['requests'][0]['message']
 
+            # Keep copy of the request aside for signature purposes,
+            # as the original request might by modified by preprocessing.
+            #
+            if handler.get('sign', False) and received_msg is None:
+                received_msg = copy.deepcopy(request)
+            
             handler_func = getattr(self, handler.get('name'))
             if result is None:
                 reply = handler_func(request)
@@ -416,7 +432,7 @@ class Fwglobals:
                     raise Exception(reply['message'])
 
             # On router configuration request, e.g. add-interface,
-            # remove-tunnel, modify-device, etc. update the configuration database
+            # remove-tunnel, etc. update the configuration database
             # signature. This is needed to assists the database synchronization
             # feature that keeps the configuration set by user on the flexiManage
             # in sync with the one stored on the flexiEdge device.
@@ -427,15 +443,13 @@ class Fwglobals:
             if reply['ok'] == 1 and handler.get('sign', False):
                 # Update the configuration signature
                 self.router_cfg.update_signature(received_msg)
-                # Add the updated signatire to the reply, so server could be quite
+                # Add the updated signatire to the reply, so server could be quiet
                 reply['router-cfg-hash'] = self.router_cfg.get_signature()
 
             return reply
 
         except Exception as e:
             global log
-            if len(str(params)) > 4096:
-                params = '<truncated>'
             err_str = "%s(%s): %s" % (str(e), req, format(params))
             log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}

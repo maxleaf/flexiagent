@@ -4,7 +4,6 @@
   "params": {
     "type": "full-sync",
     "router-cfg-hash": "kukuriku",
-	"reconnect": "true",
     "requests": [
 		{
 		  "entity":  "agent",

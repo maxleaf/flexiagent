@@ -1532,7 +1532,7 @@ def tunnel_change_postprocess(add, addr):
 # request to the first, when the whole operation is considered to be failed.
 # Convert both type of aggregations into same format:
 # {
-#   'message': 'aggregated-router-api',
+#   'message': 'aggregated',
 #   'params' : {
 #                'requests':     <list of aggregated requests>,
 #                'original_msg': <original message>
@@ -1549,19 +1549,10 @@ def fix_aggregated_message_format(msg):
 
     # 'list' aggregation
     if type(msg) == list:
-
-        # Figure out if 'reconnect' appears in one of aggregated messages.
-        # If it does, place it in the new aggregation header.
-        reconnect = False
-        for request in msg:
-            if 'params' in request and 'reconnect' in request['params']:
-                reconnect = True
-                break
-
         return  \
             {
-                'message': 'aggregated-router-api',
-                'params' : { 'requests': msg, 'reconnect': reconnect }
+                'message': 'aggregated',
+                'params' : { 'requests': msg }
             }
 
     # 'start-router' aggregation
@@ -1600,7 +1591,7 @@ def fix_aggregated_message_format(msg):
                     })
             return \
                 {
-                    'message': 'aggregated-router-api',
+                    'message': 'aggregated',
                     'params' : { 'requests': requests }
                 }
 
@@ -1619,7 +1610,7 @@ def fix_aggregated_message_format(msg):
 
         return \
             {
-                'message': 'aggregated-router-api',
+                'message': 'aggregated',
                 'params' : { 'requests': requests }
             }
 

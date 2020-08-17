@@ -3,18 +3,15 @@
   "message": "sync-device",
   "params": {
     "router-cfg-hash": "kukuriku",
-	"reconnect": "true",
     "requests": [
 		{
 		  "entity": "agent",
 		  "message": "add-dhcp-config",
 		  "params": {
 			"interface": "0000:00:09.00",
-		    "range_start": "20.20.20.150",
-		    "range_end": "20.20.20.200",
-		    "dns": [
-			"8.8.4.4"
-		    ],
+		    "range_start": "192.168.56.150",
+		    "range_end": "192.168.56.200",
+		    "dns": [ "8.8.4.4" ],
 		    "mac_assign": []
 		  }
 		}
@@ -409,9 +406,7 @@
 			  "addr":"10.0.0.4/24",
 			  "gateway": "10.0.0.10",
 			  "type":"wan",
-			  "multilink": {
-				  "labels": [ "green" ]
-			  }
+              "multilink": { "labels": [ "green" ] }
 		  }
 		}
 		,
@@ -420,7 +415,7 @@
 		  "message": "add-interface",
 		  "params": {
 			  "pci":"0000:00:09.00",
-			  "addr":"192.168.56.100/24",
+			  "addr":"192.168.56.102/24",
 			  "routing":"ospf",
 			  "type":"lan"
 		  }
