@@ -1713,9 +1713,16 @@ def connect_to_wifi(params):
     subprocess.check_output('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
 
     try:
-        subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B' % interface_name, shell=True)
-        subprocess.check_output('dhclient %s' % interface_name, shell=True)
-        return True
+        output = subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
+        time.sleep(3)
+
+        is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
+        
+        if (is_success.strip() == 'COMPLETED'):
+            subprocess.check_output('dhclient %s' % interface_name, shell=True)
+            return True
+        else:
+            return False
     except subprocess.CalledProcessError:
         return False  
 
