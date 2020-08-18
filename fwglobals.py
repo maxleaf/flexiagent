@@ -204,7 +204,7 @@ class Fwglobals:
         self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
         self.OSPF_LOG_FILE       = '/var/log/frr/ospfd.log'
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
-        self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.orig'
+        self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.baseline'
         self.VPP_CONFIG_FILE_RESTORE = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'

@@ -31,10 +31,11 @@ import sys
 import uuid
 import yaml
 import shutil
+import re
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
-from fw_vpp_startupconf import FwStartupConf, L, T
+from fw_vpp_startupconf import FwStartupConf
 
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
@@ -61,7 +62,7 @@ class Checker:
         self.detected_nics          = None
         self.supported_nics         = None
         self.fw_ac_db               = FwStartupConf()
-        self.vpp_configuration      = L(self.fw_ac_db.load(self.CFG_VPP_CONF_FILE))
+        self.vpp_configuration      = self.fw_ac_db.load(self.CFG_VPP_CONF_FILE)
         self.vpp_config_modified    = False
         self.update_grub            = False
 
@@ -810,7 +811,7 @@ class Checker:
             return True
 
         if not conf:
-            conf = L([])
+            conf = self.fw_ac_db.get_main_list()
         if conf['dpdk'] is None:
             tup = self.fw_ac_db.create_element('dpdk')
             conf.append(tup)
@@ -872,7 +873,7 @@ class Checker:
 
         # if configuration files does not exist, create it, and create the 'cpu' and 'dpdk' sections.
         if not conf:
-            conf = L([])
+            conf = self.fw_ac_db.get_main_list()
             tup = self.fw_ac_db.create_element('cpu')
             conf.append(tup)
             conf['cpu'].append(self.fw_ac_db.create_element('main-core 0')) 
@@ -892,19 +893,22 @@ class Checker:
             return True
 
         # configuration file exist 
+        print conf
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
             if tup_main_core:
                 main_core_param = tup_main_core[0]
-                main_core_param_val = int(main_core_param.split(' ')[1])
+                tmp = re.split('\s+', main_core_param.strip())
+                main_core_param_val = int(tmp[1])
                     
         string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
         if string:
             tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
             if tup_core_list:
                 corelist_worker_param = tup_core_list[0]
-                corelist_worker_param_val = corelist_worker_param.split(' ')[1]
+                tmp = re.split('\s+', corelist_worker_param.strip())
+                corelist_worker_param_val = tmp[1]
                 if corelist_worker_param_val.isdigit():
                     corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
                 else:
@@ -916,7 +920,8 @@ class Checker:
             tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
             if tup_workers:
                 workers_param = tup_workers[0]
-                workers_param_val = int(workers_param.split(' ')[1])
+                tmp = re.split('\s+', workers_param.strip())
+                workers_param_val = int(tmp[1])
  
         if conf and not conf['dpdk']:
             conf.append(self.fw_ac_db.create_element('dpdk'))
@@ -926,7 +931,8 @@ class Checker:
                 tup_num_rx = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
                 if tup_num_rx:
                     num_of_rx_queues_param = tup_num_rx[0]
-                    num_of_rx_queues_param_val = int(num_of_rx_queues_param.split(' ')[1])
+                    tmp = re.split('\s+', num_of_rx_queues_param.strip())
+                    num_of_rx_queues_param_val = int(tmp[1])                  
 
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
@@ -1059,7 +1065,8 @@ class Checker:
             if string:
                 tup = self.fw_ac_db.get_tuple_from_key(conf['unix'],string)
                 if tup:
-                    usec = int(tup[0].split(' ')[1])
+                    tmp = re.split('\s+', tup[0].strip())
+                    usec = int(tmp[1])
                     conf_param = tup[0]
 
         while True:
@@ -1076,6 +1083,13 @@ class Checker:
         if enable_ps_mode == True:
             if usec == usec_rest:
                 return True   #nothing to do    
+            elif not conf:
+                    conf = self.fw_ac_db.get_main_list()
+                    if conf['unix'] is None:
+                        tup = self.fw_ac_db.create_element(conf,'unix')
+                        tup.append(self.fw_ac_db.create_elemen('poll-sleep-usec %d' %(usec_rest)))
+                        self.vpp_config_modified = True
+                        return True
             else:
                 if conf_param:
                     self.fw_ac_db.remove_element(conf['unix'], conf_param)
@@ -1083,17 +1097,7 @@ class Checker:
                 conf['unix'].append(self.fw_ac_db.create_element(conf_param))
                 self.vpp_config_modified = True
                 return True
-
-        if enable_ps_mode == True:
-            if not conf:
-                conf = L([])
-            if conf['unix'] is None:
-                tup = self.fw_ac_db.create_element(conf,'unix')
-                tup.append(self.fw_ac_db.create_elemen('poll-sleep-usec %d' %(usec_rest)))
-            self.vpp_config_modified = True
-            return True
-
-        if enable_ps_mode == False:
+        else: # enable_ps_mode is False
             if conf_param:
                 self.fw_ac_db.remove_element(conf['unix'], conf_param)
                 self.vpp_config_modified = True
@@ -1119,9 +1123,9 @@ class Checker:
                 tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
                 if tup_workers:
                     workers_param = tup_workers[0]
-                    num_of_workers_cores = int(workers_param.split(' ')[1])
+                    tmp = re.split('\s+', workers_param.strip())
+                    num_of_workers_cores = int(tmp[1])
 
-        update_line = ''
         if num_of_workers_cores == 0:
             update_line = ''
         elif num_of_workers_cores == 1:
@@ -1139,9 +1143,11 @@ class Checker:
         write_file = open(grub_write_file, "w")
         for line in read_file:
             if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
+                # no need to handle lines which are remarked
                 if line.startswith("#"):
                     write_file.write(line)
                 else:
+                    #if line is found, remark it, and save its contents for later processing
                     grub_line_found = True
                     grub_line = line
                     line = "# "+line
@@ -1153,10 +1159,14 @@ class Checker:
     # zero cores means reset to old line, without our additions
         if grub_line_found == True:
             add_grub_line = True
+            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
             val_line = grub_line.split('=\"')[1].strip()
+            # take the GRUB_CMDLINE_LINUX_DEFAULT part
             prefix_val = grub_line.split('=\"')[0]
             val_line = val_line.strip('\" ')
-            val_line_list = val_line.split(' ')
+            #create a list of tokens from the val_line
+            val_line_list = re.split('\s+', val_line.strip())
+            #remove old values, if exist, so we can replace them with ourts
             for elem in val_line_list:
                 if elem.startswith('iommu'):
                     val_line_list.remove(elem)
@@ -1172,8 +1182,10 @@ class Checker:
             for elem in val_line_list:        
                 if elem.startswith('rcu_nocbs'):
                     val_line_list.remove(elem)
+            #regroup val_line
             val_line = " ".join(val_line_list)
 
+            #add our values.
             if num_of_workers_cores!=0:
                 grub_line = prefix_val+ '=\"' + val_line + " " + update_line + '\"'
             else:

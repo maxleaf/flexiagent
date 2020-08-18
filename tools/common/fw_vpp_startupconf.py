@@ -1,6 +1,3 @@
-#! /usr/bin/python
-
-
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
@@ -21,11 +18,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-
 import os
 import shutil
-
-#!/usr/bin/python
 import json
 import re
 import sys
@@ -62,8 +56,8 @@ class T(list):
 		if isinstance(key, int) and key>=0 and key<2:
 			super(T,self).__setitem__(key,value)
 		else:
-			#super(T,self).__setitem__(self.ELEM_KEY,key)
-			super(T,self).__setitem__(self.T_ELEM_VALUE,value)
+			if super(T,self).__getitem__(self.T_ELEM_KEY) == key:
+				super(T,self).__setitem__(self.T_ELEM_VALUE,value)
 
 	"""
 	API
@@ -73,7 +67,8 @@ class T(list):
 	e.append(value)
 	"""
 	def append(self, value):
-		self[1].append(value)
+		if str(type(self[1])) == "<class 'fw_vpp_startupconf.L'>":
+			self[1].append(value)
 
 	def __str__(self):
 		s = '(' + str(super(T,self).__getitem__(self.T_ELEM_KEY)) + ", " + str(super(T,self).__getitem__(self.T_ELEM_VALUE)) + ')'
@@ -101,17 +96,17 @@ class L(list):
 			the startupconf module, so we can do that.
 			"""
 			for element in self:
-				if element[self.L_ELEM_KEY] == key:
-					return element[self.L_ELEM_VALUE]
-			return None
-		else:
+				if str(type(element)) == "<class 'fw_vpp_startupconf.T'>":
+					if element[self.L_ELEM_KEY] == key:
+						return element[self.L_ELEM_VALUE]
 			return None
 
 	def __str__(self):
+		ln = len(self)
 		s = '['
-		for element in self:
-			s = s + str(element)
-			if self[-1] != element:
+		for i in range(ln):
+			s = s + str(self[i])
+			if i < ln - 1:
 				s = s + ', '
 		s = s + ']'
 		return s
@@ -155,7 +150,9 @@ class FwStartupConf:
 	CLOSE_LIST                 = 4
 
 	def __init__(self):
+		# The DB is a list of tuples. This is the main list.
 		self.main_list  = L([])
+		# use to follow the tree when we are dealing with a list inside a list (and so on)
 		self.listOfList = [self.main_list]
 		self.path       = ''  #For Debugging, gives path of keys (e.g. 'cpu' or 'dpdk'/'dev default')
 		self.levels     = 0   #For Debugging, gives depth of keys (e.g. 1 in case of 'cpu'; 2 in case of'dpdk'/'dev default')
@@ -174,9 +171,18 @@ class FwStartupConf:
 		
 		:param lst: list to populate
 		"""
-		if self.value != None:
-			tup = T([self.key, L([(self.value, L([]))])])
+		if self.value != '':
+			"""
+			case of key { val. In this case val is the first element in the list of its owner
+			tuple. So we create tuple and an inner tuple which is the first element in the list.
+			""" 
+			sub_tup = self.create_element(self.value)
+			tup = self.create_element(self.key)
+			tup.append(sub_tup)
 		else:
+			"""
+			case of key { . We create regular tuple with empty list as value.
+			"""
 			tup = self.create_element(self.key)
 		lst.append(tup)
 		self.path = self.path+ '/' + self.key
@@ -190,7 +196,9 @@ class FwStartupConf:
 		This function creates a single-value list, as the result of a line in the startupconf file that looks like:
 		key { val }
 		"""
-		tup = T([self.key, L([(self.value,L([]))])])
+		sub_tup = self.create_element(self.value)
+		tup = self.create_element(self.key)
+		tup.append(sub_tup)
 		self.curr_list.append(tup)
 		self.key = self.value = ''
 
@@ -252,7 +260,7 @@ class FwStartupConf:
 				}
 				"""
 				self.key = line.split('{')[0].strip()
-				self.value = None
+				self.value = ''
 				return self.ADD_LIST
 				
 		elif line.strip('{}') == line:
@@ -260,7 +268,7 @@ class FwStartupConf:
 			a simple line to add to the list: num-mbufs 128000
 			"""
 			self.key = line.strip()
-			self.value = None
+			self.value = ''
 			return self.ADD_LINE
 		elif line == '}':
 			return self.CLOSE_LIST
@@ -336,7 +344,7 @@ class FwStartupConf:
 		:param search_str:  The search string to use to mach for the tuple's key
 		"""
 		for element in lst:
-			if element[0].startswith(search_str):
+			if element[0] is not None and element[0].startswith(search_str):
 				return element[0]
 		return None
 
@@ -371,6 +379,13 @@ class FwStartupConf:
 				return element
 		return None
 
+	def get_main_list(self):
+		"""
+		API.
+		Returns the head of the DB
+		"""
+		return self.main_list
+
 	def dump(self, db, file_name):
 		"""
 		API.
@@ -382,7 +397,7 @@ class FwStartupConf:
 		with open (file_name, 'w') as self.out_fp:
 			indent = 0
 			self._dump_list(db,indent)
-			#print(str(self))
+
 			
 	def _dump_list(self, value, indent):
 		"""

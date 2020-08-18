@@ -1083,7 +1083,7 @@ def obj_dump_attributes(obj, level=1):
 def vpp_startup_conf_add_devices(params):
     filename = params['vpp_config_filename']
     p = FwStartupConf()
-    config = L(p.load(filename))
+    config = p.load(filename)
 
     if config['dpdk'] == None:
         tup = p.create_element('dpdk')
@@ -1100,7 +1100,7 @@ def vpp_startup_conf_add_devices(params):
 def vpp_startup_conf_remove_devices(params):
     filename = params['vpp_config_filename']
     p = FwStartupConf()
-    config = L(p.load(filename))
+    config = p.load(filename)
 
     if config['dpdk'] == None:
         return
@@ -1116,7 +1116,7 @@ def vpp_startup_conf_remove_devices(params):
 def vpp_startup_conf_add_nat(params):
     filename = params['vpp_config_filename']
     p = FwStartupConf()
-    config = L(p.load(filename))
+    config = p.load(filename)
     tup = p.create_element('nat')
     config.append(tup)
     config['nat'].append(p.create_element('endpoint-dependent'))
@@ -1131,7 +1131,7 @@ def vpp_startup_conf_add_nat(params):
 def vpp_startup_conf_remove_nat(params):
     filename = params['vpp_config_filename']
     p = FwStartupConf()
-    config = L(p.load(filename))
+    config = p.load(filename)
     key = p.get_element(config, 'nat')
     if key:
         p.remove_element(config,key)
