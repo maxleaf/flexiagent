@@ -87,7 +87,11 @@ class OS_DECODERS:
                 daddr[addr_af_name] = addr.address.split('%')[0]
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-
+            if daddr['gateway'] is not None:
+                # Send STUN request only for interfaces with Gateway
+                daddr['public_ip'], daddr['public_port'] = fwutils.find_srcip_public_addr(daddr[addr_af_name],4789,1)
+            else:
+                daddr['public_ip'] = daddr['public_port'] = ''
             out.append(daddr)
         return (out,1)
 

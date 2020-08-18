@@ -458,3 +458,16 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
+
+    def get_interfaces_with_gw(self):
+        """
+        Get only the interfaces that has GW. Those interfaces are suspected
+        to have access to the internet, so we need to collection of them to 
+        later send STUN requwest on each.
+        """
+        interfaces = self.get_interfaces(self)
+        gw_if = []
+        for elem in interfaces:
+            gw = elem[0].get('gateway')
+            if gw is not None:
+                gw_if.append(elem)

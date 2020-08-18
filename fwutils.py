@@ -1660,24 +1660,26 @@ def fix_aggregated_message_format(msg):
     return msg  # No conversion is needed
 
 
-def find_srcip_public_addr(lcl_src_ip, lcl_src_port = 4789):
+def find_srcip_public_addr(lcl_src_ip, lcl_src_port = 4789, rounds = 1):
 	timeout = 0.5
 	interval = 0.1
 	nat_type = None 
 	nat_ext_ip = None 
 	nat_ext_port = None
-	trails = 0
-	num_of_trails = 15
     fwglobals.log.debug("trying to find external %s:%s" %(lcl_ip_src,lcl_src_port)
-	while (timeout <= 3 and trails < num_of_trails):
+	while (timeout <= 32):
 		start = time.time()
 		nat_type,nat_ext_ip, nat_ext_port = stun.get_ip_info(lcl_src_ip, lcl_src_port)
-		while nat_ext_port == None and time.time() - start < timeout:
+		if (rounds == 1):
+            return nat_ext_ip, nat_ext_port
+
+        while nat_ext_port == None and time.time() - start < timeout:
 			time.sleep(interval)
 		if nat_ext_port == None:
-			if timeout < 3:
-				timeout += 0.5
-			trails+=1
+			if timeout < 32:
+				timeout *= 2
+        else:
+            break
 
     if nat_ext_ip != None:
         fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_ip_src,lcl_src_port)

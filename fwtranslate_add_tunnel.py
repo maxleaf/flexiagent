@@ -426,7 +426,7 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
                               'admin_up_down':1 }
     cmd_list.append(cmd)
 
-def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
+def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, dest_port):
     """Add VxLAN tunnel command into the list.
 
     :param cmd_list:             List of commands.
@@ -434,18 +434,20 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
     :param bridge_id:            Bridge identifier.
     :param src:                  Source ip address.
     :param src:                  Destination ip address.
+    :param dest_port:            Destination port after STUN resolution
 
     :returns: None.
     """
     # vxlan.api.json: vxlan_add_del_tunnel (..., is_add, tunnel <type vl_api_vxlan_add_del_tunnel_t>, ...)
     ret_attr = 'sw_if_index'
     src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
-    dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
+    od = fwutils.ip_str_to_bytes(dst)[0]
     cmd_params = {
             'is_add'               : 1,
             'src_address'          : src_addr_bytes,
             'dst_address'          : dst_addr_bytes,
             'vni'                  : bridge_id,
+            'dest_port'            : dest_port,
             'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
                        {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway', 'arg': src}],
             'instance'             : bridge_id,
