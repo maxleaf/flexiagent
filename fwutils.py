@@ -139,6 +139,18 @@ def get_machine_serial():
         return str(serial)
     except:
         return '0'
+def pid_of(proccess_name):
+    """Get pid of process.
+
+    :param proccess_name:   Proccess name.
+
+    :returns:           process identifier.
+    """
+    try:
+        pid = subprocess.check_output(['pidof', proccess_name])
+    except:
+        pid = None
+    return pid
 
 def vpp_pid():
     """Get pid of VPP process.
@@ -146,7 +158,7 @@ def vpp_pid():
     :returns:           process identifier.
     """
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        pid = pid_of('vpp')
     except:
         pid = None
     return pid
@@ -1688,20 +1700,23 @@ def get_available_access_points(interface_name):
         return access_points
 
 def connect_to_wifi(params):
-    print(params)
     interface_name = params['interfaceName']
     essid = params['essid']
     password = params['password']
-    
-    # wpa_passphrase_output = subprocess.check_output('cmd', shell=True)
-    cmd = "wpa_supplicant -B -i %s -c <(wpa_passphrase %s %s) -Dwext" % (interface_name, essid, password)
-    print(cmd)
+
+    wpaIsRun = True if pid_of('wpa_supplicant') else False
+    if (wpaIsRun):
+        os.system('sudo killall wpa_supplicant')
+        time.sleep(3)
+
+    # create config file
+    subprocess.check_output('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
+
     try:
-        output = subprocess.check_output(cmd, shell=False)
-        print("output=%s" % output)
+        subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B' % interface_name, shell=True)
+        subprocess.check_output('dhclient %s' % interface_name, shell=True)
         return True
     except subprocess.CalledProcessError:
-        print("ERROR")
         return False  
 
 def is_wifi_interface(interface_name):
