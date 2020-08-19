@@ -1,8 +1,6 @@
 ################################################################################
-
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
-#
 # Copyright (C) 2019  flexiWAN Ltd.
 #
 # This program is free software: you can redistribute it and/or modify it under
@@ -17,8 +15,37 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
 ################################################################################
+
+"""
+This is a whitebox script to test netplan under different scenarios and with 
+ combination of netplans.
+ The script start with loading a initial configuration in netplan. These initial
+ configurations are:
+ - Basic netplan with all interfaces
+ - Multiple netplan files for different interfaces
+ - With metrics configuration in netplan and without as static and as dhcp
+ - Use default route in netplan configuration and without
+ - Use match in netplan and set name
+ - Use incomplete configurations in netplan
+ After loading the initial configuration the script will start the loading test 
+ configurations which are:
+ 1) two WANs + LAN, 
+ 2) two LANs + WAN, 
+ 3) One WAN + One LAN + Unassigned  
+ 4) Two dhcp + One Static
+ After each test the initial netplan file is again loaded.
+ 
+ Test Environment : This test has to be run on a Ubuntu 18.04 Virtualbox with 
+ 3 intf: 0000:00:03.0, 0000:00:08.0 and 0000:00:09.0
+ 
+ REMEMBER TO STOP THE ROUTER BEFORE RUNNING THE SCRIPT
+ 
+ Use : sudo systemctl stop flexiwan-router
+ 
+ To run the script : pytest -k 13
+ """
 
 import glob
 import os
@@ -57,7 +84,7 @@ def test():
             with fwtests.TestFwagent() as agent:
                 print("   " + os.path.basename(t))
 
-		agent.cli('-f %s' % cli_start_router_file)
+	        agent.cli('-f %s' % cli_start_router_file)
                 # Load router configuration with spoiled lists
                 agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
 
