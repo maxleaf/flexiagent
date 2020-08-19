@@ -5,12 +5,10 @@ import shutil
 import glob
 from getmac import get_mac_address as gma
 import netifaces
-import pdb
 
 def macDynamic():
     """ This function will change the mac address of the respective interfaces taking the mac addresses from ifconfig 
     """
-    pdb.set_trace()
     #Extracting all interfaces
     intf = netifaces.interfaces()
     #Extracting all Mac addresses
