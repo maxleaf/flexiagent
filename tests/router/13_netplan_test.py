@@ -63,14 +63,11 @@ cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 cli_start_router_file = os.path.join(cli_path, 'start-router.cli')
 multiple_netplan = os.path.join(cli_path, 'multiple_netplans/')
 
-def test():
+def test(netplan_backup):
     tests_path = __file__.replace('.py', '')
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     yaml_config = sorted(glob.glob('%s/*.yaml' % tests_path))
     orig_yaml = glob.glob("/etc/netplan/50*.yaml")
-    #take backup of original netplan yaml file
-    orig_backup = orig_yaml[0].replace('yaml', 'yaml.backup')
-    shutil.move(orig_yaml[0], orig_backup)
     for yaml in yaml_config:
         
         for t in test_cases:
@@ -83,20 +80,19 @@ def test():
 	        os.system('netplan apply')
             with fwtests.TestFwagent() as agent:
                 print("   " + os.path.basename(t))
-
-	        agent.cli('-f %s' % cli_start_router_file)
+	        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
+		assert ok
                 # Load router configuration with spoiled lists
-                agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
-
+                (ok, _) = agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
+		assert ok
+		
                 # Ensure that spoiled lists were reverted completely
                 configured = fwtests.wait_vpp_to_be_configured([('interfaces', 0),('tunnels', 0)], timeout=30)
                 assert configured
 
-                agent.cli('-f %s' % cli_stop_router_file)
-
-            os.system('rm -f /etc/netplan/*.yaml')
+                (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
+		assert ok
+            #os.system('rm -f /etc/netplan/*.yaml')
     #restoring the original yaml file
-    #orig_backup = orig_yaml[0].replace('yaml.backup', 'yaml')
-    shutil.move(orig_backup, orig_yaml[0])
 if __name__ == '__main__':
     test()
