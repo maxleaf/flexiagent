@@ -93,6 +93,7 @@ class FwAgent:
         self.thread_statistics    = None
         self.should_reconnect     = False
         self.pending_msg_replies  = []
+        self.handling_request     = False
 
         if handle_sigterm:
             signal.signal(signal.SIGTERM, self._sigterm_handler)
@@ -429,12 +430,18 @@ class FwAgent:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
-                # does not help in case of Proxy in the middle, as was observed in field
+                # does not help in case of Proxy in the middle, as was observed in field.
+                #
+                # Note management does not send next request until it gets
+                # response for the previous request. As a result, heavy local
+                # processing prevents receiving of 'get-device-stats'-s. To
+                # avoid false alarm and unnecessary disconnection check the
+                # self.handling_request flag.
                 #
                 timeout = 30
                 if (slept % timeout) == 0:
-                    if self.request_received:
-                        self.request_received = False
+                    if self.received_request or self.handling_request:
+                        self.received_request = False
                     else:
                         fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
                         ws.close()
@@ -453,7 +460,7 @@ class FwAgent:
                 time.sleep(1)
                 slept += 1
 
-        self.request_received = True
+        self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
         self.thread_statistics.start()
 
@@ -520,6 +527,9 @@ class FwAgent:
         """
         print_message = fwglobals.g.cfg.DEBUG
 
+        self.received_request = True
+        self.handling_request = True
+
         # Aggregation is not well defined in today protocol (May-2019),
         # so align all kind of aggregations to the common request format
         # expected by the agent framework.
@@ -528,8 +538,6 @@ class FwAgent:
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
-
-        self.request_received = True
 
         reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
 
@@ -540,6 +548,8 @@ class FwAgent:
 
         if print_message:
             fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
+
+        self.handling_request = False
         return (reply, msg)
 
     def inject_requests(self, filename, ignore_errors=False):
