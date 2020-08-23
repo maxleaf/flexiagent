@@ -138,6 +138,10 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
     set_name = ''
     old_ifname = ''
     ifname = fwutils.pci_to_tap(pci)
+    if not ifname:
+        err_str = "add_remove_netplan_interface: %s was not found" % pci
+        fwglobals.log.error(err_str)
+        return (False, err_str)
 
     if pci in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[pci].get('fname')
@@ -224,14 +228,15 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
                     break
                 time.sleep(1)
             if not ip_address_is_found:
-                fwglobals.log.error("add_remove_netplan_interface: %s has no ip address" % ifname)
-                return (False, None)
+                err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
+                fwglobals.log.error(err_str)
+                return (False, err_str)
 
     except Exception as e:
-        err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
+        err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname_run, str(e))
-        fwglobals.log.error(err)
-        return (False, None)
+        fwglobals.log.error(err_str)
+        return (False, err_str)
 
     return (True, None)
 

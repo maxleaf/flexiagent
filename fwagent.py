@@ -985,10 +985,10 @@ def daemon_rpc(func, **kwargs):
         fwglobals.log.debug("invoke remote FwagentDaemon::%s(%s)" % (func, json.dumps(kwargs)))
         return remote_func(**kwargs)
     except Pyro4.errors.CommunicationError:
-        fwglobals.log.debug("no FwagentDaemon was detected")
+        fwglobals.log.debug("ignore FwagentDaemon::%s(%s): daemon does not run" % (func, json.dumps(kwargs)))
         return None
     except Exception as e:
-        fwglobals.log.debug("failed to connect to FwagentDaemon: %s" % str(e))
+        fwglobals.log.debug("FwagentDaemon::%s(%s) failed: %s" % (func, json.dumps(kwargs), str(e)))
         ex_type, ex_value, ex_tb = sys.exc_info()
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
