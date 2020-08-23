@@ -396,7 +396,7 @@ class FwAgent:
         """
         fwglobals.log.info("connection to orchestrator is closed")
         if self.thread_statistics:
-            self.isConnRunning = False
+            self.connected = False
             self.thread_statistics.join()
 
     def _on_open(self, ws):
@@ -406,6 +406,7 @@ class FwAgent:
 
         :returns: None.
         """
+        self.connected = True
         self._clean_connection_failure()
 
         if loadsimulator.g.enabled():
@@ -424,21 +425,23 @@ class FwAgent:
 
         def run(*args):
             slept = 0
-            while self.isConnRunning:
+            while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field
-                if (slept % 30) == 0:
-                    if self.requestReceived:
-                        self.requestReceived = False
+                #
+                timeout = 30
+                if (slept % timeout) == 0:
+                    if self.request_received:
+                        self.request_received = False
                     else:
-                        fwglobals.log.debug("connect: no request was received in 50 seconds, drop connection")
+                        fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
                         ws.close()
                         fwglobals.log.debug("connect: connection was terminated")
                         break
                 # Every 30 seconds update statistics
-                if (slept % 30) == 0:
+                if (slept % timeout) == 0:
                     if loadsimulator.g.enabled():
                         if loadsimulator.g.started:
                             loadsimulator.g.update_stats()
@@ -450,8 +453,7 @@ class FwAgent:
                 time.sleep(1)
                 slept += 1
 
-        self.isConnRunning = True
-        self.requestReceived = True
+        self.request_received = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
         self.thread_statistics.start()
 
@@ -527,7 +529,7 @@ class FwAgent:
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
-        self.requestReceived = True
+        self.request_received = True
 
         reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
 
