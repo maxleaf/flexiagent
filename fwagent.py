@@ -525,7 +525,7 @@ class FwAgent:
 
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
+            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
         self.requestReceived = True
 
@@ -537,7 +537,7 @@ class FwAgent:
             reply.update({'message': 'success'})
 
         if print_message:
-            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
         return (reply, msg)
 
     def inject_requests(self, filename, ignore_errors=False):
