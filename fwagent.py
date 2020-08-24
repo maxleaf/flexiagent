@@ -82,9 +82,9 @@ class FwAgent:
     Only one request can be processed at any time.
     The global message handler sits in the Fwglobals module.
 
-    :param handle_sigterm: A flag to handle termination signal
+    :param handle_signals: A flag to handle system signals
     """
-    def __init__(self, handle_sigterm=True):
+    def __init__(self, handle_signals=True):
         """Constructor method
         """
         self.token                = None
@@ -95,13 +95,11 @@ class FwAgent:
         self.pending_msg_replies  = []
         self.handling_request     = False
 
-        if handle_sigterm:
-            signal.signal(signal.SIGTERM, self._sigterm_handler)
+        if handle_signals:
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
 
-        if loadsimulator.is_initialized():
-            signal.signal(signal.SIGINT, self._sigint_handler)
-
-    def _sigint_handler(self, signum, frame):
+    def _signal_handler(self, signum, frame):
         """Signal handler for CTRL+C
 
         :param signum:         Signal type
@@ -109,20 +107,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("Fwagent got SIGINT")
-        loadsimulator.g.stop()
-        self.__exit__(None, None, None)
-        exit(1)
-
-    def _sigterm_handler(self, signum, frame):
-        """Signal handler for SIGTERM signal
-
-        :param signum:         Signal type
-        :param frame:          Stack frame.
-
-        :returns: None.
-        """
-        fwglobals.log.info("Fwagent got SIGTERM")
+        fwglobals.log.info("Fwagent got %s" % fwglobals.g.signal_names[signum])
         self.__exit__(None, None, None)
         exit(1)
 
@@ -728,13 +713,11 @@ class FwagentDaemon(object):
         self.active      = False
         self.thread_main = None
 
-        self.SIGNALS_TO_NAMES_DICT = dict((getattr(signal, n), n) \
-                                          for n in dir(signal) if n.startswith('SIG') and '_' not in n )
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("FwagentDaemon: got %s" % self.SIGNALS_TO_NAMES_DICT[signum])
+        fwglobals.log.info("FwagentDaemon: got %s" % fwglobals.g.signal_names[signum])
         exit(1)
 
     def __enter__(self):
