@@ -1457,6 +1457,12 @@ def get_reconfig_hash():
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
+        nomaskaddr = addr.split('/')[0]
+        prms = globals.g.stun_wrap.find_addr(nomaskaddr)
+        if prms is not None:
+            if prms['public_ip'] is not None and prms['public_port'] is not None:
+                res += 'public_ip:' + prms['public_ip'] + ',' + 'public_port:' + prms['public_port'] + ','
+
     if res:
         fwglobals.log.info('reconfig_hash_get: %s' % res)
         hash = hashlib.md5(res).hexdigest()
@@ -1658,32 +1664,3 @@ def fix_aggregated_message_format(msg):
             }
 
     return msg  # No conversion is needed
-
-
-def find_srcip_public_addr(lcl_src_ip, lcl_src_port = 4789, rounds = 1):
-	timeout = 0.5
-	interval = 0.1
-	nat_type = None 
-	nat_ext_ip = None 
-	nat_ext_port = None
-    fwglobals.log.debug("trying to find external %s:%s" %(lcl_ip_src,lcl_src_port)
-	while (timeout <= 32):
-		start = time.time()
-		nat_type,nat_ext_ip, nat_ext_port = stun.get_ip_info(lcl_src_ip, lcl_src_port)
-		if (rounds == 1):
-            return nat_ext_ip, nat_ext_port
-
-        while nat_ext_port == None and time.time() - start < timeout:
-			time.sleep(interval)
-		if nat_ext_port == None:
-			if timeout < 32:
-				timeout *= 2
-        else:
-            break
-
-    if nat_ext_ip != None:
-        fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_ip_src,lcl_src_port)
-	else:
-        fwglobals.log.debug("failed to find external ip:port for  %s:%s" %(lcl_ip_src,lcl_src_port)
-    return nat_ext_ip, nat_ext_port
-	

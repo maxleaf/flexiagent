@@ -26,6 +26,7 @@ import os
 import re
 import traceback
 import yaml
+import copy
 
 from sqlitedict import SqliteDict
 
@@ -48,6 +49,18 @@ class FwRouterCfg:
         if self.db.get('signature') is None:
             self.db['signature'] = ""
 
+        """
+        update() is a key function in routerCfg class. All requests are coming through it.
+        If another module would like to register on a reuqest, becuase it has some actions
+        it would like to do as a result of that request, it can ask update() to call a callback
+        with the request. In that callback, the module will do its action, and return.
+        Several modules can register on several requests, provided as a list to 
+        register_request_callbacks(). Modules who does not want to listen on requests any longer
+        can call unresiter_request_callback.
+        Listeners are held in a list, so it can be arranged according to priorities.
+        """
+        self.routerCfgCb_db = []
+
     def __enter__(self):
         return self
 
@@ -62,6 +75,29 @@ class FwRouterCfg:
         """Destructor method
         """
         self.db.close()
+
+    def register_request_callbacks(self, listener, callback, requests):
+        """
+        register a listener with a callback to a list of requests. Update()
+        will call all callbacks register for that request.
+        The callback signature should be (req, params) where req is the request and the params
+        are the params of the request, in a dicitionary. See update() for more details.
+        :param: listener - for logging propuses.
+        :param: callback - the function to be called
+        :param: requests - list of requests the listener would like to be notified for
+        """
+        dict_elem = {'listener':listener, 'callback': callback, 'requests':requests}
+        self.routerCfgCb_db.append(dict_elem)
+
+    def unregister_request_callback(self, listener, callback):
+        """
+        unregister a module (listener) from listening on incoming requests
+        :param: listener - string representing the module. For logging.
+        :param: callback - the callback used to listen to requests.
+        """
+        for elem in self.routerCfgCb_db:
+            if elem['callback'] == callback:
+                self.routerCfgCb_db.remove(elem)
 
     def clean(self):
         """Clean DB
@@ -96,6 +132,18 @@ class FwRouterCfg:
         key_func    = getattr(key_module, 'get_request_key')
         return key_func(params)
 
+    def _call_callback(requset, params):
+        """
+        go over routerCfgCb_db and check if callback should be called for each listener based on the
+        request. This fnction is called from update().
+        :param: request - the request recieved
+        :param: params  - the params to send to the callback
+        """
+        for listener in self.routerCfgCb_db:
+            for req in listener[requests]:
+                if re.match(req, requests):
+                    listener[callback](req, params)
+
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
@@ -118,8 +166,15 @@ class FwRouterCfg:
         try:
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
+                hook_add(req, self.db[req_key]['params'])
+                cb_params = copy.deepcopy(self.db[req_key]['params'])
             else:
+                hook_remove(req, self.db[req_key]['params'])
+                cb_params = copy.deepcopy(self.db[req_key]['params'])
                 del self.db[req_key]
+
+            call_callback(req,cb_params)
+
         except KeyError:
             pass
         except Exception as e:
@@ -458,16 +513,3 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
-
-    def get_interfaces_with_gw(self):
-        """
-        Get only the interfaces that has GW. Those interfaces are suspected
-        to have access to the internet, so we need to collection of them to 
-        later send STUN requwest on each.
-        """
-        interfaces = self.get_interfaces(self)
-        gw_if = []
-        for elem in interfaces:
-            gw = elem[0].get('gateway')
-            if gw is not None:
-                gw_if.append(elem)

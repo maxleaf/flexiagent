@@ -37,6 +37,7 @@ from fwlog import Fwlog
 from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
+from fwrouterstun_wrapper import FwStunWrap
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -279,6 +280,8 @@ class Fwglobals:
         self.os_api     = OS_API()
         self.apps       = FwApps(self.APP_REC_DB_FILE)
         self.policies   = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.stun_wrap  = FwStunWrap()
+        self.stun_wrap.initialize()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -293,6 +296,7 @@ class Fwglobals:
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+        del self.stun_wrap
         del self.apps
         del self.policies
         del self.os_api

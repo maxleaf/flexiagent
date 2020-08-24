@@ -27,6 +27,10 @@ import fwnetplan
 import fwutils
 import fwstats
 import os
+import fwrouterstun_wrapper
+import fwglobals
+
+
 
 
 # TBD: define all APIs in a file
@@ -87,11 +91,16 @@ class OS_DECODERS:
                 daddr[addr_af_name] = addr.address.split('%')[0]
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-            if daddr['gateway'] is not None:
+            if daddr['gateway'] is not '':
                 # Send STUN request only for interfaces with Gateway
-                daddr['public_ip'], daddr['public_port'] = fwutils.find_srcip_public_addr(daddr[addr_af_name],4789,1)
+                prms = fwglobals.g.stun_wrap.find_addr(daddr['IPv4'])
+                if prms == None or prms['success'] == False:
+                    daddr['public_ip'], daddr['public_port'] = fwglobals.g.stun_wrap.find_srcip_public_addr(daddr['IPv4'],4789)
+                else:
+                    daddr['public_ip']   = prms['public_ip']
+                    daddr['public_port'] = prms['public_port']
             else:
-                daddr['public_ip'] = daddr['public_port'] = ''
+                daddr['public_ip'] = daddr['public_port'] = None
             out.append(daddr)
         return (out,1)
 

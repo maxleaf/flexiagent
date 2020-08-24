@@ -26,6 +26,7 @@ import time
 from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
+from fwrouterstun_wrapper import FwStunWrap
 
 import fwglobals
 
@@ -129,5 +130,19 @@ def tunnel_stats_get():
             tunnel_stats[key]['status'] = 'down'
         else:
             tunnel_stats[key]['status'] = 'up'
+
+        if tunnel_stats[key]['status'] == 'down':
+            # if tunnel status is down, we add the source IP of that tunnel to the list
+            # of addresses that we will send STUN requests on their behalf.
+            tunnel_id = key
+            #go to router configuration db, and find this tunnel
+            tunnels = fwglobals.g.router_cfg.get_tunnels()
+            for params in tunnels:
+                if params['tunnel-id'] == tunnel_id:
+                    # found tunnel, add its source IP address to the cache of addresses for which
+                    # we will send STUN requests.
+                    srcaddr = params['src']
+                    fwglobals.g.stun_wrap.add_and_reset_addr(srcaddr)
+                    break
 
     return tunnel_stats

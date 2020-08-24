@@ -31,8 +31,8 @@ import sys
 import uuid
 import yaml
 
-common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
-sys.path.append(common_tools)
+common = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
+sys.path.append(common)
 import fwtool_vpp_startupconf_dict
 
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')

@@ -2,10 +2,15 @@ import binascii
 import logging
 import random
 import socket
+import os
+import sys
+globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
+sys.path.append(globals)
+import fwglobals
 
-__version__ = '1.0.0'
-
-log = logging.getLogger("pystun3")
+__version__ = '3.1.0.0'
+#logging.basicConfig(filename='/etc/flexiwan/agent/pystun3.log',level=logging.DEBUG)
+#log = logging.getLogger("pystun3")
 
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
@@ -16,6 +21,13 @@ STUN_SERVERS = (
     'stun4.l.google.com:19302',
     'stun.ekiga.net'
 )
+
+"""
+for testing none responsive STUN server
+STUN_SERVERS = (
+ 'stun.voxgratia.org',   
+)
+"""
 
 stun_servers_list = STUN_SERVERS
 
@@ -110,10 +122,11 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
     data = binascii.a2b_hex(str_data)
     recvCorr = False
     while not recvCorr:
+        buf = 0
         recieved = False
         count = 3
         while not recieved:
-            log.debug("sendto: %s", (host, port))
+            fwglobals.log.debug("Stun: sendto: %s", (host, port))
             try:
                 sock.sendto(data, (host, port))
             except socket.gaierror:
@@ -121,7 +134,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                 return retVal
             try:
                 buf, addr = sock.recvfrom(2048)
-                log.debug("recvfrom: %s", addr)
+                fwglobals.log.debug("Stun: recvfrom: %s", addr)
                 recieved = True
             except Exception:
                 recieved = False
@@ -131,8 +144,14 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                     retVal['Resp'] = False
                     return retVal
         msgtype = b2a_hexstr(buf[0:2])
-        bind_resp_msg = dictValToMsgType[msgtype] == "BindResponseMsg"
-        tranid_match = tranid.upper() == b2a_hexstr(buf[4:20]).upper()
+        #FLEXIWAN_FIX
+        try:
+            # from some reason we sometimes get msgtype u'00800' resulting KeyError exception
+            bind_resp_msg = dictValToMsgType[msgtype] == "BindResponseMsg"
+        except KeyError:
+            bind_resp_msg = None
+        else:
+            tranid_match = tranid.upper() == b2a_hexstr(buf[4:20]).upper()
         if bind_resp_msg and tranid_match:
             recvCorr = True
             retVal['Resp'] = True
@@ -183,7 +202,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
 def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
     _initialize()
     port = stun_port
-    log.debug("Do Test1")
+    fwglobals.log.debug("Stun: Do Test1")
     resp = False
     if stun_host:
         ret = stun_test(s, stun_host, port, source_ip, source_port)
@@ -195,7 +214,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                 temp_stun_host_ = stun_host_.split(':')[0]
                 port = int(stun_host_.split(':')[1])
                 stun_host_ = temp_stun_host_
-            log.debug('Trying STUN host: %s', stun_host_)
+            fwglobals.log.debug('Stun: Trying STUN host: %s', stun_host_)
             ret = stun_test(s, stun_host_, port, source_ip, source_port)
             resp = ret['Resp']
             if resp:
@@ -203,7 +222,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                 break
     if not resp:
         return Blocked, ret
-    log.debug("Result: %s", ret)
+    fwglobals.log.debug("Stun: Result: %s", ret)
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
     changedIP = ret['ChangedIP']
@@ -218,26 +237,26 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
             typ = SymmetricUDPFirewall
     else:
         changeRequest = ''.join([ChangeRequest, '0004', "00000006"])
-        log.debug("Do Test2")
+        fwglobals.log.debug("Stun: Do Test2")
         ret = stun_test(s, stun_host, port, source_ip, source_port,
                         changeRequest)
-        log.debug("Result: %s", ret)
+        fwglobals.log.debug("Stun: Result: %s", ret)
         if ret['Resp']:
             typ = FullCone
         else:
-            log.debug("Do Test1")
+            fwglobals.log.debug("Stun: Do Test1")
             ret = stun_test(s, changedIP, changedPort, source_ip, source_port)
-            log.debug("Result: %s", ret)
+            fwglobals.log.debug("Stun: Result: %s", ret)
             if not ret['Resp']:
                 typ = ChangedAddressError
             else:
                 if exIP == ret['ExternalIP'] and exPort == ret['ExternalPort']:
                     changePortRequest = ''.join([ChangeRequest, '0004',
                                                  "00000002"])
-                    log.debug("Do Test3")
+                    fwglobals.log.debug("Stun: Do Test3")
                     ret = stun_test(s, changedIP, port, source_ip, source_port,
                                     changePortRequest)
-                    log.debug("Result: %s", ret)
+                    fwglobals.log.debug("Stun: Result: %s", ret)
                     if ret['Resp']:
                         typ = RestricNAT
                     else:

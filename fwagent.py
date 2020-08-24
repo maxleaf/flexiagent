@@ -57,6 +57,7 @@ import fwutils
 from fwlog import Fwlog
 import loadsimulator
 import pprint
+from fwrouterstun_wrapper import FwStunWrap
 
 # Global signal handler for clean exit
 def global_signal_handler(signum, frame):
@@ -424,6 +425,12 @@ class FwAgent:
 
         def run(*args):
             slept = 0
+            # Since this thread runs as long as the agent lives, we "hijeck" it
+            # for the purpose of STUN request as well. We have several calculations
+            # to do every second, and this is a good place to make tehm.
+            # So here we initialize the StunWrapper class.
+            p = fwglobals.g.stun_wrap
+
             while self.isConnRunning:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
@@ -449,6 +456,11 @@ class FwAgent:
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
+
+                # send stun retquests for addresses that a request was not sent for
+                # them, or for ones that did not get reply previously
+                p.send_stun_request()
+                p.increase_sec()
 
         self.isConnRunning = True
         self.requestReceived = True
