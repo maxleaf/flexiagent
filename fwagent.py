@@ -486,7 +486,7 @@ class FwAgent:
 
         (reply, msg) = self.handle_received_request(msg)
 
-        fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
+        fwglobals.log.debug(str(pmsg['seq']) + " request=" + json.dumps(pmsg['msg']))
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
 
         # Messages that change the interfaces might cause the existing connection to break
