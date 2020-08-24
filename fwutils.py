@@ -1338,11 +1338,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     else:
         fwglobals.g.policies.remove_policy(policy_id)
 
-    if re.match(fallback, 'drop'):
-        fallback = 'fallback drop'
-
-    if re.match(order, 'load-balancing'):
-        order = 'select_group random'
+    fallback = 'fallback drop' if re.match(fallback, 'drop') else ''
+    order    = 'select_group random' if re.match(order, 'load-balancing') else ''
 
     if acl_id is None:
         vppctl_cmd = 'fwabf policy %s id %d action %s %s' % (op, policy_id, fallback, order)
@@ -1351,10 +1348,7 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
 
     group_id = 1
     for link in links:
-        order = ''
-        if re.match(link.get('order', 'priority'), 'load-balancing'):
-            order = 'random'
-
+        order  = 'random' if re.match(link.get('order', 'None'), 'load-balancing') else ''
         labels = link['pathlabels']
         ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
         ids = ','.join(map(str, ids_list))
@@ -1365,8 +1359,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None:
-        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+    if out is None or 'unknown' in out:
+        return (False, "failed vppctl_cmd=%s: %s" % (vppctl_cmd, out))
 
     return (True, None)
 
