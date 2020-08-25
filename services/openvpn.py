@@ -42,7 +42,7 @@ class OpenVPN:
         """
     
         try:
-            if (params['version']):
+            if params['version']:
                 # version = params['version']
                 version = 'stable'
             else:
@@ -121,7 +121,7 @@ class OpenVPN:
         try:
             vpnIsRun = True if self._openvpn_pid() else False
 
-            if (vpnIsRun):
+            if vpnIsRun:
                 os.system('sudo killall openvpn')
                 time.sleep(5)  # 5 sec
             
@@ -147,7 +147,7 @@ class OpenVPN:
 
         vpnIsRun = True if self._openvpn_pid() else False
 
-        if (vpnIsRun):
+        if vpnIsRun:
             commands.insert(0, 'killall openvpn')
 
         try:
