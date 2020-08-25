@@ -43,7 +43,7 @@ from netaddr import IPNetwork, IPAddress
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
 sys.path.append(common_tools)
-import fwtool_vpp_startupconf_dict
+from fw_vpp_startupconf import FwStartupConf, L, T
 
 from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
@@ -836,6 +836,8 @@ def reset_router_config():
         os.remove(fwglobals.g.FRR_OSPFD_FILE)
     if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
+    elif os.path.exists(fwglobals.g.VPP_CONFIG_FILE_RESTORE):
+        shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
     with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
@@ -1077,108 +1079,64 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
-def vpp_startup_conf_update(filename, path, param, val, add, filename_backup=None):
-    """Updates the /etc/vpp/startup.conf
 
-    :param filename:    /etc/vpp/startup.conf
-    :param path:        path to parameter in the startup.conf, e.g. 'dpdk/dev 0000:02:00.1'
-    :param param:       name of the parameter, e.g. 'name'
-    :param val:         value of the paremeter, e.g. 'eth0'
-    :param add:         if True the parameter will be added or modified,
-                        if False the parameter will be commented out
+def vpp_startup_conf_add_devices(params):
+    filename = params['vpp_config_filename']
+    p = FwStartupConf()
+    config = p.load(filename)
 
-     :returns: None.
-     """
-
-    # Load file into dictionary
-    conf = fwtool_vpp_startupconf_dict.load(filename)
-
-    # Goto the leaf sub-section according the path.
-    # If some of sections don't exist, create them.
-    # Section is a list that might contains parameters (list) or sub-sections (dictionaries),
-    # so steps in path stands for dictionaries, when the last step is list.
-    section = conf
-    steps = path.split('/')
-    prev_section = section
-    prev_step    = steps[0]
-    for (idx, step) in enumerate(steps):
-        if step not in section:
-            if idx < len(steps)-1:
-                section[step] = {}
-            else:
-                section[step] = []  # Last step which is list
-        prev_section = section
-        prev_step    = step
-        section      = section[step]
-
-    # If leaf section is empty (it is possible if path exists, but section is empty)
-    # initialize it with empty list of parameters.
-    if section is None:
-        prev_section[prev_step] = []
-        section = prev_section[prev_step]
-
-    # Update parameter.
-    # Firstly find it in section list of parameter
-    found_elements = [ el for el in section if param in el ]
-    if add:
-        # If element was found, update it. Otherwise - add new parameter
-        if len(found_elements) > 0:
-            if not val is None:     # If there is a value to update ...
-                found_elements[0][param] = val
-        else:
-            if val is None:
-                section.append(param)
-            else:
-                section.append({param: val})
-    else:
-        if len(found_elements) > 0:
-            section.remove(found_elements[0])
-            section.append('ELEMENT_TO_BE_REMOVED')
-        if len(section) == 0:
-            prev_section[prev_step] = None
-
-    # Dump dictionary back into file
-    fwtool_vpp_startupconf_dict.dump(conf, filename)
-
-def vpp_startup_conf_add_devices(vpp_config_filename, devices):
-    config = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
-    if not config.get('dpdk'):
-        config['dpdk'] = []
-    for dev in devices:
+    if config['dpdk'] == None:
+        tup = p.create_element('dpdk')
+        config.append(tup)
+    for dev in params['devices']:
         config_param = 'dev %s' % dev
-        if not config_param in config['dpdk']:
-            config['dpdk'].append(config_param)
+        if p.get_element(config['dpdk'],config_param) == None:
+            tup = p.create_element(config_param)
+            config['dpdk'].append(tup)
 
-    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
+    p.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
-    config = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
-    if not config.get('dpdk'):
+def vpp_startup_conf_remove_devices(params):
+    filename = params['vpp_config_filename']
+    p = FwStartupConf()
+    config = p.load(filename)
+
+    if config['dpdk'] == None:
         return
-    for dev in devices:
+    for dev in params['devices']:
         config_param = 'dev %s' % dev
-        if config_param in config['dpdk']:
-            config['dpdk'].remove(config_param)
-    if len(config['dpdk']) == 0:
-        config['dpdk'].append('ELEMENT_TO_BE_REMOVED')  # Need this to avoid empty list section before dump(), as yaml goes crazy with empty list sections
+        key = p.get_element(config['dpdk'],config_param)
+        if key:
+            p.remove_element(config['dpdk'], key)
 
-    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
+    p.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_add_nat(vpp_config_filename):
-    config   = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
-    config['nat'] = []
-    config['nat'].append('endpoint-dependent')
-    config['nat'].append('translation hash buckets 1048576')
-    config['nat'].append('translation hash memory 268435456')
-    config['nat'].append('user hash buckets 1024')
-    config['nat'].append('max translations per user 10000')
-    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
+def vpp_startup_conf_add_nat(params):
+    filename = params['vpp_config_filename']
+    p = FwStartupConf()
+    config = p.load(filename)
+    tup = p.create_element('nat')
+    config.append(tup)
+    config['nat'].append(p.create_element('endpoint-dependent'))
+    config['nat'].append(p.create_element('translation hash buckets 1048576'))
+    config['nat'].append(p.create_element('translation hash memory 268435456'))
+    config['nat'].append(p.create_element('user hash buckets 1024'))
+    config['nat'].append(p.create_element('max translations per user 10000'))
+ 
+    p.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_remove_nat(vpp_config_filename):
-    config   = fwtool_vpp_startupconf_dict.load(vpp_config_filename)
-    if config.get('nat'):
-        del config['nat']
-    fwtool_vpp_startupconf_dict.dump(config, vpp_config_filename)
+def vpp_startup_conf_remove_nat(params):
+    filename = params['vpp_config_filename']
+    p = FwStartupConf()
+    config = p.load(filename)
+    key = p.get_element(config, 'nat')
+    if key:
+        p.remove_element(config,key)
+    p.dump(config, filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
