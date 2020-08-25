@@ -163,6 +163,7 @@ class FwStunWrap:
         updated in the cache. Sent only if the seconds counter equels to
         the calculated time it should be sent ('next_time').
         """
+        ext_ip = ext_port = None
         for key in self.local_cache['stun_interfaces'].keys():
             if self.local_cache['stun_interfaces'][key]['success'] == True:
                 pass
@@ -170,7 +171,7 @@ class FwStunWrap:
                 elem = self.local_cache['stun_interfaces'][key]
                 addr = key
                 if elem['sec_counter'] == elem['next_time']:
-                    nat_type, ext_ip, ext_port = find_srcip_public_addr(addr)
+                    ext_ip, ext_port = self.find_srcip_public_addr(addr)
                     elem['sec_counter'] = 0
                     if ext_port == None:
                         self._handle_none_response(addr)
@@ -195,5 +196,6 @@ class FwStunWrap:
             return nat_ext_ip, nat_ext_port
         else:
             fwglobals.log.debug("failed to find external ip:port for  %s:%s" %(lcl_src_ip,lcl_src_port))
+            self.add_and_reset_addr(lcl_src_ip)
             return None,None
 

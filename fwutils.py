@@ -1456,13 +1456,14 @@ def get_reconfig_hash():
         gw, metric = get_linux_interface_gateway(name)
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
+            print res
 
         nomaskaddr = addr.split('/')[0]
-        prms = globals.g.stun_wrap.find_addr(nomaskaddr)
+        prms = fwglobals.g.stun_wrap.find_addr(nomaskaddr)
         if prms is not None:
             if prms['public_ip'] is not None and prms['public_port'] is not None:
-                res += 'public_ip:' + prms['public_ip'] + ',' + 'public_port:' + prms['public_port'] + ','
-
+                res += 'public_ip:' + prms['public_ip'] + ',' + 'public_port:' + str(prms['public_port']) + ','
+                print res
     if res:
         fwglobals.log.info('reconfig_hash_get: %s' % res)
         hash = hashlib.md5(res).hexdigest()

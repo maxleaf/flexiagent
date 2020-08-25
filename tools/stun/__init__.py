@@ -8,7 +8,7 @@ globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..'
 sys.path.append(globals)
 import fwglobals
 
-__version__ = '3.1.0.0'
+__version__ = '1.0.0'
 #logging.basicConfig(filename='/etc/flexiwan/agent/pystun3.log',level=logging.DEBUG)
 #log = logging.getLogger("pystun3")
 
@@ -16,6 +16,9 @@ __version__ = '3.1.0.0'
 STUN_SERVERS = (
     'stun.l.google.com:19302',
     'stun1.l.google.com:19302',
+    'stun01.sipphone.com',
+    'stun.fwdnet.net',
+    'stun.ideasip.com',
     'stun2.l.google.com:19302',
     'stun3.l.google.com:19302',
     'stun4.l.google.com:19302',
@@ -126,15 +129,16 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
         recieved = False
         count = 3
         while not recieved:
-            fwglobals.log.debug("Stun: sendto: %s", (host, port))
+            fwglobals.log.debug("Stun: sendto: %s:%d" %(host, port))
             try:
                 sock.sendto(data, (host, port))
             except socket.gaierror:
+                fwglobals.log.error("Stun: got socket.gaierror exception")
                 retVal['Resp'] = False
                 return retVal
             try:
                 buf, addr = sock.recvfrom(2048)
-                fwglobals.log.debug("Stun: recvfrom: %s", addr)
+                fwglobals.log.debug("Stun: recvfrom: %s"  %(addr))
                 recieved = True
             except Exception:
                 recieved = False
@@ -198,7 +202,6 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
     # s.close()
     return retVal
 
-
 def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
     _initialize()
     port = stun_port
@@ -214,7 +217,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                 temp_stun_host_ = stun_host_.split(':')[0]
                 port = int(stun_host_.split(':')[1])
                 stun_host_ = temp_stun_host_
-            fwglobals.log.debug('Stun: Trying STUN host: %s', stun_host_)
+            fwglobals.log.debug('Stun: Trying STUN host: %s' %(stun_host_))
             ret = stun_test(s, stun_host_, port, source_ip, source_port)
             resp = ret['Resp']
             if resp:
@@ -222,7 +225,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                 break
     if not resp:
         return Blocked, ret
-    fwglobals.log.debug("Stun: Result: %s", ret)
+    fwglobals.log.debug("Stun: Result: %s" %(ret))
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
     changedIP = ret['ChangedIP']
@@ -240,13 +243,13 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
         fwglobals.log.debug("Stun: Do Test2")
         ret = stun_test(s, stun_host, port, source_ip, source_port,
                         changeRequest)
-        fwglobals.log.debug("Stun: Result: %s", ret)
+        fwglobals.log.debug("Stun: Result: %s" %(ret))
         if ret['Resp']:
             typ = FullCone
         else:
             fwglobals.log.debug("Stun: Do Test1")
             ret = stun_test(s, changedIP, changedPort, source_ip, source_port)
-            fwglobals.log.debug("Stun: Result: %s", ret)
+            fwglobals.log.debug("Stun: Result: %s" %(ret))
             if not ret['Resp']:
                 typ = ChangedAddressError
             else:
@@ -256,7 +259,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                     fwglobals.log.debug("Stun: Do Test3")
                     ret = stun_test(s, changedIP, port, source_ip, source_port,
                                     changePortRequest)
-                    fwglobals.log.debug("Stun: Result: %s", ret)
+                    fwglobals.log.debug("Stun: Result: %s" %(ret))
                     if ret['Resp']:
                         typ = RestricNAT
                     else:
@@ -269,7 +272,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
 def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
                 stun_port=3478):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(2)
+    s.settimeout(3)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((source_ip, source_port))
 
