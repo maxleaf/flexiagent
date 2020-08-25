@@ -20,4 +20,5 @@ already=$(grep "network ${ifconfig_local_ip}" /etc/frr/ospfd.conf)
 if [ -z "$already" ]
 then
    sed -i -E "$sed_command" /etc/frr/ospfd.conf
+   systemctl restart frr
 fi
