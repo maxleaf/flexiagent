@@ -23,7 +23,14 @@
 import services.openvpn
 
 services = {
-    'open-vpn': services.openvpn
+    'open-vpn': services.openvpn.OpenVPN()
+}
+
+messages = {
+    'install-service':   {'name': '_install', 'revert': '_uninstall'},
+    'uninstall-service': {'name': '_uninstall'},
+    'modify-service':    {'name': '_modify'},
+    'upgrade-service':   {'name': '_upgrade'}
 }
 
 class FwServices:
@@ -48,34 +55,20 @@ class FwServices:
         
         service = services.get(service_type)
         assert service, '%s: "%s" service is not supported' % (message, service_type)
-        
-        reply = {'ok': 1}
-        if (message == 'install-service'):
-            try:
-                service.install(params['config'])
-            except:
-                service.uninstall()
-                reply = {'ok': 0}
-        elif message == 'uninstall-service':
-            try:
-                service.uninstall()
-            except:
-                reply = {'ok': 0}
-        elif message == 'modify-service':
-            try:
-                service.modify(params['config'])
-            except:
-                reply = {'ok': 0}
-        elif message == 'upgrade-service':
-            try:
-                service.upgrade(params['config'])
-            except:
-                reply = {'ok': 0}
-        else:
-            reply = {'ok': 0}
 
-        if reply['ok'] == 0:
-            reply = {'entity':'servicesReply', 'message': False, 'ok': 0}
-        else:
+        handler = messages.get(message)
+        assert handler, '%s: "%s" handler is not supported' % (message, message)        
+        
+        handler_func = getattr(service, handler['name'])
+        assert handler_func, '%s: "%s" function is not implemented fro this service' % (message, handler_func)        
+     
+        try:
+            handler_func(params['config'])
             reply = {'entity':'servicesReply', 'message': True, 'ok': 1}
+        except Exception as e:            
+            if handler.get('revert', False):                
+                handler_func = getattr(service, handler['revert'])
+                handler_func(params['config'])
+            reply = {'entity':'servicesReply', 'message': str(e), 'ok': 0}
+        
         return reply
