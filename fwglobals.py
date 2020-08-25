@@ -296,6 +296,7 @@ class Fwglobals:
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+        self.stun_wrap.finalize()
         del self.stun_wrap
         del self.apps
         del self.policies

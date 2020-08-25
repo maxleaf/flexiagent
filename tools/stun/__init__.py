@@ -4,6 +4,7 @@ import random
 import socket
 import os
 import sys
+import traceback
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
 import fwglobals
@@ -138,9 +139,10 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                 return retVal
             try:
                 buf, addr = sock.recvfrom(2048)
-                fwglobals.log.debug("Stun: recvfrom: %s"  %(addr))
+                fwglobals.log.debug("Stun: recvfrom: %s %s" %(type(addr), addr))
                 recieved = True
-            except Exception:
+            except Exception as e:
+                fwglobals.log.error("Got exception from recvfrom: %s, %s" % (str(e), str(traceback.format_exc())))
                 recieved = False
                 if count > 0:
                     count -= 1
@@ -272,7 +274,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
 def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
                 stun_port=3478):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(3)
+    s.settimeout(5)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((source_ip, source_port))
 

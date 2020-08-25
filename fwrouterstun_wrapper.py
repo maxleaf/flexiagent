@@ -52,20 +52,24 @@ class FwStunWrap:
         """
         prints the content on the local cache
         """
-        for key in self.local_cache.keys():
-            print (key + ':')
-            for addr in self.local_cache[key].keys():
-                print (addr+':'+str(self.local_cache[key][addr]))
+        print ('stun_interfaces:')
+        for addr in self.local_cache['stun_interfaces'].keys():
+            if addr:
+                print (addr+':'+str(self.local_cache['stun_interfaces'][addr]))
 
     def __init__(self):
         self.local_cache = fwglobals.g.AGENT_CACHE
         self.local_cache['stun_interfaces'] = {}
         self.local_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
+        self.run = True
         #self.is_running = True
 
     def initialize(self):
         fwglobals.g.router_cfg.register_request_callbacks('fwstunwrap', self.fwstuncb, \
             ['-add-interface', '-remove-interface'])
+
+    def finalize(self):
+        self.run = False
 
     def fwstuncb(request, params):
         """
@@ -163,6 +167,8 @@ class FwStunWrap:
         updated in the cache. Sent only if the seconds counter equels to
         the calculated time it should be sent ('next_time').
         """
+        if self.run == False:
+            return
         ext_ip = ext_port = None
         for key in self.local_cache['stun_interfaces'].keys():
             if self.local_cache['stun_interfaces'][key]['success'] == True:
