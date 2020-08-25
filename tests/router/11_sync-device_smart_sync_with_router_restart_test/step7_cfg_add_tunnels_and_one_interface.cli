@@ -12,7 +12,12 @@
 			  "addr":"10.0.0.4/24",
 			  "gateway": "10.0.0.10",
 			  "type":"wan",
-              "multilink": { "labels": [ "green" ] }
+			  "multilink": {
+				  "labels": [
+					  "green",
+					  "blue",
+					  "red"]
+			  }
 		  }
 		}
 		,
@@ -29,10 +34,24 @@
 		,
 		{
 		  "entity":  "agent",
+		  "message": "add-interface",
+		  "params": {
+			  "pci":"0000:00:03.00",
+			  "addr":"1.0.0.4/24",
+			  "gateway": "1.0.0.1",
+			  "type":"wan",
+			  "multilink": {
+				  "labels": [ "yellow", "blue"]
+			  }
+		  }
+		}
+		,
+		{
+		  "entity":  "agent",
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
-			"dst": "20.0.0.4",
+			"dst": "100.0.0.4",
 			"tunnel-id": 1,
 			"ipsec": {
 			  "local-sa": {
@@ -67,11 +86,11 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
-			"dst": "12.0.0.4",
-			"tunnel-id": 12,
+			"dst": "30.0.0.4",
+			"tunnel-id": 2,
 			"ipsec": {
 			  "local-sa": {
-				 "spi": 1030,
+				 "spi": 3030,
 				 "crypto-alg": "aes-cbc-128",
 				 "crypto-key": "3030aa794f574265564551694d653768",
 				 "integr-alg": "sha1-96",
@@ -121,7 +140,7 @@
 			  }
 			},
 			"loopback-iface": {
-			  "addr":"10.100.0.9/31",
+			  "addr":"10.100.0.8/31",
 			  "mac":"08:00:27:fd:00:09",
 			  "mtu":1420,
 			  "routing":"ospf",

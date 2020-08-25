@@ -35,9 +35,9 @@ cli_get_device_stats_file  = os.path.join(cli_path, 'get_device_stats.cli')
 ################################################################################
 # This test feeds agent with router configuration out of step1_X.cli file.
 # Than it injects a number of 'sync-device' requests to test smart
-# synchronization that does not require VPP restart. The restart is not required
-# neither new interfaces should be added nor existing interfaces should be
-# removed in order to get in sync.
+# synchronization that does require VPP restart. The restart is required
+# when either new interfaces is added or existing interfaces is removed in order
+# to get in sync with flexiManage.
 # Every injected 'sync-device' request is named a 'step'.
 #   After every step test ensures that resulted VPP configuration and
 # configuration database dump match the expected VPP configuration and dump.
@@ -52,22 +52,27 @@ cli_get_device_stats_file  = os.path.join(cli_path, 'get_device_stats.cli')
 #   step2_cfg_donttouch_modify_add_remove_opposite_order.cli - performs all kind
 #       of possible configuration adjustments for all kinds of configuration
 #       items - addition, removal, modifications, not-touching (no modifications).
-#       That does not include adding and removal interfaces in order to prevent
-#       vpp restart. The interface modifying and not-touching are tested.
-#       The order of configuration items (add-X requests) in 'sync-device' is
-#       opposite to the order sent by server usually. This is subject for test,
-#       as order of synchronization is important! For example, the tunnels
-#       should be removed before interfaces used by them, etc.
+#       That includes adding and removal interfaces in order to prevent vpp
+#       restart. The order of configuration items (add-X requests) in
+#       'sync-device' is opposite to the order sent by server usually. This is
+#       subject for test, as order of synchronization is important! For example,
+#       the tunnels should be removed before interfaces used by them, etc.
 #   step3_cfg_donttouch_modify_add_remove_usual_order.cli - same as step 2,
 #       but 'sync-device' contains configuration items (add-X) requests in order
 #       which is used usually by flexiManage. It is opposite to the order in
 #       step 2.
-#   step4_cfg_remove_tunnels_only.cli - the result of sync is removal of tunnels
-#       only. All the rest should be not touched.
-#   step5_cfg_add_tunnels_only.cli - the result of sync is addition of tunnels
-#       only. All the rest should be not touched.
-#   step6_cfg_modify_tunnels_only.cli - the result of sync is modification of
-#       tunnels only. All the rest should be not touched.
+#   step4_cfg_remove_tunnels_and_one_interface.cli - the result of sync is
+#       removal of tunnels and one interface only.
+#       touched. We have to remove interface in order to cause vpp restart.
+#       Note we have to remove multilink-policy as it might use interfaces.
+#   step5_cfg_remove_interfaces.cli - the result of sync is
+#       removal of all interfaces. Note we have to remove dhcp-config as well,
+#       as they require LAN interface. That leaves us with applications only.
+#   step6_cfg_add_interfaces_only.cli - the result of sync is addition of
+#       interfaces only.
+#   step7_cfg_add_tunnels_and_one_interface_only.cli - the result of sync is
+#       addition of tunnels and one interface only. All the rest should be not
+#       touched. We have to add interface in order to cause vpp restart.
 ################################################################################
 def test():
     with fwtests.TestFwagent() as agent:
@@ -81,8 +86,6 @@ def test():
             if idx == 0:
                 print("")
             print("   " + os.path.basename(step))
-
-            step_start_time = fwtests.get_log_time()
 
             # Inject request.
             # Note the first request comes with 'daemon=True' to leave agent
@@ -123,24 +126,27 @@ def test():
                 cfg_signature = ret.get('router-cfg-hash')
                 assert cfg_signature == '', "signature was not reset on 'sync-device' success: %s" % cfg_signature
 
-                # Ensure that VPP was not restarted even once during test.
-                # In this case the log should have only one notion of vpp start -
-                # on loading initial configuration:
+                # Ensure that VPP was restarted during test.
+                # In this case the log should have only more than one notion of
+                # vpp start that happened on loading initial configuration:
                 #     Aug  2 06:13:03 localhost fwagent: router was started: vpp_pid=...
                 #
                 lines = agent.grep_log('router was started: vpp_pid=', print_findings=False)
-                assert len(lines) == 1, "log has not expected number of VPP starts: %d:%s" % \
+                assert len(lines) > 1, "log has not expected number of VPP starts: %d:%s" % \
                                         (len(lines), '\n'.join(lines))
 
-                # Ensure that smart sync is indeed smart: it should reconfigure
-                # only delta between 'sync-device' content and current
-                # configuration. Step6 modifies 3 tunnels. So we should see 6
-                # executed requests in log: 3 'remove-tunnel'-s and 3 'add-tunnel'-s.
-                #
-                if idx == 5:  # step6_cfg_modify_tunnels_only.cli
-                    lines = agent.grep_log('FWROUTER_API: === start execution of ', print_findings=False, since=step_start_time)
-                    assert len(lines) == 6, "log has not expected number of sync requests: %d:%s" % \
-                                            (len(lines), '\n'.join(lines))
+
+        ########################################################################
+        # Run post test checks
+        ########################################################################
+        # Ensure that number of VPP starts is same as a number of steps,
+        # as every step starts VPP. The step1 starts it on initial configuration,
+        # the rest steps restart it on smart sync, as all steps either remove
+        # or add interfaces.
+        #
+        lines = agent.grep_log('router was started: vpp_pid=', print_findings=False)
+        assert len(lines) == len(steps), "log has not expected number (%d) of VPP starts: %d:%s" % \
+                                (len(steps), len(lines), '\n'.join(lines))
 
 if __name__ == '__main__':
     test()

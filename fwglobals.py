@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import json
 import os
 import Pyro4
@@ -68,6 +69,7 @@ request_handlers = {
     'sync-device':                  {'name': '_call_agent_api'},
 
     # Router API
+    'aggregated':                   {'name': '_call_router_api', 'sign': True},
     'start-router':                 {'name': '_call_router_api', 'sign': True},
     'stop-router':                  {'name': '_call_router_api', 'sign': True},
     'add-interface':                {'name': '_call_router_api', 'sign': True},
@@ -410,7 +412,6 @@ class Fwglobals:
 
         :returns: Dictionary with error string and status code.
         """
-
         try:
             req    = request['message']
             params = request.get('params')
@@ -428,6 +429,12 @@ class Fwglobals:
                 assert handler, 'fwglobals: aggregation with "%s" request is not supported' % \
                     params['requests'][0]['message']
 
+            # Keep copy of the request aside for signature purposes,
+            # as the original request might by modified by preprocessing.
+            #
+            if handler.get('sign', False) and received_msg is None:
+                received_msg = copy.deepcopy(request)
+            
             handler_func = getattr(self, handler.get('name'))
             if result is None:
                 reply = handler_func(request)
@@ -451,7 +458,7 @@ class Fwglobals:
             if reply['ok'] == 1 and handler.get('sign', False):
                 # Update the configuration signature
                 self.router_cfg.update_signature(received_msg)
-                # Add the updated signatire to the reply, so server could be quite
+                # Add the updated signatire to the reply, so server could be quiet
                 reply['router-cfg-hash'] = self.router_cfg.get_signature()
 
             return reply

@@ -31,6 +31,7 @@
 # If argument '-s' was provided:
 # -> clean router configuration database
 
+import getopt
 import os
 import sys
 
@@ -40,17 +41,38 @@ import fwglobals
 import fwutils
 import fwnetplan
 
+def parse_argv(argv):
+    options = [
+        'quiet',        # If True no prints onto screen will be done
+        'clean_cfg'     # If True the router configuration database will be reset
+    ]
+    arg_quiet     = False
+    arg_clean_cfg = False
+
+    opts,_ = getopt.getopt(argv, '', options)
+    for opt, _ in opts:
+        if opt == '--quiet':
+            arg_quiet = True
+        elif opt == '--clean_cfg':
+            arg_clean_cfg = True
+    return (arg_quiet, arg_clean_cfg)
+
 def main():
     """Entry point.
     """
-    print ("Shutting down flexiwan-router...")
+
+    (arg_quiet, arg_clean_cfg) = parse_argv(sys.argv[1:])
+
+    if not arg_quiet:
+        print ("Shutting down flexiwan-router...")
     fwglobals.initialize()
     os.system('systemctl stop flexiwan-router')
     fwutils.stop_vpp()
     fwnetplan.restore_linux_netplan_files()
-    if '-s' in sys.argv:
+    if arg_clean_cfg:
         fwutils.reset_router_config()
-    print ("Done.")
+    if not arg_quiet:
+        print ("Done")
 
 if __name__ == '__main__':
     main()
