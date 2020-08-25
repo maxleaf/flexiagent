@@ -89,6 +89,9 @@ class OpenVPN:
             fwglobals.log.debug("Openvpn installed successfully")
             return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
         except Exception as e:
+            #call uninstall function to clean the machine on installation error
+            self._uninstall(params)
+            
             msg = str(e)
             fwglobals.log.error(msg)
             return (False, msg)

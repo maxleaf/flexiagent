@@ -27,7 +27,7 @@ services = {
 }
 
 messages = {
-    'install-service':   {'name': '_install', 'revert': '_uninstall'},
+    'install-service':   {'name': '_install'},
     'uninstall-service': {'name': '_uninstall'},
     'modify-service':    {'name': '_modify'},
     'upgrade-service':   {'name': '_upgrade'}
@@ -70,9 +70,6 @@ class FwServices:
 
             reply = {'entity':'servicesReply', 'message': 'success', 'ok': 1}
         except Exception as e:
-            if handler.get('revert', False):
-                handler_func = getattr(service, handler['revert'])
-                handler_func(params['config'])
             reply = {'entity':'servicesReply', 'message': str(e), 'ok': 0}
         
         return reply
