@@ -41,16 +41,16 @@ class FwServices:
         """Constructor method.
         """
 
-    def call(self, req):
-        """Invokes API specified by the 'req' parameter.
+    def call(self, request):
+        """Invokes API specified by the 'request' parameter.
 
-        :param req: Request name.
+        :param request: Request name.
         :param params: Parameters from flexiManage.
 
         :returns: Reply.
         """
-        message = req['message']
-        params = req['params']
+        message = request['message']
+        params = request['params']
         service_type = params['type']
         
         service = services.get(service_type)
