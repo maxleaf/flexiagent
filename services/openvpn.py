@@ -41,52 +41,57 @@ class OpenVPN:
         :returns: (True, None) tuple on success, (False, <error string>) on failure.
         """
     
-        if (params['version']):
-            # version = params['version']
-            version = 'stable'
-        else:
-            version = 'stable'
+        try:
+            if (params['version']):
+                # version = params['version']
+                version = 'stable'
+            else:
+                version = 'stable'
 
-        os.system('mkdir -p /etc/openvpn')
-        os.system('mkdir -p /etc/openvpn/server')
-        os.system('mkdir -p /etc/openvpn/client')
-        dir = os.path.dirname(os.path.realpath(__file__))
-        shutil.copyfile('{}/openvpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
-        shutil.copyfile('{}/openvpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
-        shutil.copyfile('{}/openvpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
-    
-        commands = [
-            'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
-            'echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version,
-            'apt-get update && apt-get install -y openvpn',
-            'chmod +x /etc/openvpn/server/auth-script.sh',
-            'chmod +x /etc/openvpn/server/up-script.sh',
-            'chmod +x /etc/openvpn/server/down-script.sh',
+            os.system('mkdir -p /etc/openvpn')
+            os.system('mkdir -p /etc/openvpn/server')
+            os.system('mkdir -p /etc/openvpn/client')
+            dir = os.path.dirname(os.path.realpath(__file__))
+            shutil.copyfile('{}/openvpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
+            shutil.copyfile('{}/openvpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
+            shutil.copyfile('{}/openvpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
+        
+            commands = [
+                'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
+                'echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version,
+                'apt-get update && apt-get install -y openvpn',
+                'chmod +x /etc/openvpn/server/auth-script.sh',
+                'chmod +x /etc/openvpn/server/up-script.sh',
+                'chmod +x /etc/openvpn/server/down-script.sh',
 
-            # Convert DOS format to UNIX format
-            "sed -i 's/\r$//' /etc/openvpn/server/auth-script.sh",
-            "sed -i 's/\r$//' /etc/openvpn/server/up-script.sh",
-            "sed -i 's/\r$//' /etc/openvpn/server/down-script.sh",
-        
-            'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
-            'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
-            'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
-            'echo "%s" > /etc/openvpn/server/server.crt' % params['serverCrt'],
-            'echo "%s" > /etc/openvpn/server/tc.key' % params['tlsKey'],
-            'echo "%s" > /etc/openvpn/server/dh.pem' % params['dhKey'],
+                # Convert DOS format to UNIX format
+                "sed -i 's/\r$//' /etc/openvpn/server/auth-script.sh",
+                "sed -i 's/\r$//' /etc/openvpn/server/up-script.sh",
+                "sed -i 's/\r$//' /etc/openvpn/server/down-script.sh",
+            
+                'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
+                'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
+                'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
+                'echo "%s" > /etc/openvpn/server/server.crt' % params['serverCrt'],
+                'echo "%s" > /etc/openvpn/server/tc.key' % params['tlsKey'],
+                'echo "%s" > /etc/openvpn/server/dh.pem' % params['dhKey'],
 
-            'rm -rf ./pki'
-        ]
-        
-        for command in commands:
-            ret = os.system(command)
-            if ret:
-                return (False, ret)
-        
-        self._modify(params)
-        
-        fwglobals.log.debug("Openvpn installed successfully")
-        return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+                'rm -rf ./pki'
+            ]
+            
+            for command in commands:
+                ret = os.system(command)
+                if ret:
+                    return (False, ret)
+            
+            self._modify(params)
+            
+            fwglobals.log.debug("Openvpn installed successfully")
+            return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+        except Exception as e:
+            msg = str(e)
+            fwglobals.log.error(msg)
+            return (False, msg)
 
 
     def _openvpn_pid(self):
@@ -124,8 +129,8 @@ class OpenVPN:
             fwglobals.log.debug("openvpn server is running!")
             return (True, None)
         except Exception as e:
-            msg = "failed to start openvpn service. you can see more details in the log file"
-            fwglobals.log.error(str(e))
+            msg = str(e)
+            fwglobals.log.error(msg)
             return (False, msg)
 
     def _uninstall(self, params):
@@ -152,8 +157,8 @@ class OpenVPN:
                     fwglobals.log.error(ret)
                     return (False, ret)
         except Exception as e:
-            msg = "failed to uninstaled openvpn service."
-            fwglobals.log.error(str(e))
+            msg = str(e)
+            fwglobals.log.error(msg)
             return (False, msg)
 
         return (True, None)

@@ -63,10 +63,14 @@ class FwServices:
         assert handler_func, '%s: "%s" function is not implemented fro this service' % (message, handler_func)        
      
         try:
-            handler_func(params['config'])
-            reply = {'entity':'servicesReply', 'message': True, 'ok': 1}
-        except Exception as e:            
-            if handler.get('revert', False):                
+            (success, error) = handler_func(params['config'])
+            
+            if success == False:
+                raise Exception(error)
+
+            reply = {'entity':'servicesReply', 'message': 'success', 'ok': 1}
+        except Exception as e:
+            if handler.get('revert', False):
                 handler_func = getattr(service, handler['revert'])
                 handler_func(params['config'])
             reply = {'entity':'servicesReply', 'message': str(e), 'ok': 0}
