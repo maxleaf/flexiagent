@@ -51,9 +51,9 @@ class OpenVPN:
         os.system('mkdir -p /etc/openvpn/server')
         os.system('mkdir -p /etc/openvpn/client')
         dir = os.path.dirname(os.path.realpath(__file__))
-        shutil.copyfile('{}/vpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
-        shutil.copyfile('{}/vpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
-        shutil.copyfile('{}/vpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
+        shutil.copyfile('{}/openvpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
+        shutil.copyfile('{}/openvpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
+        shutil.copyfile('{}/openvpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
     
         commands = [
             'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
