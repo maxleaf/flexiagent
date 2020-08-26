@@ -52,6 +52,7 @@ import os
 import re
 import sys
 import shutil
+import macDynamic
 
 code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
 test_root = code_root + '/tests/'
@@ -73,23 +74,22 @@ def test(netplan_backup):
         for t in test_cases:
             #copy the netplan file to netplan dir
 	    if 'multiple_netplan' in yaml:
-                os.system('cp -R %s* /etc/netplan/' % multiple_netplan) 
+                os.system('cp -R %s* /etc/netplan/' % multiple_netplan)
+                #To update the MAC address in the yaml files, uncomment the function below
+                #Please note that 2 modules: getmac and netifaces have to be installed 
+                #macDynamic.convertMacAddress() 
             else:
 	        shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
 	        #apply netplan
-	        os.system('netplan apply')
+	    os.system('netplan apply')
             with fwtests.TestFwagent() as agent:
                 print("   " + os.path.basename(t))
 	        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
 		assert ok
                 # Load router configuration with spoiled lists
-                (ok, _) = agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
+                (ok, _) = agent.cli('--api inject_requests filename=%s ignore_errors=False' % t)
 		assert ok
 		
-                # Ensure that spoiled lists were reverted completely
-                configured = fwtests.wait_vpp_to_be_configured([('interfaces', 0),('tunnels', 0)], timeout=30)
-                assert configured
-
                 (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
 		assert ok
             #os.system('rm -f /etc/netplan/*.yaml')
