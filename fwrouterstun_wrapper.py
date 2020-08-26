@@ -52,10 +52,10 @@ class FwStunWrap:
         """
         prints the content on the local cache
         """
-        print ('stun_interfaces:')
+        fwglobals.log.debug('stun_interfaces in Cache:')
         for addr in self.local_cache['stun_interfaces'].keys():
             if addr:
-                print (addr+':'+str(self.local_cache['stun_interfaces'][addr]))
+                fwglobals.log.debug(addr+':'+str(self.local_cache['stun_interfaces'][addr]))
 
     def __init__(self):
         self.local_cache = fwglobals.g.AGENT_CACHE
@@ -193,7 +193,7 @@ class FwStunWrap:
         nat_ext_port = None
         fwglobals.log.debug("trying to find external %s:%s" %(lcl_src_ip,lcl_src_port))
         nat_type, nat_ext_ip, nat_ext_port = stun.get_ip_info(lcl_src_ip, lcl_src_port)
-        if nat_ext_ip != None:
+        if nat_ext_ip != None and nat_ext_port != None:
             fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
             self.add_and_reset_addr(lcl_src_ip)
             self.local_cache['stun_interfaces'][lcl_src_ip]['success']     = True

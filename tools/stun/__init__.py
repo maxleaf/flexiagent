@@ -20,10 +20,15 @@ STUN_SERVERS = (
     'stun01.sipphone.com',
     'stun.fwdnet.net',
     'stun.ideasip.com',
-    'stun2.l.google.com:19302',
+    'stun.ekiga.net',
+	'stun.ideasip.com',
+    'stun.voiparound.com',
+    'stun.voipbuster.com',
+    'stun.voipstunt.com',
+    'stun.voxgratia.org',
+	'stun2.l.google.com:19302',
     'stun3.l.google.com:19302',
     'stun4.l.google.com:19302',
-    'stun.ekiga.net'
 )
 
 """
@@ -259,7 +264,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                     changePortRequest = ''.join([ChangeRequest, '0004',
                                                  "00000002"])
                     fwglobals.log.debug("Stun: Do Test3")
-                    ret = stun_test(s, changedIP, port, source_ip, source_port,
+                    ret = stun_test(s, changedIP, changedPort, source_ip, source_port,
                                     changePortRequest)
                     fwglobals.log.debug("Stun: Result: %s" %(ret))
                     if ret['Resp']:
@@ -268,6 +273,11 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                         typ = RestricPortNAT
                 else:
                     typ = SymmetricNAT
+    # restore previously learned exIP and exPort in case of `RestricPortNat`
+    if ret['ExternalIP'] is None and exIP is not None:
+        ret['ExternalIP'] = exIP
+    if ret['ExternalPort'] is None and exPort is not None:
+        ret['ExternalPort'] = exPort
     return typ, ret
 
 

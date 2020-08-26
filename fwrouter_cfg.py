@@ -86,6 +86,8 @@ class FwRouterCfg:
         :param: callback - the function to be called
         :param: requests - list of requests the listener would like to be notified for
         """
+        fwglobals.log.debug("Registering %s module's callback %s to the following requests %s"\
+            %(listener, callback.__name__, str(requests)))
         dict_elem = {'listener':listener, 'callback': callback, 'requests':requests}
         self.routerCfgCb_db.append(dict_elem)
 
@@ -140,9 +142,11 @@ class FwRouterCfg:
         :param: params  - the params to send to the callback
         """
         for listener in self.routerCfgCb_db:
-            for req in listener[requests]:
-                if re.match(req, requests):
-                    listener[callback](req, params)
+            for req in listener['requests']:
+                if re.match(req, request):
+                    fwglobals.log.debug("Listner %s callback %s is called for request %s"\
+                        %(req['listener'], req['callbak'].__name__, requset))
+                    listener[callback](requset, params)
 
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
@@ -166,13 +170,11 @@ class FwRouterCfg:
         try:
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
-                hook_add(req, self.db[req_key]['params'])
                 cb_params = copy.deepcopy(self.db[req_key]['params'])
             else:
-                hook_remove(req, self.db[req_key]['params'])
                 cb_params = copy.deepcopy(self.db[req_key]['params'])
                 del self.db[req_key]
-
+            fwglobals.log.debug("update() going to call listeners' callbacks")
             call_callback(req,cb_params)
 
         except KeyError:

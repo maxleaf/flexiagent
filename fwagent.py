@@ -453,6 +453,11 @@ class FwAgent:
                             break
                     else:
                         fwstats.update_stats()
+
+                if (slept % 30) == 0:
+                    #log content of Stun addresses cache
+                    p.dump()
+
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
