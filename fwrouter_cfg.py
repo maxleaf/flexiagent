@@ -134,7 +134,7 @@ class FwRouterCfg:
         key_func    = getattr(key_module, 'get_request_key')
         return key_func(params)
 
-    def _call_callback(requset, params):
+    def _call_callback(self, requset, params):
         """
         go over routerCfgCb_db and check if callback should be called for each listener based on the
         request. This fnction is called from update().
@@ -175,7 +175,7 @@ class FwRouterCfg:
                 cb_params = copy.deepcopy(self.db[req_key]['params'])
                 del self.db[req_key]
             fwglobals.log.debug("update() going to call listeners' callbacks")
-            call_callback(req,cb_params)
+            self._call_callback(req,cb_params)
 
         except KeyError:
             pass
