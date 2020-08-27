@@ -43,7 +43,7 @@ from netaddr import IPNetwork, IPAddress
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
 sys.path.append(common_tools)
-from fw_vpp_startupconf import FwStartupConf, L, T
+from fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
