@@ -134,7 +134,7 @@ class FwRouterCfg:
         key_func    = getattr(key_module, 'get_request_key')
         return key_func(params)
 
-    def _call_callback(self, requset, params):
+    def _call_callback(self, request, params):
         """
         go over routerCfgCb_db and check if callback should be called for each listener based on the
         request. This fnction is called from update().
@@ -145,8 +145,8 @@ class FwRouterCfg:
             for req in listener['requests']:
                 if re.match(req, request):
                     fwglobals.log.debug("Listner %s callback %s is called for request %s"\
-                        %(req['listener'], req['callbak'].__name__, requset))
-                    listener[callback](requset, params)
+                        %(listener['listener'], listener['callback'].__name__, request))
+                    listener['callback'](request, params)
 
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
@@ -174,7 +174,7 @@ class FwRouterCfg:
             else:
                 cb_params = copy.deepcopy(self.db[req_key]['params'])
                 del self.db[req_key]
-            fwglobals.log.debug("update() going to call listeners' callbacks")
+            fwglobals.log.debug("update() going to call listeners' callbacks if exist")
             self._call_callback(req,cb_params)
 
         except KeyError:
@@ -424,6 +424,8 @@ class FwRouterCfg:
 
         :returns: the signature as a string.
         """
+        if not 'signature' in self.db:
+            self.reset_signature()
         return self.db['signature']
 
     def reset_signature(self):

@@ -2,6 +2,7 @@ from sqlitedict import SqliteDict
 import threading
 import sys
 import os
+import re
 import fwglobals
 
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
@@ -66,20 +67,20 @@ class FwStunWrap:
 
     def initialize(self):
         fwglobals.g.router_cfg.register_request_callbacks('fwstunwrap', self.fwstuncb, \
-            ['-add-interface', '-remove-interface'])
+            ['add-interface', 'remove-interface'])
 
     def finalize(self):
         self.run = False
 
-    def fwstuncb(request, params):
+    def fwstuncb(self, request, params):
         """
         callback to be called from fwrouterCfg's update() function.
         """
-        if re.match('-add-interface', request):
-            if params['gateway'] is not '':
-                self.add_addr(params[addr].split('/')[0])
+        if re.match('add-interface', request):
+            if params['type'] == 'wan':
+                self.add_addr(params['addr'].split('/')[0])
         else:
-            self.remove_addr(params[addr].split('/')[0])
+            self.remove_addr(params['addr'].split('/')[0])
 
     def add_addr(self, addr):
         """

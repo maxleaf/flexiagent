@@ -144,7 +144,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                 return retVal
             try:
                 buf, addr = sock.recvfrom(2048)
-                fwglobals.log.debug("Stun: recvfrom: %s %s" %(type(addr), addr))
+                fwglobals.log.debug("Stun: recvfrom: %s" %(str(addr)))
                 recieved = True
             except Exception as e:
                 fwglobals.log.error("Got exception from recvfrom: %s, %s" % (str(e), str(traceback.format_exc())))
