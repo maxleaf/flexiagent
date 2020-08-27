@@ -25,6 +25,7 @@ import json
 import os
 import Pyro4
 import re
+import signal
 import time
 import traceback
 import yaml
@@ -238,6 +239,11 @@ class Fwglobals:
             if re.match("WS_STATUS_", a):
                 self.ws_reconnect_status_codes.append(getattr(self, a))
 
+        # Load signal to string map
+        self.signal_names = dict((getattr(signal, n), n) \
+                                for n in dir(signal) if n.startswith('SIG') and '_' not in n )
+
+
     def get_cache_data(self, key):
         """get the cache data for a given key
 
@@ -273,7 +279,7 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return
 
-        self.fwagent    = FwAgent(handle_sigterm=False)
+        self.fwagent    = FwAgent(handle_signals=False)
         self.router_cfg = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.agent_api  = FWAGENT_API()
         self.router_api = FWROUTER_API(self.MULTILINK_DB_FILE)

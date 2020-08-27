@@ -71,7 +71,7 @@ class Checker(fwsystem_checker_common.Checker):
                             return False
                     # Now add the 8.8.8.8 to it's configuration
                     if len(self.nameservers) == 0:
-                        ret = os.system('printf "\nnameserver 8.8.8.8\n" >> %s' % config_filename)
+                        ret = os.system('printf "\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" >> %s' % config_filename)
                         if ret != 0:
                             print(prompt + 'failed to add 8.8.8.8 to %s' % config_filename)
                             return False
