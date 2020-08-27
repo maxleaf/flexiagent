@@ -1,0 +1,22 @@
+[
+{
+  "entity": "agent",
+  "message": "start-router"
+} 
+,
+{
+  "entity":"agent",
+  "message":"get-device-stats"
+}
+,
+{
+  "entity":"agent",
+  "message":"get-device-info",
+  "params":""
+}
+,
+{
+  "entity": "agent",
+  "message": "stop-router"
+}
+]

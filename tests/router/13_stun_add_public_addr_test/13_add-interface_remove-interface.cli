@@ -1,12 +1,17 @@
 [
 {
   "entity": "agent",
+  "message": "start-router"
+}
+,
+{
+  "entity": "agent",
   "message": "add-interface",
   "params": {
-      "pci":"0000:00:08.00",
-      "addr":"10.0.0.4/24",
-      "routing":"ospf",
-      "type":"lan"
+      "pci":"0000:00:14.02",
+      "addr":"100.100.100.100/24",
+      "routing":"OSPF",
+      "type":"LAN"
   }
 }
 ,
@@ -14,7 +19,12 @@
   "entity": "agent",
   "message": "remove-interface",
   "params": {
-      "pci":"0000:00:08.00"
+      "pci":"0000:00:14.02"
   }
+}
+,
+{
+  "entity": "agent",
+  "message": "stop-router"
 }
 ]

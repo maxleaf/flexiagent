@@ -17,15 +17,11 @@ __version__ = '1.0.0'
 STUN_SERVERS = (
     'stun.l.google.com:19302',
     'stun1.l.google.com:19302',
-    'stun01.sipphone.com',
-    'stun.fwdnet.net',
-    'stun.ideasip.com',
-    'stun.ekiga.net',
-	'stun.ideasip.com',
     'stun.voiparound.com',
     'stun.voipbuster.com',
     'stun.voipstunt.com',
-    'stun.voxgratia.org',
+    'stun.ekiga.net',
+    'stun.ideasip.com',
 	'stun2.l.google.com:19302',
     'stun3.l.google.com:19302',
     'stun4.l.google.com:19302',
@@ -264,7 +260,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                     changePortRequest = ''.join([ChangeRequest, '0004',
                                                  "00000002"])
                     fwglobals.log.debug("Stun: Do Test3")
-                    ret = stun_test(s, changedIP, changedPort, source_ip, source_port,
+                    ret = stun_test(s, changedIP, port, source_ip, source_port,
                                     changePortRequest)
                     fwglobals.log.debug("Stun: Result: %s" %(ret))
                     if ret['Resp']:
