@@ -1080,43 +1080,40 @@ def obj_dump_attributes(obj, level=1):
             obj_dump_attributes(val, level=level+1)
 
 
-def vpp_startup_conf_add_devices(params):
-    filename = params['vpp_config_filename']
+def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     p = FwStartupConf()
-    config = p.load(filename)
+    config = p.load(vpp_config_filename)
 
     if config['dpdk'] == None:
         tup = p.create_element('dpdk')
         config.append(tup)
-    for dev in params['devices']:
+    for dev in devices:
         config_param = 'dev %s' % dev
         if p.get_element(config['dpdk'],config_param) == None:
             tup = p.create_element(config_param)
             config['dpdk'].append(tup)
 
-    p.dump(config, filename)
+    p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_remove_devices(params):
-    filename = params['vpp_config_filename']
+def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     p = FwStartupConf()
-    config = p.load(filename)
+    config = p.load(vpp_config_filename)
 
     if config['dpdk'] == None:
         return
-    for dev in params['devices']:
+    for dev in devices:
         config_param = 'dev %s' % dev
         key = p.get_element(config['dpdk'],config_param)
         if key:
             p.remove_element(config['dpdk'], key)
 
-    p.dump(config, filename)
+    p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_add_nat(params):
-    filename = params['vpp_config_filename']
+def vpp_startup_conf_add_nat(vpp_config_filename):
     p = FwStartupConf()
-    config = p.load(filename)
+    config = p.load(vpp_config_filename)
     tup = p.create_element('nat')
     config.append(tup)
     config['nat'].append(p.create_element('endpoint-dependent'))
@@ -1124,18 +1121,17 @@ def vpp_startup_conf_add_nat(params):
     config['nat'].append(p.create_element('translation hash memory 268435456'))
     config['nat'].append(p.create_element('user hash buckets 1024'))
     config['nat'].append(p.create_element('max translations per user 10000'))
- 
-    p.dump(config, filename)
+
+    p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_remove_nat(params):
-    filename = params['vpp_config_filename']
+def vpp_startup_conf_remove_nat(vpp_config_filename):
     p = FwStartupConf()
-    config = p.load(filename)
+    config = p.load(vpp_config_filename)
     key = p.get_element(config, 'nat')
     if key:
         p.remove_element(config,key)
-    p.dump(config, filename)
+    p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def reset_dhcpd():
