@@ -441,6 +441,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, dest_port):
     # vxlan.api.json: vxlan_add_del_tunnel (..., is_add, tunnel <type vl_api_vxlan_add_del_tunnel_t>, ...)
     ret_attr = 'sw_if_index'
     src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
+    dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
     cmd_params = {
             'is_add'               : 1,
             'src_address'          : src_addr_bytes,
