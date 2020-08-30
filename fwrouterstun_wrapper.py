@@ -78,22 +78,30 @@ class FwStunWrap:
         """
         if re.match('add-interface', request):
             if params['type'] == 'wan':
-                self.add_addr(params['addr'].split('/')[0])
+                self.add_addr(params['addr'].split('/')[0], params)
         else:
             self.remove_addr(params['addr'].split('/')[0])
 
-    def add_addr(self, addr):
+    def add_addr(self, addr, params=None):
         """
-        Add address to chace.
+        Add address to chace. There are two cases here:
+        1. The address already has public port and IP as part of its parameters,
+        because this is how we got it from management, due to previous
+        STUN requests.
+        2. The addres and no public information.
         """
+        #1 add address with public info, over-written the address if exist in cache.
+        if params and params['PublicIp'] and params['PublicPort']:
+            self.add_and_reset_addr(addr)
+            c = self.local_cache['stun_interfaces']
+            c[addr]['public_ip'] = params['PublicIp']
+            c[addr]['public_port'] = params['PublicPort']
+            c[addr]['sucess'] = True
+            return
+
+        #2 if address already in cache, do not add it, so its counters won't reset
         if addr not in self.local_cache['stun_interfaces'].keys():
-            self.local_cache['stun_interfaces'][addr] = {
-                'public_ip':None,
-                'public_port':None,
-                'sec_counter':0,
-                'next_time':1,
-                'success':False
-            }
+            self.add_and_reset_addr(addr)
 
     def remove_addr(self, addr):
         """
@@ -117,7 +125,8 @@ class FwStunWrap:
         resets info for an address, as if it never got a STUN reply.
         We will use it when we detect that a tunnel is dicsonnceted, and we
         need to start sending STUN request for it. If the address is already in the DB,
-        we will reset its data.
+        we will reset its data. If the address is already in the cache, its values
+        will be over-written.
         """
         self.local_cache['stun_interfaces'][address] = {
                             'public_ip':None,
@@ -137,7 +146,7 @@ class FwStunWrap:
             if address['success'] == False:
                 address['sec_counter']+=1
 
-    def _handle_none_response(self, address):
+    def _handle_stun_none_response(self, address):
         """
         Handle non response after STUN request was sent.
         double the delay between retransmission, until reaching 60. Then
@@ -150,7 +159,7 @@ class FwStunWrap:
             addr['next_time'] = 60
         addr['success'] = False
 
-    def _handle_response(self, address, public_ip, public_port):
+    def _handle_stun_response(self, address, public_ip, public_port):
         """
         Handle STUN reposnse for an address. Reset all the counters,
         update the results, and set the 'success' flag to True.
@@ -181,9 +190,9 @@ class FwStunWrap:
                     ext_ip, ext_port = self.find_srcip_public_addr(addr)
                     elem['sec_counter'] = 0
                     if ext_port == None:
-                        self._handle_none_response(addr)
+                        self._handle_stun_none_response(addr)
                     else:
-                        self._handle_response(addr,ext_ip, ext_port)
+                        self._handle_stun_response(addr,ext_ip, ext_port)
 
     def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port = 4789):
         """
