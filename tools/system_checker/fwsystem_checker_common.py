@@ -30,6 +30,7 @@ import subprocess
 import sys
 import uuid
 import yaml
+import shutil
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -891,7 +892,6 @@ class Checker:
             return True
 
         # configuration file exist 
-        print conf
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)

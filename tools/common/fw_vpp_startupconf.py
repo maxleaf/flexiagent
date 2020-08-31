@@ -427,7 +427,13 @@ class FwStartupConf:
 		"""
 		string = value[0]
 		string = string.strip('\'')
-		if (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])>0:
+		# This is a case for main category with empty list of values.
+		if (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])==0 and indent == 1:
+			# This is a case of key in main list with empty list of values.
+			string = string + " {\n"
+			self._dump_line(string, indent)
+			self._dump_line('}\n\n',indent)
+		elif (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])>0:
 			if len(value[1]) == 1 and indent > 1:
 				#list[tuple[0]], value[1] is a list, so val is the 1st element of the first tuple in the list
 				val = value[1][0][0] 
