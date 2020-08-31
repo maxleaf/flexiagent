@@ -1001,7 +1001,6 @@ class Checker:
             return True
 
         # configuration file exist 
-        print conf
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
