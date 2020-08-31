@@ -238,7 +238,7 @@ def get_interface_address(if_name):
     interfaces = psutil.net_if_addrs()
     if if_name not in interfaces:
         fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
-        return ''
+        return None
 
     addresses = interfaces[if_name]
     for addr in addresses:
@@ -1387,7 +1387,6 @@ def get_reconfig_hash():
     res = ''
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
     vpp_run = vpp_does_run()
-
     for wan in wan_list:
         name = pci_to_linux_iface(wan['pci'])
 
@@ -1398,18 +1397,20 @@ def get_reconfig_hash():
             return ''
 
         addr = get_interface_address(name)
-        if not re.search(addr, wan['addr']):
-            res += 'addr:' + addr + ','
+        if addr != None:
+            if not re.search(addr, wan['addr']):
+                res += 'addr:' + addr + ','
 
         gw, metric = get_linux_interface_gateway(name)
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
-        nomaskaddr = addr.split('/')[0]
-        prms = fwglobals.g.stun_wrap.find_addr(nomaskaddr)
-        if prms is not None:
-            if prms['public_ip'] is not None and prms['public_port'] is not None:
-                res += 'public_ip:' + prms['public_ip'] + ',' + 'public_port:' + str(prms['public_port']) + ','
+        if addr != None:
+            nomaskaddr = addr.split('/')[0]
+            prms = fwglobals.g.stun_wrap.find_addr(nomaskaddr)
+            if prms is not None:
+                if prms['public_ip'] is not None and prms['public_port'] is not None:
+                    res += 'public_ip:' + prms['public_ip'] + ',' + 'public_port:' + str(prms['public_port']) + ','
 
     if res:
         fwglobals.log.info('reconfig_hash_get: %s' % res)
