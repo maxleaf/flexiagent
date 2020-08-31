@@ -49,20 +49,18 @@ class Fwlog:
 
         :returns: None.
         """
-        # Fold long strings into multiple lines to avoid truncation in log viewer
-        chunk_len = 2048
-        msgs = [log_message[i:i+chunk_len] for i in range(0, len(log_message), chunk_len)]
-
         if to_terminal and self.to_terminal_enabled:
-            if len(msgs) == 1:
-                print(log_message)
-            else:
-                print("--multiline-start--")
-                for msg in msgs:
-                    print(msg)
-                print("--multiline-end--")
+            print(log_message)
 
         if to_syslog and self.to_syslog_enabled:
+
+            # syslog discards lines beyond 8K by default, so we fold them.
+            # We use 8000 and not 8192 to leave space for syslog additions,
+            # like pid, date, etc.
+            #
+            chunk_len = 8000
+            msgs = [log_message[i:i+chunk_len] for i in range(0, len(log_message), chunk_len)]
+
             if len(msgs) == 1:
                 syslog.syslog(log_message)
             else:

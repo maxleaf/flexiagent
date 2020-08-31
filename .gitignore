@@ -4,7 +4,7 @@ __pycache__/
 .vscode/
 pytestdebug.log
 .cache
-.DS_Store
+*.DS_Store
 
 # Docs build
 /docs/_build

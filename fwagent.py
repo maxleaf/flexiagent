@@ -83,9 +83,9 @@ class FwAgent:
     Only one request can be processed at any time.
     The global message handler sits in the Fwglobals module.
 
-    :param handle_sigterm: A flag to handle termination signal
+    :param handle_signals: A flag to handle system signals
     """
-    def __init__(self, handle_sigterm=True):
+    def __init__(self, handle_signals=True):
         """Constructor method
         """
         self.token                = None
@@ -94,14 +94,13 @@ class FwAgent:
         self.thread_statistics    = None
         self.should_reconnect     = False
         self.pending_msg_replies  = []
+        self.handling_request     = False
 
-        if handle_sigterm:
-            signal.signal(signal.SIGTERM, self._sigterm_handler)
+        if handle_signals:
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
 
-        if loadsimulator.is_initialized():
-            signal.signal(signal.SIGINT, self._sigint_handler)
-
-    def _sigint_handler(self, signum, frame):
+    def _signal_handler(self, signum, frame):
         """Signal handler for CTRL+C
 
         :param signum:         Signal type
@@ -109,20 +108,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("Fwagent got SIGINT")
-        loadsimulator.g.stop()
-        self.__exit__(None, None, None)
-        exit(1)
-
-    def _sigterm_handler(self, signum, frame):
-        """Signal handler for SIGTERM signal
-
-        :param signum:         Signal type
-        :param frame:          Stack frame.
-
-        :returns: None.
-        """
-        fwglobals.log.info("Fwagent got SIGTERM")
+        fwglobals.log.info("Fwagent got %s" % fwglobals.g.signal_names[signum])
         self.__exit__(None, None, None)
         exit(1)
 
@@ -397,7 +383,7 @@ class FwAgent:
         """
         fwglobals.log.info("connection to orchestrator is closed")
         if self.thread_statistics:
-            self.isConnRunning = False
+            self.connected = False
             self.thread_statistics.join()
 
     def _on_open(self, ws):
@@ -407,6 +393,7 @@ class FwAgent:
 
         :returns: None.
         """
+        self.connected = True
         self._clean_connection_failure()
 
         if loadsimulator.g.enabled():
@@ -427,25 +414,30 @@ class FwAgent:
             slept = 0
             # Since this thread runs as long as the agent lives, we "hijeck" it
             # for the purpose of STUN request as well. We have several calculations
-            # to do every second, and this is a good place to make tehm.
-            # So here we initialize the StunWrapper class.
+            # to do every second, and this is a good place to make them.
             p = fwglobals.g.stun_wrap
-
-            while self.isConnRunning:
+            while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
-                # does not help in case of Proxy in the middle, as was observed in field
-                if (slept % 30) == 0:
-                    if self.requestReceived:
-                        self.requestReceived = False
+                # does not help in case of Proxy in the middle, as was observed in field.
+                # Note management does not send next request until it gets
+                # response for the previous request. As a result, heavy local
+                # processing prevents receiving of 'get-device-stats'-s. To
+                # avoid false alarm and unnecessary disconnection check the
+                # self.handling_request flag.
+                #
+                timeout = 30
+                if (slept % timeout) == 0:
+                    if self.received_request or self.handling_request:
+                        self.received_request = False
                     else:
-                        fwglobals.log.debug("connect: no request was received in 50 seconds, drop connection")
+                        fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
                         ws.close()
                         fwglobals.log.debug("connect: connection was terminated")
                         break
                 # Every 30 seconds update statistics
-                if (slept % 30) == 0:
+                if (slept % timeout) == 0:
                     if loadsimulator.g.enabled():
                         if loadsimulator.g.started:
                             loadsimulator.g.update_stats()
@@ -454,7 +446,7 @@ class FwAgent:
                     else:
                         fwstats.update_stats()
 
-                if (slept % 30) == 0:
+                if (slept % timeout) == 0:
                     #log content of Stun addresses cache
                     p.dump()
 
@@ -467,8 +459,8 @@ class FwAgent:
                 p.send_stun_request()
                 p.increase_sec()
 
-        self.isConnRunning = True
-        self.requestReceived = True
+
+        self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
         self.thread_statistics.start()
 
@@ -494,7 +486,7 @@ class FwAgent:
 
         (reply, msg) = self.handle_received_request(msg)
 
-        fwglobals.log.debug(str(pmsg['seq']) + " request=" + message)
+        fwglobals.log.debug(str(pmsg['seq']) + " request=" + json.dumps(pmsg['msg']))
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
 
         # Messages that change the interfaces might cause the existing connection to break
@@ -535,6 +527,9 @@ class FwAgent:
         """
         print_message = fwglobals.g.cfg.DEBUG
 
+        self.received_request = True
+        self.handling_request = True
+
         # Aggregation is not well defined in today protocol (May-2019),
         # so align all kind of aggregations to the common request format
         # expected by the agent framework.
@@ -542,9 +537,7 @@ class FwAgent:
 
         print_message = False if msg['message'] == 'get-device-stats' else print_message
         if print_message:
-            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=4))
-
-        self.requestReceived = True
+            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
         reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
 
@@ -554,7 +547,9 @@ class FwAgent:
             reply.update({'message': 'success'})
 
         if print_message:
-            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=4))
+            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
+
+        self.handling_request = False
         return (reply, msg)
 
     def inject_requests(self, filename, ignore_errors=False):
@@ -733,13 +728,11 @@ class FwagentDaemon(object):
         self.active      = False
         self.thread_main = None
 
-        self.SIGNALS_TO_NAMES_DICT = dict((getattr(signal, n), n) \
-                                          for n in dir(signal) if n.startswith('SIG') and '_' not in n )
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("FwagentDaemon: got %s" % self.SIGNALS_TO_NAMES_DICT[signum])
+        fwglobals.log.info("FwagentDaemon: got %s" % fwglobals.g.signal_names[signum])
         exit(1)
 
     def __enter__(self):
@@ -990,8 +983,10 @@ def daemon_rpc(func, **kwargs):
         fwglobals.log.debug("invoke remote FwagentDaemon::%s(%s)" % (func, json.dumps(kwargs)))
         return remote_func(**kwargs)
     except Pyro4.errors.CommunicationError:
+        fwglobals.log.debug("ignore FwagentDaemon::%s(%s): daemon does not run" % (func, json.dumps(kwargs)))
         return None
-    except:
+    except Exception as e:
+        fwglobals.log.debug("FwagentDaemon::%s(%s) failed: %s" % (func, json.dumps(kwargs), str(e)))
         ex_type, ex_value, ex_tb = sys.exc_info()
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
