@@ -15,6 +15,10 @@ __version__ = '1.0.0'
 
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
+    'stun2.l.google.com:19302',
+    'stun3.l.google.com:19302',
+    'stun4.l.google.com:19302',
+    'stunserver.org:3478',
     'stun.ekiga.net',
     'stun.pjsip.org',
     'stun.voipstunt.com',
