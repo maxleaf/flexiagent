@@ -80,6 +80,7 @@ class FwStunWrap:
             if params['type'] == 'wan':
                 self.add_addr(params['addr'].split('/')[0], params)
         else:
+            # We know it is "remove" because we only registered for "add" and "remove"
             self.remove_addr(params['addr'].split('/')[0])
 
     def add_addr(self, addr, params=None):
@@ -87,8 +88,8 @@ class FwStunWrap:
         Add address to chace. There are two cases here:
         1. The address already has public port and IP as part of its parameters,
         because this is how we got it from management, due to previous
-        STUN requests.
-        2. The addres and no public information.
+        STUN requests (add-interface)
+        2. The addres has no public information.
         """
         #1 add address with public info, over-written the address if exist in cache.
         if params and params['PublicIp'] and params['PublicPort']:
@@ -123,10 +124,9 @@ class FwStunWrap:
     def add_and_reset_addr(self, address):
         """
         resets info for an address, as if it never got a STUN reply.
-        We will use it when we detect that a tunnel is dicsonnceted, and we
-        need to start sending STUN request for it. If the address is already in the DB,
-        we will reset its data. If the address is already in the cache, its values
-        will be over-written.
+        We will use it everytime we need to reset address's data, such as in the case 
+        when we detect that a tunnel is dicsonnceted, and we need to start sending STUN request
+        for it. If the address is already in the cache, its values will be over-written.
         """
         self.local_cache['stun_interfaces'][address] = {
                             'public_ip':None,
@@ -206,9 +206,11 @@ class FwStunWrap:
         if nat_ext_ip != None and nat_ext_port != None:
             fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
             self.add_and_reset_addr(lcl_src_ip)
-            self.local_cache['stun_interfaces'][lcl_src_ip]['success']     = True
-            self.local_cache['stun_interfaces'][lcl_src_ip]['public_ip']   = nat_ext_ip
-            self.local_cache['stun_interfaces'][lcl_src_ip]['public_port'] = nat_ext_port
+            c = self.local_cache['stun_interfaces'][lcl_src_ip]
+            c['success']     = True
+            c['public_ip']   = nat_ext_ip
+            c['public_port'] = nat_ext_port
+            self.dump()
             return nat_ext_ip, nat_ext_port
         else:
             fwglobals.log.debug("failed to find external ip:port for  %s:%s" %(lcl_src_ip,lcl_src_port))

@@ -15,16 +15,9 @@ __version__ = '1.0.0'
 
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
-    'stun.l.google.com:19302',
-    'stun1.l.google.com:19302',
-    'stun.voiparound.com',
-    'stun.voipbuster.com',
-    'stun.voipstunt.com',
     'stun.ekiga.net',
-    'stun.ideasip.com',
-	'stun2.l.google.com:19302',
-    'stun3.l.google.com:19302',
-    'stun4.l.google.com:19302',
+    'stun.pjsip.org',
+    'stun.voipstunt.com',
 )
 
 """
@@ -131,7 +124,8 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
         recieved = False
         count = 3
         while not recieved:
-            fwglobals.log.debug("Stun: sendto: %s:%d" %(host, port))
+            if port != None and host != None:
+                fwglobals.log.debug("Stun: sendto: %s:%d" %(host, port))
             try:
                 sock.sendto(data, (host, port))
             except socket.gaierror:
@@ -280,7 +274,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
 def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
                 stun_port=3478):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(5)
+    s.settimeout(7)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((source_ip, source_port))
 
