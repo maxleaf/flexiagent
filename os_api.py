@@ -95,7 +95,7 @@ class OS_DECODERS:
                 # Send STUN request only for interfaces with Gateway
                 prms = fwglobals.g.stun_wrap.find_addr(daddr['IPv4'])
                 if prms == None or prms['success'] == False:
-                    daddr['public_ip'], daddr['public_port'] = fwglobals.g.stun_wrap.find_srcip_public_addr(daddr['IPv4'],4789)
+                    daddr['public_ip'], daddr['public_port'] = fwglobals.g.stun_wrap.find_srcip_public_addr(daddr['IPv4'])
                 else:
                     daddr['public_ip']   = prms['public_ip']
                     daddr['public_port'] = prms['public_port']
