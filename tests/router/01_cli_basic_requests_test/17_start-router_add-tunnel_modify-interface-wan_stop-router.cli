@@ -47,24 +47,26 @@
       "addr":"10.100.0.7/31",
       "mac":"02:00:27:fd:00:07",
       "mtu":1420,
-	  "routing":"ospf"
+      "routing":"ospf"
     }
   }
 }
 ,
 {
   "entity": "agent",
-  "message": "modify-device",
+  "message": "aggregated",
   "params": {
-    "modify_interfaces": {
-      "interfaces": [
+    "requests": [
         {
-          "pci": "0000:00:08.00",
-          "addr": "8.8.4.4/24",
-          "type": "WAN"
+          "entity":  "agent",
+          "message": "modify-interface",
+          "params": {
+              "pci": "0000:00:08.00",
+              "addr": "8.8.4.4/24",
+              "type": "WAN"
+          }
         }
-      ]
-    }
+    ]
   }
 }
 ,

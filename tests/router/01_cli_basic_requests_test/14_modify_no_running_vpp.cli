@@ -1,0 +1,48 @@
+[
+{
+  "entity": "agent",
+  "message": "add-interface",
+  "params": {
+      "pci":"0000:00:03.00",
+      "addr":"8.8.1.1/24",
+      "type":"wan"
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "add-interface",
+  "params": {
+      "pci":"0000:00:08.00",
+      "addr":"10.10.10.10/24",
+      "routing":"ospf",
+      "type":"lan"
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "modify-interface",
+  "params": {
+      "pci":"0000:00:03.00",
+      "addr":"8.8.6.6/24"
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "aggregated",
+  "params": {
+      "requests": [
+        {
+          "entity": "agent",
+          "message": "modify-interface",
+          "params": {
+              "pci":"0000:00:08.00",
+              "addr":"10.10.6.6/24"
+          }
+        }
+      ]
+  }
+}
+]
