@@ -43,6 +43,30 @@ import fwglobals
 import fwutils
 import fwnetplan
 
+from yaml.constructor import ConstructorError
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
+
+
+def no_duplicates_constructor(loader, node, deep=False):
+    """Check for duplicate keys."""
+
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        value = loader.construct_object(value_node, deep=deep)
+        if key in mapping:
+            raise ConstructorError("", node.start_mark,
+                                   "found duplicate key (%s)" % key, key_node.start_mark)
+        mapping[key] = value
+
+    return loader.construct_mapping(node, deep)
+
+yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, no_duplicates_constructor)
+
 class Checker:
     """This is Checker class representation.
 
@@ -465,6 +489,15 @@ class Checker:
                 raise Exception("Multiple default routes with the same metric %u" % metric)
             return True
         except Exception as e:
+            try:
+                self._check_duplicate_netplan_sections()
+            except:
+                print("Please fix duplicate netplan sections first")
+                return False
+            duplicates = self._get_duplicate_interface_definitions()
+            if duplicates:
+                print("Please fix duplicate interface definition in netplan first")
+                return False
             print(prompt + str(e))
             if not fix:
                 return False
@@ -493,6 +526,81 @@ class Checker:
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
+        return True
+
+    def _check_duplicate_netplan_sections(self):
+        files = glob.glob("/etc/netplan/*.yaml") + \
+                glob.glob("/lib/netplan/*.yaml") + \
+                glob.glob("/run/netplan/*.yaml")
+
+        for fname in files:
+            with open(fname, 'r') as stream:
+                yaml.load(stream)
+
+    def _get_duplicate_interface_definitions(self):
+        files = glob.glob("/etc/netplan/*.yaml") + \
+                glob.glob("/lib/netplan/*.yaml") + \
+                glob.glob("/run/netplan/*.yaml")
+
+        interfaces = {}
+        for fname in files:
+            with open(fname, 'r') as stream:
+                config = yaml.safe_load(stream)
+                if 'network' in config:
+                    network = config['network']
+                    if 'ethernets' in network:
+                        ethernets = network['ethernets']
+                        for dev in ethernets:
+                            if dev not in interfaces:
+                                interfaces[dev] = [fname]
+                            else:
+                                interfaces[dev].append(fname)
+
+        duplicates = {}
+        for dev, files in interfaces.items():
+            if len(files) > 1:
+                duplicates[dev] = files
+        return duplicates
+
+    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=None):
+        """Check if any section is defined multiple times in Netplan files.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        try:
+            self._check_duplicate_netplan_sections()
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            return False
+        return True
+
+    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=None):
+        """Check if interface is defined in multiple Netplan files.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        try:
+            duplicates = self._get_duplicate_interface_definitions()
+            if duplicates:
+                message = "Found multiple interface definitions: "
+                for dev, files in duplicates.items():
+                    message += dev + ' in '
+                    for file in files:
+                        message += file + ', '
+                raise Exception(message)
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            return False
         return True
 
 
@@ -893,7 +1001,6 @@ class Checker:
             return True
 
         # configuration file exist 
-        print conf
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
