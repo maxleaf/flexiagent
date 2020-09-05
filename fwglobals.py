@@ -347,7 +347,10 @@ class Fwglobals:
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
             func_str = request['params'].get('func')
-            args_str = ', '.join([ "%s=%s" % (arg_name, args[arg_name]) for arg_name in args.keys() ])
+            if args:
+                args_str = ', '.join([ "%s=%s" % (arg_name, args[arg_name]) for arg_name in args.keys() ])
+            else:
+                args_str = ''
             log.error('_call_python_api: %s(%s) failed: %s' % (func_str, args_str, val))
         reply = {'ok':ok, 'message':val}
         return reply
