@@ -22,15 +22,15 @@
 
 import services.openvpn
 
-services = {
+fwservices = {
     'open-vpn': services.openvpn.OpenVPN()
 }
 
-messages = {
-    'install-service':   {'name': '_install'},
-    'uninstall-service': {'name': '_uninstall'},
-    'modify-service':    {'name': '_modify'},
-    'upgrade-service':   {'name': '_upgrade'}
+fwservices_handlers = {
+    'install-service':   {'handler': 'install'},
+    'uninstall-service': {'handler': 'uninstall'},
+    'modify-service':    {'handler': 'modify'},
+    'upgrade-service':   {'handler': 'upgrade'}
 }
 
 class FwServices:
@@ -53,13 +53,13 @@ class FwServices:
         params = request['params']
         service_type = params['type']
         
-        service = services.get(service_type)
+        service = fwservices.get(service_type)
         assert service, '%s: "%s" service is not supported' % (message, service_type)
 
-        handler = messages.get(message)
+        handler = fwservices_handlers.get(message)
         assert handler, '%s: "%s" handler is not supported' % (message, message)        
         
-        handler_func = getattr(service, handler['name'])
+        handler_func = getattr(service, handler['handler'])
         assert handler_func, '%s: "%s" function is not implemented fro this service' % (message, handler_func)        
      
         try:

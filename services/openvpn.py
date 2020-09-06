@@ -30,7 +30,7 @@ from netaddr import IPNetwork, IPAddress
 class OpenVPN:
     """OpenVPN class representation.
     """
-    def _install(self, params):
+    def install(self, params):
         """Install Open VPN server on host.
 
         :param params: params - open vpn parameters:
@@ -81,13 +81,13 @@ class OpenVPN:
                 if ret:
                     return (False, ret)
             
-            self._modify(params)
+            self.modify(params)
             
             fwglobals.log.debug("Openvpn installed successfully")
             return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
         except Exception as e:
             #call uninstall function to clean the machine on installation error
-            self._uninstall(params)
+            self.uninstall(params)
 
             msg = str(e)
             fwglobals.log.error(msg)
@@ -105,7 +105,7 @@ class OpenVPN:
             pid = None
         return pid
 
-    def _modify(self, params):
+    def modify(self, params):
         """Configure Open VPN server on host.
 
         :param params: params - open vpn parameters:
@@ -133,7 +133,7 @@ class OpenVPN:
             fwglobals.log.error(msg)
             return (False, msg)
 
-    def _uninstall(self, params):
+    def uninstall(self, params):
         """Remove Open VPN server on host.
 
         :returns: (True, None) tuple on success, (False, <error string>) on failure.
@@ -163,7 +163,7 @@ class OpenVPN:
 
         return (True, None)
 
-    def _upgrade(self, params):
+    def upgrade(self, params):
         return self.install(params)
 
     def _configure_server_file(self, params):
