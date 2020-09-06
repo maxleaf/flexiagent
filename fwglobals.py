@@ -25,6 +25,7 @@ import json
 import os
 import Pyro4
 import re
+import signal
 import time
 import traceback
 import yaml
@@ -213,7 +214,8 @@ class Fwglobals:
         self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
         self.OSPF_LOG_FILE       = '/var/log/frr/ospfd.log'
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
-        self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.orig'
+        self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.baseline'
+        self.VPP_CONFIG_FILE_RESTORE = '/etc/vpp/startup.conf.orig'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
@@ -245,6 +247,11 @@ class Fwglobals:
         for a in dir(self):
             if re.match("WS_STATUS_", a):
                 self.ws_reconnect_status_codes.append(getattr(self, a))
+
+        # Load signal to string map
+        self.signal_names = dict((getattr(signal, n), n) \
+                                for n in dir(signal) if n.startswith('SIG') and '_' not in n )
+
 
     def get_cache_data(self, key):
         """get the cache data for a given key
@@ -289,7 +296,6 @@ class Fwglobals:
         self.services_api = FwServices()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
-        
 
         self.router_api.restore_vpp_if_needed()
 
@@ -356,7 +362,10 @@ class Fwglobals:
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
             func_str = request['params'].get('func')
-            args_str = json.dumps(args) if args else ""
+            if args:
+                args_str = ', '.join([ "%s=%s" % (arg_name, args[arg_name]) for arg_name in args.keys() ])
+            else:
+                args_str = ''
             log.error('_call_python_api: %s(%s) failed: %s' % (func_str, args_str, val))
         reply = {'ok':ok, 'message':val}
         return reply

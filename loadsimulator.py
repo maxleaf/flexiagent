@@ -32,6 +32,7 @@ import fwutils
 import ssl
 import fwagent
 import traceback
+import signal
 import sys
 import fwstats
 
@@ -58,6 +59,14 @@ class LoadSimulator:
         self.data = ''
         self.versions = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.thread_statistics = None
+
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT,  self._signal_handler)
+
+    def _signal_handler(self, signum, frame):
+        fwglobals.log.info("LoadSimulator: got %s" % fwglobals.g.signal_names[signum])
+        self.stop()
+        exit(1)
 
     def stop(self):
         """Stop simulated devices.
@@ -138,7 +147,7 @@ class LoadSimulator:
         """
         fwglobals.log.info("started in simulate mode")
 
-        with fwagent.FwAgent() as agent:
+        with fwagent.FwAgent(handle_signals=False) as agent:
 
             self.enable(int(count))
 
@@ -233,9 +242,3 @@ def initialize():
     global g
     g = LoadSimulator()
 
-def is_initialized():
-    """Check if singleton is initialized.
-
-    :returns: 'True' if singleton is initialized and 'False' otherwise.
-    """
-    return 'g' in globals()
