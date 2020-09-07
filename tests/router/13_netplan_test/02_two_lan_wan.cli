@@ -1,25 +1,44 @@
-[
+ [
     {
         "entity": "agent",
-        "message": "modify-device",
+        "message": "add-interface",
         "params": {
-            "modify_interfaces": {
-                "interfaces": [
-                    {
-                        "pci": "0000:00:03.00",
-                        "dhcp": "no",
-                        "addr": "10.0.1.147/24",
-                        "addr6": "fe80::824:49ff:fe84:4111/64",
-                        "metric": "",
-                        "routing": "NONE",
-                        "type": "LAN",
-                        "multilink": {
-                            "labels": []
-                        }
-                    }
-                ]
-            },
-            "reconnect": true
+            "pci": "0000:00:03.00",
+            "dhcp": "no",
+            "addr": "10.0.1.10/24",
+            "routing": "NONE",
+            "type": "wan",
+            "multilink": {
+                "labels": []
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-interface",
+        "params": {
+            "pci": "0000:00:08.00",
+            "dhcp": "no",
+            "addr": "192.168.1.10/24",
+            "routing": "NONE",
+            "type": "lan",
+            "multilink": {
+                "labels": []
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-interface",
+        "params": {
+            "pci": "0000:00:09.00",
+            "dhcp": "no",
+            "addr": "192.168.2.10/24",
+            "routing": "NONE",
+            "type": "lan",
+            "multilink": {
+                "labels": []
+            }
         }
     }
 ]

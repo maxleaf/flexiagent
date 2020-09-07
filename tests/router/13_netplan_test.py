@@ -44,9 +44,8 @@ This is a whitebox script to test netplan under different scenarios and with
  
  Use : sudo systemctl stop flexiwan-router
  
- To run the script : pytest -k 13
+ To run the script : pytest -s -k 13
  """
-
 import glob
 import os
 import re
@@ -70,8 +69,8 @@ def test(netplan_backup):
     yaml_config = sorted(glob.glob('%s/*.yaml' % tests_path))
     orig_yaml = glob.glob("/etc/netplan/50*.yaml")
     for yaml in yaml_config:
-        
-        for t in test_cases:
+        print("Netplan :: %s" % yaml.split('/')[-1])
+        for test in [t for t in test_cases if t not in [cli_stop_router_file, cli_start_router_file]]:
             #copy the netplan file to netplan dir
 	    if 'multiple_netplan' in yaml:
                 os.system('cp -R %s* /etc/netplan/' % multiple_netplan)
@@ -80,19 +79,23 @@ def test(netplan_backup):
                 #macDynamic.convertMacAddress() 
             else:
 	        shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
-	        #apply netplan
+	    #apply netplan
 	    os.system('netplan apply')
+
             with fwtests.TestFwagent() as agent:
-                print("   " + os.path.basename(t))
-	        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
+                print("   " + os.path.basename(test))
+	        (ok, out) = agent.cli('-f %s' % cli_start_router_file)
 		assert ok
+                print("start_router: %s" % out)
+
                 # Load router configuration with spoiled lists
-                (ok, _) = agent.cli('--api inject_requests filename=%s ignore_errors=False' % t)
+                (ok, out) = agent.cli('--api inject_requests filename=%s ignore_errors=False' % test)
 		assert ok
+                print("Inject cli '%s': %s" %(os.path.basename(test),out))
 		
-                (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
+                (ok, out) = agent.cli('-f %s' % cli_stop_router_file)
 		assert ok
-            #os.system('rm -f /etc/netplan/*.yaml')
-    #restoring the original yaml file
+                print("stop_router: %s" % out)
+            os.system('rm -f /etc/netplan/*.yaml')
 if __name__ == '__main__':
     test()

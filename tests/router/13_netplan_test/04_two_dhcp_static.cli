@@ -1,26 +1,48 @@
 [
     {
         "entity": "agent",
-        "message": "modify-device",
+        "message": "add-interface",
         "params": {
-            "modify_router": {
-                "assign": [
-                    {
-                        "pci": "0000:00:03.00",
-                        "dhcp": "yes",
-                        "addr": "10.0.5.147/24",
-                        "addr6": "fe80::824:49ff:fe84:4111/64",
-                        "gateway": "",
-                        "metric": "",
-                        "routing": "NONE",
-                        "type": "WAN",
-                        "multilink": {
-                            "labels": []
-                        }
-                    }
-                ]
-            },
-            "reconnect": true
+            "pci": "0000:00:03.00",
+            "dhcp": "yes",
+            "addr": "10.0.1.10/24",
+            "gateway": "10.0.1.1",
+            "metric": "100",
+            "routing": "NONE",
+            "type": "wan",
+            "multilink": {
+                "labels": []
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-interface",
+        "params": {
+            "pci": "0000:00:08.00",
+            "dhcp": "no",
+            "addr": "192.168.1.10/24",
+            "routing": "NONE",
+            "type": "lan",
+            "multilink": {
+                "labels": []
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-interface",
+        "params": {
+            "pci": "0000:00:09.00",
+            "dhcp": "yes",
+            "addr": "10.0.2.10/24",
+            "gateway": "10.0.2.1",
+            "metric": "200",
+            "routing": "NONE",
+            "type": "wan",
+            "multilink": {
+                "labels": []
+            }
         }
     }
 ]
