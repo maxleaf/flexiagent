@@ -43,7 +43,8 @@ fwagent_api = {
     'reset-device':                     '_reset_device_soft',
     'sync-device':                      '_sync_device',
     'get-wifi-available-access-points': '_get_wifi_available_access_points',
-    'connect-to-wifi':                  '_connect_to_wifi'
+    'connect-to-wifi':                  '_connect_to_wifi',
+    'connect-to-lte':                   '_connect_to_lte'
 }
 
 class FWAGENT_API:
@@ -368,5 +369,15 @@ class FWAGENT_API:
             return {'message': result, 'ok': result}
         except:
             raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
+
+    def _connect_to_lte(self, params):
+        fwglobals.log.info("FWAGENT_API: _connect_to_lte STARTED")
+        
+        try:
+            result = fwutils.connect_to_lte(params)
+            fwglobals.log.info("FWAGENT_API: _connect_to_lte FINISHED")
+            return {'message': result, 'ok': result}
+        except:
+            raise Exception("_connect_to_lte: failed to connect to lte: %s" % format(sys.exc_info()[1]))
 
 

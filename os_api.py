@@ -64,15 +64,11 @@ class OS_DECODERS:
         out = []
 
         for nicname, addrs in inp.items():
-            isWifi = fwutils.is_wifi_interface(nicname)
 
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] == "" and isWifi == False:
-                continue
             daddr = {
                 'name':nicname,
-                'pciaddr':pciaddr[0],
-                'driver':pciaddr[1],
+                'pciaddr':'',
+                'driver':'',
                 'MAC':'',
                 'IPv4':'',
                 'IPv4Mask':'',
@@ -83,14 +79,27 @@ class OS_DECODERS:
                 'metric': '',
                 'internet_source':  ''
             }
-            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
-            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
-            
-            if isWifi:
+
+            if fwutils.is_wifi_interface(nicname):
                 daddr['internet_source'] = 'wifi'
                 daddr['driver'] = fwutils.get_wifi_interface_driver(nicname)
 
+            elif fwutils.is_lte_interface(nicname):
+                daddr['internet_source'] = 'lte'
+                daddr['driver'] = ''
+
+            else:
+                pciaddr = fwutils.linux_to_pci_addr(nicname)
+                if pciaddr[0] == "":
+                    continue
                 
+                daddr['pciaddr'] = pciaddr[0]
+                daddr['driver'] = pciaddr[1]
+            
+            
+            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
+            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
+
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
                 daddr[addr_af_name] = addr.address.split('%')[0]

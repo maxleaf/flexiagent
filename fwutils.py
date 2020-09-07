@@ -39,6 +39,7 @@ import shutil
 import sys
 import traceback
 import yaml
+import serial
 from netaddr import IPNetwork, IPAddress
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
@@ -1719,6 +1720,49 @@ def connect_to_wifi(params):
         is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
         
         if (is_success.strip() == 'COMPLETED'):
+            subprocess.check_output('dhclient %s' % interface_name, shell=True)
+            return True
+        else:
+            return False
+    except subprocess.CalledProcessError:
+        return False  
+
+def is_lte_interface(interface_name):
+    """Check if interface is LTE.                            
+
+    :param interface_name: Interface name to check.
+
+    :returns: Boolean.
+    """
+    interfaces = ['enp0s22u1u3i8', 'enp0s22u1u3i10']
+    if interface_name in interfaces:
+        return True
+    
+    return False
+
+def connect_to_lte(params):
+    interface_name = params['interfaceName']
+    apn = params['apn']
+
+    try:
+        ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
+        print(ser.name)        
+        bye = ser.write("At!scact=1,1\r\n")     # write a string
+        # time.sleep(3)
+        response =  ser.read(2)
+
+        # while True:
+        #     response = ser.readline()
+        #     print "python printed:", response
+
+
+        ser.close()      
+        # output = subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
+        # 
+
+        # is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
+        
+        if (True):
             subprocess.check_output('dhclient %s' % interface_name, shell=True)
             return True
         else:
