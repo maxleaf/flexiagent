@@ -226,7 +226,6 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
-        fwglobals.log.debug("FWROUTER_API::call: %s" % json.dumps(request))
 
         dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
 
@@ -575,7 +574,7 @@ class FWROUTER_API:
 
         :param request: The request received from flexiManage.
 
-        :returns: request after stripping out no impact reqeuests.
+        :returns: request after stripping out no impact requests.
         """
         def _should_be_stripped(_request):
             req    = _request['message']
@@ -584,7 +583,7 @@ class FWROUTER_API:
             if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
                 return True
             elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
-                # Ensure this is actaully not modification request :)
+                # Ensure this is actually not modification request :)
                 curr_params = fwglobals.g.router_cfg.get_request_params(_request)
                 if params == curr_params:
                     return True
@@ -603,7 +602,7 @@ class FWROUTER_API:
                 fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
                 return None
             if len(requests) < len(request['params']['requests']):
-                fwglobals.log.debug("_strip_noop_request: aggragation after strip: %s" % json.dumps(requests))
+                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(requests))
             request['params']['requests'] = requests
         return request
 
