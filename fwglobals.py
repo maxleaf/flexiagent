@@ -69,6 +69,7 @@ request_handlers = {
     'get-wifi-available-access-points':  {'name': '_call_agent_api'},
     'connect-to-wifi':                   {'name': '_call_agent_api'},
     'connect-to-lte':                    {'name': '_call_agent_api'},
+    'get-interface-status':              {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
