@@ -1688,27 +1688,38 @@ def is_lte_interface(interface_name):
     
     return False
 
+def run_serial_command(ser, command):
+    ser.write('%s\r\n' % command)
+    time.sleep(2)
+    ret = []
+
+    while ser.inWaiting() > 0:
+		msg = ser.readline().strip()
+		msg = msg.replace("\r","")
+		msg = msg.replace("\n","")
+		if msg!="":
+			ret.append(msg)
+
+    return ret
+
 def connect_to_lte(params):
     interface_name = params['interfaceName']
     apn = params['apn']
 
     try:
         ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
-        print(ser.name)        
-        bye = ser.write("At!scact=1,1\r\n")     # write a string
-        # time.sleep(3)
-        response =  ser.read(2)
+        
+        response = run_serial_command(ser, 'At!scact?')
 
-        # while True:
-        #     response = ser.readline()
-        #     print "python printed:", response
+        if not 'OK' in response or '!SCACT: 1,0' in response:
+            response = run_serial_command(ser, 'At+cgdcont=1,"ip","%s"' % str(apn))
+            
+            if 'ERROR' in response:
+                return False
 
+            response = run_serial_command(ser, 'At!scact=1,1')
 
-        ser.close()      
-        # output = subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
-        # 
-
-        # is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
+        ser.close()
         
         if (True):
             subprocess.check_output('dhclient %s' % interface_name, shell=True)

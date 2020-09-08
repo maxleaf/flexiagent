@@ -77,16 +77,18 @@ class OS_DECODERS:
                 'dhcp':'',
                 'gateway':'',
                 'metric': '',
-                'internet_source':  ''
+                'connectivity_type': ''
             }
 
             if fwutils.is_wifi_interface(nicname):
-                daddr['internet_source'] = 'wifi'
+                daddr['connectivity_type'] = 'wifi'
                 daddr['driver'] = fwutils.get_wifi_interface_driver(nicname)
+                daddr['dhcp'] = 'yes'
 
             elif fwutils.is_lte_interface(nicname):
-                daddr['internet_source'] = 'lte'
+                daddr['connectivity_type'] = 'lte'
                 daddr['driver'] = ''
+                daddr['dhcp'] = 'yes'
 
             else:
                 pciaddr = fwutils.linux_to_pci_addr(nicname)
@@ -95,9 +97,8 @@ class OS_DECODERS:
                 
                 daddr['pciaddr'] = pciaddr[0]
                 daddr['driver'] = pciaddr[1]
+                daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             
-            
-            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
 
             for addr in addrs:
