@@ -1702,6 +1702,16 @@ def run_serial_command(ser, command):
 
     return ret
 
+def get_lte_apn_configured():
+    #ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
+    #ser.write('At+cgdcont?\r\n')
+    # ser.write('AT!GSTATUS?\r\n')
+    # time.sleep(0.3)
+    # s = ser.readline().strip()
+
+    #ser.close()
+    return ''
+
 def connect_to_lte(params):
     interface_name = params['interfaceName']
     apn = params['apn']
@@ -1722,7 +1732,7 @@ def connect_to_lte(params):
         ser.close()
         
         if (True):
-            subprocess.check_output('dhclient %s' % interface_name, shell=True)
+            subprocess.check_output('dhclient %s' % str(interface_name), shell=True)
             return True
         else:
             return False

@@ -384,9 +384,20 @@ class FWAGENT_API:
     def _get_interface_status(self, params):
         fwglobals.log.info("FWAGENT_API: _get_interface_status STARTED")
         try:
-            # result = fwutils.connect_to_lte(params)
+            interface_name = str(params['interfaceName'])
+
+            addr = fwutils.get_interface_address(interface_name)
+            apn = fwutils.get_lte_apn_configured()#At+cgdcont?
+            connectivity = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+
+            response = {
+                'address':      addr,
+                'apn':          apn,
+                'connectivity': connectivity
+            }
+
             fwglobals.log.info("FWAGENT_API: _get_interface_status FINISHED")
-            return {'message': {}, 'ok': 1}
+            return {'message': response, 'ok': 1}
         except:
             raise Exception("_get_interface_status: failed to connect to lte: %s" % format(sys.exc_info()[1]))
 
