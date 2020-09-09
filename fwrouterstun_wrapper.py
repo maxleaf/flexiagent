@@ -194,7 +194,7 @@ class FwStunWrap:
                     else:
                         self._handle_stun_response(addr,ext_ip, ext_port)
 
-    def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port=54320):
+    def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port=4789):
         """
         sends one STUN request for an address.
         """

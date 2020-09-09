@@ -280,11 +280,17 @@ def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(2)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind((source_ip, source_port))
-
-    nat_type, nat = get_nat_type(s, source_ip, source_port,
+    try:
+        fwglobals.log.debug("get_ip_info, binding to %s:%d" %(source_ip, source_port))
+        s.bind((source_ip, source_port))
+    except Exception as e:
+        fwglobals.log.error("Got exception from bind: %s, %s" % (str(e), str(traceback.format_exc())))
+        s.close()
+        return (None, None, None)
+    else:        
+        nat_type, nat = get_nat_type(s, source_ip, source_port,
                                  stun_host=stun_host, stun_port=stun_port)
-    external_ip = nat['ExternalIP']
-    external_port = nat['ExternalPort']
-    s.close()
-    return (nat_type, external_ip, external_port)
+        external_ip = nat['ExternalIP']
+        external_port = nat['ExternalPort']
+        s.close()
+        return (nat_type, external_ip, external_port)
