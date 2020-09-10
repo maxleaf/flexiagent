@@ -400,7 +400,8 @@ class Fwglobals:
     def handle_request(self, request, result=None, received_msg=None):
         """Handle request.
 
-        :param request:      The request received from flexiManage.
+        :param request:      The request received from flexiManage after
+                             transformation by fwutils.fix_aggregated_message_format().
         :param result:       Place for result.
         :param received_msg: The original message received from flexiManage.
 
@@ -428,7 +429,7 @@ class Fwglobals:
             #
             if handler.get('sign', False) and received_msg is None:
                 received_msg = copy.deepcopy(request)
-            
+
             handler_func = getattr(self, handler.get('name'))
             if result is None:
                 reply = handler_func(request)
