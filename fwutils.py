@@ -1415,7 +1415,7 @@ def get_reconfig_hash():
                 res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
 
     if res:
-        fwglobals.log.info('reconfig_hash_get: %s' % res)
+        fwglobals.log.info('get_reconfig_hash: %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash
 
