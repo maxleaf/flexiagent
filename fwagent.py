@@ -449,7 +449,9 @@ class FwAgent:
                 if (slept % timeout) == 0:
                     fwglobals.g.stun_wrapper.log_address_cache()
 
-                if (slept % timeout/2) == 0:
+                # Check every slept/2 if cache is empty, skipping first round so the cache
+                # will be filled with addresses from real-time add-interface massages.
+                if (slept % timeout/2 == 0 and slept > timeout/2):
                     fwglobals.g.stun_wrapper.check_if_cache_empty()
 
                 # send STUN retquests for addresses that a request was not sent for

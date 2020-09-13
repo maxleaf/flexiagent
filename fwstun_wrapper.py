@@ -92,17 +92,17 @@ class FwStunWrap:
         #1 add address with public info, over-written the address if exist in cache.
         if params and params['PublicIp'] and params['PublicPort']:
             self.reset_addr(addr)
-            c[addr]['public_ip']   = params['PublicIp']
-            c[addr]['public_port'] = params['PublicPort']
-            c[addr]['sucess']      = True
-            c['stun_server']       = None 
-            c['stun_server_port']  = None
+            c[addr]['public_ip']        = params['PublicIp']
+            c[addr]['public_port']      = params['PublicPort']
+            c[addr]['sucess']           = True
+            c[addr]['stun_server']      = None 
+            c[addr]['stun_server_port'] = None
 
         #2 if address already in cache, do not add it, so its counters won't reset
         elif addr not in self.local_cache['stun_interfaces'].keys():
             self.reset_addr(addr)
-            c['stun_server']       = None 
-            c['stun_server_ port'] = None
+            c[addr]['stun_server']      = None 
+            c[addr]['stun_server_port'] = None
 
     def remove_addr(self, addr):
         """
@@ -205,21 +205,22 @@ class FwStunWrap:
 
     def check_if_cache_empty(self):
         """
-        Due to unexplained issue (yet), the cache can become empty.
-        In that case, we will go to the router configuration, retreive
-        interfaces with gateway, and fill the cache with those addresses.
+        If the agent and management are disconnected for some time,
+        the cache can become empty. In that case, we will go to the router 
+        configuration, retreive interfaces with gateway, and fill the cache 
+        with those addresses.
         """
         if self.local_cache['stun_interfaces']:
             return
-        local_db = SqliteDict("./.requests.sqlite")
-        for key in local_db.keys():
+        for key in self.local_db.keys():
             if 'add-interface' in key:
-                address = local_db[key]['Request']['addr']
-                if local_db[key]['Request']['gateway'] == "":
+                address = self.local_db[key]['params']['addr']
+                if self.local_db[key]['params'].get('gateway') != None and \
+                    self.local_db[key]['params']['gateway'] == "":
                     pass
                 else:
                     address = address.split('/')[0]
-                    self.add_and_reset_addr(address)
+                    self.add_addr(address)
         return
 
     def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port):
@@ -237,11 +238,11 @@ class FwStunWrap:
             fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
             self.reset_addr(lcl_src_ip)
             c = self.local_cache['stun_interfaces'][lcl_src_ip]
-            c['success']     = True
-            c['public_ip']   = nat_ext_ip
-            c['public_port'] = nat_ext_port
-            c['stun_server'] = stun_host
-            c['stun_server_port']   = stun_port
+            c['success']         = True
+            c['public_ip']       = nat_ext_ip
+            c['public_port']     = nat_ext_port
+            c['stun_server']     = stun_host
+            c['stun_server_port'] = stun_port
             self.log_address_cache()
             return nat_ext_ip, nat_ext_port
         else:
