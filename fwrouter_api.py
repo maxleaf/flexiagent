@@ -577,15 +577,25 @@ class FWROUTER_API:
         :returns: request after stripping out no impact requests.
         """
         def _should_be_stripped(_request):
-            req    = _request['message']
-            params = _request['message']
-
+            req = _request['message']
             if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
                 return True
             elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
                 # Ensure this is actually not modification request :)
-                curr_params = fwglobals.g.router_cfg.get_request_params(_request)
-                if params == curr_params:
+                existing_params = fwglobals.g.router_cfg.get_request_params(_request)
+                if existing_params == _request.get('params'):
+                    return True
+            elif re.match('start-router', req) and fwutils.vpp_does_run():
+                return True
+            elif re.match('modify-', req):
+                # For modification request ensure that it goes to modify indeed.
+                noop = True
+                new_params = _request.get('params')
+                old_params = fwglobals.g.router_cfg.get_params(_request)
+                for (key, val) in new_params.items():
+                    if val != old_params.get(key):
+                        noop = False
+                if noop:
                     return True
             return False
 
@@ -641,6 +651,17 @@ class FWROUTER_API:
                         information into VPP FIB.
         """
 
+        def _should_reconnect_agent_on_modify_interface(new_params):
+            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
+            if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
+                return True
+            if new_params.get('gateway') and new_params.get('gateway') != old_params.get('gateway'):
+                return True
+            if new_params.get('metric') and new_params.get('metric') != old_params.get('metric'):
+                return True
+            return False
+
+
         (restart_router, reconnect_agent, gateways) = \
         (False,          False,           [])
 
@@ -649,14 +670,15 @@ class FWROUTER_API:
                 restart_router  = True
                 reconnect_agent = True
             elif request['message'] == 'modify-interface':
-                reconnect_agent = True
+                reconnect_agent = _should_reconnect_agent_on_modify_interface(request['params'])
             elif request['message'] == 'aggregated':
                 for _request in request['params']['requests']:
                     if re.match('(add|remove)-interface', _request['message']):
                         restart_router = True
                         reconnect_agent = True
                     elif _request['message'] == 'modify-interface':
-                        reconnect_agent = True
+                        if _should_reconnect_agent_on_modify_interface(_request['params']):
+                            reconnect_agent = True
 
         if re.match('modify-interface', request['message']):
             gw = request['params'].get('gateway')
