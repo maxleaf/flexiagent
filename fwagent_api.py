@@ -125,10 +125,6 @@ class FWAGENT_API:
         :returns: Dictionary with statistics.
         """
         reply = fwstats.get_stats()
-
-        # Add router configuration hash to assist database synchronization feature
-        reply['router-cfg-hash'] = fwglobals.g.router_cfg.get_signature()
-
         return reply
 
     def _upgrade_device_sw(self, params):
