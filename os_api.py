@@ -27,11 +27,7 @@ import fwnetplan
 import fwutils
 import fwstats
 import os
-import fwrouterstun_wrapper
 import fwglobals
-
-
-
 
 # TBD: define all APIs in a file
 os_modules = {
@@ -66,7 +62,6 @@ class OS_DECODERS:
         :returns: Array of interface descriptions.
         """
         out = []
-
         for nicname, addrs in inp.items():
             pciaddr = fwutils.linux_to_pci_addr(nicname)
             if pciaddr[0] == "":
@@ -93,12 +88,13 @@ class OS_DECODERS:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
             if daddr['gateway'] is not '':
                 # Send STUN request only for interfaces with Gateway
-                prms = fwglobals.g.stun_wrap.find_addr(daddr['IPv4'])
-                if prms == None or prms['success'] == False:
-                    daddr['public_ip'], daddr['public_port'] = fwglobals.g.stun_wrap.find_srcip_public_addr(daddr['IPv4'],4789)
+                (public_ip, public_port) = fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
+                if public_ip == None or public_port == None:
+                    daddr['public_ip'], daddr['public_port'] = \
+                        fwglobals.g.stun_wrapper.find_srcip_public_addr(daddr['IPv4'],4789, None, None)
                 else:
-                    daddr['public_ip']   = prms['public_ip']
-                    daddr['public_port'] = prms['public_port']
+                    daddr['public_ip']   = public_ip
+                    daddr['public_port'] = public_port
             else:
                 daddr['public_ip'] = daddr['public_port'] = None
             out.append(daddr)

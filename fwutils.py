@@ -1386,6 +1386,9 @@ def get_interface_gateway(ip):
 def get_reconfig_hash():
     res = ''
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    if len(wan_list) == 0:
+        return res
+        
     vpp_run = vpp_does_run()
     for wan in wan_list:
         name = pci_to_linux_iface(wan['pci'])
@@ -1405,12 +1408,11 @@ def get_reconfig_hash():
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
-        if addr != None:
+        if addr:
             nomaskaddr = addr.split('/')[0]
-            prms = fwglobals.g.stun_wrap.find_addr(nomaskaddr)
-            if prms is not None:
-                if prms['public_ip'] is not None and prms['public_port'] is not None:
-                    res += 'public_ip:' + prms['public_ip'] + ',' + 'public_port:' + str(prms['public_port']) + ','
+            public_ip, public_port = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
+            if public_ip and public_port:
+                res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
 
     if res:
         fwglobals.log.info('reconfig_hash_get: %s' % res)

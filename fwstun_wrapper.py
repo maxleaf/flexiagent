@@ -34,6 +34,8 @@ class FwStunWrap:
         'sec_counter':
         'next_time':
         'success':
+        'stun_server':
+        'stun_server_port':
     }
     """
 
@@ -49,7 +51,7 @@ class FwStunWrap:
             self.send_stun_request()
     """
 
-    def dump(self):
+    def log_address_cache(self):
         """
         prints the content on the local cache
         """
@@ -63,14 +65,9 @@ class FwStunWrap:
         self.local_cache['stun_interfaces'] = {}
         self.local_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
         self.run = True
-        #self.is_running = True
-
-    def initialize(self):
         fwglobals.g.router_cfg.register_request_callbacks('fwstunwrap', self.fwstuncb, \
             ['add-interface', 'remove-interface'])
-
-    def finalize(self):
-        self.run = False
+        #self.is_running = True
 
     def fwstuncb(self, request, params):
         """
@@ -89,20 +86,23 @@ class FwStunWrap:
         1. The address already has public port and IP as part of its parameters,
         because this is how we got it from management, due to previous
         STUN requests (add-interface)
-        2. The addres has no public information.
+        2. The addres is new and has no public information.
         """
+        c = self.local_cache['stun_interfaces']
         #1 add address with public info, over-written the address if exist in cache.
         if params and params['PublicIp'] and params['PublicPort']:
-            self.add_and_reset_addr(addr)
-            c = self.local_cache['stun_interfaces']
-            c[addr]['public_ip'] = params['PublicIp']
+            self.reset_addr(addr)
+            c[addr]['public_ip']   = params['PublicIp']
             c[addr]['public_port'] = params['PublicPort']
-            c[addr]['sucess'] = True
-            return
+            c[addr]['sucess']      = True
+            c['stun_server']       = None 
+            c['stun_server_port']  = None
 
         #2 if address already in cache, do not add it, so its counters won't reset
-        if addr not in self.local_cache['stun_interfaces'].keys():
-            self.add_and_reset_addr(addr)
+        elif addr not in self.local_cache['stun_interfaces'].keys():
+            self.reset_addr(addr)
+            c['stun_server']       = None 
+            c['stun_server_ port'] = None
 
     def remove_addr(self, addr):
         """
@@ -117,23 +117,33 @@ class FwStunWrap:
         find address in cache, and return its params
         """
         if addr in self.local_cache['stun_interfaces'].keys():
-            return self.local_cache['stun_interfaces'][addr]
+            return self.local_cache['stun_interfaces'][addr]['public_ip'], \
+                self.local_cache['stun_interfaces'][addr]['public_port']
         else:
-            return None
+            return None, None
 
-    def add_and_reset_addr(self, address):
+    def reset_addr(self, address):
         """
         resets info for an address, as if it never got a STUN reply.
         We will use it everytime we need to reset address's data, such as in the case 
         when we detect that a tunnel is dicsonnceted, and we need to start sending STUN request
         for it. If the address is already in the cache, its values will be over-written.
+        
+        Stun server and port will not be reset, because we want to map an address to the same
+        STUN server, meaning an interface will send STUN requests to the same STUN server
+        always, unless the STUN server went down or the request timed-out. In that case,
+        the unerlying level will replace the STUN server in find_srcip_public_addr().
+
+        we initialize 'sec_coutner' to 30, because this is the everage time it take for
+        a tunnel to get connected, so no point in sending STUN requests for disconnected tunnel
+        before.
         """
         self.local_cache['stun_interfaces'][address] = {
-                            'public_ip':None,
+                            'public_ip':  None,
                             'public_port':None,
                             'sec_counter':0,
-                            'next_time':1,
-                            'success':False
+                            'next_time':  30,
+                            'success':    False,
                             }
 
     def increase_sec(self):
@@ -154,21 +164,19 @@ class FwStunWrap:
         """
         addr = self.local_cache['stun_interfaces'][address]
         if addr['next_time'] < 60:
-            addr['next_time']*=2
+            addr['next_time']+=4
         if addr['next_time'] > 60:
             addr['next_time'] = 60
         addr['success'] = False
 
-    def _handle_stun_response(self, address, public_ip, public_port):
+    def _handle_stun_response(self, address):
         """
         Handle STUN reposnse for an address. Reset all the counters,
         update the results, and set the 'success' flag to True.
+        Some of the info was already updated by find_srcip_public_addr().
         """
         addr = self.local_cache['stun_interfaces'][address]
-        addr['success'] = True
-        addr['public_ip'] = public_ip
-        addr['public_port'] = public_port
-        addr['next_time'] = 1
+        addr['next_time'] = 30
         addr['sec_counter'] = 0
 
     def send_stun_request(self):
@@ -187,14 +195,34 @@ class FwStunWrap:
                 elem = self.local_cache['stun_interfaces'][key]
                 addr = key
                 if elem['sec_counter'] == elem['next_time']:
-                    ext_ip, ext_port = self.find_srcip_public_addr(addr)
+                    ext_ip, ext_port = self.find_srcip_public_addr(addr, 4789, elem['stun_server'], \
+                        elem['stun_server_port'])
                     elem['sec_counter'] = 0
                     if ext_port == None:
                         self._handle_stun_none_response(addr)
                     else:
-                        self._handle_stun_response(addr,ext_ip, ext_port)
+                        self._handle_stun_response(addr)
 
-    def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port=4789):
+    def check_if_cache_empty(self):
+        """
+        Due to unexplained issue (yet), the cache can become empty.
+        In that case, we will go to the router configuration, retreive
+        interfaces with gateway, and fill the cache with those addresses.
+        """
+        if self.local_cache['stun_interfaces']:
+            return
+        local_db = SqliteDict("./.requests.sqlite")
+        for key in local_db.keys():
+            if 'add-interface' in key:
+                address = local_db[key]['Request']['addr']
+                if local_db[key]['Request']['gateway'] == "":
+                    pass
+                else:
+                    address = address.split('/')[0]
+                    self.add_and_reset_addr(address)
+        return
+
+    def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port):
         """
         sends one STUN request for an address.
         """
@@ -202,18 +230,22 @@ class FwStunWrap:
         nat_ext_ip = None 
         nat_ext_port = None
         fwglobals.log.debug("trying to find external %s:%s" %(lcl_src_ip,lcl_src_port))
-        nat_type, nat_ext_ip, nat_ext_port = stun.get_ip_info(lcl_src_ip, lcl_src_port)
-        if nat_ext_ip != None and nat_ext_port != None:
+        nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
+            stun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port)
+
+        if nat_ext_ip and nat_ext_port:
             fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
-            self.add_and_reset_addr(lcl_src_ip)
+            self.reset_addr(lcl_src_ip)
             c = self.local_cache['stun_interfaces'][lcl_src_ip]
             c['success']     = True
             c['public_ip']   = nat_ext_ip
             c['public_port'] = nat_ext_port
-            self.dump()
+            c['stun_server'] = stun_host
+            c['stun_server_port']   = stun_port
+            self.log_address_cache()
             return nat_ext_ip, nat_ext_port
         else:
             fwglobals.log.debug("failed to find external ip:port for  %s:%s" %(lcl_src_ip,lcl_src_port))
-            self.add_and_reset_addr(lcl_src_ip)
+            self.reset_addr(lcl_src_ip)
             return None,None
 

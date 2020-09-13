@@ -214,10 +214,12 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
     else:
         for stun_host_ in stun_servers_list:
             #FLEXIWAN_FIX: handle STUN server addresses in the form of ip:port
-            if ':' in stun_host_:
-                temp_stun_host_ = stun_host_.split(':')[0]
-                port = int(stun_host_.split(':')[1])
-                stun_host_ = temp_stun_host_
+            stun_info = stun_host_.split(':')
+            stun_host_ = stun_info[0]
+            if len (stun_info) == 2:
+                port = int(stun_info[1])
+            else:
+                port = 3789
             fwglobals.log.debug('Stun: Trying STUN host: %s' %(stun_host_))
             ret = stun_test(s, stun_host_, port, source_ip, source_port)
             resp = ret['Resp']
@@ -225,7 +227,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
                 stun_host = stun_host_
                 break
     if not resp:
-        return Blocked, ret
+        return Blocked, ret, None, None
     fwglobals.log.debug("Stun: Result: %s" %(ret))
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
@@ -272,7 +274,7 @@ def get_nat_type(s, source_ip, source_port, stun_host=None, stun_port=3478):
         ret['ExternalIP'] = exIP
     if ret['ExternalPort'] is None and exPort is not None:
         ret['ExternalPort'] = exPort
-    return typ, ret
+    return typ, ret ,stun_host, port
 
 
 def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
@@ -286,11 +288,11 @@ def get_ip_info(source_ip="0.0.0.0", source_port=54320, stun_host=None,
     except Exception as e:
         fwglobals.log.error("Got exception from bind: %s, %s" % (str(e), str(traceback.format_exc())))
         s.close()
-        return (None, None, None)
+        return (None, None, None, None, None)
     else:        
-        nat_type, nat = get_nat_type(s, source_ip, source_port,
+        nat_type, nat, stun_h, stun_p = get_nat_type(s, source_ip, source_port,
                                  stun_host=stun_host, stun_port=stun_port)
         external_ip = nat['ExternalIP']
         external_port = nat['ExternalPort']
         s.close()
-        return (nat_type, external_ip, external_port)
+        return (nat_type, external_ip, external_port, stun_h, stun_p)

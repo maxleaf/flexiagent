@@ -57,7 +57,6 @@ import fwutils
 from fwlog import Fwlog
 import loadsimulator
 import pprint
-from fwrouterstun_wrapper import FwStunWrap
 
 # Global signal handler for clean exit
 def global_signal_handler(signum, frame):
@@ -412,10 +411,11 @@ class FwAgent:
 
         def run(*args):
             slept = 0
-            # Since this thread runs as long as the agent lives, we "hijeck" it
-            # for the purpose of STUN request as well. We have several calculations
-            # to do every second, and this is a good place to make them.
-            p = fwglobals.g.stun_wrap
+            # Since this thread runs as long as the agent has commincation with mgmt,
+            #  we "hijeck" it for the purpose of STUN request as well. 
+            # We have several calculationsto do every second, and this is a good 
+            # place to make them.
+            
             while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
@@ -447,17 +447,19 @@ class FwAgent:
                         fwstats.update_stats()
 
                 if (slept % timeout) == 0:
-                    #log content of Stun addresses cache
-                    p.dump()
+                    fwglobals.g.stun_wrapper.log_address_cache()
+
+                if (slept % timeout/2) == 0:
+                    fwglobals.g.stun_wrapper.check_if_cache_empty()
+
+                # send STUN retquests for addresses that a request was not sent for
+                # them, or for ones that did not get reply previously
+                fwglobals.g.stun_wrapper.send_stun_request()
+                fwglobals.g.stun_wrapper.increase_sec()
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
-
-                # send stun retquests for addresses that a request was not sent for
-                # them, or for ones that did not get reply previously
-                p.send_stun_request()
-                p.increase_sec()
 
 
         self.received_request = True
