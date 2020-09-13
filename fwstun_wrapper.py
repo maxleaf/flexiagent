@@ -245,6 +245,7 @@ class FwStunWrap:
         nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
             stun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port)
 
+        fwglobals.log.debug("find_srcip_public_addr: adding address %s to cache" %(str(lcl_src_ip)))
         if nat_ext_ip and nat_ext_port:
             fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
             self.reset_addr(lcl_src_ip)
