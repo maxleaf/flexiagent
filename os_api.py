@@ -91,7 +91,7 @@ class OS_DECODERS:
                 (public_ip, public_port) = fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
                 if public_ip == None or public_port == None:
                     daddr['public_ip'], daddr['public_port'] = \
-                        fwglobals.g.stun_wrapper.find_srcip_public_addr(daddr['IPv4'],4789, None, None)
+                        fwglobals.g.stun_wrapper.find_srcip_public_addr(daddr['IPv4'],4789, None, None, True)
                 else:
                     daddr['public_ip']   = public_ip
                     daddr['public_port'] = public_port

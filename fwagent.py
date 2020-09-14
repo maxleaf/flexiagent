@@ -411,10 +411,6 @@ class FwAgent:
 
         def run(*args):
             slept = 0
-            # Since this thread runs as long as the agent has commincation with mgmt,
-            #  we "hijeck" it for the purpose of STUN request as well. 
-            # We have several calculationsto do every second, and this is a good 
-            # place to make them.
             
             while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
@@ -445,19 +441,6 @@ class FwAgent:
                             break
                     else:
                         fwstats.update_stats()
-
-                if (slept % timeout) == 0:
-                    fwglobals.g.stun_wrapper.log_address_cache()
-
-                # Check every slept/2 if cache is empty, skipping first round so the cache
-                # will be filled with addresses from real-time add-interface massages.
-                if (slept % timeout/2 == 0 and slept > timeout/2):
-                    fwglobals.g.stun_wrapper.check_if_cache_empty()
-
-                # send STUN retquests for addresses that a request was not sent for
-                # them, or for ones that did not get reply previously
-                fwglobals.g.stun_wrapper.send_stun_request()
-                fwglobals.g.stun_wrapper.increase_sec()
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)

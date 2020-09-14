@@ -194,6 +194,11 @@ class FwStunWrap:
         """
         if self.run == False:
             return
+
+        # Check if cache is empty. If it is, fill it with WAN addresses from router DB
+        self.check_if_cache_empty()
+
+        #now start sending STUN request
         ext_ip = ext_port = None
         for key in self.local_cache['stun_interfaces'].keys():
             if self.local_cache['stun_interfaces'][key]['success'] == True:
@@ -203,7 +208,7 @@ class FwStunWrap:
                 addr = key
                 if elem['sec_counter'] == elem['next_time']:
                     ext_ip, ext_port = self.find_srcip_public_addr(addr, 4789, elem['stun_server'], \
-                        elem['stun_server_port'])
+                        elem['stun_server_port'], False)
                     elem['sec_counter'] = 0
                     if ext_port == None:
                         self._handle_stun_none_response(addr)
@@ -213,8 +218,8 @@ class FwStunWrap:
     def check_if_cache_empty(self):
         """
         If the agent and management are disconnected for some time,
-        the cache can become empty. In that case, we will go to the router 
-        configuration, retreive interfaces with gateway, and fill the cache 
+        the cache can become empty. In that case, we will go to the router
+        configuration, retreive interfaces with gateway, and fill the cache
         with those addresses.
         """
         if self.local_cache['stun_interfaces']:
@@ -222,15 +227,16 @@ class FwStunWrap:
         for key in self.local_db.keys():
             if 'add-interface' in key:
                 address = self.local_db[key]['params']['addr']
-                if self.local_db[key]['params'].get('gateway') != None and \
-                    self.local_db[key]['params']['gateway'] == "":
+                if 'gateway' not in self.local_db[key]['params'] or  \
+                   'gateway' in self.local_db[key]['params'] and \
+                       self.local_db[key]['params']['gateway'] == '':
                     pass
                 else:
                     address = address.split('/')[0]
                     self.add_addr(address)
         return
 
-    def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port):
+    def find_srcip_public_addr(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port, stop_after_one_try):
         """
         sends one STUN request for an address.
         This function used in 2 cases:
@@ -243,7 +249,7 @@ class FwStunWrap:
         nat_ext_port = None
         fwglobals.log.debug("trying to find external %s:%s" %(lcl_src_ip,lcl_src_port))
         nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
-            stun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port)
+            stun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port, stop_after_one_try)
 
         fwglobals.log.debug("find_srcip_public_addr: adding address %s to cache" %(str(lcl_src_ip)))
         if nat_ext_ip and nat_ext_port:
