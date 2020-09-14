@@ -25,6 +25,7 @@ import os
 
 import fwutils
 import fwglobals
+import socket
 
 from netaddr import *
 
@@ -521,25 +522,33 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     crypto_key  = fwutils.hex_str_to_bytes(str(local_sa['crypto-key']))  # str() is needed in Python 2
     integr_key  = fwutils.hex_str_to_bytes(str(local_sa['integr-key']))
 
+    entry = {
+        'sad_id': local_sa_id,
+        'spi': local_sa['spi'],
+        'protocol': socket.IPPROTO_ESP,
+        'crypto_algorithm': crypto_alg,
+        'crypto_key': {
+            'data': crypto_key,
+            'length': len(crypto_key),
+        },
+        'integrity_algorithm': integr_alg,
+        'integrity_key': {
+            'data': integr_key,
+            'length': len(integr_key),
+        }
+    }
+
     cmd_params = {
-            'is_add': 1 ,
-            'sad_id' : local_sa_id ,
-            'spi' : local_sa['spi'] ,
-            'protocol' : 1 ,                   # IPSEC_PROTOCOL_ESP = 1 , vpp/src/vnet/ipsec/ipsec.h
-            'crypto_algorithm' : crypto_alg,
-            'crypto_key' : crypto_key,
-            'crypto_key_length' : len(crypto_key),
-            'integrity_algorithm' : integr_alg,
-            'integrity_key' : integr_key,
-            'integrity_key_length' : len(integr_key)
+        'is_add': 1 ,
+        'entry': entry
     }
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "ipsec_sad_add_del_entry"
+    cmd['cmd']['name']    = "ipsec_sad_entry_add_del"
     cmd['cmd']['params']  = cmd_params
     cmd['cmd']['descr']   = "add SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd['revert'] = {}
-    cmd['revert']['name']   = 'ipsec_sad_add_del_entry'
+    cmd['revert']['name']   = 'ipsec_sad_entry_add_del'
     cmd['revert']['params'] = copy.deepcopy(cmd_params)
     cmd['revert']['params']['is_add'] = 0
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
