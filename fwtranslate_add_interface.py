@@ -205,12 +205,12 @@ def add_interface(params):
         cmd['cmd']['name']    = "nat44_add_del_interface_addr"
         cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (iface_pci, iface_addr)
         cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                    'is_add':1, 'twice_nat':0 }
+                                    'is_add':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_add_del_interface_addr"
         cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (iface_pci, iface_addr)
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                    'is_add':0, 'twice_nat':0 }
+                                    'is_add':0 }
         cmd_list.append(cmd)
 
         cmd = {}
@@ -218,12 +218,12 @@ def add_interface(params):
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
         cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_pci, iface_addr)
         cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                    'is_add':1, 'is_inside':0 }
+                                    'is_add':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
         cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_pci, iface_addr)
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                    'is_add':0, 'is_inside':0 }
+                                    'is_add':0 }
         cmd_list.append(cmd)
 
         # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
@@ -235,12 +235,12 @@ def add_interface(params):
             cmd['cmd'] = {}
             cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
             cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
             cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
             cmd['revert'] = {}
             cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
             cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0 }
             cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
 
             cmd_list.append(cmd)
@@ -254,12 +254,12 @@ def add_interface(params):
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
         cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_pci, iface_addr)
         cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                    'is_add':1, 'is_inside':1 }
+                                    'is_add':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
         cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_pci, iface_addr)
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                    'is_add':0, 'is_inside':1 }
+                                    'is_add':0 }
         cmd_list.append(cmd)
 
     # Update ospfd.conf.
