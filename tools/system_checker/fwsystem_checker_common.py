@@ -535,7 +535,7 @@ class Checker:
 
         for fname in files:
             with open(fname, 'r') as stream:
-                yaml.load(stream)
+                yaml.safe_load(stream)
 
     def _get_duplicate_interface_definitions(self):
         files = glob.glob("/etc/netplan/*.yaml") + \
