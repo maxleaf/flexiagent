@@ -730,24 +730,22 @@ class Checker:
         """
         # Ensure that the /sys/kernel/mm/transparent_hugepage/enabled file includes [never].
         # Note this file uses '[]' to denote the chosen option.
-        filename = '/sys/kernel/mm/transparent_hugepage/enabled'
-
-        # If we installed 'hugepages' utility by previous invocation of this checker,
-        # just go and call it to disable the Transparent Hugepages.
-        # We do it on every checker invocation as the utility result doesn't persist reboot :(
-        # And it is not easy anymore (since 18.04) to configure Ubuntu to run scripts on startup.
-        ret = os.system('dpkg -l | grep hugepages > /dev/null')
-        if ret == 0:
-            os.system('hugeadm --thp-never')
-
-        # Now perform the check
-        with open(filename, "r") as f:
+        thp_filename = '/sys/kernel/mm/transparent_hugepage/enabled'
+        with open(thp_filename, "r") as f:
             first_line = f.readlines()[0]
             if re.search('\[never\]', first_line):
                 return True
+        # Ensure that the /etc/default/grub file includes the "transparent_hugepage=never"
+        # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
+        grub_filename = '/etc/default/grub'
+        try:
+            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).strip()
+            return True   # No exception - grep found the pattern
+        except subprocess.CalledProcessError:
+            pass
 
         if not fix:
-            print(prompt + "'never' is not chosen in %s" % filename)
+            print(prompt + "'never' is neither chosen in %s nor defined in %s" % (thp_filename, grub_filename))
             return False
 
         # Disable transparent hugepages:
@@ -770,25 +768,37 @@ class Checker:
         # Trial #3:
         # Install hugepages soft and use it.
         # Seems to work. But requires run of 'hugeadm --thp-never' after every reboot!
+        # This option requires interactive mode of system checker,
+        # so user could approve installation of the third party software.
+        # So silent mode does not work! And this confuses a lot.
         # -----------------------------------------------------------
-        ret = os.system('dpkg -l | grep hugepages > /dev/null')
+        # Trial #4:
+        # Use mix of commands:
+        # 1. echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        #    This should disable transparent hugepages for current session only.
+        #    Next reboot will restore original value.
+        # 2. Add "transparent_hugepage=never" to the the GRUB_CMDLINE_LINUX_DEFAULT
+        #    option in the /etc/default/grub file.
+        #    This should disable transparent hugepages permanently, so it will
+        #    survive next and future reboots.
+        # -----------------------------------------------------------
+
+        # Move selection (square brackets) to the 'never' option in the transparent_hugepage file.
+        # Note the 'echo' below does not override the file, but selects [never] option instead!
+        #
+        cmd = 'echo never > ' + thp_filename
+        ret = os.system(cmd)
         if ret != 0:
-            # Ask user approval to install the 3rd party
-            if not silently:
-                while True:
-                    choice = raw_input(prompt + "install 'hugepages' utility (required for configuration)? [Y/n]: ")
-                    if choice == 'y' or choice == 'Y' or choice == '':
-                        break
-                    elif choice == 'n' or choice == 'N':
-                        return False
-            cmd = 'apt -y install hugepages'
-            ret = os.system(cmd)
-            if ret != 0:
-                print(prompt + "'%s' failed (%d)" % (cmd,ret))
-                return False
-        ret = os.system('hugeadm --thp-never')
+            print(prompt + "%s - failed (%d)" % (cmd,ret))
+            return False
+
+        # Update the grub file
+        #
+        cmd = 'sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\\"transparent_hugepage=never /" ' + grub_filename
+        print(cmd)
+        ret = os.system(cmd)
         if ret != 0:
-            print(prompt + "'hugeadm --thp-never' failed (%d)" % (cmd,ret))
+            print(prompt + "%s - failed (%d)" % (cmd,ret))
             return False
         return True
 
