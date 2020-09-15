@@ -250,18 +250,18 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                                     'is_add':0, 'address':iface_addr_bytes, 'address_length':iface_addr_len }
         cmd_list.append(cmd)
 
-        # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
+        # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']      = "sw_interface_set_flags"
         cmd['cmd']['descr']     = "UP loopback interface %s" % addr
         cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'admin_up_down':1 }
+                                    'flags':VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP }
         cmd['revert'] = {}
         cmd['revert']['name']   = "sw_interface_set_flags"
         cmd['revert']['descr']  = "DOWN loopback interface %s" % addr
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'admin_up_down':0 }
+                                    'flags':0 }
         cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
@@ -423,13 +423,13 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
     cmd['revert']['descr']      = "delete gre tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
+    # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "sw_interface_set_flags"
     cmd['cmd']['descr']   = "UP GRE tunnel %s -> %s" % (src, dst)
     cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'admin_up_down':1 }
+                              'flags':VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP }
     cmd_list.append(cmd)
 
 def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
@@ -470,13 +470,13 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
     cmd['revert']['descr']      = "delete vxlan tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
+    # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "sw_interface_set_flags"
     cmd['cmd']['descr']   = "UP vxlan tunnel %s -> %s" % (src, dst)
     cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'admin_up_down':1 }
+                              'flags':VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP }
     cmd_list.append(cmd)
 
 def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
