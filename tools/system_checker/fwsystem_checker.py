@@ -349,6 +349,19 @@ if __name__ == '__main__':
     import argparse
     global arg
 
+    # Ensure that VPP does not run.
+    # Otherwise driver interface checks might fail and user will be scared for
+    # no reason. Note it is too late to check system, if router was started :)
+    #
+    try:
+        pid = subprocess.check_output(['pidof', 'vpp'])
+        # If we reached this point, i.e. if no exception occurred, the vpp pid was found
+        print ("error: router runs (pid=%s), too late to check the system" % pid)
+        exit(FW_EXIT_CODE_OK)
+    except:
+        pass
+
+
     parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
     parser.add_argument('-c', '--check_only', action='store_true',
                         help="check configuration and exit")
