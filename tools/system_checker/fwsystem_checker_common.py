@@ -169,18 +169,23 @@ class Checker:
 
         :returns: 'True' if check is successful and 'False' otherwise.
         """
+        def _print_without_line_feed(str):
+            # So odd print is needed to enforce no line feed, so next print()
+            # will override this line.
+            print str,
+            sys.stdout.flush() # Need this as tail ',' removes the 'newline' in print(), so the print is not flushed immediately
+
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            print "\rcheck WAN connectivity on %s" % iface,
-            sys.stdout.flush()      # Need this as tail ',' remove the 'newline' in print(), so the print is not flushed immediately
+            _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
             ret = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
             if ret == 0:
                 self.wan_interfaces.append(str(iface))
-        print "\r                                                         \r",  # Clean the line before it is overwrote by next print
-        if len(self.wan_interfaces) == 0:
-            return False
-        return True
+                _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+                return True
+        _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+        return False
 
     def hard_check_kernel_io_modules(self, supported):
         """Check kernel IP modules presence.
