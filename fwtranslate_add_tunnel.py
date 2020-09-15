@@ -28,6 +28,7 @@ import fwglobals
 import socket
 
 from netaddr import *
+from vpp_papi import VppEnum
 
 # add_tunnel
 # --------------------------------------
@@ -388,34 +389,38 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
     :param cmd_list:             List of commands.
     :param cache_key:            Cache key of the tunnel to be used by others.
     :param src:                  Source ip address.
-    :param src:                  Destination ip address.
+    :param dst:                  Destination ip address.
     :param local_sa_id:          Local SA identifier.
     :param remote_sa_id:         Remote SA identifier.
 
     :returns: None.
     """
-    # ipsec_gre.api.json: ipsec_gre_add_del_tunnel (..., is_add, tunnel <type vl_api_ipsec_gre_tunnel_t>, ...)
+    # gre.api.json: gre_tunnel_add_del (..., is_add, tunnel <type vl_api_gre_tunnel_type_t>, ...)
     ret_attr = 'sw_if_index'
-    src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
-    dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
+    src_ip = src.split('/')[0]
+    dst_ip = dst.split('/')[0]
+    tunnel = {
+        'src': src_ip,
+        'dst': dst_ip,
+        'type': VppEnum.vl_api_gre_tunnel_type_t.
+                           GRE_API_TUNNEL_TYPE_TEB,
+        'mode': VppEnum.vl_api_tunnel_mode_t.
+                           TUNNEL_API_MODE_P2P}
     cmd_params = {
             'is_add'       : 1,
-            'src_address'  : src_addr_bytes,
-            'dst_address'  : dst_addr_bytes,
-            'local_sa_id'  : local_sa_id,
-            'remote_sa_id' : remote_sa_id
+            'tunnel'       : tunnel
     }
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']          = "ipsec_gre_add_del_tunnel"
+    cmd['cmd']['name']          = "gre_tunnel_add_del"
     cmd['cmd']['params']        = cmd_params
     cmd['cmd']['cache_ret_val'] = (ret_attr , cache_key)
-    cmd['cmd']['descr']         = "create ipsec tunnel %s -> %s" % (src, dst)
+    cmd['cmd']['descr']         = "create gre tunnel %s -> %s" % (src, dst)
     cmd['revert'] = {}
-    cmd['revert']['name']       = 'ipsec_gre_add_del_tunnel'
+    cmd['revert']['name']       = 'gre_tunnel_add_del'
     cmd['revert']['params']     = copy.deepcopy(cmd_params)
     cmd['revert']['params']['is_add'] = 0
-    cmd['revert']['descr']      = "delete ipsec tunnel %s -> %s" % (src, dst)
+    cmd['revert']['descr']      = "delete gre tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_flags (..., sw_if_index, admin_up_down, ...)
