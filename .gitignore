@@ -23,3 +23,5 @@ pytestdebug.log
 # Text files
 *.txt
 
+#Swap files
+*.sw[g-p]

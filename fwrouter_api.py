@@ -353,13 +353,13 @@ class FWROUTER_API:
 
         for (idx, request) in enumerate(requests):
             try:
-                fwglobals.log.debug("_call_aggregated: executing request %s" % (json.dumps(request)))
+                fwglobals.log.debug("_call_aggregated: handle request %s" % (json.dumps(request)))
                 self._call_simple(request)
             except Exception as e:
                 if dont_revert_on_failure:
                     raise e
                 # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to execute %s. reverting previous requests..." % json.dumps(request))
+                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % json.dumps(request))
                 for request in reversed(requests[0:idx]):
                     try:
                         op = request['message']
@@ -730,6 +730,25 @@ class FWROUTER_API:
         params  = request.get('params')
         updated = False
 
+        # 'modify-X' preprocessing:
+        #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
+        #     Implement real modification on demand :)
+        #
+        if re.match('modify-', req):
+            req     = 'aggregated'
+            params  = { 'requests' : _preprocess_modify_X(request) }
+            request = {'message': req, 'params': params}
+            updated = True
+            # DON'T RETURN HERE !!! FURTHER PREPROCESSING IS NEEDED !!!
+        elif req == 'aggregated':
+            new_requests = []
+            for _request in params['requests']:
+                if re.match('modify-', _request['message']):
+                    new_requests += _preprocess_modify_X(_request)
+                else:
+                    new_requests.append(_request)
+            params['requests'] = new_requests
+
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
         # The remove-* request might have partial set of parameters only.
@@ -743,19 +762,6 @@ class FWROUTER_API:
             for _request in params['requests']:
                 if re.match('remove-', _request['message']):
                     _request['params'] = fwglobals.g.router_cfg.get_request_params(_request)
-
-
-        # 'modify-X' preprocessing:
-        #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
-        #     Implement real modification on demand :)
-        #
-        if re.match('modify-', req):
-            req     = 'aggregated'
-            params  = { 'requests' : _preprocess_modify_X(request) }
-            request = {'message': req, 'params': params}
-            updated = True
-            # DON'T RETURN HERE !!! FURTHER PREPROCESSING IS NEEDED !!!
-
 
         ########################################################################
         # The code below preprocesses 'add-application' and 'add-multilink-policy'
@@ -838,18 +844,6 @@ class FWROUTER_API:
         # Perform same preprocessing for aggregated requests, either
         # original or created above.
         ########################################################################
-
-        # Preprocess 'modify-X':
-        #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
-        #     Implement real modification on demand :)
-        #
-        new_requests = []
-        for _request in params['requests']:
-            if re.match('modify-', _request['message']):
-                new_requests += _preprocess_modify_X(_request)
-            else:
-                new_requests.append(_request)
-        params['requests'] = new_requests
 
         # Go over all requests and rearrange them, as order of requests is
         # important for proper configuration of VPP!

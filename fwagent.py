@@ -468,12 +468,13 @@ class FwAgent:
 
         :returns: None.
         """
-        pmsg = json.loads(message)
-        msg = pmsg['msg']
+        pmsg    = json.loads(message)
+        request = pmsg['msg']
 
-        (reply, msg) = self.handle_received_request(msg)
+        fwglobals.log.debug(str(pmsg['seq']) + " request=" + json.dumps(request))
 
-        fwglobals.log.debug(str(pmsg['seq']) + " request=" + json.dumps(pmsg['msg']))
+        reply = self.handle_received_request(request)
+
         fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
 
         # Messages that change the interfaces might cause the existing connection to break
@@ -537,7 +538,7 @@ class FwAgent:
             fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
 
         self.handling_request = False
-        return (reply, msg)
+        return reply
 
     def inject_requests(self, filename, ignore_errors=False):
         """Injects requests loaded from within 'file' JSON file,
@@ -558,13 +559,13 @@ class FwAgent:
             requests = json.loads(f.read())
             if type(requests) is list:   # Take care of file with list of requests
                 for (idx, req) in enumerate(requests):
-                    (reply, _) = self.handle_received_request(req)
+                    reply = self.handle_received_request(req)
                     if reply['ok'] == 0 and ignore_errors == False:
                         raise Exception('failed to inject request #%d in %s: %s' % \
                                         ((idx+1), filename, reply['message']))
                 return None
             else:   # Take care of file with single request
-                (reply, _) = self.handle_received_request(requests)
+                reply = self.handle_received_request(requests)
                 if reply['ok'] == 0:
                     raise Exception('failed to inject request from within %s: %s' % \
                                     (filename, reply['message']))

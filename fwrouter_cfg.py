@@ -271,6 +271,8 @@ class FwRouterCfg:
                         'message': self.db[key].get('request',""),
                         'params':  self.db[key].get('params', "")
                     }
+                    if request['params'] == None:  # flexiManage team doesn't like None :)
+                        request['params'] = {}
                     if full:
                         request.update({
                             'cmd_list': self.db[key].get('cmd_list', ""),

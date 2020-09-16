@@ -427,6 +427,7 @@ class FwStartupConf:
 		"""
 		string = value[0]
 		string = string.strip('\'')
+		# This is a case for main category with empty list of values.
 		if (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])==0 and indent == 1:
 			# This is a case of key in main list with empty list of values.
 			string = string + " {\n"
