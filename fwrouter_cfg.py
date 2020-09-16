@@ -233,6 +233,19 @@ class FwRouterCfg:
         res = True if req_key in self.db else False
         return res
 
+    def get_params(self, request):
+        """Retrives parameters of the provided configuration request.
+        This function can be used to find parameters of configuration item
+        before modification.
+
+        :param request: The configuration request, e.g. modify-interface.
+        :returns: parameters of the request stored in the database.
+        """
+        req_key = self._get_request_key(request)
+        if req_key in self.db:
+            return self.db[req_key].get('params')
+        return None
+
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests that look exactly
         as they would look if were received from server.
