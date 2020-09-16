@@ -1618,7 +1618,12 @@ def fix_aggregated_message_format(msg):
                 'params' : { 'requests': requests }
             }
 
-    return msg  # No conversion is needed
+    # No conversion is needed here.
+    # We return copy of object in order to be consistent with previous 'return'-s
+    # which return new object. The caller function might rely on this,
+    # e.g. see the fwglobals.g.handle_request() assumes
+    #
+    return copy.deepcopy(msg)
 
 def get_available_access_points(interface_name):
     """Get WIFI available access points.                            

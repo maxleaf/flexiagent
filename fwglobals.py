@@ -404,7 +404,8 @@ class Fwglobals:
     def handle_request(self, request, result=None, received_msg=None):
         """Handle request.
 
-        :param request:      The request received from flexiManage.
+        :param request:      The request received from flexiManage after
+                             transformation by fwutils.fix_aggregated_message_format().
         :param result:       Place for result.
         :param received_msg: The original message received from flexiManage.
 
@@ -430,9 +431,9 @@ class Fwglobals:
             # Keep copy of the request aside for signature purposes,
             # as the original request might by modified by preprocessing.
             #
-            if handler.get('sign', False) and received_msg is None:
+            if handler.get('sign', False) == True and received_msg is None:
                 received_msg = copy.deepcopy(request)
-            
+
             handler_func = getattr(self, handler.get('name'))
             if result is None:
                 reply = handler_func(request)
@@ -449,15 +450,13 @@ class Fwglobals:
             # signature. This is needed to assists the database synchronization
             # feature that keeps the configuration set by user on the flexiManage
             # in sync with the one stored on the flexiEdge device.
-            # Note we do that here, as at this point we handle configuration
-            # request that was received from flexiManage and that was not
-            # generated locally.
+            # Note we update signature on configuration requests only, but
+            # retrieve it into replies for all requests. This is to simplify
+            # flexiManage code.
             #
-            if reply['ok'] == 1 and handler.get('sign', False):
-                # Update the configuration signature
+            if reply['ok'] == 1 and handler.get('sign', False) == True:
                 self.router_cfg.update_signature(received_msg)
-                # Add the updated signatire to the reply, so server could be quiet
-                reply['router-cfg-hash'] = self.router_cfg.get_signature()
+            reply['router-cfg-hash'] = self.router_cfg.get_signature()
 
             return reply
 

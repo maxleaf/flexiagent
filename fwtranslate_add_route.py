@@ -101,6 +101,6 @@ def get_request_key(params):
         key = 'add-route:%s:%s' % (params['addr'], params['via'])
 
     if 'metric' in params.keys():
-        key += ':' + params['metric']
+        key += ':' + str(params['metric'])
 
     return key
