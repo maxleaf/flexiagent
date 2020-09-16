@@ -82,7 +82,7 @@ class OS_DECODERS:
 
             if fwutils.is_wifi_interface(nicname):
                 daddr['connectivity_type'] = 'wifi'
-                daddr['driver'] = fwutils.get_wifi_interface_driver(nicname)
+                daddr['driver'] = fwutils.get_interface_driver(nicname)
                 daddr['dhcp'] = 'yes'
 
             elif fwutils.is_lte_interface(nicname):

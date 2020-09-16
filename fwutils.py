@@ -1687,8 +1687,9 @@ def is_lte_interface(interface_name):
 
     :returns: Boolean.
     """
-    interfaces = ['enp0s22u1u3i8', 'enp0s22u1u3i10']
-    if interface_name in interfaces:
+    driver = get_interface_driver(interface_name)
+    supported_lte_drivers = ['cdc_mbim']
+    if driver in supported_lte_drivers:
         return True
     
     return False
@@ -1758,7 +1759,7 @@ def is_wifi_interface(interface_name):
     except subprocess.CalledProcessError:
         return False   
 
-def get_wifi_interface_driver(interface_name):
+def get_interface_driver(interface_name):
     """Get WIFI interface driver.                            
 
     :param interface_name: Interface name to check.
