@@ -238,7 +238,7 @@ def get_interface_address(if_name):
     interfaces = psutil.net_if_addrs()
     if if_name not in interfaces:
         fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
-        return ''
+        return None
 
     addresses = interfaces[if_name]
     for addr in addresses:
@@ -1386,8 +1386,10 @@ def get_interface_gateway(ip):
 def get_reconfig_hash():
     res = ''
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    if len(wan_list) == 0:
+        return res
+        
     vpp_run = vpp_does_run()
-
     for wan in wan_list:
         name = pci_to_linux_iface(wan['pci'])
 
@@ -1398,15 +1400,22 @@ def get_reconfig_hash():
             return ''
 
         addr = get_interface_address(name)
-        if not re.search(addr, wan['addr']):
-            res += 'addr:' + addr + ','
+        if addr != None:
+            if not re.search(addr, wan['addr']):
+                res += 'addr:' + addr + ','
 
         gw, metric = get_linux_interface_gateway(name)
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
+        if addr:
+            nomaskaddr = addr.split('/')[0]
+            public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
+            if public_ip and public_port:
+                res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
+
     if res:
-        fwglobals.log.info('reconfig_hash_get: %s' % res)
+        fwglobals.log.info('get_reconfig_hash: %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash
 
@@ -1481,6 +1490,7 @@ def vpp_set_dhcp_detect(pci, remove):
 
     sw_if_index = pci_to_vpp_sw_if_index(pci)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
+
 
     vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)
 

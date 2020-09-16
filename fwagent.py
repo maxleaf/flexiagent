@@ -411,12 +411,12 @@ class FwAgent:
 
         def run(*args):
             slept = 0
+            
             while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field.
-                #
                 # Note management does not send next request until it gets
                 # response for the previous request. As a result, heavy local
                 # processing prevents receiving of 'get-device-stats'-s. To
@@ -441,9 +441,11 @@ class FwAgent:
                             break
                     else:
                         fwstats.update_stats()
+
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
+
 
         self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')

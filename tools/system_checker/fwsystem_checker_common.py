@@ -31,7 +31,6 @@ import sys
 import uuid
 import yaml
 import shutil
-import re
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
