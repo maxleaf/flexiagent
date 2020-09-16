@@ -302,7 +302,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         fwglobals.log.error("Got exception from bind: %s, %s" % (str(e), str(traceback.format_exc())))
         s.close()
         return (None, None, None, None, None)
-    else:        
+    else:
         nat_type, nat, stun_h, stun_p = get_nat_type(s, source_ip, source_port,
                                  stun_host=stun_host, stun_port=stun_port, stop_after_one_try=stop_after_one_try)
         external_ip = nat['ExternalIP']

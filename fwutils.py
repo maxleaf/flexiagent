@@ -1410,7 +1410,7 @@ def get_reconfig_hash():
 
         if addr:
             nomaskaddr = addr.split('/')[0]
-            public_ip, public_port = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
+            public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
             if public_ip and public_port:
                 res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
 
