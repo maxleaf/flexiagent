@@ -423,6 +423,25 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
     cmd['revert']['descr']      = "delete gre tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
+    # ipsec.api.json: ipsec_tunnel_protect_update (..., tunnel <type vl_api_ipsec_tunnel_protect_t>, ...)
+    tunnel = {
+        'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+        'n_sa_in': 1,
+        'sa_out': remote_sa_id,
+        'sa_in': [local_sa_id],
+        'nh': "0.0.0.0"}
+
+    cmd_params = {
+            'tunnel'       : tunnel
+    }
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']          = "ipsec_tunnel_protect_update"
+    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['descr']         = "update tunnel ipsec protect %s -> %s" % (src, dst)
+    cmd_list.append(cmd)
+
     # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
     cmd = {}
     cmd['cmd'] = {}

@@ -123,6 +123,7 @@ request_handlers = {
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
     'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
     'ipsec_spd_add_del_entry':      {'name': '_call_vpp_api'},
+    'ipsec_tunnel_protect_update':  {'name': '_call_vpp_api'},
     'l2_flags':                     {'name': '_call_vpp_api'},
     'nat44_add_del_interface_addr':             {'name': '_call_vpp_api'},
     'nat44_interface_add_del_output_feature':   {'name': '_call_vpp_api'},

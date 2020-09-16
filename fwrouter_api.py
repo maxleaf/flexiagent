@@ -1146,6 +1146,10 @@ class FWROUTER_API:
                     substs = p['substs']
                     substs_element = p
                     break
+        elif type(params)==dict:
+            for param in params.values():
+                if type(param)==dict and 'substs' in param:
+                   substs = param['substs']
         if substs is None:
             return
 
@@ -1167,11 +1171,15 @@ class FWROUTER_API:
 
             # Add new param/replace old value with new one
             if 'add_param' in s:
-                if type(params) is dict:
+                if type(params)==dict and 'substs' in params:
                     if 'args' in params:        # Take care of cmd['cmd']['name'] = "python" commands
                         params['args'][s['add_param']] = new
                     else:                       # Take care of rest commands
                         params[s['add_param']] = new
+                elif type(params)==dict:
+                    for param in params.values():
+                        if type(param)==dict and 'substs' in param:
+                            param[s['add_param']] = new
                 else:  # list
                     params.insert({s['add_param'], new})
             elif 'replace' in s:
@@ -1187,8 +1195,12 @@ class FWROUTER_API:
                 raise Exception("fwutils.py.substitute: not supported type of substitution in '%s'" % format(params))
 
         # Once all substitutions are made, remove substitution list from params
-        if type(params) is dict:
+        if type(params)==dict and 'substs' in params:
             del params['substs']
+        elif type(params)==dict:
+            for param in params.values():
+                if type(param)==dict and 'substs' in param:
+                   del param['substs']
         else:  # list
             params.remove(substs_element)
 
