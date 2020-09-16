@@ -21,6 +21,7 @@
 ################################################################################
 
 import copy
+import ipaddress
 import os
 
 import fwutils
@@ -444,12 +445,12 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
     """
     # vxlan.api.json: vxlan_add_del_tunnel (..., is_add, tunnel <type vl_api_vxlan_add_del_tunnel_t>, ...)
     ret_attr = 'sw_if_index'
-    src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
-    dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
+    src_addr = ipaddress.ip_address(src)
+    dst_addr = ipaddress.ip_address(dst)
     cmd_params = {
             'is_add'               : 1,
-            'src_address'          : src_addr_bytes,
-            'dst_address'          : dst_addr_bytes,
+            'src_address'          : src_addr,
+            'dst_address'          : dst_addr,
             'vni'                  : bridge_id,
             'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
                        {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway', 'arg': src}],
