@@ -1116,7 +1116,7 @@ class FWROUTER_API:
         ]
         messages = fwglobals.g.router_cfg.dump(types=types)
         for msg in messages:
-            reply = fwglobals.g.router_api.call(msg)
+            reply = fwglobals.g.router_api._call_simple(msg)
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 
