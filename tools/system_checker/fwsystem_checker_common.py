@@ -121,8 +121,12 @@ class Checker:
         try:
             out = subprocess.check_output('cat /proc/cpuinfo | grep sse4_2', shell=True).strip()
         except subprocess.CalledProcessError:
-            return False
-        return True
+            try:
+                out = subprocess.check_output('cat /proc/cpuinfo | grep flags -m 1 | cut -d ":" -f 2', shell=True).strip()
+                return (False, out)
+            except:
+                (False, 'no "flags" in /proc/cpuinfo')
+        return (True, 'sse4_2')
 
     def hard_check_ram(self, gb):
         """Check RAM requirements.
@@ -131,9 +135,11 @@ class Checker:
 
         :returns: 'True' if check is successful and 'False' otherwise.
         """
-        if psutil.virtual_memory().total < gb * pow(1000, 3):  # 1024^3 might be too strict if some RAM is pre-allocated for VM
-            return False
-        return True
+        found = psutil.virtual_memory().total
+        found_str = str(found/pow(1000, 3)) + "GB"
+        if found < gb * pow(1000, 3):  # 1024^3 might be too strict if some RAM is pre-allocated for VM
+            return (False, found_str)
+        return (True, found_str)
 
     def hard_check_cpu_number(self, num_cores):
         """Check CPU requirements.
@@ -142,9 +148,10 @@ class Checker:
 
         :returns: 'True' if check is successful and 'False' otherwise.
         """
-        if psutil.cpu_count() < num_cores:
-            return False
-        return True
+        found = psutil.cpu_count()
+        if found < num_cores:
+            return (False, str(found) + " cores")
+        return (True, str(found) + " cores")
 
     def hard_check_nic_number(self, num_nics):
         """Check NICs number.
@@ -157,10 +164,10 @@ class Checker:
             # NETWORK_BASE_CLASS = "02", so look for 'Class:  02XX'
             out = subprocess.check_output("lspci -Dvmmn | grep -cE 'Class:[[:space:]]+02'", shell=True).strip()
             if int(out) < num_nics:
-                return False
+                return (False, out + ' nics')
+            return (True, out + ' nics')
         except subprocess.CalledProcessError:
-            return False
-        return True
+            return (False, '0 nics')
 
     def hard_check_wan_connectivity(self, supported):
         """Check WAN connectivity.
@@ -183,9 +190,9 @@ class Checker:
             if ret == 0:
                 self.wan_interfaces.append(str(iface))
                 _print_without_line_feed("\r                                              \r")  # Clean the line on screen
-                return True
+                return (True, "connected to internet")
         _print_without_line_feed("\r                                              \r")  # Clean the line on screen
-        return False
+        return (False, "not connected to internet")
 
     def hard_check_kernel_io_modules(self, supported):
         """Check kernel IP modules presence.
@@ -202,9 +209,8 @@ class Checker:
         for mod in modules:
             ret = os.system('modinfo %s > /dev/null 2>&1' %  mod)
             if ret:
-                print(mod + ' not found')
-                succeeded = False
-        return succeeded
+                return (False, mod + ' is not loaded')
+        return (True, str(modules).strip('[]'))
 
     def hard_check_nic_drivers(self, supported):
         """Check NIC drivers.
@@ -257,17 +263,22 @@ class Checker:
                         'driver' : driver,
                         'supported' : supported }
             except Exception as e:
-                print(str(e))
-                return False
+                return (False, str(e))
 
         # Now go over found network cards and ensure that they are supported
-        succeeded = True
-        for pci in self.detected_nics:
+        supported     = []
+        not_supported = []
+        for pci in sorted(self.detected_nics.keys()):
             device = self.detected_nics[pci]
-            if not device['supported']:
-                print('%s %s driver is not supported' % (device['manufacturer'], device['driver']))
-                succeeded = False
-        return succeeded
+            device_str = '%s %s %s' % (pci, device['manufacturer'], device['driver'])
+            if device['supported']:
+                supported.append(device_str)
+            else:
+                not_supported.append(device_str)
+
+        if len(not_supported) > 0:
+            return (False, str(not_supported).strip('[]'))
+        return (True, str(supported).strip('[]'))
 
     def soft_check_uuid(self, fix=False, silently=False, prompt=''):
         """Check if UUID is present in system.
@@ -322,7 +333,7 @@ class Checker:
             f.close()
             return True
 
-    def hard_check_default_route_connectivity(self, fix=False, silently=False, prompt=''):
+    def hard_check_default_route_connectivity(self, fix=False, silently=False):
         """Check route connectivity.
 
         :param fix:             Fix problem.
@@ -339,19 +350,16 @@ class Checker:
             # Find all default routes and ensure that configured interface has WAN connectivity
             default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
             if len(default_routes) == 0:
-                print(prompt + "no default route was found")
-                return False
+                return (False, "no default route was found")
             for route in default_routes:
                 # The 'route' should be in 'default via 192.168.1.1 dev enp0s3 proto static' format
                 # Extracts the interface name from this line and ensure that it presents in self.wan_interfaces.
                 iface_name = route.split(' ')[4]
                 if iface_name in self.wan_interfaces:
-                    return True
-            print(prompt + "default route has no WAN connectivity")
-            return False
+                    return (True, "connectivity through %s" % (iface_name))
+            return (False, "default route has no WAN connectivity")
         except Exception as e:
-            print(prompt + str(e))
-            return False
+            return (False, str(e))
 
     def soft_check_default_route(self, fix=False, silently=False, prompt=''):
         """Check if default route is present.

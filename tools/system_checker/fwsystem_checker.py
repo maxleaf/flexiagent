@@ -53,7 +53,7 @@ FW_EXIT_CODE_ERROR_UNMET_SYSTEM_REQUIREMENTS          = 0x2
 FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION = 0x4
 FW_EXIT_CODE_ERROR_ABORTED_BY_USER                    = 0x8
 
-hard_checkers = [
+hard_checks = [
     { 'hard_check_sse42'              : [ True , 'critical' , 'support in SSE 4.2 is required' ] },
     { 'hard_check_ram'                : [ 4 ,    'critical' , 'at least 4GB RAM is required' ] },
     { 'hard_check_cpu_number'         : [ 2,     'critical' , 'at least 2 logical CPU-s are required' ] },
@@ -64,7 +64,7 @@ hard_checkers = [
     { 'hard_check_default_route_connectivity' : [ True, 'optional' ,  'default route should have WAN connectivity' ] }
 ]
 
-soft_checkers = [
+soft_checks = [
     { 'soft_check_uuid'               : { 'severity': 'critical' }},
     { 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
     { 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
@@ -81,7 +81,6 @@ soft_checkers = [
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
 	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
-
 ]
 
 class TXT_COLOR:
@@ -95,83 +94,104 @@ class TXT_COLOR:
     FG_UNDERLINE        = '\x1b[4m'
     END                 = '\x1b[0m'
 
-def checker_name_to_description(checker_name):
-    """Convert checker name into description.
+def check_name_to_description(check_name):
+    """Convert check name into description.
 
-    :param checker_name:         Checker name.
+    :param check_name:         check name.
 
     :returns: Description.
     """
-    return ' '.join(checker_name.split('_')[1:])
+    return ' '.join(check_name.split('_')[1:])
 
-def report_checker_result(succeeded, severity, checker_name, description=None):
-    """Report checker results.
+def report_results(results):
+    """Goes over list of check results and for each of them print information
+    regarding check and it result onto screen.
+    The list elements are dictionary of following format:
+        { <check_name>: {
+            'result': <False on failure/True on success>,
+            'current_value': <checked value if applicable, e.g. found RAM in GB>,
+            'severity':      <severity taken from hard_checks/soft_checks>,
+            'description':   <description if the check taken from hard_checks/soft_checks>
+          }
+        }
 
-    :param succeeded:       Success status.
-    :param severity:        Severity level.
-    :param checker_name:    Checker name.
-    :param description:     Description.
+    :param results: List of checks and results
 
-    :returns: None.
+    :returns: True if all critical checks succeeded, False otherwise.
     """
-    if not description:
-        description = checker_name_to_description(checker_name)
-    if succeeded:
-        status   = TXT_COLOR.FG_SUCCESS + ' PASSED ' + TXT_COLOR.END
-    else:
-        if severity == 'optional':
-            status   = TXT_COLOR.BG_FAILURE_OPTIONAL + ' FAILED ' + TXT_COLOR.END
-        else:
-            status   = TXT_COLOR.BG_FAILURE_CRITICAL + ' FAILED ' + TXT_COLOR.END
-    print('%s: %s : %s' % (status, severity.upper(), description))
+    success = True
+    for element in results:
+        (check_name, result_params) = element.items()[0]
+        succeeded   = result_params.get('result', False)
+        value       = result_params.get('value', '')
+        severity    = result_params.get('severity')
+        description = result_params.get('description')
 
-def check_hard_configuration(checker, check_only):
+        if not description:
+            description = check_name_to_description(check_name)
+        if succeeded:
+            status = TXT_COLOR.FG_SUCCESS + ' PASSED ' + TXT_COLOR.END
+        else:
+            if severity == 'optional':
+                status = TXT_COLOR.BG_FAILURE_OPTIONAL + ' FAILED ' + TXT_COLOR.END
+            else:
+                status = TXT_COLOR.BG_FAILURE_CRITICAL + ' FAILED ' + TXT_COLOR.END
+        print('%s: %s : %s (found: %s)' % \
+            (status, severity.upper(), description, str(value)))
+
+        if not succeeded and severity == 'critical':
+            success = False
+
+    return success
+
+
+def check_hard_configuration(checker, escape):
     """Check hard configuration.
 
-    :param checker:         Checker name.
-    :param check_only:      Check only mode.
+    :param check:  The Checker object that implements check methods.
+    :param escape: The list of checks that should not be run.
 
-    :returns: 'True' if succeeded.
+    :returns: list of checks with results and found values.
     """
-    succeeded = True
-    for element in hard_checkers:
-        (checker_name, checker_params) = element.items()[0]
+    results = []
+    for element in hard_checks:
+        (check_name, check_params) = element.items()[0]
 
-        # Don't run connectivity checkers in check only mode,
-        # as every check waits 5 seconds for ping response on every found interface.
-        # That might suspend agent start too long, making user experience bad.
-        if 'connectivity' in checker_name and check_only:
+        if check_name in escape:
             continue
 
-        checker_func = getattr(checker, checker_name)
-        args         = checker_params[0]
-        severity     = checker_params[1]
-        description  = checker_params[2]
-        result = checker_func(args)
-        if not result and severity == 'critical':
-            succeeded = False
-        report_checker_result(result, severity, checker_name, description)
-    return succeeded
+        check_func   = getattr(checker, check_name)
+        expected_val = check_params[0]
+        severity     = check_params[1]
+        description  = check_params[2]
 
-def check_soft_configuration(checker, fix=False, quiet=False):
+        (result, found_val) = check_func(expected_val)
+
+        results.append({check_name: {
+            'result': result, 'value': found_val, 'severity': severity,
+            'description': description}})
+    return results
+
+def check_soft_configuration(check, fix=False, quiet=False):
     """Check hard configuration.
 
-    :param checker:         Checker name.
-    :param fix:             Fix problem.
-    :param quiet:           Do not prompt user.
+    :param check: check object inhereted from fwsystem_check_common.check.
+                    For example, ubuntu1804.check.
+    :param fix:     Fix problem.
+    :param quiet:   Do not prompt user.
 
     :returns: 'True' if succeeded.
     """
     succeeded = True
-    for element in soft_checkers:
+    for element in soft_checks:
 
-        (checker_name, checker_params) = element.items()[0]
-        prompt = checker_name_to_description(checker_name) + ': '
+        (check_name, check_params) = element.items()[0]
+        prompt = check_name_to_description(check_name) + ': '
 
-        checker_func = getattr(checker, checker_name)
-        severity     = checker_params['severity']
-        result       = checker_func(fix=False, prompt=prompt)
-        report_checker_result(result, severity, checker_name)
+        check_func = getattr(check, check_name)
+        severity     = check_params['severity']
+        result       = check_func(fix=False, prompt=prompt)
+        report_check_result(result, severity, check_name)
 
         go_and_fix = fix
         if go_and_fix:
@@ -179,8 +199,8 @@ def check_soft_configuration(checker, fix=False, quiet=False):
             if result:
                 go_and_fix = False
 
-            interactive = '' if not 'interactive' in checker_params \
-                             else checker_params['interactive']
+            interactive = '' if not 'interactive' in check_params \
+                             else check_params['interactive']
 
             # If parameter is adjustable and interactive mode was chosen,
             # fix the parameter even if result is OK. This is to provide
@@ -198,14 +218,14 @@ def check_soft_configuration(checker, fix=False, quiet=False):
             continue
 
         if quiet:
-            result = checker_func(fix=True, silently=True, prompt=prompt)
-            report_checker_result(result, severity, checker_name)
+            result = check_func(fix=True, silently=True, prompt=prompt)
+            report_check_result(result, severity, check_name)
         else:
             while True:
                 choice = raw_input(prompt + "configure? [y/N/q]: ")
                 if choice == 'y' or choice == 'Y':
-                    result = checker_func(fix=True, silently=False, prompt=prompt)
-                    report_checker_result(result, severity, checker_name)
+                    result = check_func(fix=True, silently=False, prompt=prompt)
+                    report_check_result(result, severity, check_name)
                     break
                 elif choice == 'n' or choice == 'N' or choice == '':
                     break
@@ -215,7 +235,7 @@ def check_soft_configuration(checker, fix=False, quiet=False):
             succeeded = False
     return succeeded
 
-def reset_system_to_defaults(checker):
+def reset_system_to_defaults(check):
     """ reset vpp configuration to default
 
     :returns: 'True' if succeeded.
@@ -234,8 +254,8 @@ def reset_system_to_defaults(checker):
             shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
             if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
                 shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
-            checker.update_grub = True
-            checker.update_grub_file()
+            check.update_grub = True
+            check.update_grub_file()
             reboot_needed = True
             break
     
@@ -251,7 +271,7 @@ def reset_system_to_defaults(checker):
     return True
 
 def main(args):
-    """Checker entry point.
+    """check entry point.
 
     :param args:            Command line arguments.
 
@@ -266,9 +286,21 @@ def main(args):
         # -----------------------------------------
         hard_status_code = FW_EXIT_CODE_OK
         if not args.soft_only:
+
             if not args.hard_only:
                 print('\n=== hard configuration ====')
-            success = check_hard_configuration(checker, args.check_only)
+
+            # If runs in --check_only mode don't run checks that might take time,
+            # like connectivity check which  might take 5 seconds for pinging
+            # every found interface. This is to avoid delay on agent start to
+            # keep positive user experience.
+            #
+            escape = []
+            if args.check_only:
+                escape = [ 'hard_check_wan_connectivity', 'hard_check_default_route_connectivity']
+
+            results = check_hard_configuration(checker, escape)
+            success = report_results(results)
             hard_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_UNMET_HARDWARE_REQUIREMENTS
             if args.hard_only:
                 return hard_status_code
@@ -283,7 +315,7 @@ def main(args):
             if not success:
                 print('')
                 print("===================================================================================")
-                print("! system checker errors, run 'fwsystem_checker' with no flags to fix configuration!")
+                print("! system check errors, run 'fwsystem_check' with no flags to fix configuration!")
                 print("===================================================================================")
                 print('')
             return (soft_status_code | hard_status_code)
@@ -323,12 +355,12 @@ def main(args):
             else:
                 success = True
 
-        if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
+        if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_check might change python code too ;)
 	        if success == True:
                     print ("Please wait..")
                     os.system("sudo systemctl stop flexiwan-router")
-                    checker.save_config()
-                    if checker.update_grub == True:
+                    check.save_config()
+                    if check.update_grub == True:
 		                rebootSys = 'x'
                                 while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
                                     rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
@@ -341,7 +373,7 @@ def main(args):
 
                 os.system("sudo systemctl start flexiwan-router")
                 print ("Done.")
-		
+
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
         return (soft_status_code | hard_status_code)
 
