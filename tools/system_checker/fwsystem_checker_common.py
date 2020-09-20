@@ -288,8 +288,10 @@ class Checker:
                 uuid_obj = uuid.UUID(found_uuid)
                 if uuid_obj.variant==uuid.RFC_4122 and not uuid_obj.version:
                     raise Exception("failed to deduce version of found UUID according RFC4122: %s" % found_uuid)
+                if found_uuid == "03000200-0400-0500-0006-000700080009":
+                    raise Exception("found UUID is not legal: %s" % found_uuid)
             except ValueError:
-                raise Exception("found UUID '%s' doesn't comply to RFC" % found_uuid)
+                raise Exception("found UUID doesn't comply to RFC: %s" % found_uuid)
             return True
 
         except Exception as e:
