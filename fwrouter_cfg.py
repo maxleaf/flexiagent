@@ -357,14 +357,16 @@ class FwRouterCfg:
         interfaces = self._get_requests('add-interface')
         if not type and not pci and not ip:
             return interfaces
+        result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
-                interfaces.remove(params)
+                continue
             elif pci and pci != params['pci']:
-                interfaces.remove(params)
+                continue
             elif ip and not re.match(ip, params['addr']):
-                interfaces.remove(params)
-        return interfaces
+                continue
+            result.append(params)
+        return result
 
     def get_tunnels(self):
         return self._get_requests('add-tunnel')
