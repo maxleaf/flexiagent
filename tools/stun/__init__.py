@@ -137,9 +137,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
             try:
                 num_bytes = sock.sendto(data, (host, port))
             except Exception as e:
-                fwglobals.log.error("Stun: error in sendto(), error %s" %(os.strerror(e.errno)))
                 if num_bytes == 0:
-                    fwglobals.log.error("Stun: no data sent on sendto()")
                     retVal['Resp'] = False
                     return retVal
             try:
@@ -147,9 +145,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                 fwglobals.log.debug("Stun: recvfrom: %s" %(str(addr)))
                 received = True
             except Exception as e:
-                fwglobals.log.error("Stun: error in recvfrom()")
                 if buf==None or addr==None:
-                    fwglobals.log.error("Stun: no data received from recvfrom()")
                 received = False
 
             if count > 0:

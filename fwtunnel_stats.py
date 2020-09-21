@@ -26,7 +26,6 @@ import time
 from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
-#import subprocess
 import fwglobals
 
 tunnel_stats_global = {}
