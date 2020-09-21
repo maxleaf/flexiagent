@@ -40,6 +40,12 @@ import getopt
 import importlib
 import platform
 import sys
+import shutil
+
+globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
+sys.path.append(globals)
+import fwglobals
+import fwutils
 
 FW_EXIT_CODE_OK = 0
 FW_EXIT_CODE_ERROR_UNMET_HARDWARE_REQUIREMENTS        = 0x1
@@ -63,14 +69,19 @@ soft_checkers = [
     { 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
     { 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
     { 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
+    {'soft_check_multiple_interface_definitions': {'severity': 'critical'}},
+    {'soft_check_duplicate_netplan_sections': {'severity': 'critical'}},
     { 'soft_check_default_routes_metric'         : { 'severity': 'critical' }},
     { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
-    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
+    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
-    { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }}
+    { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+    { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
+
 ]
 
 class TXT_COLOR:
@@ -142,12 +153,12 @@ def check_hard_configuration(checker, check_only):
         report_checker_result(result, severity, checker_name, description)
     return succeeded
 
-def check_soft_configuration(checker, fix=False, quite=False):
+def check_soft_configuration(checker, fix=False, quiet=False):
     """Check hard configuration.
 
     :param checker:         Checker name.
     :param fix:             Fix problem.
-    :param quite:           Do not prompt user.
+    :param quiet:           Do not prompt user.
 
     :returns: 'True' if succeeded.
     """
@@ -174,11 +185,11 @@ def check_soft_configuration(checker, fix=False, quite=False):
             # If parameter is adjustable and interactive mode was chosen,
             # fix the parameter even if result is OK. This is to provide
             # user with ability to change default configuration.
-            if result and not quite and interactive == 'optional':
+            if result and not quiet and interactive == 'optional':
                 go_and_fix = True
 
             # Don't fix if silent was specified but user interaction is required
-            if not result and quite and interactive == 'must':
+            if not result and quiet and interactive == 'must':
                go_and_fix = False
 
         if not go_and_fix:
@@ -186,7 +197,7 @@ def check_soft_configuration(checker, fix=False, quite=False):
                 succeeded = False
             continue
 
-        if quite:
+        if quiet:
             result = checker_func(fix=True, silently=True, prompt=prompt)
             report_checker_result(result, severity, checker_name)
         else:
@@ -203,6 +214,41 @@ def check_soft_configuration(checker, fix=False, quite=False):
         if not result and severity == 'critical':
             succeeded = False
     return succeeded
+
+def reset_system_to_defaults(checker):
+    """ reset vpp configuration to default
+
+    :returns: 'True' if succeeded.
+    """
+    # This function does the following:
+    # 1. Copies the startup.conf.orig over the start.conf and startup.conf.baseline files.
+    # 2. reset /etc/default/grub to a single core configuration
+    # 3. Reboot.
+
+    reboot_needed = False
+    while True:
+        choice = raw_input("Resetting to Factory Defauls. Resetting will reboot the system. Are you sure? [y/N]: ")
+        if choice == 'n' or choice == 'N' or choice == '':
+            return True
+        elif choice == 'y' or choice == 'Y':
+            shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
+            if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
+                shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
+            checker.update_grub = True
+            checker.update_grub_file(True)
+            reboot_needed = True
+            break
+
+    if reboot_needed == True:
+        while True:
+            choice = raw_input("Reboot the system? [Y/n]: ")
+            if choice == 'n' or choice == 'N':
+                print ("Please reboot the system for changes to take effect.")
+                return True
+            elif choice == 'y' or choice == 'Y' or choice == '':
+                print ("Rebooting....")
+                os.system('reboot now')
+    return True
 
 def main(args):
     """Checker entry point.
@@ -242,9 +288,9 @@ def main(args):
                 print('')
             return (soft_status_code | hard_status_code)
 
-        if args.quite:
+        if args.quiet:
             # In silent mode just go and configure needed stuff
-            success = check_soft_configuration(checker, fix=True, quite=True)
+            success = check_soft_configuration(checker, fix=True, quiet=True)
             soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
             return  (soft_status_code | hard_status_code)
 
@@ -252,31 +298,50 @@ def main(args):
         # The start intercation with user.
         check_soft_configuration(checker, fix=False)
         choice = 'x'
-        while not (choice == '' or choice == '0' or choice == '1'):
+        while not (choice == '' or choice == '0' or choice == '4'):
             choice = raw_input(
                             "\n" +
                             "\t[0] - quit and use fixed parameters\n" +
-                            "\t 1  - quit\n" +
-                            "\t 2  - check system configuration\n" +
-                            "\t 3  - configure system silently\n" +
-                            "\t 4  - configure system interactively\n" +
-                            "\t-------------------------------------\n" +
+                            "\t 1  - check system configuration\n" +
+                            "\t 2  - configure system silently\n" +
+                            "\t 3  - configure system interactively\n" +
+                            "\t 4  - restore system to factory defaults\n" +
+                            "\t-----------------------------------------\n" +
                             "Choose: ")
-            if choice == '2':
+            if choice == '1':
             	print('')
                 success = check_soft_configuration(checker, fix=False)
+            elif choice == '2':
+            	print('')
+                success = check_soft_configuration(checker, fix=True, quiet=True)
             elif choice == '3':
             	print('')
-                success = check_soft_configuration(checker, fix=True, quite=True)
+                success = check_soft_configuration(checker, fix=True, quiet=False)
             elif choice == '4':
-            	print('')
-                success = check_soft_configuration(checker, fix=True, quite=False)
+                print ('')
+                success = reset_system_to_defaults(checker)
             else:
                 success = True
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-            os.system("sudo systemctl restart flexiwan-router")
+	        if success == True:
+                    print ("Please wait..")
+                    os.system("sudo systemctl stop flexiwan-router")
+                    checker.save_config()
+                    if checker.update_grub == True:
+		                rebootSys = 'x'
+                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
+                                    rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
+                                                    "Would you like to reboot now (Y/n)?")
+                                    if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
+                                        print ("Rebooting...")
+                                        os.system('reboot now')
+                                    else:
+                                        print ("Please reboot the system for changes to take effect.")
 
+                os.system("sudo systemctl start flexiwan-router")
+                print ("Done.")
+		
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
         return (soft_status_code | hard_status_code)
 
@@ -284,10 +349,23 @@ if __name__ == '__main__':
     import argparse
     global arg
 
+    # Ensure that VPP does not run.
+    # Otherwise driver interface checks might fail and user will be scared for
+    # no reason. Note it is too late to check system, if router was started :)
+    #
+    try:
+        pid = subprocess.check_output(['pidof', 'vpp'])
+        # If we reached this point, i.e. if no exception occurred, the vpp pid was found
+        print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
+        exit(FW_EXIT_CODE_OK)
+    except:
+        pass
+
+
     parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
     parser.add_argument('-c', '--check_only', action='store_true',
                         help="check configuration and exit")
-    parser.add_argument('-q', '--quite', action='store_true',
+    parser.add_argument('-q', '--quiet', action='store_true',
                         help="adjust system configuration silently")
     parser.add_argument('-r', '--hard_only', action='store_true',
                         help="check hard configuration only")

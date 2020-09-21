@@ -3,8 +3,9 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-      "src": "8.8.1.1",
-      "dst": "8.8.1.2",
+      "src": "10.0.0.4",
+      "dst": "20.0.0.4",
+      "dstPort": "1068",
       "tunnel-id": 1,
       "ipsec": {
         "local-sa": {
@@ -36,7 +37,7 @@
   "message": "add-route",
   "params": {
     "addr": "default",
-	"via": "10.0.0.66"
+	"via": "10.0.0.10"
   }
 }
 ,
@@ -47,6 +48,7 @@
     {
       "pci":"0000:00:08.00",
       "addr":"10.0.0.4/24",
+      "gateway": "10.0.0.10",
       "type":"wan"
     },
     {
@@ -66,6 +68,7 @@
       {
         "pci":"0000:00:08.00",
         "addr":"10.0.0.4/24",
+        "gateway": "10.0.0.10",
         "type":"wan"
       },
       {
@@ -87,11 +90,7 @@
 {
   "entity":  "agent",
   "message": "remove-tunnel",
-  "params": {
-      "src": "8.8.1.1",
-      "dst": "8.8.1.2",
-       "tunnel-id": 1
-  }
+  "params": { "tunnel-id": 1 }
 }
 ,
 {

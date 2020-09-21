@@ -22,30 +22,30 @@
 
 import fwglobals
 
-def revert(req_key):
-    """Generate revert commands.
-    Goes over list of complement command tuples from end to beginning
-    and for every command tuple add it's revert command to list.
+def revert(request):
+    """Generate list of commands for the 'remove-X' type of requests.
+    To do that it fetches the list of commands for the corresponding 'add-X'
+    request, goes over this list from the end to the beginning and for every
+    command takes it's revert section and adds it to the result list.
     In this way we create list of commands that reverts the original request.
 
-     :param req_key:        Command's key to be reverted.
+    :param request: The request received from flexiManage.
 
-     :returns: A list of commands.
-     """
-    cmd_list = []
-    cmd_list_src = []
+    :returns: A list of commands.
+    """
 
-    try:
-        (cmd_list_src , executed) = fwglobals.g.router_api.db_requests.fetch_cmd_list(req_key)
-    except KeyError as e:
-        pass
+    # Fetch list of commands for the correspondent 'add-X' request
+    (cmd_list_src, executed) = fwglobals.g.router_cfg.get_request_cmd_list(request)
 
     # If there is no 'add-XXX' commands to revert,
     # or if the 'add-XXX' commands were never executed,
     # return empty list, so nothing will be reverted.
-    if len(cmd_list_src) == 0 or executed == False:
+    if not cmd_list_src or executed == False:
         return []
 
+    # Now go and generate list of commands for 'remove-X' request out of the list
+    # of commands for the correspondent 'add-X' request.
+    cmd_list = []
     for cmd_src in reversed(cmd_list_src):
         if 'revert' in cmd_src:
             cmd = {}

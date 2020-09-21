@@ -27,7 +27,7 @@ import fwnetplan
 import fwutils
 import fwstats
 import os
-
+import fwglobals
 
 # TBD: define all APIs in a file
 os_modules = {
@@ -47,7 +47,6 @@ os_api_defs = {
     'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
     'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'stop_router':{'module':'fwutils', 'api':'stop_router', 'decode':'default'},
     'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
     'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
 }
@@ -63,7 +62,6 @@ class OS_DECODERS:
         :returns: Array of interface descriptions.
         """
         out = []
-
         for nicname, addrs in inp.items():
             pciaddr = fwutils.linux_to_pci_addr(nicname)
             if pciaddr[0] == "":
@@ -88,7 +86,18 @@ class OS_DECODERS:
                 daddr[addr_af_name] = addr.address.split('%')[0]
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-
+            if daddr['gateway'] is not '':
+                # Send STUN request only for interfaces with Gateway
+                (public_ip, public_port, nat_type) = fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
+                if public_ip == None or public_port == None:
+                    daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
+                        fwglobals.g.stun_wrapper.find_srcip_public_addr(daddr['IPv4'],4789, None, None, True)
+                else:
+                    daddr['public_ip']   = public_ip
+                    daddr['public_port'] = public_port
+                    daddr['nat_type']    = nat_type
+            else:
+                daddr['public_ip'] = daddr['public_port'] = daddr['nat_type'] = None
             out.append(daddr)
         return (out,1)
 
@@ -117,14 +126,16 @@ class OS_API:
         """
         self.decoders = OS_DECODERS()
 
-    def call_simple(self, req, params=None):
+    def call_simple(self, request):
         """Handle a request from os_api_defs.
 
-        :param req: Request name.
-        :param params: Parameters from flexiManage.
+        :param request: The request received from flexiManage.
 
         :returns: Reply with status and error message.
         """
+        req    = request['message']
+        params = request.get('params')
+
         api_defs = os_api_defs.get(req)
         if api_defs == None:
             reply = {'entity':'osReply', 'message':'API Error', 'ok':0}

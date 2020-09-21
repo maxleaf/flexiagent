@@ -1,0 +1,91 @@
+{
+  "entity": "agent",
+  "message": "aggregated",
+  "params": {
+    "requests": [
+		{
+		  "entity": "agent",
+		  "message": "remove-application",
+		  "params": {
+			"applications": [
+			  {
+				"name": "new_ssh",
+				"id": "55",
+				"category": "remote_access",
+				"serviceClass": "default",
+				"importance": "low",
+				"description": "New Secure Shell (NSSH)",
+				"rules": [
+				  {
+					"protocol": "tcp",
+					"ports": "22"
+				  }
+				],
+				"modified": false
+			  },
+			  {
+				"name": "telnet",
+				"id": "6",
+				"category": "remote_access",
+				"serviceClass": "default",
+				"importance": "medium",
+				"description": "Telnet protocol",
+				"rules": [
+				  {
+					"protocol": "tcp",
+					"ports": "22"
+				  }
+				],
+				"modified": false
+			  }
+			]
+		  }
+		}
+		,
+		{
+		  "entity": "agent",
+		  "message": "add-application",
+		  "params": {
+			"applications": [
+			  {
+				"name": "nighttime",
+				"id": "3",
+				"category": "management",
+				"serviceClass": "network-control",
+				"importance": "low",
+				"description": "Nighttime Protocol",
+				"rules": [
+				  {
+					"protocol": "udp",
+					"ports": "28"
+				  }
+				]
+			  }
+			]
+		  }
+		}
+		,
+		{
+		  "entity": "agent",
+		  "message": "remove-dhcp-config",
+		  "params": {
+			"interface": "0000:00:09.00",
+		    "range_start": "40.40.40.04",
+		    "range_end": "40.40.40.40",
+		    "dns": [ "8.8.8.8" ]
+		  }
+		}
+		,
+		{
+		  "entity":  "agent",
+		  "message": "remove-interface",
+		  "params": {
+			  "pci":"0000:00:09.00",
+			  "addr":"192.168.56.102/24",
+		      "routing":"ospf",
+		      "type":"lan"
+		  }
+		}
+	]
+  }
+}

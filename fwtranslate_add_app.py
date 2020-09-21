@@ -31,8 +31,6 @@ import fwutils
 
 from netaddr import *
 
-proto_map = {'icmp':1, 'tcp':6, 'udp':17}
-
 # add-application
 # --------------------------------------
 # Translates request:
@@ -70,6 +68,9 @@ def _create_rule(is_ipv6=0, is_permit=0, proto=0,
              'dst_ip_addr': d_ip})
     return rule
 
+
+proto_map = {'icmp':1, 'tcp':6, 'udp':17}
+
 def add_acl_rule(rule, rules):
     """Add ACL rule.
 
@@ -81,18 +82,18 @@ def add_acl_rule(rule, rules):
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
     ip_prefix = 0
     ip_bytes = '\x00\x00\x00\x00'
-    proto = 0
+    proto = None
     port_from = 0
     port_to = 65535
 
     protocol = rule.get('protocol', None)
     if protocol:
-        proto = proto_map[rule['protocol']]
+        proto = [ proto_map[rule['protocol']] ]
 
     ip = rule.get('ip', None)
     if ip:
         ip_network = IPNetwork(rule['ip'])
-        ip_bytes, ip_len = fwutils.ip_str_to_bytes(str(ip_network.ip))
+        ip_bytes, _ = fwutils.ip_str_to_bytes(str(ip_network.ip))
         ip_prefix = ip_network.prefixlen
 
     ports = rule.get('ports', None)
@@ -102,19 +103,28 @@ def add_acl_rule(rule, rules):
         if len(ports_map) > 1:
             port_to = ports_map[1]
 
-    rules.append(_create_rule(is_ipv6=0, is_permit=1,
-                              dport_from=port_from,
-                              dport_to=port_to,
-                              d_prefix=ip_prefix,
-                              proto=proto,
-                              d_ip=ip_bytes))
+        # If ports were provided, ensure non-zero protocol in rule.
+        # The zero protocol in rule causes VPP/ACL to ignore ports at all,
+        # so rule matches any ports!
+        # Most likely this is not what user expected to happen.
+        #
+        if not proto:
+            proto = [ proto_map['udp'] , proto_map['tcp'] ]
 
-    rules.append(_create_rule(is_ipv6=0, is_permit=1,
-                              sport_from=port_from,
-                              sport_to=port_to,
-                              s_prefix=ip_prefix,
-                              proto=proto,
-                              s_ip=ip_bytes))
+    for p in proto:
+        rules.append(_create_rule(is_ipv6=0, is_permit=1,
+                                dport_from=port_from,
+                                dport_to=port_to,
+                                d_prefix=ip_prefix,
+                                proto=p,
+                                d_ip=ip_bytes))
+
+        rules.append(_create_rule(is_ipv6=0, is_permit=1,
+                                sport_from=port_from,
+                                sport_to=port_to,
+                                s_prefix=ip_prefix,
+                                proto=p,
+                                s_ip=ip_bytes))
 
 def _add_acl(params, cmd_list, cache_key):
     """Generate ACL command.
@@ -158,15 +168,38 @@ def _add_app_info(params, cmd_list, cache_key):
     new_params = copy.deepcopy(params)
     new_params['substs'] = [ { 'add_param':cache_key, 'val_by_key':cache_key} ]
 
+
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']          = "add-app-info"
-    cmd['cmd']['params']        = new_params
-    cmd['cmd']['descr']         = "Add APP %s" % (params['id'])
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "Add APP %s" % (params['id'])
+    cmd['cmd']['params']    = {
+                'object': 'fwglobals.g.apps',
+                'func':   'add_remove_application',
+                'args': {
+                    'add':          True,
+                    'id':           params['id'],
+                    'category':     params.get('category'),
+                    'serviceClass': params.get('serviceClass'),
+                    'importance':   params.get('importance')
+                },
+                'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]
+    }
     cmd['revert'] = {}
-    cmd['revert']['name']       = 'remove-app-info'
-    cmd['revert']['params']     = new_params
-    cmd['revert']['descr']      = "Delete APP %s" % (params['id'])
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "Delete APP %s" % (params['id'])
+    cmd['revert']['params'] = {
+                'object': 'fwglobals.g.apps',
+                'func':   'add_remove_application',
+                'args': {
+                    'add':          False,
+                    'id':           params['id'],
+                    'category':     params.get('category'),
+                    'serviceClass': params.get('serviceClass'),
+                    'importance':   params.get('importance')
+                },
+                'substs': [ { 'add_param':cache_key, 'val_by_key':cache_key} ]
+    }
     cmd_list.append(cmd)
 
 def add_app(params):

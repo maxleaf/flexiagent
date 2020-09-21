@@ -24,8 +24,10 @@
 import fwutils
 import time
 import loadsimulator
+import psutil
 
 from fwtunnel_stats import tunnel_stats_get
+import fwglobals
 
 # Globals
 # Keep updates up to 1 hour ago
@@ -38,7 +40,7 @@ updates_list = []
 vpp_pid = ''
 
 # Keeps last stats
-stats = {'ok':0, 'running':False, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0}
+stats = {'ok':0, 'running':False, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0}
 
 def update_stats():
     """Update statistics dictionary using values retrieved from VPP interfaces.
@@ -93,6 +95,7 @@ def update_stats():
                         if pci:
                             if_bytes[pci] = calc_stats
 
+
             stats['bytes'] = if_bytes
             stats['tunnel_stats'] = tunnel_stats
             stats['period'] = stats['time'] - prev_stats['time']
@@ -111,8 +114,41 @@ def update_stats():
             'stats': stats['bytes'], 
             'period': stats['period'],
             'tunnel_stats': stats['tunnel_stats'],
+            'health': get_system_health(),
             'utc': time.time()
         })
+
+def get_system_health():
+    # Get CPU info
+    try:
+        cpu_stats = psutil.cpu_percent(percpu = True)
+    except Exception as e:
+        fwglobals.log.excep("Error getting cpu stats: %s" % str(e))
+        cpu_stats = [0]
+    # Get memory info
+    try:
+        memory_stats = psutil.virtual_memory().percent
+    except Exception as e:
+        fwglobals.log.excep("Error getting memory stats: %s" % str(e))
+        memory_stats = 0
+    # Get disk info
+    try:
+        disk_stats = psutil.disk_usage('/').percent
+    except Exception as e:
+        fwglobals.log.excep("Error getting disk stats: %s" % str(e))
+        disk_stats = 0
+    # Get temperature info
+    try:
+        temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
+        all_temp = psutil.sensors_temperatures()
+        for ttype, templist in all_temp.items():
+            for temp in templist:
+                if temp.current > temp_stats['value']:
+                    temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}
+    except Exception as e:
+        fwglobals.log.excep("Error getting temperature stats: %s" % str(e))
+
+    return {'cpu': cpu_stats, 'mem': memory_stats, 'disk': disk_stats, 'temp': temp_stats}
 
 def get_stats():
     """Return a new statistics dictionary.
@@ -142,6 +178,7 @@ def get_stats():
             'stateReason': reason,
             'stats': {},
             'tunnel_stats': {},
+            'health': {},
             'period': 0,
             'utc': time.time(),
             'reconfig': reconfig
@@ -151,6 +188,7 @@ def get_stats():
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
+        res_update_list[-1]['health'] = get_system_health()
 
     return {'message': res_update_list, 'ok': 1}
 
@@ -169,4 +207,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'period':0, 'reconfig':False}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False}

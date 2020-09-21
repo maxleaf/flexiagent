@@ -21,7 +21,6 @@
 ################################################################################
 
 import glob
-import hashlib
 import os
 import time
 import subprocess
@@ -31,7 +30,7 @@ import fwutils
 import shutil
 import yaml
 
-def _backup_netplan_files():
+def backup_linux_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
@@ -42,7 +41,7 @@ def _backup_netplan_files():
             shutil.copyfile(fname, fname_backup)
             shutil.move(fname, fname_run)
 
-def delete_netplan_files():
+def restore_linux_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
             glob.glob("/lib/netplan/*.fwrun.yaml") + \
             glob.glob("/run/netplan/*.fwrun.yaml")
@@ -58,16 +57,8 @@ def delete_netplan_files():
 
     if files:
         cmd = 'netplan apply'
+        fwglobals.log.debug(cmd)
         subprocess.check_output(cmd, shell=True)
-
-def add_del_netplan_files(params):
-    is_add = params['is_add']
-    if is_add:
-        _backup_netplan_files()
-    else:
-        delete_netplan_files()
-
-    return (True, None)
 
 def _get_netplan_interface_name(name, section):
     if 'set-name' in section:
@@ -140,22 +131,17 @@ def _add_netplan_file(fname):
         yaml.safe_dump(config, stream, default_flow_style=False)
 
 
-def add_remove_netplan_interface(params):
-    pci = params['pci']
-    is_add = params['is_add']
-    dhcp = params['dhcp']
-    ip = params['ip']
-    gw = params['gw']
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
     config_section = {}
     old_ethernets = {}
-    if params['metric']:
-        metric = int(params['metric'])
-    else:
-        metric = 0
 
     set_name = ''
     old_ifname = ''
     ifname = fwutils.pci_to_tap(pci)
+    if not ifname:
+        err_str = "add_remove_netplan_interface: %s was not found" % pci
+        fwglobals.log.error(err_str)
+        return (False, err_str)
 
     if pci in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[pci].get('fname')
@@ -195,7 +181,7 @@ def add_remove_netplan_interface(params):
         else:
             config_section['dhcp4'] = False
             config_section['addresses'] = [ip]
-            if gw is not None and gw:
+            if gw:
                 if 'routes' in config_section:
                     def_route_existed = False
                     routes = config_section['routes']
@@ -242,14 +228,15 @@ def add_remove_netplan_interface(params):
                     break
                 time.sleep(1)
             if not ip_address_is_found:
-                fwglobals.log.error("add_remove_netplan_interface: %s has no ip address" % ifname)
-                return (False, None)
+                err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
+                fwglobals.log.error(err_str)
+                return (False, err_str)
 
     except Exception as e:
-        err = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
+        err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname_run, str(e))
-        fwglobals.log.error(err)
-        return (False, None)
+        fwglobals.log.error(err_str)
+        return (False, err_str)
 
     return (True, None)
 

@@ -30,15 +30,41 @@ import subprocess
 import sys
 import uuid
 import yaml
+import shutil
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
-import fwtool_vpp_startupconf_dict
+from fw_vpp_startupconf import FwStartupConf
 
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
 import fwglobals
+import fwutils
 import fwnetplan
+
+from yaml.constructor import ConstructorError
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
+
+
+def no_duplicates_constructor(loader, node, deep=False):
+    """Check for duplicate keys."""
+
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        value = loader.construct_object(value_node, deep=deep)
+        if key in mapping:
+            raise ConstructorError("", node.start_mark,
+                                   "found duplicate key (%s)" % key, key_node.start_mark)
+        mapping[key] = value
+
+    return loader.construct_mapping(node, deep)
+
+yaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, no_duplicates_constructor)
 
 class Checker:
     """This is Checker class representation.
@@ -58,12 +84,20 @@ class Checker:
         self.nameservers            = None
         self.detected_nics          = None
         self.supported_nics         = None
-        self.vpp_configuration      = fwtool_vpp_startupconf_dict.load(self.CFG_VPP_CONF_FILE)
+        self.fw_ac_db               = FwStartupConf()
+        self.vpp_configuration      = self.fw_ac_db.load(self.CFG_VPP_CONF_FILE)
         self.vpp_config_modified    = False
+        self.update_grub            = False
 
         supported_nics_filename = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'dpdk_supported_nics.json')
         with open(supported_nics_filename, 'r') as f:
             self.supported_nics = json.load(f)
+
+    def save_config (self):
+        if self.vpp_config_modified:
+            self.fw_ac_db.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
+            self.update_grub_file()
+        shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
 
     def __enter__(self):
         return self
@@ -74,7 +108,7 @@ class Checker:
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         if self.vpp_config_modified:
-            fwtool_vpp_startupconf_dict.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE, debug=self.debug)
+            self.fw_ac_db.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
 
     def hard_check_sse42(self, supported):
         """Check SSE 4.2 support.
@@ -134,18 +168,23 @@ class Checker:
 
         :returns: 'True' if check is successful and 'False' otherwise.
         """
+        def _print_without_line_feed(str):
+            # So odd print is needed to enforce no line feed, so next print()
+            # will override this line.
+            print str,
+            sys.stdout.flush() # Need this as tail ',' removes the 'newline' in print(), so the print is not flushed immediately
+
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            print "\rcheck WAN connectivity on %s" % iface,
-            sys.stdout.flush()      # Need this as tail ',' remove the 'newline' in print(), so the print is not flushed immediately
+            _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
             ret = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
             if ret == 0:
                 self.wan_interfaces.append(str(iface))
-        print "\r                                                         \r",  # Clean the line before it is overwrote by next print
-        if len(self.wan_interfaces) == 0:
-            return False
-        return True
+                _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+                return True
+        _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+        return False
 
     def hard_check_kernel_io_modules(self, supported):
         """Check kernel IP modules presence.
@@ -248,8 +287,10 @@ class Checker:
                 uuid_obj = uuid.UUID(found_uuid)
                 if uuid_obj.variant==uuid.RFC_4122 and not uuid_obj.version:
                     raise Exception("failed to deduce version of found UUID according RFC4122: %s" % found_uuid)
+                if found_uuid == "03000200-0400-0500-0006-000700080009":
+                    raise Exception("found UUID is not legal: %s" % found_uuid)
             except ValueError:
-                raise Exception("found UUID '%s' doesn't comply to RFC" % found_uuid)
+                raise Exception("found UUID doesn't comply to RFC: %s" % found_uuid)
             return True
 
         except Exception as e:
@@ -454,6 +495,15 @@ class Checker:
                 raise Exception("Multiple default routes with the same metric %u" % metric)
             return True
         except Exception as e:
+            try:
+                self._check_duplicate_netplan_sections()
+            except:
+                print("Please fix duplicate netplan sections first")
+                return False
+            duplicates = self._get_duplicate_interface_definitions()
+            if duplicates:
+                print("Please fix duplicate interface definition in netplan first")
+                return False
             print(prompt + str(e))
             if not fix:
                 return False
@@ -482,6 +532,81 @@ class Checker:
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
+        return True
+
+    def _check_duplicate_netplan_sections(self):
+        files = glob.glob("/etc/netplan/*.yaml") + \
+                glob.glob("/lib/netplan/*.yaml") + \
+                glob.glob("/run/netplan/*.yaml")
+
+        for fname in files:
+            with open(fname, 'r') as stream:
+                yaml.safe_load(stream)
+
+    def _get_duplicate_interface_definitions(self):
+        files = glob.glob("/etc/netplan/*.yaml") + \
+                glob.glob("/lib/netplan/*.yaml") + \
+                glob.glob("/run/netplan/*.yaml")
+
+        interfaces = {}
+        for fname in files:
+            with open(fname, 'r') as stream:
+                config = yaml.safe_load(stream)
+                if 'network' in config:
+                    network = config['network']
+                    if 'ethernets' in network:
+                        ethernets = network['ethernets']
+                        for dev in ethernets:
+                            if dev not in interfaces:
+                                interfaces[dev] = [fname]
+                            else:
+                                interfaces[dev].append(fname)
+
+        duplicates = {}
+        for dev, files in interfaces.items():
+            if len(files) > 1:
+                duplicates[dev] = files
+        return duplicates
+
+    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=None):
+        """Check if any section is defined multiple times in Netplan files.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        try:
+            self._check_duplicate_netplan_sections()
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            return False
+        return True
+
+    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=None):
+        """Check if interface is defined in multiple Netplan files.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        try:
+            duplicates = self._get_duplicate_interface_definitions()
+            if duplicates:
+                message = "Found multiple interface definitions: "
+                for dev, files in duplicates.items():
+                    message += dev + ' in '
+                    for file in files:
+                        message += file + ', '
+                raise Exception(message)
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            return False
         return True
 
 
@@ -611,24 +736,22 @@ class Checker:
         """
         # Ensure that the /sys/kernel/mm/transparent_hugepage/enabled file includes [never].
         # Note this file uses '[]' to denote the chosen option.
-        filename = '/sys/kernel/mm/transparent_hugepage/enabled'
-
-        # If we installed 'hugepages' utility by previous invocation of this checker,
-        # just go and call it to disable the Transparent Hugepages.
-        # We do it on every checker invocation as the utility result doesn't persist reboot :(
-        # And it is not easy anymore (since 18.04) to configure Ubuntu to run scripts on startup.
-        ret = os.system('dpkg -l | grep hugepages > /dev/null')
-        if ret == 0:
-            os.system('hugeadm --thp-never')
-
-        # Now perform the check
-        with open(filename, "r") as f:
+        thp_filename = '/sys/kernel/mm/transparent_hugepage/enabled'
+        with open(thp_filename, "r") as f:
             first_line = f.readlines()[0]
             if re.search('\[never\]', first_line):
                 return True
+        # Ensure that the /etc/default/grub file includes the "transparent_hugepage=never"
+        # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
+        grub_filename = '/etc/default/grub'
+        try:
+            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).strip()
+            return True   # No exception - grep found the pattern
+        except subprocess.CalledProcessError:
+            pass
 
         if not fix:
-            print(prompt + "'never' is not chosen in %s" % filename)
+            print(prompt + "'never' is neither chosen in %s nor defined in %s" % (thp_filename, grub_filename))
             return False
 
         # Disable transparent hugepages:
@@ -651,25 +774,37 @@ class Checker:
         # Trial #3:
         # Install hugepages soft and use it.
         # Seems to work. But requires run of 'hugeadm --thp-never' after every reboot!
+        # This option requires interactive mode of system checker,
+        # so user could approve installation of the third party software.
+        # So silent mode does not work! And this confuses a lot.
         # -----------------------------------------------------------
-        ret = os.system('dpkg -l | grep hugepages > /dev/null')
+        # Trial #4:
+        # Use mix of commands:
+        # 1. echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        #    This should disable transparent hugepages for current session only.
+        #    Next reboot will restore original value.
+        # 2. Add "transparent_hugepage=never" to the the GRUB_CMDLINE_LINUX_DEFAULT
+        #    option in the /etc/default/grub file.
+        #    This should disable transparent hugepages permanently, so it will
+        #    survive next and future reboots.
+        # -----------------------------------------------------------
+
+        # Move selection (square brackets) to the 'never' option in the transparent_hugepage file.
+        # Note the 'echo' below does not override the file, but selects [never] option instead!
+        #
+        cmd = 'echo never > ' + thp_filename
+        ret = os.system(cmd)
         if ret != 0:
-            # Ask user approval to install the 3rd party
-            if not silently:
-                while True:
-                    choice = raw_input(prompt + "install 'hugepages' utility (required for configuration)? [Y/n]: ")
-                    if choice == 'y' or choice == 'Y' or choice == '':
-                        break
-                    elif choice == 'n' or choice == 'N':
-                        return False
-            cmd = 'apt -y install hugepages'
-            ret = os.system(cmd)
-            if ret != 0:
-                print(prompt + "'%s' failed (%d)" % (cmd,ret))
-                return False
-        ret = os.system('hugeadm --thp-never')
+            print(prompt + "%s - failed (%d)" % (cmd,ret))
+            return False
+
+        # Update the grub file
+        #
+        cmd = 'sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\\"transparent_hugepage=never /" ' + grub_filename
+        print(cmd)
+        ret = os.system(cmd)
         if ret != 0:
-            print(prompt + "'hugeadm --thp-never' failed (%d)" % (cmd,ret))
+            print(prompt + "%s - failed (%d)" % (cmd,ret))
             return False
         return True
 
@@ -718,6 +853,7 @@ class Checker:
                 if ret != 0:
                     print(prompt + "failed to write hugepages=%d into %s" % (default_hugepages, vpp_hugepages_file))
                     return False
+                    os.system('sysctl -p %s' %(vpp_hugepages_file))
                 return True
             return True
 
@@ -744,6 +880,7 @@ class Checker:
         if ret != 0:
             print(prompt + "failed to write hugepages=%d into %s" % (hugepages, vpp_hugepages_file))
             return False
+        os.system('sysctl -p %s' %(vpp_hugepages_file))
         return True
 
     def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=None):
@@ -767,15 +904,17 @@ class Checker:
         buffers = 16384  # Set default
         conf    = self.vpp_configuration
         conf_param = None
-        if conf and conf.get('dpdk'):
-            for param in conf['dpdk']:
-                if 'num-mbufs' in param:
-                    buffers = int(param.split(' ')[1])
-                    conf_param = param
-                    break
+        if conf and conf['dpdk']:
+            key = self.fw_ac_db.get_element(conf['dpdk'], 'num-mbufs')
+            if key:
+                tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'], key)
+                if tup:
+                    buffers = int(tup[0].split(' ')[1])
+                    conf_param = tup[0]
+
         old = buffers
         while True:
-            str_buffers = raw_input(prompt + "Enter number of memory buffers per CPU core [%d]: " % buffers)
+            str_buffers = raw_input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
             try:
                 if len(str_buffers) == 0:
                     break
@@ -788,16 +927,405 @@ class Checker:
             return True     # No need to update
 
         if conf_param:
-            conf['dpdk'].remove(conf_param)
-            conf_param = 'num-mbufs %d' % buffers
-            conf['dpdk'].append(conf_param)
+            self.fw_ac_db.remove_element(conf['dpdk'], conf_param)
+            conf_param = 'num-mbufs %d' % (buffers)
+            tup = self.fw_ac_db.create_element(conf_param)
+            conf['dpdk'].append(tup)
             self.vpp_config_modified = True
             return True
 
         if not conf:
-            conf = {}
-        if conf.get('dpdk') is None:
-            conf['dpdk'] = []
-        conf['dpdk'].append({ 'num-mbufs' : buffers })
+            conf = self.fw_ac_db.get_main_list()
+        if conf['dpdk'] is None:
+            tup = self.fw_ac_db.create_element('dpdk')
+            conf.append(tup)
+
+        conf['dpdk'].append(self.fw_ac_db.create_element('num-mbufs %d' %(buffers)))
         self.vpp_config_modified = True
         return True
+
+    def soft_check_vpp_workers_core(self, fix=False, silently=False, prompt=''):
+        """Check and set number of worker cores to process incoming packets.
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        # This function does the following:
+        # 1. sets "main-core", "corelist-worrkers" and "workers" in "cpu" section in /etc/vpp/startup.conf
+        # 2. sets "num-rx-queues" in "dpdk" section in /etc/vpp/startup.conf
+        # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/defualt/grub
+        # 4. sudo update-grub
+
+        if not fix or silently:
+            return True
+        # 'Fix' and 'silently' has no meaning for vpp configuration parameters,
+        # as any value is good for it, and if no value was configured,
+        # the exisiting values will be used, or zero if none.
+
+        num_worker_cores = psutil.cpu_count() - 1
+        input_cores = 0
+        while True:
+            str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
+            try:
+                if len(str_cores) == 0:
+                    break
+                input_cores = int(str_cores)
+                if input_cores > num_worker_cores:
+                    print ("Number of cores entered (%d) was set to maximum available (%d)" % (input_cores, num_worker_cores))
+                    input_cores = num_worker_cores
+                break
+            except Exception as e:
+                print(prompt + str(e))
+
+        conf = self.vpp_configuration
+        need_to_update = False
+
+        main_core_param                 = None
+        main_core_param_val             = 0
+        corelist_worker_param_nim_val   = 0
+        corelist_worker_param_max_val   = 0
+        corelist_worker_param           = None
+        corelist_worker_param_val       = None
+        workers_param                   = None
+        workers_param_val               = 0
+        num_of_rx_queues_param          = None
+        num_of_rx_queues_param_val      = -1
+        dev_default_key                 = 'dev default' # to avoid errors and mistypes
+
+        # if configuration files does not exist, create it, and create the 'cpu' and 'dpdk' sections.
+        if not conf:
+            conf = self.fw_ac_db.get_main_list()
+            tup = self.fw_ac_db.create_element('cpu')
+            conf.append(tup)
+            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0')) 
+            if input_cores == 0:
+                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 0'))
+            elif input_cores == 1:
+                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1'))
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1-%d' % (input_cores)))
+            conf['cpu'].append(self.fw_ac_db.create_element('workers %d' % (input_cores)))
+            self.vpp_config_modified = True
+
+            conf.append(self.fw_ac_db.create_element('dpdk'))
+            self._add_tup_to_dpdk(input_cores)
+            self.vpp_config_modified = True
+            self.update_grub = True
+            return True
+
+        # configuration file exist
+        string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
+        if string:
+            tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+            if tup_main_core:
+                main_core_param = tup_main_core[0]
+                tmp = re.split('\s+', main_core_param.strip())
+                main_core_param_val = int(tmp[1])
+
+        string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
+        if string:
+            tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+            if tup_core_list:
+                corelist_worker_param = tup_core_list[0]
+                tmp = re.split('\s+', corelist_worker_param.strip())
+                corelist_worker_param_val = tmp[1]
+                if corelist_worker_param_val.isdigit():
+                    corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
+                else:
+                    corelist_worker_param_nim_val = int(corelist_worker_param_val.split('-')[0])
+                    corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
+
+        string = self.fw_ac_db.get_element(conf['cpu'],'workers')
+        if string:
+            tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
+            if tup_workers:
+                workers_param = tup_workers[0]
+                tmp = re.split('\s+', workers_param.strip())
+                workers_param_val = int(tmp[1])
+
+        if conf and not conf['dpdk']:
+            conf.append(self.fw_ac_db.create_element('dpdk'))
+        if conf['dpdk'][dev_default_key]:
+            string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key],'num-rx-queues')
+            if string:
+                tup_num_rx = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
+                if tup_num_rx:
+                    num_of_rx_queues_param = tup_num_rx[0]
+                    tmp = re.split('\s+', num_of_rx_queues_param.strip())
+                    num_of_rx_queues_param_val = int(tmp[1])
+
+        # we assume the following configuration in 'cpu' and 'dpdk' sections:
+        # main-core 0
+        # corelist_workers 1-%input_cores
+        # workers %input_cores
+        # num-rx-queues %input_cores
+
+        # in case no multi core requested
+        if input_cores == 0:
+            if main_core_param:
+                self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
+            main_core_param = 'main-core 0'
+            conf['cpu'].append(self.fw_ac_db.create_element(main_core_param))
+
+            if corelist_worker_param:
+                self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
+            corelist_worker_param = 'corelist-workers 0' 
+            conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
+
+            if workers_param:
+                self.fw_ac_db.remove_element(conf['cpu'], workers_param)
+            workers_param = 'workers 0'
+            conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
+
+            if num_of_rx_queues_param:
+                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
+            num_of_rx_queues_param = 'num-rx-queues 0'
+            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
+
+            self.vpp_config_modified = True
+            self.update_grub = True
+            return True 
+
+        # in case multi core configured
+        if input_cores != 0:
+            new_main_core_param = 'main-core 0'
+            if main_core_param:
+                if main_core_param_val != 0:
+                    self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
+                    conf['cpu'].append(self.fw_ac_db.create_element(new_main_core_param))
+                    self.vpp_config_modified = True
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element(new_main_core_param))
+                self.vpp_config_modified = True
+
+            if input_cores == 1:
+                new_corelist_worker_param = 'corelist-workers 1'
+            else:
+                new_corelist_worker_param = 'corelist-workers 1-%d' % (input_cores)
+            if corelist_worker_param:
+                if corelist_worker_param_nim_val != 1 or corelist_worker_param_max_val != input_cores:
+                    self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
+                    conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
+                    self.vpp_config_modified = True
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
+                self.vpp_config_modified = True
+
+            new_workers_param = 'workers %d' % (input_cores)
+            if workers_param:
+                if workers_param_val != input_cores:
+                    self.fw_ac_db.remove_element(conf['cpu'], workers_param)
+                    conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
+                    self.vpp_config_modified = True
+            else:
+                conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
+                self.vpp_config_modified = True
+
+            if num_of_rx_queues_param_val != input_cores:
+                if conf['dpdk'] != None:
+                    if conf['dpdk'][dev_default_key]:
+                        new_num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
+                        string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key], 'num-rx-queues')
+                        if string:
+                            tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
+                            if tup:
+                                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], string)
+                            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
+                    else:
+                        self._add_tup_to_dpdk(input_cores)
+                        self.vpp_config_modified = True 
+
+            if self.vpp_config_modified == True:
+                self.update_grub = True
+            return True
+
+    def _add_tup_to_dpdk(self, num_of_cores):
+        """ 
+        adds 'def default' tuple to 'dpdk' and sets 'num-rx-queue' value
+
+        :param num_of_cores:  num of cores to handle incoming traffic
+
+        :returns True
+        """
+        # This function does the following:
+        # 1. create a new sub tuple in 'dpdk'
+        # 2. populated it with num-rx-queues %value
+        cfg = self.vpp_configuration
+        dev_default_key = 'dev default'
+        if cfg['dpdk'][dev_default_key] == None:
+            cfg['dpdk'].append(self.fw_ac_db.create_element(dev_default_key))
+            cfg['dpdk'][dev_default_key].append(self.fw_ac_db.create_element('num-rx-queues %d' % (num_of_cores)))
+
+        return True
+
+    def soft_check_cpu_power_saving(self, fix=False, silently=False, prompt=''):
+        """Set power saving on main core: add delay to polling frequancy to main core loop
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        # This function does the following:
+        # 1. Ask the user if to emable power saving mode
+        # 2. If so, set poll-sleep-usec parameter in startup.conf's unix 
+        #    section to some TBD value.
+
+        if not fix or silently:
+            return True
+
+        enable_ps_mode  = False
+        usec_rest       = 300
+        usec            = 0
+        conf            = self.vpp_configuration
+        conf_param      = None
+        if conf and conf['unix']:
+            string = self.fw_ac_db.get_element(conf['unix'], 'poll-sleep-usec')
+            if string:
+                tup = self.fw_ac_db.get_tuple_from_key(conf['unix'],string)
+                if tup:
+                    tmp = re.split('\s+', tup[0].strip())
+                    usec = int(tmp[1])
+                    conf_param = tup[0]
+
+        while True:
+            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")        
+            if str_ps_mode == 'Y' or str_ps_mode == 'y':
+                enable_ps_mode = True
+                break
+            elif str_ps_mode == 'N' or str_ps_mode == 'n' or str_ps_mode == '':
+                enable_ps_mode = False
+                break
+            else:
+                return True  #nothing to do
+
+        if enable_ps_mode == True:
+            if usec == usec_rest:
+                return True   #nothing to do
+            elif not conf:
+                    conf = self.fw_ac_db.get_main_list()
+                    if conf['unix'] is None:
+                        tup = self.fw_ac_db.create_element(conf,'unix')
+                        tup.append(self.fw_ac_db.create_elemen('poll-sleep-usec %d' %(usec_rest)))
+                        self.vpp_config_modified = True
+                        return True
+            else:
+                if conf_param:
+                    self.fw_ac_db.remove_element(conf['unix'], conf_param)
+                conf_param = 'poll-sleep-usec %d' % usec_rest
+                conf['unix'].append(self.fw_ac_db.create_element(conf_param))
+                self.vpp_config_modified = True
+                return True
+        else: # enable_ps_mode is False
+            if conf_param:
+                self.fw_ac_db.remove_element(conf['unix'], conf_param)
+                self.vpp_config_modified = True
+                return True
+
+        return True
+
+    def update_grub_file(self, reset=False):
+        """Update /etc/default/grub to work with configured number of cores.
+        """
+        # This function does the following:
+        # 1. check how many cores to update
+        # 2. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/defualt/grub
+        # 3. sudo update-grub
+        if self.update_grub == False:
+            return
+
+        num_of_workers_cores = 0
+        # if reset is True, the cfg points to the old configuration while we
+        # already copied the startup.conf.restore to startup.conf, so we can't
+        # take the old number of workers from the current DB. In case of reset,
+        # we need to explicit set the number of cores to zero.
+        if reset==False:
+            cfg = self.vpp_configuration
+            if cfg and cfg['cpu']:
+                string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
+                if string:
+                    tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                    if tup_workers:
+                        workers_param = tup_workers[0]
+                        tmp = re.split('\s+', workers_param.strip())
+                        num_of_workers_cores = int(tmp[1])
+
+        if num_of_workers_cores == 0:
+            update_line = ''
+        elif num_of_workers_cores == 1:
+            update_line = 'iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1'
+        else:
+            update_line = 'iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
+        grub_read_file  = '/etc/default/grub'
+        grub_write_file = '/etc/default/grub.tmp'
+
+        add_grub_line = False
+        grub_line_found = False
+        grub_line = ''
+        prefix_val = "GRUB_CMDLINE_LINUX_DEFAULT"
+        read_file  = open(grub_read_file, "r")
+        write_file = open(grub_write_file, "w")
+        for line in read_file:
+            if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
+                # no need to handle lines which are remarked
+                if line.startswith("#"):
+                    write_file.write(line)
+                else:
+                    #if line is found, remark it, and save its contents for later processing
+                    grub_line_found = True
+                    grub_line = line
+                    line = "# "+line
+                    write_file.write(line)
+            else:
+                write_file.write(line)
+
+    # remove old values if exist, so we can replace with ours.
+    # zero cores means reset to old line, without our additions
+        if grub_line_found == True:
+            add_grub_line = True
+            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
+            val_line = grub_line.split('=\"')[1].strip()
+            # take the GRUB_CMDLINE_LINUX_DEFAULT part
+            prefix_val = grub_line.split('=\"')[0]
+            val_line = val_line.strip('\" ')
+            #create a list of tokens from the val_line
+            val_line_list = re.split('\s+', val_line.strip())
+            #remove old values, if exist, so we can replace them with ourts
+            results = []
+            for elem in val_line_list:
+                if elem.startswith('iommu'):
+                    continue
+                elif elem.startswith('intel_iommu'):
+                    continue
+                elif elem.startswith('isolcpus'):
+                    continue
+                elif elem.startswith('nohz_full'):
+                    continue
+                elif elem.startswith('rcu_nocbs'):
+                    continue
+                results.append(elem)
+            #regroup val_line
+            val_line = " ".join(results)
+
+            #add our values.
+            if num_of_workers_cores!=0:
+                grub_line = prefix_val+ '=\"' + val_line + " " + update_line + '\"'
+            else:
+                grub_line = prefix_val+ '=\"' + val_line +'\"'
+            write_file.write(grub_line+'\n')
+        else:
+            grub_line = prefix_val+'\"' + update_line + '\"'
+            write_file.write(grub_line+'\n')
+
+        write_file.close()
+        read_file.close()
+        shutil.copyfile (grub_write_file, grub_read_file)
+        os.remove (grub_write_file)
+        if add_grub_line == True:
+            os.system ("sudo update-grub")
+        return
+

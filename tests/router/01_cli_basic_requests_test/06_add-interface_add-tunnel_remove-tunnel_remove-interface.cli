@@ -14,8 +14,9 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "8.8.1.1",
-    "dst": "8.8.1.2",
+    "src": "10.0.0.4",
+    "dst": "20.0.0.4",
+    "dstPort": "1068",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {
@@ -45,11 +46,7 @@
 {
   "entity":  "agent",
   "message": "remove-tunnel",
-  "params": {
-    "src": "8.8.1.1",
-    "dst": "8.8.1.2",
-    "tunnel-id": 1
-  }
+  "params": { "tunnel-id": 1 }
 }
 ,
 {
