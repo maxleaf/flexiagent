@@ -30,16 +30,16 @@
       "local-sa": {
          "spi": 5,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "4e2f8c6fcdd1bdafa13235d388e31bef",
+         "crypto-key": "4a506a794f574265564551694d653768",
          "integr-alg": "sha1-96",
-         "integr-key": "2e11aa3a41c04c6440cb39fa40313689"
+         "integr-key": "4339314b55523947594d6d3547666b45764e6a58"
       },
       "remote-sa": {
          "spi": 4,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "9be852e667ae2436d0197a91aca318a2",
+         "crypto-key": "4a506a794f574265564551694d653768",
          "integr-alg": "sha1-96",
-         "integr-key": "be6baffee24ec9f7aac8044ca859c40d"
+         "integr-key": "4339314b55523947594d6d3547666b45764e6a58"
       }
     },
     "loopback-iface": {
