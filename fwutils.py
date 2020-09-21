@@ -808,6 +808,7 @@ def stop_vpp():
                 dpdk.bind_one(dpdk.devices[d]["Slot"], drv, False)
                 break
     fwstats.update_state(False)
+    os.system('sudo netplan apply')
 
 def connect_to_router():
     """Connect to VPP Python API.
