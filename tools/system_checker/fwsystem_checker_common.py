@@ -922,7 +922,7 @@ class Checker:
         if conf['dpdk'] is None:
             tup = self.fw_ac_db.create_element('dpdk')
             conf.append(tup)
-        
+
         conf['dpdk'].append(self.fw_ac_db.create_element('num-mbufs %d' %(buffers)))
         self.vpp_config_modified = True
         return True
@@ -965,7 +965,7 @@ class Checker:
 
         conf = self.vpp_configuration
         need_to_update = False
-        
+
         main_core_param                 = None
         main_core_param_val             = 0
         corelist_worker_param_nim_val   = 0
@@ -999,7 +999,7 @@ class Checker:
             self.update_grub = True
             return True
 
-        # configuration file exist 
+        # configuration file exist
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
@@ -1007,7 +1007,7 @@ class Checker:
                 main_core_param = tup_main_core[0]
                 tmp = re.split('\s+', main_core_param.strip())
                 main_core_param_val = int(tmp[1])
-                    
+
         string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
         if string:
             tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
@@ -1028,7 +1028,7 @@ class Checker:
                 workers_param = tup_workers[0]
                 tmp = re.split('\s+', workers_param.strip())
                 workers_param_val = int(tmp[1])
- 
+
         if conf and not conf['dpdk']:
             conf.append(self.fw_ac_db.create_element('dpdk'))
         if conf['dpdk'][dev_default_key]:
@@ -1038,26 +1038,26 @@ class Checker:
                 if tup_num_rx:
                     num_of_rx_queues_param = tup_num_rx[0]
                     tmp = re.split('\s+', num_of_rx_queues_param.strip())
-                    num_of_rx_queues_param_val = int(tmp[1])                  
+                    num_of_rx_queues_param_val = int(tmp[1])
 
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
         # corelist_workers 1-%input_cores
         # workers %input_cores
         # num-rx-queues %input_cores
-        
+
         # in case no multi core requested
         if input_cores == 0:
             if main_core_param:
                 self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
             main_core_param = 'main-core 0'
             conf['cpu'].append(self.fw_ac_db.create_element(main_core_param))
-            
+
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
             corelist_worker_param = 'corelist-workers 0' 
             conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
-            
+
             if workers_param:
                 self.fw_ac_db.remove_element(conf['cpu'], workers_param)
             workers_param = 'workers 0'
@@ -1188,7 +1188,7 @@ class Checker:
 
         if enable_ps_mode == True:
             if usec == usec_rest:
-                return True   #nothing to do    
+                return True   #nothing to do
             elif not conf:
                     conf = self.fw_ac_db.get_main_list()
                     if conf['unix'] is None:
@@ -1209,9 +1209,9 @@ class Checker:
                 self.vpp_config_modified = True
                 return True
 
-        return True         
+        return True
 
-    def update_grub_file(self):
+    def update_grub_file(self, reset=False):
         """Update /etc/default/grub to work with configured number of cores.
         """
         # This function does the following:
@@ -1222,15 +1222,20 @@ class Checker:
             return
 
         num_of_workers_cores = 0
-        cfg = self.vpp_configuration
-        if cfg and cfg['cpu']:
-            string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
-            if string:
-                tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
-                if tup_workers:
-                    workers_param = tup_workers[0]
-                    tmp = re.split('\s+', workers_param.strip())
-                    num_of_workers_cores = int(tmp[1])
+        # if reset is True, the cfg points to the old configuration while we
+        # already copied the startup.conf.restore to startup.conf, so we can't
+        # take the old number of workers from the current DB. In case of reset,
+        # we need to explicit set the number of cores to zero.
+        if reset==False:
+            cfg = self.vpp_configuration
+            if cfg and cfg['cpu']:
+                string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
+                if string:
+                    tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                    if tup_workers:
+                        workers_param = tup_workers[0]
+                        tmp = re.split('\s+', workers_param.strip())
+                        num_of_workers_cores = int(tmp[1])
 
         if num_of_workers_cores == 0:
             update_line = ''
@@ -1273,23 +1278,21 @@ class Checker:
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
             #remove old values, if exist, so we can replace them with ourts
+            results = []
             for elem in val_line_list:
                 if elem.startswith('iommu'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:    
-                if elem.startswith('intel_iommu'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:         
-                if elem.startswith('isolcpus'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:  
-                if elem.startswith('nohz_full'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:        
-                if elem.startswith('rcu_nocbs'):
-                    val_line_list.remove(elem)
+                    continue
+                elif elem.startswith('intel_iommu'):
+                    continue
+                elif elem.startswith('isolcpus'):
+                    continue
+                elif elem.startswith('nohz_full'):
+                    continue
+                elif elem.startswith('rcu_nocbs'):
+                    continue
+                results.append(elem)
             #regroup val_line
-            val_line = " ".join(val_line_list)
+            val_line = " ".join(results)
 
             #add our values.
             if num_of_workers_cores!=0:
