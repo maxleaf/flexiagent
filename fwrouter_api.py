@@ -443,11 +443,19 @@ class FWROUTER_API:
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
 
+            # Connection to flexiManage can be lost on either start/stop-router
+            # success or failure, as interfaces are moved to/from Linux control.
+            # In this case re-establish connection as soon as possible.
+            #
+            if re.match('(start|stop)-router',  req):
+                fwglobals.g.fwagent.should_reconnect = True
+
         except Exception as e:
             err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
             if req == 'start-router' or req == 'stop-router':
                 self._set_router_failure("failed to " + req)
+                fwglobals.g.fwagent.should_reconnect = True
             raise e
 
         return {'ok':1}

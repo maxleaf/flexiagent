@@ -337,6 +337,8 @@ class FwAgent:
         cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
 
         self.ws.run_forever(sslopt={"cert_reqs": cert_required}, ping_interval=0)
+        self.ws = None
+
 		# DON'T USE ping_interval, ping_timeout !!!
 		# They might postpone ws.close()/ws.close(timeout=X) for ping_interval!
 		# That my stuck 'fwagent stop'/'systemtctl restart', where we clean resources on exit.
@@ -344,7 +346,9 @@ class FwAgent:
         #self.ws.run_forever(sslopt={"cert_reqs": cert_required},
         #                    ping_interval=0, ping_timeout=0)
         if self.connection_error_code:
+            fwglobals.log.error("connection to flexiWAN orchestrator was closed due to error: %s" % self.connection_error_msg)
             return False
+        fwglobals.log.info("connection to flexiWAN orchestrator was closed")
         return True
 
     def _on_error(self, ws, error):
@@ -484,14 +488,16 @@ class FwAgent:
         # We close the connection even if the request failed, as the change might have
         # taken place regardless of the request status, hence socket might not be operational.
         #
-        if self.should_reconnect == True:
-            fwglobals.log.info("_on_message: device changed, closing connection to orchestrator")
+        if self.should_reconnect == True or self.ws == None:
+            fwglobals.log.info("_on_message: re-establish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
             self.connection_error_code = fwglobals.g.WS_STATUS_DEVICE_CHANGE
             self.connection_error_msg = 'device change'
-            ws.close()
+            if self.ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
+                fwglobals.log.info("_on_message: closing connection to orchestrator")
+                self.ws.close()
         else:
-            ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
+            self.ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
 
     def disconnect(self):
         """Shutdowns the WebSocket connection.
