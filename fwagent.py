@@ -474,12 +474,14 @@ class FwAgent:
         """
         pmsg    = json.loads(message)
         request = pmsg['msg']
+        seq     = str(pmsg['seq'])              # Sequence number of the received message
+        job_id  = str(pmsg.get('jobid',''))     # ID of job on flexiManage that sent this message
 
-        fwglobals.log.debug(str(pmsg['seq']) + " request=" + json.dumps(request))
+        fwglobals.log.debug(seq + " job_id=" + job_id + " request=" + json.dumps(request))
 
         reply = self.handle_received_request(request)
 
-        fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
+        fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply))
 
         # Messages that change the interfaces might cause the existing connection to break
         # (for example, if the IP/mask has changed). Since sending the reply on a broken
