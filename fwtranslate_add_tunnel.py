@@ -351,7 +351,7 @@ def _add_bridge(cmd_list, bridge_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "bridge_domain_add_del"
-    cmd['cmd']['params']    = { 'bd_id':bridge_id , 'is_add':1, 'learn':0, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':1 }
+    cmd['cmd']['params']    = { 'bd_id':bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0 }
     cmd['cmd']['descr']     = "create bridge"
     cmd['revert'] = {}
     cmd['revert']['name']   = 'bridge_domain_add_del'
@@ -359,13 +359,14 @@ def _add_bridge(cmd_list, bridge_id):
     cmd['revert']['descr']  = "delete bridge"
     cmd_list.append(cmd)
 
-def _add_interface_to_bridge(cmd_list, iface_description, bridge_id, bvi, cache_key):
+def _add_interface_to_bridge(cmd_list, iface_description, bridge_id, bvi, shg, cache_key):
     """Add interface to bridge command into the list.
 
     :param cmd_list:            List of commands.
     :param iface_description:   Interface name.
     :param bridge_id:           Bridge identifier.
     :param bvi:                 Use BVI.
+    :param shg:                 Split horizon group number.
     :param cache_key:           Cache key of the tunnel to be used by others.
 
     :returns: None.
@@ -376,7 +377,7 @@ def _add_interface_to_bridge(cmd_list, iface_description, bridge_id, bvi, cache_
     cmd['cmd']['name']    = "sw_interface_set_l2_bridge"
     cmd['cmd']['descr']   = "add interface %s to bridge" % iface_description
     cmd['cmd']['params']  = { 'substs': [ { 'add_param':'rx_sw_if_index', 'val_by_key':cache_key} ],
-                              'bd_id':bridge_id , 'enable':1, 'port_type':bvi }         # port_type 1 stands for BVI (see test\vpp_l2.py)
+                              'bd_id':bridge_id , 'enable':1, 'port_type':bvi, 'shg':shg }         # port_type 1 stands for BVI (see test\vpp_l2.py)
     cmd['revert'] = {}
     cmd['revert']['name']   = 'sw_interface_set_l2_bridge'
     cmd['revert']['descr']  = "remove interface %s from bridge" % iface_description
@@ -615,12 +616,14 @@ def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 iface_description='loop0_' + params['loopback-iface']['addr'],
                 bridge_id=bridge_id,
                 bvi=1,
+                shg=0,
                 cache_key='loop0_sw_if_index')
     _add_interface_to_bridge(
                 cmd_list,
                 iface_description='l2gre_tunnel',
                 bridge_id=bridge_id,
                 bvi=0,
+                shg=1,
                 cache_key='gre_tunnel_sw_if_index')
 
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
@@ -654,12 +657,14 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 iface_description='loop1_' + loop1_cfg['addr'],
                 bridge_id=bridge_id,
                 bvi=1,
+                shg=0,
                 cache_key='loop1_sw_if_index')
     _add_interface_to_bridge(
                 cmd_list,
                 iface_description='vxlan_tunnel',
                 bridge_id=bridge_id,
                 bvi=0,
+                shg=1,
                 cache_key='vxlan_tunnel_sw_if_index')
 
     # Configure static ARP for remote loop1 IP.
