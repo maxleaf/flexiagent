@@ -356,7 +356,7 @@ if __name__ == '__main__':
     try:
         pid = subprocess.check_output(['pidof', 'vpp'])
         # If we reached this point, i.e. if no exception occurred, the vpp pid was found
-        print ("error: router runs (pid=%s), too late to check the system" % pid)
+        print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
         exit(FW_EXIT_CODE_OK)
     except:
         pass
