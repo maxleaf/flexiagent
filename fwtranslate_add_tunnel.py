@@ -642,8 +642,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 cmd_list,
                 'loop1_sw_if_index',
                 loop1_cfg,
-                id=bridge_id,
-                internal=True)
+                id=bridge_id)
     _add_bridge(
                 cmd_list, bridge_id)
     _add_vxlan_tunnel(
