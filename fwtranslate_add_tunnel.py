@@ -256,7 +256,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
         cmd['cmd']['name']      = "sw_interface_set_flags"
         cmd['cmd']['descr']     = "UP loopback interface %s" % addr
         cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'flags':2 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
+                                    'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
                                   }
         cmd['revert'] = {}
         cmd['revert']['name']   = "sw_interface_set_flags"
@@ -448,7 +448,7 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
     cmd['cmd']['name']    = "sw_interface_set_flags"
     cmd['cmd']['descr']   = "UP GRE tunnel %s -> %s" % (src, dst)
     cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'flags':2 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
+                              'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
                             }
     cmd_list.append(cmd)
 
@@ -496,7 +496,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst):
     cmd['cmd']['name']    = "sw_interface_set_flags"
     cmd['cmd']['descr']   = "UP vxlan tunnel %s -> %s" % (src, dst)
     cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'flags':2 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
+                              'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
                             }
     cmd_list.append(cmd)
 
