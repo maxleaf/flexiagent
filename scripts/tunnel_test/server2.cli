@@ -3,34 +3,28 @@
 	"entity": "agent",
 	"message": "start-router",
 	"params": {
-		"default-route": "192.168.31.1",
+		"default-route": "192.168.0.1",
 	"interfaces": [
 	   {
 		"pci": "0000:00:03.00",
-		"addr": "192.168.31.47/24",
+		"addr": "192.168.0.104/24",
 		"type":"wan"
 	   },
 	   {
 		"pci": "0000:00:08.00",
-		"addr": "10.10.10.1/24",
+		"addr": "20.20.20.1/24",
 		"routing":"ospf",
 		"type":"lan"
 	   }
-	   ],
-    "routes": [
-      {
-        "addr": "default",
-        "via": "192.168.31.1"
-      }
-      ]
+	   ]
 	}
 },
 {
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "192.168.31.47",
-    "dst": "192.168.31.76",
+    "src": "192.168.0.104",
+    "dst": "192.168.0.105",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {
