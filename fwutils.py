@@ -214,10 +214,9 @@ def get_linux_interface_gateway(if_name):
     except:
         return '', ''
 
-    metric = ''
-
     routes = dgw.splitlines()
     for route in routes:
+        metric = ''
         rip = route.split('via ')[1].split(' ')[0]
         rdev = route.split('dev ')[1].split(' ')[0]
         metric_str = route.split('metric ')
