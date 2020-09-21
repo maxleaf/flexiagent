@@ -54,11 +54,10 @@ def tunnel_stats_get_ping_time(host):
     :returns: RTT value on success and 0 otherwise.
     """
     host = host.split(':')[0]
-    cmd = "fping {host} -C 2 -q".format(host=host)
+    cmd = "fping {host} -C 2 -B 2.0 -q".format(host=host)
     res = [float(x) for x in tunnel_stats_get_simple_cmd_output(cmd).strip().split(':')[-1].split() if x != '-']
-    l_res = len(res)
-    if l_res > 0:
-        return sum(res) / l_res
+    if len(res) > 0:
+        return sum(res) / len(res)
     else:
         return 0
 

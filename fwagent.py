@@ -411,7 +411,7 @@ class FwAgent:
 
         def run(*args):
             slept = 0
-            
+
             while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
@@ -678,6 +678,12 @@ def show(agent_info, router_info):
             fwglobals.log.info("Agent cache...")
             cache = daemon_rpc('cache')
             fwglobals.log.info(pprint.pformat(cache, indent=1))
+        if agent_info == 'threads':
+            fwglobals.log.info("Agent threads...")
+            thread_list = daemon_rpc('threads')
+            if thread_list:
+                for name in thread_list:
+                    fwglobals.log.info(name)
 
     if router_info:
         if router_info == 'state':
@@ -842,6 +848,16 @@ class FwagentDaemon(object):
         :returns: cache maps.
         """
         return (fwglobals.g.AGENT_CACHE)
+
+    def threads(self):
+        """show agent threads.
+
+        :returns: list of thread names
+        """
+        thread_list = []
+        for thd in threading.enumerate():
+            thread_list.append(thd.name)
+        return (thread_list)
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -1093,7 +1109,7 @@ if __name__ == '__main__':
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
     parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
                         help="show various router parameters")
-    parser_show.add_argument('--agent', choices=['version', 'cache'],
+    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,

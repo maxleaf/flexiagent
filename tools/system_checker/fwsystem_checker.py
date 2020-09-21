@@ -219,7 +219,7 @@ def reset_system_to_defaults(checker):
     """ reset vpp configuration to default
 
     :returns: 'True' if succeeded.
-    """ 
+    """
     # This function does the following:
     # 1. Copies the startup.conf.orig over the start.conf and startup.conf.baseline files.
     # 2. reset /etc/default/grub to a single core configuration
@@ -235,10 +235,10 @@ def reset_system_to_defaults(checker):
             if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
                 shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
             checker.update_grub = True
-            checker.update_grub_file()
+            checker.update_grub_file(True)
             reboot_needed = True
             break
-    
+
     if reboot_needed == True:
         while True:
             choice = raw_input("Reboot the system? [Y/n]: ")

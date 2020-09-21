@@ -99,10 +99,14 @@ class FwRouterCfg:
         :param: listener - string representing the module. For logging.
         :param: callback - the callback used to listen to requests.
         """
+        remove_list = []
         for elem in self.callbacks:
             if elem['callback'] == callback:
                 fwglobals.log.debug("Unregister %s module's callback %s" \
                     %(listener, callback.__name__))
+                remove_list.append(elem)
+        for elem in remove_list:
+            if elem in self.callbacks():
                 self.callbacks.remove(elem)
 
     def clean(self):
@@ -344,14 +348,16 @@ class FwRouterCfg:
         interfaces = self._get_requests('add-interface')
         if not type and not pci and not ip:
             return interfaces
+        result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
-                interfaces.remove(params)
+                continue
             elif pci and pci != params['pci']:
-                interfaces.remove(params)
+                continue
             elif ip and not re.match(ip, params['addr']):
-                interfaces.remove(params)
-        return interfaces
+                continue
+            result.append(params)
+        return result
 
     def get_tunnels(self):
         return self._get_requests('add-tunnel')
