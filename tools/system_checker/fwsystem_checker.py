@@ -76,7 +76,7 @@ soft_checkers = [
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
-    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
+    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
 	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
@@ -348,6 +348,19 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     global arg
+
+    # Ensure that VPP does not run.
+    # Otherwise driver interface checks might fail and user will be scared for
+    # no reason. Note it is too late to check system, if router was started :)
+    #
+    try:
+        pid = subprocess.check_output(['pidof', 'vpp'])
+        # If we reached this point, i.e. if no exception occurred, the vpp pid was found
+        print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
+        exit(FW_EXIT_CODE_OK)
+    except:
+        pass
+
 
     parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
     parser.add_argument('-c', '--check_only', action='store_true',
