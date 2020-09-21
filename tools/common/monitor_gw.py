@@ -48,8 +48,11 @@ def update_gateway_metric(ip, line, new_metric):
         new_line = line + ' metric ' + str(new_metric)
 
     if (line != new_line):
+        print ("Modifying routes:")
         cmd = "sudo ip route del " + line
         new_cmd = "sudo ip route add " + new_line
+        print ("  - Old Route: " + cmd)
+        print ("  + New Route: " + new_cmd)
         check_output(cmd)
         check_output(new_cmd)
 
