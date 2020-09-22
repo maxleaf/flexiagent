@@ -351,7 +351,7 @@ def _add_bridge(cmd_list, bridge_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "bridge_domain_add_del"
-    cmd['cmd']['params']    = { 'bd_id':bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0 }
+    cmd['cmd']['params']    = { 'bd_id':bridge_id , 'is_add':1, 'learn':0, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':1 }
     cmd['cmd']['descr']     = "create bridge"
     cmd['revert'] = {}
     cmd['revert']['name']   = 'bridge_domain_add_del'
@@ -642,7 +642,8 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 cmd_list,
                 'loop1_sw_if_index',
                 loop1_cfg,
-                id=bridge_id)
+                id=bridge_id,
+                internal=True)
     _add_bridge(
                 cmd_list, bridge_id)
     _add_vxlan_tunnel(
@@ -680,11 +681,11 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "exec"
     cmd['cmd']['descr']   = "add static arp entry %s %s" % (remote_loop1_ip, remote_loop1_mac)
-    cmd['cmd']['params']  = ["sudo vppctl set ip arp loop%d %s %s static" % (bridge_id, remote_loop1_ip, remote_loop1_mac)]
+    cmd['cmd']['params']  = ["sudo vppctl set ip neighbor loop%d %s %s static" % (bridge_id, remote_loop1_ip, remote_loop1_mac)]
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
     cmd['revert']['descr']  = "delete static arp entry %s %s" % (remote_loop1_ip, remote_loop1_mac)
-    cmd['revert']['params'] = ["sudo vppctl set ip arp del loop%d %s %s static" % (bridge_id, remote_loop1_ip, remote_loop1_mac)]
+    cmd['revert']['params'] = ["sudo vppctl set ip neighbor del loop%d %s %s static" % (bridge_id, remote_loop1_ip, remote_loop1_mac)]
     cmd_list.append(cmd)
 
 
