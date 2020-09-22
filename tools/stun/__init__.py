@@ -145,12 +145,11 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                 received = True
             except Exception as e:
                 received = False
-
-            if count > 0:
-                count -= 1
-            else:
-                retVal['Resp'] = False
-                return retVal
+                if count > 0:
+                    count -= 1
+                else:
+                    retVal['Resp'] = False
+                    return retVal
         msgtype = b2a_hexstr(buf[0:2])
         #FLEXIWAN_FIX
         try:
