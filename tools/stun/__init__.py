@@ -3,6 +3,7 @@ import logging
 import random
 import socket
 import os
+import errno
 import sys
 import traceback
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
@@ -26,8 +27,9 @@ STUN_SERVERS = (
 
 """
 for testing none responsive STUN server
+
 STUN_SERVERS = (
- 'stun.voxgratia.org',   
+ 'stun.voxgratia.org',
 )
 """
 
@@ -124,30 +126,31 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
     data = binascii.a2b_hex(str_data)
     recvCorr = False
     while not recvCorr:
-        buf = 0
-        recieved = False
+        num_bytes = 0
+        buf = None
+        addr = None
+        received = False
         count = 3
-        while not recieved:
+        while not received:
             if port != None and host != None:
                 fwglobals.log.debug("Stun: sendto: %s:%d" %(host, port))
             try:
-                sock.sendto(data, (host, port))
-            except socket.gaierror:
-                fwglobals.log.error("Stun: got socket.gaierror exception")
+                num_bytes = sock.sendto(data, (host, port))
+            except Exception as e:
                 retVal['Resp'] = False
                 return retVal
             try:
                 buf, addr = sock.recvfrom(2048)
                 fwglobals.log.debug("Stun: recvfrom: %s" %(str(addr)))
-                recieved = True
+                received = True
             except Exception as e:
-                fwglobals.log.error("Got exception from recvfrom: %s, %s" % (str(e), str(traceback.format_exc())))
-                recieved = False
-                if count > 0:
-                    count -= 1
-                else:
-                    retVal['Resp'] = False
-                    return retVal
+                received = False
+
+            if count > 0:
+                count -= 1
+            else:
+                retVal['Resp'] = False
+                return retVal
         msgtype = b2a_hexstr(buf[0:2])
         #FLEXIWAN_FIX
         try:
@@ -286,7 +289,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     It retrieves the STUN type, the public IP as seen from the STUN on the other side of the
     NAT, and the public port.
     : param : source_ip          - the local source IP on behalf NAT request is sent
-    : param : source_port        - the local source port on bahlf NAT request is sent
+    : param : source_port        - the local source port on behalf NAT request is sent
     : param : stun_host          - the stun server host name or IP address
     : param : stun_port          - the stun server port
     : param : stop_after_one_try - in case of Register message, we want to sent only one

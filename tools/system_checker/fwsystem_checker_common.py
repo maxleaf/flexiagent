@@ -168,18 +168,23 @@ class Checker:
 
         :returns: 'True' if check is successful and 'False' otherwise.
         """
+        def _print_without_line_feed(str):
+            # So odd print is needed to enforce no line feed, so next print()
+            # will override this line.
+            print str,
+            sys.stdout.flush() # Need this as tail ',' removes the 'newline' in print(), so the print is not flushed immediately
+
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            print "\rcheck WAN connectivity on %s" % iface,
-            sys.stdout.flush()      # Need this as tail ',' remove the 'newline' in print(), so the print is not flushed immediately
+            _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
             ret = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
             if ret == 0:
                 self.wan_interfaces.append(str(iface))
-        print "\r                                                         \r",  # Clean the line before it is overwrote by next print
-        if len(self.wan_interfaces) == 0:
-            return False
-        return True
+                _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+                return True
+        _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+        return False
 
     def hard_check_kernel_io_modules(self, supported):
         """Check kernel IP modules presence.
@@ -282,8 +287,10 @@ class Checker:
                 uuid_obj = uuid.UUID(found_uuid)
                 if uuid_obj.variant==uuid.RFC_4122 and not uuid_obj.version:
                     raise Exception("failed to deduce version of found UUID according RFC4122: %s" % found_uuid)
+                if found_uuid == "03000200-0400-0500-0006-000700080009":
+                    raise Exception("found UUID is not legal: %s" % found_uuid)
             except ValueError:
-                raise Exception("found UUID '%s' doesn't comply to RFC" % found_uuid)
+                raise Exception("found UUID doesn't comply to RFC: %s" % found_uuid)
             return True
 
         except Exception as e:
@@ -534,7 +541,7 @@ class Checker:
 
         for fname in files:
             with open(fname, 'r') as stream:
-                yaml.load(stream)
+                yaml.safe_load(stream)
 
     def _get_duplicate_interface_definitions(self):
         files = glob.glob("/etc/netplan/*.yaml") + \
@@ -729,24 +736,22 @@ class Checker:
         """
         # Ensure that the /sys/kernel/mm/transparent_hugepage/enabled file includes [never].
         # Note this file uses '[]' to denote the chosen option.
-        filename = '/sys/kernel/mm/transparent_hugepage/enabled'
-
-        # If we installed 'hugepages' utility by previous invocation of this checker,
-        # just go and call it to disable the Transparent Hugepages.
-        # We do it on every checker invocation as the utility result doesn't persist reboot :(
-        # And it is not easy anymore (since 18.04) to configure Ubuntu to run scripts on startup.
-        ret = os.system('dpkg -l | grep hugepages > /dev/null')
-        if ret == 0:
-            os.system('hugeadm --thp-never')
-
-        # Now perform the check
-        with open(filename, "r") as f:
+        thp_filename = '/sys/kernel/mm/transparent_hugepage/enabled'
+        with open(thp_filename, "r") as f:
             first_line = f.readlines()[0]
             if re.search('\[never\]', first_line):
                 return True
+        # Ensure that the /etc/default/grub file includes the "transparent_hugepage=never"
+        # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
+        grub_filename = '/etc/default/grub'
+        try:
+            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).strip()
+            return True   # No exception - grep found the pattern
+        except subprocess.CalledProcessError:
+            pass
 
         if not fix:
-            print(prompt + "'never' is not chosen in %s" % filename)
+            print(prompt + "'never' is neither chosen in %s nor defined in %s" % (thp_filename, grub_filename))
             return False
 
         # Disable transparent hugepages:
@@ -769,25 +774,37 @@ class Checker:
         # Trial #3:
         # Install hugepages soft and use it.
         # Seems to work. But requires run of 'hugeadm --thp-never' after every reboot!
+        # This option requires interactive mode of system checker,
+        # so user could approve installation of the third party software.
+        # So silent mode does not work! And this confuses a lot.
         # -----------------------------------------------------------
-        ret = os.system('dpkg -l | grep hugepages > /dev/null')
+        # Trial #4:
+        # Use mix of commands:
+        # 1. echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        #    This should disable transparent hugepages for current session only.
+        #    Next reboot will restore original value.
+        # 2. Add "transparent_hugepage=never" to the the GRUB_CMDLINE_LINUX_DEFAULT
+        #    option in the /etc/default/grub file.
+        #    This should disable transparent hugepages permanently, so it will
+        #    survive next and future reboots.
+        # -----------------------------------------------------------
+
+        # Move selection (square brackets) to the 'never' option in the transparent_hugepage file.
+        # Note the 'echo' below does not override the file, but selects [never] option instead!
+        #
+        cmd = 'echo never > ' + thp_filename
+        ret = os.system(cmd)
         if ret != 0:
-            # Ask user approval to install the 3rd party
-            if not silently:
-                while True:
-                    choice = raw_input(prompt + "install 'hugepages' utility (required for configuration)? [Y/n]: ")
-                    if choice == 'y' or choice == 'Y' or choice == '':
-                        break
-                    elif choice == 'n' or choice == 'N':
-                        return False
-            cmd = 'apt -y install hugepages'
-            ret = os.system(cmd)
-            if ret != 0:
-                print(prompt + "'%s' failed (%d)" % (cmd,ret))
-                return False
-        ret = os.system('hugeadm --thp-never')
+            print(prompt + "%s - failed (%d)" % (cmd,ret))
+            return False
+
+        # Update the grub file
+        #
+        cmd = 'sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\\"transparent_hugepage=never /" ' + grub_filename
+        print(cmd)
+        ret = os.system(cmd)
         if ret != 0:
-            print(prompt + "'hugeadm --thp-never' failed (%d)" % (cmd,ret))
+            print(prompt + "%s - failed (%d)" % (cmd,ret))
             return False
         return True
 
@@ -922,7 +939,7 @@ class Checker:
         if conf['dpdk'] is None:
             tup = self.fw_ac_db.create_element('dpdk')
             conf.append(tup)
-        
+
         conf['dpdk'].append(self.fw_ac_db.create_element('num-mbufs %d' %(buffers)))
         self.vpp_config_modified = True
         return True
@@ -965,7 +982,7 @@ class Checker:
 
         conf = self.vpp_configuration
         need_to_update = False
-        
+
         main_core_param                 = None
         main_core_param_val             = 0
         corelist_worker_param_nim_val   = 0
@@ -999,7 +1016,7 @@ class Checker:
             self.update_grub = True
             return True
 
-        # configuration file exist 
+        # configuration file exist
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
@@ -1007,7 +1024,7 @@ class Checker:
                 main_core_param = tup_main_core[0]
                 tmp = re.split('\s+', main_core_param.strip())
                 main_core_param_val = int(tmp[1])
-                    
+
         string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
         if string:
             tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
@@ -1028,7 +1045,7 @@ class Checker:
                 workers_param = tup_workers[0]
                 tmp = re.split('\s+', workers_param.strip())
                 workers_param_val = int(tmp[1])
- 
+
         if conf and not conf['dpdk']:
             conf.append(self.fw_ac_db.create_element('dpdk'))
         if conf['dpdk'][dev_default_key]:
@@ -1038,26 +1055,26 @@ class Checker:
                 if tup_num_rx:
                     num_of_rx_queues_param = tup_num_rx[0]
                     tmp = re.split('\s+', num_of_rx_queues_param.strip())
-                    num_of_rx_queues_param_val = int(tmp[1])                  
+                    num_of_rx_queues_param_val = int(tmp[1])
 
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
         # corelist_workers 1-%input_cores
         # workers %input_cores
         # num-rx-queues %input_cores
-        
+
         # in case no multi core requested
         if input_cores == 0:
             if main_core_param:
                 self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
             main_core_param = 'main-core 0'
             conf['cpu'].append(self.fw_ac_db.create_element(main_core_param))
-            
+
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
             corelist_worker_param = 'corelist-workers 0' 
             conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
-            
+
             if workers_param:
                 self.fw_ac_db.remove_element(conf['cpu'], workers_param)
             workers_param = 'workers 0'
@@ -1188,7 +1205,7 @@ class Checker:
 
         if enable_ps_mode == True:
             if usec == usec_rest:
-                return True   #nothing to do    
+                return True   #nothing to do
             elif not conf:
                     conf = self.fw_ac_db.get_main_list()
                     if conf['unix'] is None:
@@ -1209,9 +1226,9 @@ class Checker:
                 self.vpp_config_modified = True
                 return True
 
-        return True         
+        return True
 
-    def update_grub_file(self):
+    def update_grub_file(self, reset=False):
         """Update /etc/default/grub to work with configured number of cores.
         """
         # This function does the following:
@@ -1222,15 +1239,20 @@ class Checker:
             return
 
         num_of_workers_cores = 0
-        cfg = self.vpp_configuration
-        if cfg and cfg['cpu']:
-            string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
-            if string:
-                tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
-                if tup_workers:
-                    workers_param = tup_workers[0]
-                    tmp = re.split('\s+', workers_param.strip())
-                    num_of_workers_cores = int(tmp[1])
+        # if reset is True, the cfg points to the old configuration while we
+        # already copied the startup.conf.restore to startup.conf, so we can't
+        # take the old number of workers from the current DB. In case of reset,
+        # we need to explicit set the number of cores to zero.
+        if reset==False:
+            cfg = self.vpp_configuration
+            if cfg and cfg['cpu']:
+                string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
+                if string:
+                    tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                    if tup_workers:
+                        workers_param = tup_workers[0]
+                        tmp = re.split('\s+', workers_param.strip())
+                        num_of_workers_cores = int(tmp[1])
 
         if num_of_workers_cores == 0:
             update_line = ''
@@ -1273,23 +1295,21 @@ class Checker:
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
             #remove old values, if exist, so we can replace them with ourts
+            results = []
             for elem in val_line_list:
                 if elem.startswith('iommu'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:    
-                if elem.startswith('intel_iommu'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:         
-                if elem.startswith('isolcpus'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:  
-                if elem.startswith('nohz_full'):
-                    val_line_list.remove(elem)
-            for elem in val_line_list:        
-                if elem.startswith('rcu_nocbs'):
-                    val_line_list.remove(elem)
+                    continue
+                elif elem.startswith('intel_iommu'):
+                    continue
+                elif elem.startswith('isolcpus'):
+                    continue
+                elif elem.startswith('nohz_full'):
+                    continue
+                elif elem.startswith('rcu_nocbs'):
+                    continue
+                results.append(elem)
             #regroup val_line
-            val_line = " ".join(val_line_list)
+            val_line = " ".join(results)
 
             #add our values.
             if num_of_workers_cores!=0:

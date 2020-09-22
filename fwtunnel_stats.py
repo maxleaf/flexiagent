@@ -26,7 +26,6 @@ import time
 from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
-
 import fwglobals
 
 tunnel_stats_global = {}
@@ -45,7 +44,7 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     """
     args = shlex.split(cmd)
     return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0]
- 
+
 def tunnel_stats_get_ping_time(host):
     """Use fping to get RTT.
 
@@ -121,7 +120,7 @@ def tunnel_stats_get():
     cur_time = time.time()
 
     for key, value in tunnel_stats_global.items():
-        tunnel_stats[key] = dict()
+        tunnel_stats[key] = {}
         tunnel_stats[key]['rtt'] = value['rtt']
         tunnel_stats[key]['drop_rate'] = value['drop_rate']
 

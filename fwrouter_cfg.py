@@ -99,11 +99,15 @@ class FwRouterCfg:
         :param: listener - string representing the module. For logging.
         :param: callback - the callback used to listen to requests.
         """
+        result_list = []
         for elem in self.callbacks:
             if elem['callback'] == callback:
                 fwglobals.log.debug("Unregister %s module's callback %s" \
                     %(listener, callback.__name__))
-                self.callbacks.remove(elem)
+                continue
+            result_list.append(elem)
+
+        self.callbacks=result_list
 
     def clean(self):
         """Clean DB
