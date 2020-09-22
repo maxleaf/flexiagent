@@ -616,7 +616,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 bridge_id,
                 l2gre_tunnel_ips['src'],
                 l2gre_tunnel_ips['dst'],
-                int(params['dstPort']))
+                int(params.get('dstPort', 4789)))
     _add_interface_to_bridge(
                 cmd_list,
                 iface_description='loop1_' + loop1_cfg['addr'],
