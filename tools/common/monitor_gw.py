@@ -71,7 +71,7 @@ def get_gateways():
     gateways = check_output(cmd).splitlines()
     res = {}
     for gw in gateways:
-        metric = '100'
+        metric = '0'
         proto = ''
         gwIp = gw.split('via ')[1].split(' ')[0]
         if 'metric ' in gw:
