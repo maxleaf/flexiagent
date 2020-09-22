@@ -10,21 +10,21 @@ sys.path.append(tools)
 import stun
 
 class FwStunWrap:
-    'Class to handle STUN resuests and reposnses'
+    'Class to handle STUN requests and responses'
     """
     The router configuration file contains a list of interfaces that are
     added to the system. We go over the file and scan for "add-interface" keys.
     For that key, we look for its IP address and GW address. If the interface has
     both IP address and GW address, it means it can access the internet. If this
-    is the case, we need to find out, if we're beinhd NAT, what is the public
+    is the case, we need to find out, if we're behind NAT, what is the public
     IP and port of that address.
-    So we add them to a section on a gloval cache, and sends STUN request for
-    each of the addresses. For those we get an asnwer, we mark a 'success' flag.
+    So we add them to a section on a global cache, and sends STUN request for
+    each of the addresses. For those we get an answer, we mark a 'success' flag.
     For those we did not, we start resending STUN requests, with increased delay
     between each. We start with 1 sec, then 2, then 4, and ends with 60. Once
-    we reach 60 seconds, we continue sending re-trasnission of the requests
+    we reach 60 seconds, we continue sending re-transmission of the requests
     every 60 seconds. Note, those counters are managed for each of the addresses
-    seperatly.  
+    separately.
 
     From globals, we use the global cache, and create fwglobals.g.AGENT_CACHE['stun_interfaces']
     sub dictionary. This dictionary has the following structure:
@@ -36,19 +36,8 @@ class FwStunWrap:
         'success':
         'stun_server':
         'stun_server_port':
+        'nat_type':
     }
-    """
-
-
-    """
-    if this will ever become a thread of its own, it is already ready
-
-    def run(self):
-        while self.is_running == True:
-            time.sleep(1)
-            #counter+=1
-            self.increase_sec()
-            self.send_stun_request()
     """
 
     def log_address_cache(self):
@@ -82,11 +71,7 @@ class FwStunWrap:
 
     def add_addr(self, addr, params=None):
         """
-        Add address to chace. There are two cases here:
-        1. The address already has public port and IP as part of its parameters,
-        because this is how we got it from management, due to previous
-        STUN requests (add-interface)
-        2. The addres is new and has no public information.
+        Add address to cache.
         """
         c = self.local_cache['stun_interfaces']
         #1 add address with public info, over-written the address if exist in cache.
@@ -94,7 +79,7 @@ class FwStunWrap:
             self.reset_addr(addr)
             c[addr]['public_ip']        = params['PublicIp']
             c[addr]['public_port']      = params['PublicPort']
-            c[addr]['sucess']           = True
+            c[addr]['success']          = True
             c[addr]['stun_server']      = None
             c[addr]['stun_server_port'] = None
             fwglobals.log.debug("adding address %s to Cache" %(str(addr)))
@@ -106,6 +91,8 @@ class FwStunWrap:
             c[addr]['stun_server_port'] = None
             fwglobals.log.debug("adding address %s to Cache" %(str(addr)))
         else:
+        #3 just make sure we are sending STUN request on an address already in cache
+            c[addr]['success']          = False
             fwglobals.log.debug("address %s already in Cache" %(str(addr)))
 
     def remove_addr(self, addr):
@@ -130,13 +117,13 @@ class FwStunWrap:
         """
         resets info for an address, as if it never got a STUN reply.
         We will use it everytime we need to reset address's data, such as in the case
-        when we detect that a tunnel is dicsonnceted, and we need to start sending STUN request
+        when we detect that a tunnel is disconnected, and we need to start sending STUN request
         for it. If the address is already in the cache, its values will be over-written.
 
         Stun server and port will not be reset, because we want to map an address to the same
         STUN server, meaning an interface will send STUN requests to the same STUN server
         always, unless the STUN server went down or the request timed-out. In that case,
-        the unerlying level will replace the STUN server in find_srcip_public_addr().
+        the underlying level will replace the STUN server in find_srcip_public_addr().
 
         we initialize 'next_time' to 30, because this is the everage time it take for
         a tunnel to get connected, so no point in sending STUN requests for disconnected tunnel
@@ -153,7 +140,7 @@ class FwStunWrap:
 
     def increase_sec(self):
         """
-        For each address not recieved an answer, increase the seconds counter
+        For each address not received an answer, increase the seconds counter
         by 1.
         """
         for addr in self.local_cache['stun_interfaces'].keys():
@@ -165,7 +152,7 @@ class FwStunWrap:
         """
         Handle non response after STUN request was sent.
         double the delay between retransmission, until reaching 60. Then
-        continue with 60 until an answer will be recieved.
+        continue with 60 until an answer will be received.
         """
         addr = self.local_cache['stun_interfaces'][address]
         if addr['next_time'] < 60:
@@ -176,7 +163,7 @@ class FwStunWrap:
 
     def _handle_stun_response(self, address, public_ip, public_port):
         """
-        Handle STUN reposnse for an address. Reset all the counters,
+        Handle STUN response for an address. Reset all the counters,
         update the results, and set the 'success' flag to True.
         Some of the info was already updated by find_srcip_public_addr().
         """
@@ -190,7 +177,7 @@ class FwStunWrap:
     def send_stun_request(self):
         """
         Send STUN request for each address that has no public IP and port
-        updated in the cache. Sent only if the seconds counter equels to
+        updated in the cache. Sent only if the seconds counter equals to
         the calculated time it should be sent ('next_time').
         """
         if self.run == False:

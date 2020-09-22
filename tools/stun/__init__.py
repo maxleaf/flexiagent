@@ -11,8 +11,6 @@ sys.path.append(globals)
 import fwglobals
 
 __version__ = '1.0.0'
-#logging.basicConfig(filename='/etc/flexiwan/agent/pystun3.log',level=logging.DEBUG)
-#log = logging.getLogger("pystun3")
 
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
@@ -145,12 +143,11 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                 received = True
             except Exception as e:
                 received = False
-
-            if count > 0:
-                count -= 1
-            else:
-                retVal['Resp'] = False
-                return retVal
+                if count > 0:
+                    count -= 1
+                else:
+                    retVal['Resp'] = False
+                    return retVal
         msgtype = b2a_hexstr(buf[0:2])
         #FLEXIWAN_FIX
         try:
