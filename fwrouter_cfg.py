@@ -246,6 +246,53 @@ class FwRouterCfg:
             return self.db[req_key].get('params')
         return None
 
+    def are_params_equal(self, params1, params2):
+        """ Compares two dictionaries while normalizing them for comparison
+        and ignoring orphan keys that have None or empty string value.
+            The orphans keys are keys that present in one dict and don't
+        present in the other dict, thanks to Scooter Software Co. for the term :)
+            We need this function to pay for bugs in flexiManage code, where
+        is provides add-/modify-/remove-X requests for same configuration
+        item with inconsistent letter case, None/empty string,
+        missing parameters, etc.
+            Note! The normalization is done for top level keys only!
+        """
+        if not params1 or not params2:
+            return False
+        if type(params1) != type(params2):
+            return False
+        if type(params1) != dict:
+            return (params1 == params2)
+
+        set_keys1   = set(params1.keys())
+        set_keys2   = set(params2.keys())
+        keys1_only  = list(set_keys1 - set_keys2)
+        keys2_only  = list(set_keys2 - set_keys1)
+        keys_common = set_keys1.intersection(set_keys2)
+
+        for key in keys1_only:
+            if not params1[key]:
+                # params1 has non-empty string/value that does not present in params2
+                return False
+
+        for key in keys2_only:
+            if not params2[key]:
+                # params2 has non-empty string/value that does not present in params1
+                return False
+
+        for key in keys_common:
+            val1 = params1[key]
+            val2 = params2[key]
+            if val1 and val2:   # Both values are neither None-s nor empty strings.
+                if type(val1) != type(val2):
+                    return False        # Not comparable types
+                if type(val1) == str:
+                    if val1.lower() != val2.lower():
+                        return False    # Strings are not equal
+                elif val1 != val2:
+                    return False        # Values are not equal
+        return True
+
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests that look exactly
         as they would look if were received from server.
@@ -460,17 +507,17 @@ class FwRouterCfg:
         """Intersects requests provided within 'requests' argument against
         the requests stored in the local database and generates output list that
         can be used for synchronization of router configuration. This output list
-        is called sync-list. It includes sequence of 'remove-X' and 'add-X'
-        requests that should be applied to device in order to configure it with
-        the configuration, reflected in the input list 'requests'.
+        is called sync-list. It includes sequence of 'remove-X', 'modify-X' and
+        'add-X' requests that should be applied to device in order to configure
+        it with the configuration, reflected in the input list 'requests'.
 
         :param requests: list of requests that reflects the desired configuration.
                          The requests are in formant of flexiManage<->flexiEdge
                          message: { 'message': 'add-X', 'params': {...}}.
 
-        :returns: synchronization list - list of 'remove-X' and 'add-X' requests
-                         that takes device to the desired configuration if applied
-                         to the device.
+        :returns: synchronization list - list of 'remove-X', 'modify-X' and
+                         'add-X' requests that takes device to the desired
+                         configuration if applied to the device.
         """
 
         # Firstly we hack a little bit the input list as follows:
@@ -489,9 +536,7 @@ class FwRouterCfg:
         # in the input list and that have same parameters. They correspond to
         # configuration items that should be not touched by synchronization.
         # The dumped requests that present in the input list but have different
-        # parameters stand for modifications. They should be added to the output
-        # list as 'remove-X' with dumped parameters and than added again as
-        # 'add-X' but with new parameters found in input list.
+        # parameters stand for modifications.
         #
         dumped_requests = fwglobals.g.router_cfg.dump(keys=True)
         output_requests = []
@@ -503,20 +548,26 @@ class FwRouterCfg:
                 #
                 dumped_params = dumped_request.get('params')
                 input_params  = input_requests[dumped_key].get('params')
-                if dumped_params == input_params:
+                if self.are_params_equal(dumped_params, input_params):
                     # The configuration item has exactly same parameters.
                     # It does not require sync, so remove it from input list.
                     #
                     del input_requests[dumped_key]
                 else:
                     # The configuration item should be modified.
-                    # So add the correspondent 'remove-X' request with current
-                    # parameters to the output list and later in this function
-                    # we will add the correspondent 'add-X' request with new
-                    # parameters out of the input list.
+                    # Rename requests in input list with 'modify-X'.
                     #
-                    dumped_request['message'] = dumped_request['message'].replace('add-', 'remove-')
-                    output_requests.append(dumped_request)
+                    # At this stage only 'modify-interface' is supported,
+                    # so for the rest types of configuration items we add
+                    # the correspondent 'remove-X' request with current
+                    # parameters to the output list and later in this function
+                    # we will add the 'add-X' request from the input list.
+                    #
+                    if dumped_request['message'] == 'add-interface':
+                        input_requests[dumped_key]['message'] = 'modify-interface'
+                    else:
+                        dumped_request['message'] = dumped_request['message'].replace('add-', 'remove-')
+                        output_requests.append(dumped_request)
             else:
                 # The configuration item does not present in the input list.
                 # So it stands for item to be removed. Add correspondent request
@@ -536,3 +587,4 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
+
