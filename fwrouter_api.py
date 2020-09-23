@@ -617,13 +617,9 @@ class FWROUTER_API:
                 return True
             elif re.match('modify-', req):
                 # For modification request ensure that it goes to modify indeed.
-                noop = True
                 new_params = _request.get('params')
                 old_params = fwglobals.g.router_cfg.get_params(_request)
-                for (key, val) in new_params.items():
-                    if val != old_params.get(key):
-                        noop = False
-                if noop:
+                if fwglobals.g.router_cfg.are_params_equal(new_params, old_params):
                     return True
             return False
 
