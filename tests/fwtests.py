@@ -297,7 +297,6 @@ def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
         timeout -= 1
         configured = vpp_is_configured(cfg_to_check, print_error=False)
     if timeout == 0:
-        vpp_is_configured(cfg_to_check, print_error=True)
         print("ERROR: wait_vpp_to_be_configured: return on timeout (%s)" % str(to))
         configured = False
     if not configured:  # If failed - run again, this time with print_error=True

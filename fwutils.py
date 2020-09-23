@@ -1313,7 +1313,7 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None or 'unknown' in out:
+    if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s: %s" % (vppctl_cmd, out))
 
     return (True, None)
@@ -1337,7 +1337,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None:
+    if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
