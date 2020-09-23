@@ -1385,28 +1385,32 @@ def get_interface_gateway(ip):
 
 def get_reconfig_hash():
     res = ''
-    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
-    if len(wan_list) == 0:
+    if_list = fwglobals.g.router_cfg.get_interfaces()
+    if len(if_list) == 0:
         return res
-        
+
     vpp_run = vpp_does_run()
-    for wan in wan_list:
-        name = pci_to_linux_iface(wan['pci'])
+    for interface in if_list:
+        name = pci_to_linux_iface(interface['pci'])
 
         if name is None and vpp_run:
-            name = pci_to_tap(wan['pci'])
+            name = pci_to_tap(interface['pci'])
 
         if name is None:
             return ''
 
         addr = get_interface_address(name)
         if addr != None:
-            if not re.search(addr, wan['addr']):
+            if not re.search(addr, interface['addr']):
                 res += 'addr:' + addr + ','
 
-        gw, metric = get_linux_interface_gateway(name)
-        if not re.match(gw, wan['gateway']):
-            res += 'gw:' + gw + ','
+        if interface['type'] == 'WAN':
+            gw, metric = get_linux_interface_gateway(name)
+            if not re.match(gw, interface['gateway']):
+                res += 'gw:' + gw + ','
+
+            if not re.match(metric, interface['metric']):
+                res += 'metric:' + metric + ','
 
         if addr:
             nomaskaddr = addr.split('/')[0]
@@ -1414,12 +1418,7 @@ def get_reconfig_hash():
             if public_ip and public_port:
                 res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
 
-    if res:
-        fwglobals.log.info('get_reconfig_hash: %s' % res)
-        hash = hashlib.md5(res).hexdigest()
-        return hash
-
-    return ''
+    return res
 
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.

@@ -7,7 +7,7 @@ import fwglobals
 
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
 sys.path.append(tools)
-import stun
+import fwstun
 
 class FwStunWrap:
     'Class to handle STUN requests and responses'
@@ -237,7 +237,7 @@ class FwStunWrap:
         nat_ext_port = None
         fwglobals.log.debug("trying to find external %s:%s" %(lcl_src_ip,lcl_src_port))
         nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
-            stun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port, stop_after_one_try)
+            fwstun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port, stop_after_one_try)
 
         fwglobals.log.debug("find_srcip_public_addr: adding address %s to cache" %(str(lcl_src_ip)))
         if nat_ext_ip and nat_ext_port:
