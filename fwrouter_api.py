@@ -249,9 +249,9 @@ class FWROUTER_API:
 
         dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
 
-        # First of all remove strip out requests that have no impact
-        # on configuration, like 'remove-X' for not existing configuration
-        # items and 'add-X' for existing configuration items.
+        # First of all strip out requests that have no impact on configuration,
+        # like 'remove-X' for not existing configuration items and 'add-X' for
+        # existing configuration items.
         #
         new_request = self._strip_noop_request(request)
         if not new_request:
