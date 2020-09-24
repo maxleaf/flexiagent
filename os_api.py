@@ -87,7 +87,7 @@ class OS_DECODERS:
 
             elif fwutils.is_lte_interface(nicname):
                 daddr['connectivity_type'] = 'lte'
-                daddr['driver'] = ''
+                daddr['driver'] = fwutils.get_interface_driver(nicname)
                 daddr['dhcp'] = 'yes'
 
             else:
