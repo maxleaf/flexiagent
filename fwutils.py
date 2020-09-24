@@ -39,7 +39,6 @@ import shutil
 import sys
 import traceback
 import yaml
-import serial
 from netaddr import IPNetwork, IPAddress
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
@@ -1771,6 +1770,6 @@ def get_interface_driver(interface_name):
         cmd = 'ethtool -i %s' % interface_name        
         out = subprocess.check_output(cmd, shell=True).splitlines()
         vals = out[0].decode().split("driver: ", 1)
-        return vals[-1]
+        return str(vals[-1])
     except subprocess.CalledProcessError:
         return ''   
