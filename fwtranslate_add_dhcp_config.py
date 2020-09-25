@@ -44,6 +44,7 @@ def _change_dhcpd_conf(params, cmd_list):
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "clean dhcpd config file"
+    cmd['revert']['filter'] = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
     cmd['revert']['params'] = {
                                 'module': 'fwutils',
                                 'func':   'modify_dhcpd',
@@ -67,6 +68,7 @@ def _restart_dhcp_server(cmd_list):
     cmd['revert'] = {}
     cmd['revert']['name'] = 'exec'
     cmd['revert']['params'] = ["sudo systemctl restart isc-dhcp-server"]
+    cmd['revert']['filter'] = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
     cmd['revert']['descr'] = "restart dhcp service"
     cmd_list.append(cmd)
 

@@ -65,16 +65,16 @@ class FwStunWrap:
         self.local_cache['stun_interfaces'] = {}
         self.local_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
         self.run = True
-        fwglobals.g.router_cfg.register_request_callbacks('fwstunwrap', self.fwstuncb, \
+        fwglobals.g.router_cfg.register_callback('FwStunWrap', self.cb_router_config, \
             ['add-interface', 'remove-interface'])
         #self.is_running = True
 
-    def fwstuncb(self, request, params):
+    def cb_router_config(self, request, params):
         """
-        callback to be called from fwrouterCfg's update() function.
+        callback to be called from FwRouterCfg update() function.
         """
         if re.match('add-interface', request):
-            if params['type'] == 'wan':
+            if params['type'].lower() == 'wan':
                 self.add_addr(params['addr'].split('/')[0], params)
         else:
             # We know it is "remove" because we only registered for "add" and "remove"
@@ -90,7 +90,7 @@ class FwStunWrap:
         """
         c = self.local_cache['stun_interfaces']
         #1 add address with public info, over-written the address if exist in cache.
-        if params and params['PublicIp'] and params['PublicPort']:
+        if params and 'PublicIp' in params and 'PublicPort' in params:
             self.reset_addr(addr)
             c[addr]['public_ip']        = params['PublicIp']
             c[addr]['public_port']      = params['PublicPort']
