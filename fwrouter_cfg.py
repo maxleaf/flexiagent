@@ -172,7 +172,14 @@ class FwRouterCfg:
             if req_name in elem['requests']:
                 fwglobals.log.debug("FwRouterCfg: %s: %s::%s(%s) - before"\
                         %(callback_type, elem['listener'], elem['callback'].__name__, req_name))
-                elem['callback'](req_name, params)
+
+                try:
+                    elem['callback'](req_name, params)
+                except Exception as e:
+                    fwglobals.log.error("FwRouterCfg: %s: %s::%s(%s): %s"\
+                            %(callback_type, elem['listener'], elem['callback'].__name__, req_name, str(e)))
+                    pass
+
                 fwglobals.log.debug("FwRouterCfg: %s: %s::%s(%s) - after"\
                         %(callback_type, elem['listener'], elem['callback'].__name__, req_name))
 
