@@ -1351,6 +1351,8 @@ def get_interface_sw_if_index(ip):
     """
 
     pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not pci:
+        return None
     return pci_to_vpp_sw_if_index(pci)
 
 def get_interface_vpp_names(type=None):

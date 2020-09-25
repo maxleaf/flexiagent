@@ -563,7 +563,7 @@ class FwRouterCfg:
         # dumped by fwglobals.g.router_cfg.dump() used below ;)
         #
         input_requests = {}
-        for request in requests:
+        for request in copy.deepcopy(requests): # Use deepcopy as we might modify input_requests[key] below
             key = self._get_request_key(request)
             input_requests.update({key:request})
 
