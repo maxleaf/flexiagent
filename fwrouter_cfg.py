@@ -203,15 +203,15 @@ class FwRouterCfg:
         req_key = self._get_request_key(request)
 
         try:
-            self._call_callback(self.callbacks_pre_update, 'pre_update', req, params)
+            cb_params = params if re.match('(add-|start-router)', req) else self.db[req_key]['params']
+            self._call_callback(self.callbacks_pre_update, 'pre_update', req, cb_params)
 
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
             else:
-                params = copy.deepcopy(self.db[req_key]['params'])
                 del self.db[req_key]
 
-            self._call_callback(self.callbacks_post_update, 'post_update', req, params)
+            self._call_callback(self.callbacks_post_update, 'post_update', req, cb_params)
 
         except KeyError:
             pass
