@@ -49,17 +49,8 @@ class FwRouterCfg:
         if self.db.get('signature') is None:
             self.db['signature'] = ""
 
-        """
-        update() is a key function in routerCfg class. All requests are coming through it.
-        If another module would like to register on a request, because it has some actions
-        it would like to do as a result of that request, it can ask update() to call a callback
-        with the request. In that callback, the module will do its action, and return.
-        Several modules can register on several requests, provided as a list to 
-        register_request_callbacks(). Modules who does not want to listen on requests any longer
-        can call unresiter_request_callback.
-        Listeners are held in a list, so it can be arranged according to priorities.
-        """
         self.callbacks = []
+
 
     def __enter__(self):
         return self
@@ -76,38 +67,37 @@ class FwRouterCfg:
         """
         self.db.close()
 
-    def register_request_callbacks(self, listener, callback, requests):
-        """
-        register a listener with a callback to a list of requests. Update()
-        will call all callbacks register for that request.
-        The callback signature should be (req, params) where req is the request and the params
-        are the params of the request, in a dicitionary. See update() for more details.
-        :param: listener - for logging propuses.
-        :param: callback - the function to be called
-        :param: requests - list of requests the listener would like to be notified for 
-                            e.g.: ['add-interface', 'remove-interface', 'stop-router']
+    def register_callback(self, listener, callback, requests):
+        """Registers a listener for notifications about  requests stored in /
+        removed from the configuration database. The latest is done by the
+        FwRouterCfg::update() method. It invokes the 'callback' before
+        the request is saved in the database.
+        The callback signature should be (req, params) where 'req' is the
+        request name, e.g. 'add-tunnel', and the 'params' are the parameters of
+        the request as they would received from server in 'params' field.
 
+        :param: listener - name of the listener for logging propuses.
+        :param: callback - the function to be used to notify listener of request
+        :param: requests - list of requests the listener would like to be
+                           notified for, e.g.:
+                            ['add-interface', 'remove-interface', 'stop-router']
         """
-        fwglobals.log.debug("Registering %s module's callback %s to the following requests %s"\
+        fwglobals.log.debug("FwRouterCfg: register_callback: %s.%s(%s)"\
             %(listener, callback.__name__, str(requests)))
-        dict_elem = {'listener':listener, 'callback': callback, 'requests':requests}
-        self.callbacks.append(dict_elem)
+        elem = {'listener':listener, 'callback': callback, 'requests':requests}
+        self.callbacks.append(elem)
 
-    def unregister_request_callback(self, listener, callback):
-        """
-        unregister a module (listener) from listening on incoming requests
+    def unregister_callback(self, listener, callback):
+        """Unregisters a listener from listening on incoming requests
         :param: listener - string representing the module. For logging.
         :param: callback - the callback used to listen to requests.
         """
-        result_list = []
-        for elem in self.callbacks:
+        for (idx, elem) in enumerate(self.callbacks):
             if elem['callback'] == callback:
-                fwglobals.log.debug("Unregister %s module's callback %s" \
+                fwglobals.log.debug("unregister_callbacks_pre_update: %s::%s" \
                     %(listener, callback.__name__))
-                continue
-            result_list.append(elem)
-
-        self.callbacks=result_list
+                del self.callbacks[idx]
+                return
 
     def clean(self):
         """Clean DB
@@ -142,18 +132,25 @@ class FwRouterCfg:
         key_func    = getattr(key_module, 'get_request_key')
         return key_func(params)
 
-    def _call_callback(self, req_name, params):
+    def _call_callback(self, listeners, req_name, params):
         """
         go over callback data base and check if callback should be called for each listener
         based on the request name. This function is called from update().
-        :param: req_name - the request recieved
-        :param: params   - the params to send to the callback
         """
-        for listener in self.callbacks:
-            if req_name in listener['requests']:
-                fwglobals.log.debug("Listner %s callback %s is called for request %s"\
-                        %(listener['listener'], listener['callback'].__name__, req_name))
-                listener['callback'](req_name, params)
+        for elem in listeners:
+            if req_name in elem['requests']:
+                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - before"\
+                        %(elem['listener'], elem['callback'].__name__, req_name))
+
+                try:
+                    elem['callback'](req_name, params)
+                except Exception as e:
+                    fwglobals.log.error("FwRouterCfg: %s.%s(%s): %s"\
+                            %(elem['listener'], elem['callback'].__name__, req_name, str(e)))
+                    pass
+
+                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - after"\
+                        %(elem['listener'], elem['callback'].__name__, req_name))
 
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
@@ -175,13 +172,13 @@ class FwRouterCfg:
         req_key = self._get_request_key(request)
 
         try:
+            cb_params = params if re.match('(add-|start-router)', req) else self.db[req_key]['params']
+            self._call_callback(self.callbacks, req, cb_params)
+
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
-                cb_params = copy.deepcopy(self.db[req_key]['params'])
             else:
-                cb_params = copy.deepcopy(self.db[req_key]['params'])
                 del self.db[req_key]
-            self._call_callback(req,cb_params)
 
         except KeyError:
             pass
@@ -296,6 +293,15 @@ class FwRouterCfg:
                 elif val1 != val2:
                     return False        # Values are not equal
         return True
+
+    def is_same_cfg_item(self, request1, request2):
+        """Checks if provided requests stand for the same configuration item.
+        """
+        req_key1 = self._get_request_key(request1)
+        req_key2 = self._get_request_key(request2)
+        if req_key1 == req_key2:
+            return True
+        return False
 
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests that look exactly
@@ -531,7 +537,7 @@ class FwRouterCfg:
         # dumped by fwglobals.g.router_cfg.dump() used below ;)
         #
         input_requests = {}
-        for request in requests:
+        for request in copy.deepcopy(requests): # Use deepcopy as we might modify input_requests[key] below
             key = self._get_request_key(request)
             input_requests.update({key:request})
 

@@ -249,9 +249,9 @@ class FWROUTER_API:
 
         dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
 
-        # First of all remove strip out requests that have no impact
-        # on configuration, like 'remove-X' for not existing configuration
-        # items and 'add-X' for existing configuration items.
+        # First of all strip out requests that have no impact on configuration,
+        # like 'remove-X' for not existing configuration items and 'add-X' for
+        # existing configuration items.
         #
         new_request = self._strip_noop_request(request)
         if not new_request:
@@ -604,15 +604,32 @@ class FWROUTER_API:
 
         :returns: request after stripping out no impact requests.
         """
-        def _should_be_stripped(_request):
-            req = _request['message']
+        def _should_be_stripped(_request, aggregated_requests=None):
+            req    = _request['message']
+            params = _request.get('params', {})
             if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
-                return True
+                # Ensure that the aggregated request does not include correspondent 'add-X' before.
+                noop = True
+                if aggregated_requests:
+                    complement_req     = re.sub('(modify-|remove-)','add-', req)
+                    complement_request = { 'message': complement_req, 'params': params }
+                    if _exist(complement_request, aggregated_requests):
+                        noop = False
+                if noop:
+                    return True
             elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
                 # Ensure this is actually not modification request :)
                 existing_params = fwglobals.g.router_cfg.get_request_params(_request)
-                if existing_params == _request.get('params'):
-                    return True
+                if fwglobals.g.router_cfg.are_params_equal(existing_params, _request.get('params')):
+                    # Ensure that the aggregated request does not include correspondent 'remove-X' before.
+                    noop = True
+                    if aggregated_requests:
+                        complement_req     = re.sub('add-','remove-', req)
+                        complement_request = { 'message': complement_req, 'params': params }
+                        if _exist(complement_request, aggregated_requests):
+                            noop = False
+                    if noop:
+                        return True
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 return True
             elif re.match('modify-', req):
@@ -623,21 +640,33 @@ class FWROUTER_API:
                     return True
             return False
 
+        def _exist(__request, requests):
+            """Checks if the list of requests has request for the same
+            configuration item as the one denoted by the provided __request.
+            """
+            for r in requests:
+                if (__request['message'] == r['message'] and
+                    fwglobals.g.router_cfg.is_same_cfg_item(__request, r)):
+                    return True
+            return False
+
+
         if request['message'] != 'aggregated':
             if _should_be_stripped(request):
                 fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
                 return None
         else:  # aggregated request
-            requests = []
-            for _request in request['params']['requests']:
-                if _should_be_stripped(_request) == False:
-                    requests.append(_request)
-            if not requests:
-                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
+            out_requests = []
+            inp_requests = request['params']['requests']
+            for _request in inp_requests:
+                if _should_be_stripped(_request, inp_requests) == False:
+                    out_requests.append(_request)
+            if not out_requests:
+                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(out_requests))
                 return None
-            if len(requests) < len(request['params']['requests']):
-                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(requests))
-            request['params']['requests'] = requests
+            if len(out_requests) < len(inp_requests):
+                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
+            request['params']['requests'] = out_requests
         return request
 
     def _analyze_request(self, request):
