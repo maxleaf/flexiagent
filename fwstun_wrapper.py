@@ -65,16 +65,16 @@ class FwStunWrap:
         self.local_cache['stun_interfaces'] = {}
         self.local_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
         self.run = True
-        fwglobals.g.router_cfg.register_callbacks_pre_update('fwstunwrap', self.fwstuncb, \
+        fwglobals.g.router_cfg.register_callback('FwStunWrap', self.cb_router_config, \
             ['add-interface', 'remove-interface'])
         #self.is_running = True
 
-    def fwstuncb(self, request, params):
+    def cb_router_config(self, request, params):
         """
-        callback to be called from fwrouterCfg's update() function.
+        callback to be called from FwRouterCfg update() function.
         """
         if re.match('add-interface', request):
-            if params['type'] == 'wan':
+            if params['type'].lower() == 'wan':
                 self.add_addr(params['addr'].split('/')[0], params)
         else:
             # We know it is "remove" because we only registered for "add" and "remove"
