@@ -90,7 +90,7 @@ class FwStunWrap:
         """
         c = self.local_cache['stun_interfaces']
         #1 add address with public info, over-written the address if exist in cache.
-        if params and params['PublicIp'] and params['PublicPort']:
+        if params and 'PublicIp' in params and 'PublicPort' in params:
             self.reset_addr(addr)
             c[addr]['public_ip']        = params['PublicIp']
             c[addr]['public_port']      = params['PublicPort']
