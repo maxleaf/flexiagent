@@ -21,7 +21,9 @@ import psutil
 import fwglobals
 import fwutils
 import hashlib
+import socket
 import re
+from netaddr import IPAddress
 
 class FwLinuxIfs:
     'Class to monitor changes on none-assigned Linux interfaces'
@@ -43,6 +45,29 @@ class FwLinuxIfs:
         """
         fwglobals.g.AGENT_CACHE['linux_ifs'] = {}
         self.local_cache = fwglobals.g.AGENT_CACHE['linux_ifs']
+
+    def _get_if_address(self, if_name):
+        """Get interface address.
+        :param : if_name - Interface name.
+       :returns: address.
+       """
+        interfaces = psutil.net_if_addrs()
+        if if_name not in interfaces:
+            fwglobals.log.debug("_get_if_address(%s): interfaces: %s" % (if_name, str(interfaces)))
+            return None
+
+        addresses = interfaces[if_name]
+        if len(addresses) > 1:
+            for addr in addresses:
+                if addr.family == socket.AF_INET:
+                    ip   = addr.address
+                    mask = IPAddress(addr.netmask).netmask_bits()
+                    return '%s/%s' % (ip, mask)
+        elif len(addresses) == 1:
+            return '%s' %(addresses[0].address)
+
+        fwglobals.log.debug("_get_if_address(%s): %s" % (if_name, str(addresses)))
+        return None
 
     def _get_linux_interfaces(self):
         """
@@ -83,52 +108,78 @@ class FwLinuxIfs:
         if name is None:
             return res
 
+        addr       = self._get_if_address(name)
         gw, metric = fwutils.get_linux_interface_gateway(name)
-        addr       = fwutils.get_interface_address(name)
 
         if pci_addr in self.local_cache:
             entry = self.local_cache[pci_addr]
             # entry is in cache, check for differences between real-time info and cached info.
             # if the is a difference, add it to the computation, and update the cache.
-            if addr and not re.search(addr, pci_addr['addr']):
-                res += 'addr:' + addr + ','
-                entry['addr'] = addr
+            if addr:
+                if not re.search(addr, entry['addr']):
+                    res += 'addr:' + addr + ','
+            else:
+                if entry.get('addr') and entry['addr'] != None:
+                    res += 'addr:' + '' + ','
+            entry['addr'] = addr
 
-            if gw and not re.match(gw, pci_addr['gateway']):
-                res += 'gw:' + gw + ','
-                entry['gateway'] = gw
+            if gw:
+                if not re.match(gw, entry['gateway']):
+                    res += 'gw:' + gw + ','
+            else:
+                if entry.get('gateway') and entry['gateway'] != '':
+                    res += 'gateway:' + '' + ','
+            entry['gateway'] = gw
 
-            if metric and not re.match(metric, pci_addr['metric']):
-                res += 'metric:' + metric + ','
-                entry['metric'] = metric
+            if metric:
+                if not re.match(metric, entry['metric']):
+                    res += 'metric:' + metric + ','
+            else:
+                if entry.get('metric') and entry['metric'] != '':
+                    res += 'metric:' + '' + ','
+            entry['metric'] = metric
         else:
             #entry is not in cache, create entry and update res
             self.local_cache[pci_addr] = {}
             entry = self.local_cache[pci_addr]
+            entry['name'] = name
+
             if addr:
                 res += 'addr:' + addr + ','
                 entry['addr'] = addr
+            else:
+                res += 'addr:' + '' + ','
+                entry['addr'] = None
 
             if gw:
                 res += 'gw:' + gw + ','
                 entry['gateway'] = gw
+            else:
+                res += 'gw:' + '' + ','
+                entry['gateway'] = ''
 
             if metric:
                 res += 'metric:' + metric + ','
                 entry['metric'] = metric
+            else:
+                res += 'metric:' + '' + ','
+                entry['metric'] = ''
 
         return res
 
-    def get_global_reconfig_hash(self):
+    def get_global_reconfig_hash(self, update_public_info):
         """
         API
         This is the main function that updates the cache and computes the overall
         reconfig hash. It filters out the assigned interfaces from the linux interfaces,
-        and updates each non-assigned interface with real-time changes made on the 
+        and updates each non-assigned interface with real-time changes made on the
         non-assigned linux devices.
         It then adds the reconfig hash of the assigned interfaces to the calculated hash
         from the cache, and run md5 on the result. This result is returned as the overall
         hahs of all the interfaces.
+        : param : update_public_info - send to get_reconfig_hash, if True it will add
+                 public IP and Port to the reconfig computation. This is to reduce STUN
+                 requests.
         """
         res = ''
         linux_pci_list    = self._get_linux_interfaces()
@@ -148,8 +199,25 @@ class FwLinuxIfs:
                 res += self._compute_entry_hash(pci_addr)
 
         # add the assigned-interfaces reconfig hash
-        res += fwutils.get_reconfig_hash()
+        res += fwutils.get_reconfig_hash(update_public_info)
         if res != '':
-            fwglobals.log.info('compute_global_reconfig_hash: %s' % res)
+            fwglobals.log.debug('compute_global_reconfig_hash: %s' % res)
             hash = hashlib.md5(res).hexdigest()
             return hash
+
+    def log_interfaces_cache(self):
+        """
+        log cache into log
+        """
+        if self.local_cache:
+            fwglobals.log.debug('Unassigned interfaces in cache:')
+            for key in self.local_cache.keys():
+                entry = self.local_cache[key]
+                string = entry['name'] + ': {' + 'pci_address: ' + key + ', Address: '
+                string += 'None' if entry['addr'] == None else entry['addr']
+                string += ', gateway: '
+                string += 'None' if entry['gateway'] == '' else entry['gateway']
+                string += ', metric: '
+                string += 'None' if entry['metric'] == '' else entry['metric']
+                string += '}'
+                fwglobals.log.debug(string)

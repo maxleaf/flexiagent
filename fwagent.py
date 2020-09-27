@@ -446,6 +446,10 @@ class FwAgent:
                     else:
                         fwstats.update_stats()
 
+                # dump unassigned interfaces information
+                if (slept % timeout) == 0:
+                    fwglobals.g.linux_interfaces.log_interfaces_cache()
+
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
