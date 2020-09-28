@@ -58,7 +58,7 @@ class FwStunWrap:
         self.local_cache['stun_interfaces'] = {}
         self.local_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
         self.run = True
-        fwglobals.g.router_cfg.register_request_callbacks('fwstunwrap', self.fwstuncb, \
+        fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
             ['add-interface', 'remove-interface'])
         #self.is_running = True
 
