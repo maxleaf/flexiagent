@@ -1393,7 +1393,7 @@ def get_interface_gateway(ip):
     """
 
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    return ip_str_to_bytes(gw_ip)[0]
+    return gw_ip
 
 def get_reconfig_hash():
     res = ''
