@@ -1287,9 +1287,13 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     """
     op = 'add' if add else 'del'
 
-    if add:
-        fwglobals.g.policies.add_policy(policy_id, priority)
-    else:
+    lan_vpp_name_list      = get_interface_vpp_names(type='lan')
+    loopback_vpp_name_list = get_tunnel_interface_vpp_names()
+    interfaces = lan_vpp_name_list + loopback_vpp_name_list
+
+    if not add:
+        for if_vpp_name in interfaces:
+            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, True)
         fwglobals.g.policies.remove_policy(policy_id)
 
     fallback = 'fallback drop' if re.match(fallback, 'drop') else ''
@@ -1313,8 +1317,13 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None or 'unknown' in out:
+    if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s: %s" % (vppctl_cmd, out))
+
+    if add:
+        fwglobals.g.policies.add_policy(policy_id, priority)
+        for if_vpp_name in interfaces:
+            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, False)
 
     return (True, None)
 
@@ -1329,6 +1338,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
+
     op = 'del' if remove else 'add'
     ip_version = 'ip6' if is_ipv6 else 'ip4'
 
@@ -1337,7 +1347,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None:
+    if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
@@ -1351,6 +1361,8 @@ def get_interface_sw_if_index(ip):
     """
 
     pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not pci:
+        return None
     return pci_to_vpp_sw_if_index(pci)
 
 def get_interface_vpp_names(type=None):

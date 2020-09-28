@@ -69,7 +69,7 @@ class FwStunWrap:
         : param : params  - params for the request, if any.
         """
         if re.match('add-interface', request):
-            if params['type'] == 'wan':
+            if params['type'].lower() == 'wan':
                 self.add_addr(params['addr'].split('/')[0], params)
         else:
             # We know it is "remove" because we only registered for "add" and "remove"
