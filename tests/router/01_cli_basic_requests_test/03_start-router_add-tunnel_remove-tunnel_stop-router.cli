@@ -32,6 +32,7 @@
   "params": {
     "src": "10.0.0.4",
     "dst": "20.0.0.4",
+    "dstPort": "1068",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {

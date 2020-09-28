@@ -201,10 +201,14 @@ class Checker(fwsystem_checker_common.Checker):
             os.system('printf "%s \\"%s\\";\n" >> %s' % (param, str(val), autoupgrade_file))
 
         # Firstly ensure that autoupgrade configuration file exists.
-        # If it doesn't exist, the autoupgrade is configured in other way that we don't support
+        # If it doesn't exist, create it.
+        #
         if not os.path.isfile(autoupgrade_file):
-            print(prompt + '%s not found' % autoupgrade_file)
-            return False
+            if not fix:
+                print(prompt + '%s not found' % autoupgrade_file)
+                return False
+            else:
+                os.system('touch ' + autoupgrade_file)
 
         # Check if there is a least one parameter that should be fixed
         params_to_fix = []

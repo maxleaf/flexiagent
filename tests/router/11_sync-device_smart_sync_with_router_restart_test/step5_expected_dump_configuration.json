@@ -2,7 +2,7 @@
   "======= START COMMAND =======": [
     {
       "Key": "start-router", 
-      "Params": null
+      "Params": {}
     }
   ]
 }

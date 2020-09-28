@@ -214,10 +214,9 @@ def get_linux_interface_gateway(if_name):
     except:
         return '', ''
 
-    metric = ''
-
     routes = dgw.splitlines()
     for route in routes:
+        metric = ''
         rip = route.split('via ')[1].split(' ')[0]
         rdev = route.split('dev ')[1].split(' ')[0]
         metric_str = route.split('metric ')
@@ -238,7 +237,7 @@ def get_interface_address(if_name):
     interfaces = psutil.net_if_addrs()
     if if_name not in interfaces:
         fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
-        return ''
+        return None
 
     addresses = interfaces[if_name]
     for addr in addresses:
@@ -808,6 +807,7 @@ def stop_vpp():
                 dpdk.bind_one(dpdk.devices[d]["Slot"], drv, False)
                 break
     fwstats.update_state(False)
+    os.system('sudo netplan apply')
 
 def connect_to_router():
     """Connect to VPP Python API.
@@ -1287,9 +1287,13 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     """
     op = 'add' if add else 'del'
 
-    if add:
-        fwglobals.g.policies.add_policy(policy_id, priority)
-    else:
+    lan_vpp_name_list      = get_interface_vpp_names(type='lan')
+    loopback_vpp_name_list = get_tunnel_interface_vpp_names()
+    interfaces = lan_vpp_name_list + loopback_vpp_name_list
+
+    if not add:
+        for if_vpp_name in interfaces:
+            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, True)
         fwglobals.g.policies.remove_policy(policy_id)
 
     fallback = 'fallback drop' if re.match(fallback, 'drop') else ''
@@ -1313,8 +1317,13 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None or 'unknown' in out:
+    if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s: %s" % (vppctl_cmd, out))
+
+    if add:
+        fwglobals.g.policies.add_policy(policy_id, priority)
+        for if_vpp_name in interfaces:
+            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, False)
 
     return (True, None)
 
@@ -1329,6 +1338,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
+
     op = 'del' if remove else 'add'
     ip_version = 'ip6' if is_ipv6 else 'ip4'
 
@@ -1337,7 +1347,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
     fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None:
+    if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
@@ -1351,6 +1361,8 @@ def get_interface_sw_if_index(ip):
     """
 
     pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not pci:
+        return None
     return pci_to_vpp_sw_if_index(pci)
 
 def get_interface_vpp_names(type=None):
@@ -1386,8 +1398,10 @@ def get_interface_gateway(ip):
 def get_reconfig_hash():
     res = ''
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    if len(wan_list) == 0:
+        return res
+        
     vpp_run = vpp_does_run()
-
     for wan in wan_list:
         name = pci_to_linux_iface(wan['pci'])
 
@@ -1398,15 +1412,22 @@ def get_reconfig_hash():
             return ''
 
         addr = get_interface_address(name)
-        if not re.search(addr, wan['addr']):
-            res += 'addr:' + addr + ','
+        if addr != None:
+            if not re.search(addr, wan['addr']):
+                res += 'addr:' + addr + ','
 
         gw, metric = get_linux_interface_gateway(name)
         if not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
+        if addr:
+            nomaskaddr = addr.split('/')[0]
+            public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
+            if public_ip and public_port:
+                res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
+
     if res:
-        fwglobals.log.info('reconfig_hash_get: %s' % res)
+        fwglobals.log.info('get_reconfig_hash: %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash
 
@@ -1481,6 +1502,7 @@ def vpp_set_dhcp_detect(pci, remove):
 
     sw_if_index = pci_to_vpp_sw_if_index(pci)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
+
 
     vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)
 

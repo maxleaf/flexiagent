@@ -468,6 +468,3 @@ class FwStartupConf:
 		"""
 		self.out_fp.write("  " * indent + value)
 		return
-
-
-
