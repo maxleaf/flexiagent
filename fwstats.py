@@ -164,7 +164,7 @@ def get_stats():
         # reconfig hash with public addresses at that rate, to reduce STUN requests.
         # This will not affect STUN requests sent due to tunnel status.
         update_public_addresses = True
-    reconfig = fwglobals.g.linux_interfaces.get_global_reconfig_hash(update_public_addresses)
+    reconfig = fwglobals.g.unassigned_interfaces.get_global_reconfig_hash(update_public_addresses)
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update

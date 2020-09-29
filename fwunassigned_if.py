@@ -25,7 +25,7 @@ import socket
 import re
 from netaddr import IPAddress
 
-class FwLinuxIfs:
+class FwUnassignedIfs:
     'Class to monitor changes on none-assigned Linux interfaces'
     """
     This class implements monitoring none-assigned Linux interfaces changes.
@@ -44,6 +44,7 @@ class FwLinuxIfs:
         init function, initializing the cache for un-assigned interfaces.
         """
         fwglobals.g.AGENT_CACHE['linux_ifs'] = {}
+        # Shorthand to the global cache
         self.local_cache = fwglobals.g.AGENT_CACHE['linux_ifs']
 
     def _get_if_address(self, if_name):
@@ -92,7 +93,7 @@ class FwLinuxIfs:
         assigned_if = fwglobals.g.router_cfg.get_interfaces()
         if len(assigned_if) == 0:
             return []
-        pci_list = [x['pci'] for x in assigned_if]
+        pci_list = [interface['pci'] for interface in assigned_if]
         return pci_list
 
     def _compute_entry_hash(self, pci_addr):
@@ -201,7 +202,7 @@ class FwLinuxIfs:
         # add the assigned-interfaces reconfig hash
         res += fwutils.get_reconfig_hash(update_public_info)
         if res != '':
-            fwglobals.log.debug('compute_global_reconfig_hash: %s' % res)
+            fwglobals.log.debug('get_global_reconfig_hash: %s' % res)
             hash = hashlib.md5(res).hexdigest()
             return hash
 

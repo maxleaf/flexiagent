@@ -114,6 +114,7 @@ class FwStunWrap:
         """
         if addr in self.local_cache['stun_interfaces'].keys():
             del self.local_cache['stun_interfaces'][addr]
+            fwglobals.log.debug("Removing address %s from Cache" %(str(addr)))
 
     def find_addr(self,addr):
         """
