@@ -99,8 +99,7 @@ class OS_DECODERS:
                         daddr['public_ip']   = public_ip
                         daddr['public_port'] = public_port
                         daddr['nat_type']    = nat_type
-            else:
-                daddr['public_ip'] = daddr['public_port'] = daddr['nat_type'] = None
+
             out.append(daddr)
         return (out,1)
 
