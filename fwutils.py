@@ -24,6 +24,7 @@ import copy
 import glob
 import hashlib
 import inspect
+import ipaddress
 import json
 import os
 import time
@@ -1393,7 +1394,7 @@ def get_interface_gateway(ip):
     """
 
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    return gw_ip
+    return ipaddress.ip_address(gw_ip)
 
 def get_reconfig_hash():
     res = ''
