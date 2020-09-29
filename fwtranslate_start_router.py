@@ -99,7 +99,14 @@ def start_router(params=None):
     for params in interfaces:
         iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
         if iface_pci:
-            # Firstly mark 'vmxnet3' interfaces as they need special care:
+            # Firstly, Mark non-dpdk interfaces as they need special care:
+            #   1. They should not appear in /etc/vpp/startup.conf because they don't have pci address.
+            #   2. They should not be removed from linux
+            # The spacial logic for these interfaces is at add_interface translator
+            if fwutils.is_non_dpdk_interface(iface_pci):
+                continue
+
+            # Mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
             #      If they appear in /etc/vpp/startup.conf, vpp will capture
             #      them with vfio-pci driver, and 'create interface vmxnet3'
@@ -246,7 +253,7 @@ def start_router(params=None):
         cmd['revert']['name']   = "vmxnet3_delete"
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':pci } ] }
-        cmd_list.append(cmd)
+        cmd_list.append(cmd)   
 
     # Once VPP started, apply configuration to it.
     cmd = {}

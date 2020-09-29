@@ -1412,11 +1412,11 @@ def get_reconfig_hash():
             return ''
 
         addr = get_interface_address(name)
-        if not re.search(addr, wan['addr']):
+        if addr and not re.search(addr, wan['addr']):
             res += 'addr:' + addr + ','
 
         gw, metric = get_linux_interface_gateway(name)
-        if not re.match(gw, wan['gateway']):
+        if 'gateway' in wan and not re.match(gw, wan['gateway']):
             res += 'gw:' + gw + ','
 
     if res:
@@ -1773,3 +1773,34 @@ def get_interface_driver(interface_name):
         return str(vals[-1])
     except subprocess.CalledProcessError:
         return ''   
+
+def is_non_dpdk_interface(interface_name):
+    """Check if interface is not supported by dpdk.                            
+
+    :param interface_name: Interface name to check.
+
+    :returns: boolean.
+    """  
+    if is_wifi_interface(interface_name):
+        return True
+    if is_lte_interface(interface_name):
+        return True
+    if interface_name == 'eth2':
+        return True
+    return False
+
+
+def get_bus_info(interface_name):
+    """Get LTE device bus info.                            
+
+    :param interface_name: Interface name to check.
+
+    :returns: bus_info .
+    """
+    try:
+        cmd = 'ethtool -i %s' % interface_name        
+        out = subprocess.check_output(cmd, shell=True).splitlines()
+        vals = out[4].decode().split("bus-info: ", 1)
+        return str(vals[-1])
+    except subprocess.CalledProcessError:
+        return ''  
