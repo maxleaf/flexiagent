@@ -206,6 +206,18 @@ class FwUnassignedIfs:
             hash = hashlib.md5(res).hexdigest()
             return hash
 
+    def is_unassigned_addr(self, address_no_mask):
+        """
+        Check if an address is unassigned (part of cache)
+        : param : address_no_mask - address to look for, without mask
+        : return: True if part of cache, False if not
+        """
+        for pci_addr in self.local_cache.keys():
+            entry = self.local_cache[pci_addr]
+            if address_no_mask == entry['addr'].split('/')[0]:
+                return True
+        return False
+
     def log_interfaces_cache(self):
         """
         log cache into log
