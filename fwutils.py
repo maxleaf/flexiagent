@@ -1407,7 +1407,9 @@ def get_reconfig_hash(update_public_info):
     if len(if_list) == 0:
         return res
 
-    fwglobals.log.debug("get_reconfig_hash: adding public ip and port to computation")
+    # print it here, and not inside the loop
+    if update_public_info == True:
+        fwglobals.log.debug("get_reconfig_hash: adding public ip and port to computation")
  
     vpp_run = vpp_does_run()
     for interface in if_list:
@@ -1442,7 +1444,7 @@ def get_reconfig_hash(update_public_info):
             if interface.get('metric') and interface['metric'] != '0':
                 res += 'metric:' + '' + ','
 
-        if update_public_info:
+        if update_public_info == True:
             if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
                 nomaskaddr = addr.split('/')[0]
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
