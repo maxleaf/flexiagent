@@ -38,6 +38,19 @@ class FwStunWrap:
         'stun_server_port':
         'nat_type':
     }
+
+    get-device-info message reply collects information on all Linux interfaces. For that,
+    it will send STUN requests on interfaces that might not be part of this cache, because
+    user, using UI, choosed not to assign them to VPP. However, we do want to monitor
+    information on unassigned interfaces, and display it in UI. Since reconfig will send
+    STUN request on those interfaces, they will be added to this cache. The point is,
+    interfaces will be added to the cache from number of reasons:
+    1. After device registration, all interfaces with gateway will be added to the cache
+    2. add-interface message from Fleximanage
+    3. Call to reconfig on all interfaces, which might add new interfaces to the cache via
+       calling send_single_stun_request()
+
+    For more information, check fwunassigned_if.py file.
     """
 
     def log_address_cache(self):
@@ -110,11 +123,17 @@ class FwStunWrap:
         """
         remove address from cache. The interface is no longer valid, no need to send
         STUN request on its behalf.
+        Note that if the address is in the unassigned-interfaces cache, we will not
+        remove it from current cache, as we still want to be able to get public IP:PORT
+        on unassigned interfaces as well.
         : param : addr - address to remove from cache.
         """
         if addr in self.local_cache['stun_interfaces'].keys():
-            del self.local_cache['stun_interfaces'][addr]
-            fwglobals.log.debug("Removing address %s from Cache" %(str(addr)))
+            if fwglobals.g.unassigned_interfaces.is_unassigned_addr(addr) == False:
+                del self.local_cache['stun_interfaces'][addr]
+                fwglobals.log.debug("Removing address %s from Cache" %(str(addr)))
+            else:
+                fwglobals.log.debug("Address %s in unassigned cache, not removing" %(str(addr)))
 
     def find_addr(self,addr):
         """
