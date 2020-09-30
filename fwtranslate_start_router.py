@@ -104,6 +104,20 @@ def start_router(params=None):
             #   2. They should not be removed from linux
             # The spacial logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(iface_pci):
+
+                # create linux bridge
+                cmd = {}
+                cmd['cmd'] = {}
+                cmd['cmd']['name']   = "exec"
+                cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  iface_pci ]
+                cmd['cmd']['descr']  = "create linux bridge"
+
+                cmd['revert'] = {}
+                cmd['revert']['name']   = "exec"
+                cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_pci, iface_pci) ]
+                cmd['revert']['descr']  = "remove linux bridge"
+                
+                cmd_list.append(cmd)
                 continue
 
             # Mark 'vmxnet3' interfaces as they need special care:

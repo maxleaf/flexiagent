@@ -118,18 +118,8 @@ def add_interface(params):
         }
         cmd_list.append(cmd)
 
-    if fwutils.is_non_dpdk_interface(iface_name):        
-        # cmd = {}
-        # cmd['cmd'] = {}
-        # cmd['cmd']['name']      = "exec"
-        # cmd['cmd']['descr']     = "Create tap interface in vpp and linux for %s %s" % (iface_addr, iface_name)
-        # cmd['cmd']['params']    = [ "sudo vppctl tap connect tap_%s" %  iface_name]
-        # cmd['revert'] = {}
-        # cmd['revert']['name']   = "exec"
-        # cmd['revert']['descr']  = "DOWN tap interface tap_%s in Linux" % iface_name
-        # cmd['revert']['params'] = [ "sudo ip link set dev tap_%s down" % iface_name ]
-        # cmd_list.append(cmd)
-
+    if fwutils.is_non_dpdk_interface(iface_name):
+        # create tap for this interface in vpp and linux
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']   = "python"
@@ -139,21 +129,55 @@ def add_interface(params):
                     'args': { 'linux_if_name': iface_name }
         }
         cmd['cmd']['descr'] = "create tap interface in linux and vpp"
-
         cmd_list.append(cmd)
 
-        # cmd = {}
-        # cmd['cmd'] = {}
-        # cmd['cmd']['name']      = "exec"
-        # cmd['cmd']['descr']     = "Create tap interface in vpp and linux for %s %s" % (iface_addr, iface_name)
-        # cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_connect', 'arg':iface_name } ]},
-        #                             "sudo ip link set dev DEV-STUB up" ]
-        # cmd['revert'] = {}
-        # cmd['revert']['name']   = "exec"
-        # cmd['revert']['descr']  = "DOWN interface %s %s in vpp and linux" % (iface_addr, iface_name)
-        # cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
-        #                             "sudo ip link set dev DEV-STUB down" ]
-        # cmd_list.append(cmd)
+        # add tap into a bridge. 
+        # Note: the bridge is created on start_router translator
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "exec"
+        cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
+                                    "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
+        cmd['cmd']['descr']  = "add tap into a bridge"
+
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
+                                    "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
+        cmd['revert']['descr']  = "remove tap from a bridge"
+        cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "exec"
+        cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
+        cmd['cmd']['descr']  = "add linux interface into a bridge"
+
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
+        cmd['revert']['descr']  = "remove linux interface from a bridge"
+        cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
+        cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
+        cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "exec"
+        cmd['cmd']['descr']     = "UP interface create by tap-inject in Linux" 
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_by_linux_interface_name', 'arg': iface_name } ]},
+                                    "sudo ip link set dev DEV-STUB up" ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']  = "DOWN interface created by tap-inject in Linux"
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_by_linux_interface_name', 'arg': iface_name } ]},
+                                    "sudo ip link set dev DEV-STUB down" ]
+        cmd_list.append(cmd)
     else:
         # add interface into netplan configuration
         cmd = {}
