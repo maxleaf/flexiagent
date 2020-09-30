@@ -210,7 +210,7 @@ def check_soft_configuration(checker, fix=False, quiet=False):
                 elif choice == 'n' or choice == 'N' or choice == '':
                     break
                 elif choice == 'q' or choice == 'Q':
-                    exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
+                    sys.exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
         if not result and severity == 'critical':
             succeeded = False
     return succeeded
@@ -357,8 +357,8 @@ if __name__ == '__main__':
         pid = subprocess.check_output(['pidof', 'vpp'])
         # If we reached this point, i.e. if no exception occurred, the vpp pid was found
         print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
-        exit(FW_EXIT_CODE_OK)
-    except:
+        sys.exit(FW_EXIT_CODE_OK)
+    except Exception as e:
         pass
 
 
@@ -376,5 +376,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     res = main(args)
     ####### For now (Dec-2019) don't block installation and agent start on failure
-    # exit(res)
-    exit(FW_EXIT_CODE_OK)
+    # sys.exit(res)
+    sys.exit(FW_EXIT_CODE_OK)
