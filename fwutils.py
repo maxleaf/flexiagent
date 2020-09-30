@@ -572,6 +572,42 @@ def vpp_if_name_to_tap(vpp_if_name):
     tap = match.group(1)
     return tap
 
+def configure_tap_in_linux_and_vpp(linux_if_name):
+    """Create tap interface in linux and vpp.
+      This function will create three interfaces:
+        1. linux tap interface.
+        2. vpp tap interface in vpp.
+        3. linux interface for tap-inject.
+    
+    :param linux_if_name: name of the linux interface to create tap for
+
+    :returns: VPP tap interface name.
+    """    
+    try:
+        vpp_tapcli_ifc = subprocess.check_output("sudo vppctl show int | grep tapcli-", shell=True).splitlines()
+    
+        linux_tap_name = "tap_%s_tapcli-%s" % (linux_if_name, len(vpp_if_name_to_pci))
+
+        vpp_tap_new = vpp_tap_connect(linux_tap_name)
+
+        return (True, None)
+    except:
+        return (False, None)
+
+def vpp_tap_connect(linux_tap_if_name):
+    """Run vpp tap connect command.
+      This command will create a linux tap interface and also tapcli interface in vpp.
+      
+     :param linux_tap_if_name: name to be assigned to linux tap device
+
+     :returns: VPP tap interface name.
+     """
+
+    vppctl_cmd - "tap connect %s" % linux_tap_if_name
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+    vpp_tap_ifc = _vppctl_read(vppctl_cmd, wait=False)
+    return vpp_tap_ifc
+
 def vpp_sw_if_index_to_name(sw_if_index):
     """Convert VPP sw_if_index into VPP interface name.
 

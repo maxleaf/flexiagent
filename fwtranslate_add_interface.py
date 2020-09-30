@@ -119,16 +119,41 @@ def add_interface(params):
         cmd_list.append(cmd)
 
     if fwutils.is_non_dpdk_interface(iface_name):        
+        # cmd = {}
+        # cmd['cmd'] = {}
+        # cmd['cmd']['name']      = "exec"
+        # cmd['cmd']['descr']     = "Create tap interface in vpp and linux for %s %s" % (iface_addr, iface_name)
+        # cmd['cmd']['params']    = [ "sudo vppctl tap connect tap_%s" %  iface_name]
+        # cmd['revert'] = {}
+        # cmd['revert']['name']   = "exec"
+        # cmd['revert']['descr']  = "DOWN tap interface tap_%s in Linux" % iface_name
+        # cmd['revert']['params'] = [ "sudo ip link set dev tap_%s down" % iface_name ]
+        # cmd_list.append(cmd)
+
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "Create tap interface in vpp and linux for %s %s" % (iface_addr, iface_name)
-        cmd['cmd']['params']    = [ "sudo vppctl tap connect tap_%s" %  iface_name]
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['descr']  = "DOWN tap interface tap_%s in Linux" % iface_name
-        cmd['revert']['params'] = [ "sudo ip link set dev tap_%s down" % iface_name ]
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                    'module': 'fwutils',
+                    'func': 'configure_tap_in_linux_and_vpp',
+                    'args': { 'linux_if_name': iface_name }
+        }
+        cmd['cmd']['descr'] = "create tap interface in linux and vpp"
+
         cmd_list.append(cmd)
+
+        # cmd = {}
+        # cmd['cmd'] = {}
+        # cmd['cmd']['name']      = "exec"
+        # cmd['cmd']['descr']     = "Create tap interface in vpp and linux for %s %s" % (iface_addr, iface_name)
+        # cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_connect', 'arg':iface_name } ]},
+        #                             "sudo ip link set dev DEV-STUB up" ]
+        # cmd['revert'] = {}
+        # cmd['revert']['name']   = "exec"
+        # cmd['revert']['descr']  = "DOWN interface %s %s in vpp and linux" % (iface_addr, iface_name)
+        # cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+        #                             "sudo ip link set dev DEV-STUB down" ]
+        # cmd_list.append(cmd)
     else:
         # add interface into netplan configuration
         cmd = {}
