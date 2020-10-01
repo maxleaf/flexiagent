@@ -446,6 +446,9 @@ class FwAgent:
                     else:
                         fwstats.update_stats()
 
+                # dump STUN and unassigned interfaces information every 'timeout' seconds
+                if (slept % timeout) == 0:
+                    fwglobals.g.stun_wrapper.log_address_cache()
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1

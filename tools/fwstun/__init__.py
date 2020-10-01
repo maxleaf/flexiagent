@@ -11,8 +11,6 @@ sys.path.append(globals)
 import fwglobals
 
 __version__ = '1.0.0'
-#logging.basicConfig(filename='/etc/flexiwan/agent/pystun3.log',level=logging.DEBUG)
-#log = logging.getLogger("pystun3")
 
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (

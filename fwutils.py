@@ -1395,38 +1395,72 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def get_reconfig_hash():
+def get_reconfig_hash(update_public_info = False):
+    """ Compute reconfig hash on interfaces in router-db.
+    public_ip and public_port will be added to the computation only if the update_public_info
+    is True, to reduce STUN traffic, as reconfig is computed every second.
+
+    : param : update_public_info - if True, add public IP and port to reconfig computation.
+    """
     res = ''
-    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
-    if len(wan_list) == 0:
+    if_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    if len(if_list) == 0:
         return res
-        
+
+    # print it here, and not inside the loop
+    if update_public_info == True:
+        fwglobals.log.debug("get_reconfig_hash: adding public ip and port to computation")
+
     vpp_run = vpp_does_run()
-    for wan in wan_list:
-        name = pci_to_linux_iface(wan['pci'])
+    for interface in if_list:
+        name = pci_to_linux_iface(interface.get('pci'))
 
         if name is None and vpp_run:
-            name = pci_to_tap(wan['pci'])
+            name = pci_to_tap(interface.get('pci'))
 
         if name is None:
             return ''
 
         addr = get_interface_address(name)
-        if addr != None:
-            if not re.search(addr, wan['addr']):
+        if addr:
+            if not re.search(addr, interface.get('addr')):
                 res += 'addr:' + addr + ','
+        else:
+            if interface.get('addr') and interface['addr'] != None:
+                res += 'addr:' + '' + ','
 
         gw, metric = get_linux_interface_gateway(name)
-        if not re.match(gw, wan['gateway']):
-            res += 'gw:' + gw + ','
+        if gw: # Lan interfaces might not have GW
+            if not re.match(gw, interface.get('gateway')):
+                res += 'gw:' + gw + ','
+        else:
+            if interface.get('gateway') and interface['gateway'] != '':
+                res += 'gw:' + '' + ','
 
-        if addr:
-            nomaskaddr = addr.split('/')[0]
-            public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
-            if public_ip and public_port:
-                res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
+        if metric:
+            if not re.match(metric, interface.get('metric')):
+                res += 'metric:' + metric + ','
+        else:
+            if interface.get('metric') and interface['metric'] != '0':
+                res += 'metric:' + '' + ','
+        if update_public_info == True:
+            if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
+                nomaskaddr = addr.split('/')[0]
+                public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
+                fwglobals.g.stun_wrapper.send_single_stun_request(nomaskaddr,4789, None, None, True)
+                new_p_ip, new_p_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
+                if new_p_ip:
+                    if public_ip != new_p_ip:
+                        res += 'public_ip:' + new_p_ip + ','
+                else:
+                    res += 'public_ip:' + '' + ','
 
-    if res:
+                if new_p_port:
+                    if public_port != new_p_port:
+                        res += 'public_port:' + str(new_p_port) + ','
+                else:
+                        res += 'public_port:' + '' + ','
+	if res:
         fwglobals.log.info('get_reconfig_hash: %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash

@@ -130,11 +130,9 @@ class FWROUTER_API:
         timeout = 30
         slept    = 0
         while self.router_started:
-            if (slept % timeout) == 0:
-                fwglobals.g.stun_wrapper.log_address_cache()
-
             # send STUN retquests for addresses that a request was not sent for
             # them, or for ones that did not get reply previously
+            
             fwglobals.g.stun_wrapper.send_stun_request()
             fwglobals.g.stun_wrapper.increase_sec()
 
