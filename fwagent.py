@@ -481,7 +481,8 @@ class FwAgent:
 
         reply = self.handle_received_request(request)
 
-        fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply))
+        reply_str = reply if not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
+        fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
 
         # Messages that change the interfaces might cause the existing connection to break
         # (for example, if the IP/mask has changed). Since sending the reply on a broken
@@ -531,7 +532,7 @@ class FwAgent:
         # expected by the agent framework.
         msg = fwutils.fix_aggregated_message_format(received_msg)
 
-        print_message = False if msg['message'] == 'get-device-stats' else print_message
+        print_message = False if re.match('get-device-', msg['message']) else print_message
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 

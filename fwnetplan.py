@@ -175,6 +175,9 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
             if old_ifname in old_ethernets:
                 config_section = old_ethernets[old_ifname]
 
+        if 'dhcp6' in config_section:
+            del config_section['dhcp6']
+
         if re.match('yes', dhcp):
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
@@ -236,6 +239,9 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname_run, str(e))
         fwglobals.log.error(err_str)
+        if fname_run:
+            with open(fname_run, 'r') as f:
+                fwglobals.log.error("NETPLAN file contents: " + f.read())
         return (False, err_str)
 
     return (True, None)
