@@ -178,6 +178,53 @@ def add_interface(params):
         cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_by_linux_interface_name', 'arg': iface_name } ]},
                                     "sudo ip link set dev DEV-STUB down" ]
         cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                    'module': 'fwnetplan',
+                    'func': 'add_remove_inf_from_netplan',
+                    'args': { 'is_add'       : 0,
+                            'linux_interface': iface_name
+                    }
+        }
+        cmd_list.append(cmd)
+
+        # add interface into netplan configuration
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                    'module': 'fwnetplan',
+                    'func': 'add_remove_netplan_interface',
+                    'args': { 'is_add'       : 1,
+                            'pci'            : None,
+                            'ip'             : iface_addr,
+                            'gw'             : gw,
+                            'metric'         : metric,
+                            'dhcp'           : dhcp,
+                            'linux_interface': iface_name
+                    }
+        }
+        cmd['cmd']['descr'] = "add interface into netplan config file"
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                    'module': 'fwnetplan',
+                    'func': 'add_remove_netplan_interface',
+                    'args': {
+                            'is_add'         : 0,
+                            'pci'            : None,
+                            'ip'             : iface_addr,
+                            'gw'             : gw,
+                            'metric'         : metric,
+                            'dhcp'           : dhcp,
+                            'linux_interface': iface_name
+                    }
+        }
+        cmd['revert']['descr'] = "remove interface from netplan config file"
+        cmd_list.append(cmd)
     else:
         # add interface into netplan configuration
         cmd = {}

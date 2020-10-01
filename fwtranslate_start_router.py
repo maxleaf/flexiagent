@@ -118,6 +118,13 @@ def start_router(params=None):
                 cmd['revert']['descr']  = "remove linux bridge"
                 
                 cmd_list.append(cmd)
+
+                cmd = {}
+                cmd['cmd'] = {}
+                cmd['cmd']['name']    = "exec"
+                cmd['cmd']['params']  = [ "sudo ip addr flush dev %s" % iface_pci ]
+                cmd['cmd']['descr']   = "reset dev %s in Linux" % iface_pci
+                cmd_list.append(cmd)
                 continue
 
             # Mark 'vmxnet3' interfaces as they need special care:

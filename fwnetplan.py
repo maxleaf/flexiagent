@@ -130,14 +130,29 @@ def _add_netplan_file(fname):
     with open(fname, 'w+') as stream:
         yaml.safe_dump(config, stream, default_flow_style=False)
 
+def add_remove_inf_from_netplan(is_add, linux_interface):
+    config = {}
+    fname_run = '/etc/netplan/01-netcfg.fwrun.yaml'
+    with open(fname_run, 'r+') as stream:
+        config = yaml.safe_load(stream)
 
-def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
+    if 'network' in config:
+        network = config['network']
+        ethernets = network['ethernets']
+
+        if linux_interface in ethernets:
+            del ethernets[linux_interface]
+            
+            with open(fname_run, 'w') as stream:
+                yaml.safe_dump(config, stream)
+
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interface=None):
     config_section = {}
     old_ethernets = {}
 
     set_name = ''
     old_ifname = ''
-    ifname = fwutils.pci_to_tap(pci)
+    ifname = fwutils.pci_to_tap(pci) if not linux_interface else fwutils.vpp_tap_by_linux_interface_name(linux_interface)
     if not ifname:
         err_str = "add_remove_netplan_interface: %s was not found" % pci
         fwglobals.log.error(err_str)
@@ -222,7 +237,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         if is_add == 1:
             ip_address_is_found = False
             for _ in range(50):
-                ifname = fwutils.pci_to_tap(pci)
+                ifname = fwutils.pci_to_tap(pci) if not linux_interface else fwutils.vpp_tap_by_linux_interface_name(linux_interface)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
