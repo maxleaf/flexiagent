@@ -109,7 +109,7 @@ class FWAGENT_API:
             # Load network configuration.
             info['network'] = {}
             info['network']['interfaces'] = fwglobals.g.handle_request({ 'message': 'interfaces'})['message']
-            info['reconfig'] = fwutils.get_reconfig_hash()
+            info['reconfig'] = fwglobals.g.unassigned_interfaces.get_global_reconfig_hash(True)
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])

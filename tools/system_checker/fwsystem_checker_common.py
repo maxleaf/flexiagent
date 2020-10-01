@@ -944,8 +944,8 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_vpp_workers_core(self, fix=False, silently=False, prompt=''):
-        """Check and set number of worker cores to process incoming packets.
+    def soft_check_multicore_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+        """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
         :param silently:        Do not prompt user.
