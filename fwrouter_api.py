@@ -129,6 +129,7 @@ class FWROUTER_API:
         """
         timeout = 30
         slept    = 0
+
         while self.router_started:
             # send STUN retquests for addresses that a request was not sent for
             # them, or for ones that did not get reply previously

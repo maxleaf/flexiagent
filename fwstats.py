@@ -155,10 +155,16 @@ def get_stats():
 
     :returns: Statistics dictionary.
     """
+    update_public_addresses = False
     res_update_list = list(updates_list)
     del updates_list[:]
 
-    reconfig = fwutils.get_reconfig_hash()
+    if res_update_list and res_update_list[0] and res_update_list[0]['stats']:
+        # stats dictionary is getting updated every 30 seconds. We will update
+        # reconfig hash with public addresses at that rate, to reduce STUN requests.
+        # This will not affect STUN requests sent due to tunnel status.
+        update_public_addresses = True
+    reconfig = fwglobals.g.unassigned_interfaces.get_global_reconfig_hash(update_public_addresses)
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update

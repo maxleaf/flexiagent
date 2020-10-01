@@ -39,6 +39,7 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
+from fwunassigned_if import FwUnassignedIfs
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -288,6 +289,7 @@ class Fwglobals:
         self.apps          = FwApps(self.APP_REC_DB_FILE)
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper  = FwStunWrap()
+        self.unassigned_interfaces = FwUnassignedIfs()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -302,6 +304,7 @@ class Fwglobals:
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+        del self.unassigned_interfaces 
         del self.stun_wrapper
         del self.apps
         del self.policies

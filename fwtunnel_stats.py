@@ -1,6 +1,4 @@
-#! /usr/bin/python
-
-################################################################################
+#################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #

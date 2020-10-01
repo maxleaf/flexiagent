@@ -1403,7 +1403,7 @@ def get_reconfig_hash(update_public_info = False):
     : param : update_public_info - if True, add public IP and port to reconfig computation.
     """
     res = ''
-    if_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    if_list = fwglobals.g.router_cfg.get_interfaces()
     if len(if_list) == 0:
         return res
 
@@ -1443,6 +1443,7 @@ def get_reconfig_hash(update_public_info = False):
         else:
             if interface.get('metric') and interface['metric'] != '0':
                 res += 'metric:' + '' + ','
+
         if update_public_info == True:
             if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
                 nomaskaddr = addr.split('/')[0]
