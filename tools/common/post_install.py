@@ -85,7 +85,7 @@ if __name__ == '__main__':
     try:
         if len(sys.argv) < 4:
             print("Usage: %s <prev_version> <new_version> <install|remove>" % sys.argv[0])
-            exit(FW_EXIT_CODE_ERROR)
+            sys.exit(FW_EXIT_CODE_ERROR)
 
         prev_version = sys.argv[1]
         new_version = sys.argv[2]
@@ -102,4 +102,4 @@ if __name__ == '__main__':
 
     except Exception as e:
         print("Post install error: %s" % (str(e)))
-    exit(FW_EXIT_CODE_OK)
+    sys.exit(FW_EXIT_CODE_OK)
