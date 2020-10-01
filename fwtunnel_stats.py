@@ -26,7 +26,6 @@ import time
 from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
-
 import fwglobals
 
 tunnel_stats_global = {}
@@ -45,7 +44,7 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     """
     args = shlex.split(cmd)
     return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0]
- 
+
 def tunnel_stats_get_ping_time(host):
     """Use fping to get RTT.
 
@@ -121,7 +120,7 @@ def tunnel_stats_get():
     cur_time = time.time()
 
     for key, value in tunnel_stats_global.items():
-        tunnel_stats[key] = dict()
+        tunnel_stats[key] = {}
         tunnel_stats[key]['rtt'] = value['rtt']
         tunnel_stats[key]['drop_rate'] = value['drop_rate']
 
@@ -129,5 +128,17 @@ def tunnel_stats_get():
             tunnel_stats[key]['status'] = 'down'
         else:
             tunnel_stats[key]['status'] = 'up'
+
+        if tunnel_stats[key]['status'] == 'down':
+            # if tunnel status is down, we add the source IP of that tunnel to the list
+            # of addresses that we will send STUN requests on their behalf.
+            # go to router configuration db, and find this tunnel
+            tunnels = fwglobals.g.router_cfg.get_tunnels()
+            for params in tunnels:
+                if params['tunnel-id'] == key:
+                    # found tunnel, add its source IP address to the cache of addresses for which
+                    # we will send STUN requests.
+                    fwglobals.g.stun_wrapper.add_addr(params['src'])
+                    break
 
     return tunnel_stats

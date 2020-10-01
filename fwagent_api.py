@@ -230,7 +230,7 @@ class FWAGENT_API:
         :returns: Dictionary with configuration and status code.
         """
         configs = fwutils.dump_router_config()
-        reply = {'ok': 1, 'message': configs if configs else {}}
+        reply = {'ok': 1, 'message': configs if configs else []}
         return reply
 
     def _reset_device_soft(self, params=None):

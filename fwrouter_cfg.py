@@ -26,6 +26,7 @@ import os
 import re
 import traceback
 import yaml
+import copy
 
 from sqlitedict import SqliteDict
 
@@ -48,6 +49,9 @@ class FwRouterCfg:
         if self.db.get('signature') is None:
             self.db['signature'] = ""
 
+        self.callbacks = []
+
+
     def __enter__(self):
         return self
 
@@ -62,6 +66,38 @@ class FwRouterCfg:
         """Destructor method
         """
         self.db.close()
+
+    def register_callback(self, listener, callback, requests):
+        """Registers a listener for notifications about  requests stored in /
+        removed from the configuration database. The latest is done by the
+        FwRouterCfg::update() method. It invokes the 'callback' before
+        the request is saved in the database.
+        The callback signature should be (req, params) where 'req' is the
+        request name, e.g. 'add-tunnel', and the 'params' are the parameters of
+        the request as they would received from server in 'params' field.
+
+        :param: listener - name of the listener for logging propuses.
+        :param: callback - the function to be used to notify listener of request
+        :param: requests - list of requests the listener would like to be
+                           notified for, e.g.:
+                            ['add-interface', 'remove-interface', 'stop-router']
+        """
+        fwglobals.log.debug("FwRouterCfg: register_callback: %s.%s(%s)"\
+            %(listener, callback.__name__, str(requests)))
+        elem = {'listener':listener, 'callback': callback, 'requests':requests}
+        self.callbacks.append(elem)
+
+    def unregister_callback(self, listener, callback):
+        """Unregisters a listener from listening on incoming requests
+        :param: listener - string representing the module. For logging.
+        :param: callback - the callback used to listen to requests.
+        """
+        for (idx, elem) in enumerate(self.callbacks):
+            if elem['callback'] == callback:
+                fwglobals.log.debug("unregister_callbacks_pre_update: %s::%s" \
+                    %(listener, callback.__name__))
+                del self.callbacks[idx]
+                return
 
     def clean(self):
         """Clean DB
@@ -96,6 +132,26 @@ class FwRouterCfg:
         key_func    = getattr(key_module, 'get_request_key')
         return key_func(params)
 
+    def _call_callback(self, listeners, req_name, params):
+        """
+        go over callback data base and check if callback should be called for each listener
+        based on the request name. This function is called from update().
+        """
+        for elem in listeners:
+            if req_name in elem['requests']:
+                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - before"\
+                        %(elem['listener'], elem['callback'].__name__, req_name))
+
+                try:
+                    elem['callback'](req_name, params)
+                except Exception as e:
+                    fwglobals.log.error("FwRouterCfg: %s.%s(%s): %s"\
+                            %(elem['listener'], elem['callback'].__name__, req_name, str(e)))
+                    pass
+
+                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - after"\
+                        %(elem['listener'], elem['callback'].__name__, req_name))
+
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
@@ -116,10 +172,14 @@ class FwRouterCfg:
         req_key = self._get_request_key(request)
 
         try:
+            cb_params = params if re.match('(add-|start-router)', req) else self.db[req_key]['params']
+            self._call_callback(self.callbacks, req, cb_params)
+
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
             else:
                 del self.db[req_key]
+
         except KeyError:
             pass
         except Exception as e:
@@ -173,6 +233,75 @@ class FwRouterCfg:
         req_key = self._get_request_key(request)
         res = True if req_key in self.db else False
         return res
+
+    def get_params(self, request):
+        """Retrives parameters of the provided configuration request.
+        This function can be used to find parameters of configuration item
+        before modification.
+
+        :param request: The configuration request, e.g. modify-interface.
+        :returns: parameters of the request stored in the database.
+        """
+        req_key = self._get_request_key(request)
+        if req_key in self.db:
+            return self.db[req_key].get('params')
+        return None
+
+    def are_params_equal(self, params1, params2):
+        """ Compares two dictionaries while normalizing them for comparison
+        and ignoring orphan keys that have None or empty string value.
+            The orphans keys are keys that present in one dict and don't
+        present in the other dict, thanks to Scooter Software Co. for the term :)
+            We need this function to pay for bugs in flexiManage code, where
+        is provides add-/modify-/remove-X requests for same configuration
+        item with inconsistent letter case, None/empty string,
+        missing parameters, etc.
+            Note! The normalization is done for top level keys only!
+        """
+        if not params1 or not params2:
+            return False
+        if type(params1) != type(params2):
+            return False
+        if type(params1) != dict:
+            return (params1 == params2)
+
+        set_keys1   = set(params1.keys())
+        set_keys2   = set(params2.keys())
+        keys1_only  = list(set_keys1 - set_keys2)
+        keys2_only  = list(set_keys2 - set_keys1)
+        keys_common = set_keys1.intersection(set_keys2)
+
+        for key in keys1_only:
+            if not params1[key]:
+                # params1 has non-empty string/value that does not present in params2
+                return False
+
+        for key in keys2_only:
+            if not params2[key]:
+                # params2 has non-empty string/value that does not present in params1
+                return False
+
+        for key in keys_common:
+            val1 = params1[key]
+            val2 = params2[key]
+            if val1 and val2:   # Both values are neither None-s nor empty strings.
+                if type(val1) != type(val2):
+                    return False        # Not comparable types
+                if type(val1) == str:
+                    if val1.lower() != val2.lower():
+                        return False    # Strings are not equal
+                elif val1 != val2:
+                    return False        # Values are not equal
+        return True
+
+    def is_same_cfg_item(self, request1, request2):
+        """Checks if provided requests stand for the same configuration item.
+        """
+        req_key1 = self._get_request_key(request1)
+        req_key2 = self._get_request_key(request2)
+        if req_key1 == req_key2:
+            return True
+        return False
 
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests that look exactly
@@ -285,14 +414,16 @@ class FwRouterCfg:
         interfaces = self._get_requests('add-interface')
         if not type and not pci and not ip:
             return interfaces
+        result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
-                interfaces.remove(params)
+                continue
             elif pci and pci != params['pci']:
-                interfaces.remove(params)
+                continue
             elif ip and not re.match(ip, params['addr']):
-                interfaces.remove(params)
-        return interfaces
+                continue
+            result.append(params)
+        return result
 
     def get_tunnels(self):
         return self._get_requests('add-tunnel')
@@ -369,6 +500,8 @@ class FwRouterCfg:
 
         :returns: the signature as a string.
         """
+        if not 'signature' in self.db:
+            self.reset_signature()
         return self.db['signature']
 
     def reset_signature(self):
@@ -384,17 +517,17 @@ class FwRouterCfg:
         """Intersects requests provided within 'requests' argument against
         the requests stored in the local database and generates output list that
         can be used for synchronization of router configuration. This output list
-        is called sync-list. It includes sequence of 'remove-X' and 'add-X'
-        requests that should be applied to device in order to configure it with
-        the configuration, reflected in the input list 'requests'.
+        is called sync-list. It includes sequence of 'remove-X', 'modify-X' and
+        'add-X' requests that should be applied to device in order to configure
+        it with the configuration, reflected in the input list 'requests'.
 
         :param requests: list of requests that reflects the desired configuration.
                          The requests are in formant of flexiManage<->flexiEdge
                          message: { 'message': 'add-X', 'params': {...}}.
 
-        :returns: synchronization list - list of 'remove-X' and 'add-X' requests
-                         that takes device to the desired configuration if applied
-                         to the device.
+        :returns: synchronization list - list of 'remove-X', 'modify-X' and
+                         'add-X' requests that takes device to the desired
+                         configuration if applied to the device.
         """
 
         # Firstly we hack a little bit the input list as follows:
@@ -404,7 +537,7 @@ class FwRouterCfg:
         # dumped by fwglobals.g.router_cfg.dump() used below ;)
         #
         input_requests = {}
-        for request in requests:
+        for request in copy.deepcopy(requests): # Use deepcopy as we might modify input_requests[key] below
             key = self._get_request_key(request)
             input_requests.update({key:request})
 
@@ -413,9 +546,7 @@ class FwRouterCfg:
         # in the input list and that have same parameters. They correspond to
         # configuration items that should be not touched by synchronization.
         # The dumped requests that present in the input list but have different
-        # parameters stand for modifications. They should be added to the output
-        # list as 'remove-X' with dumped parameters and than added again as
-        # 'add-X' but with new parameters found in input list.
+        # parameters stand for modifications.
         #
         dumped_requests = fwglobals.g.router_cfg.dump(keys=True)
         output_requests = []
@@ -427,20 +558,26 @@ class FwRouterCfg:
                 #
                 dumped_params = dumped_request.get('params')
                 input_params  = input_requests[dumped_key].get('params')
-                if dumped_params == input_params:
+                if self.are_params_equal(dumped_params, input_params):
                     # The configuration item has exactly same parameters.
                     # It does not require sync, so remove it from input list.
                     #
                     del input_requests[dumped_key]
                 else:
                     # The configuration item should be modified.
-                    # So add the correspondent 'remove-X' request with current
-                    # parameters to the output list and later in this function
-                    # we will add the correspondent 'add-X' request with new
-                    # parameters out of the input list.
+                    # Rename requests in input list with 'modify-X'.
                     #
-                    dumped_request['message'] = dumped_request['message'].replace('add-', 'remove-')
-                    output_requests.append(dumped_request)
+                    # At this stage only 'modify-interface' is supported,
+                    # so for the rest types of configuration items we add
+                    # the correspondent 'remove-X' request with current
+                    # parameters to the output list and later in this function
+                    # we will add the 'add-X' request from the input list.
+                    #
+                    if dumped_request['message'] == 'add-interface':
+                        input_requests[dumped_key]['message'] = 'modify-interface'
+                    else:
+                        dumped_request['message'] = dumped_request['message'].replace('add-', 'remove-')
+                        output_requests.append(dumped_request)
             else:
                 # The configuration item does not present in the input list.
                 # So it stands for item to be removed. Add correspondent request
@@ -460,3 +597,4 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
+

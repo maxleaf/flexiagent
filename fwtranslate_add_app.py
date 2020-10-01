@@ -111,6 +111,11 @@ def add_acl_rule(rule, rules):
         if not proto:
             proto = [ proto_map['udp'] , proto_map['tcp'] ]
 
+    # If no protocol was provided, use ANY
+    #
+    if not proto:
+        proto = [ 0 ]
+
     for p in proto:
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
                                 dport_from=port_from,

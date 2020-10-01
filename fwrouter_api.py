@@ -94,6 +94,7 @@ class FWROUTER_API:
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
+        self.thread_stun     = None
 
     def finalize(self):
         """Destructor method
@@ -120,6 +121,25 @@ class FWROUTER_API:
             except Exception as e:
                 fwglobals.log.error("watchdog: exception: %s" % str(e))
                 pass
+
+    def stun_thread(self):
+        """STUN thread
+        Its function is to send STUN requests for address:4789 in a timely manner
+        according to some algorithm-based calculations.
+        """
+        timeout = 30
+        slept    = 0
+        while self.router_started:
+            if (slept % timeout) == 0:
+                fwglobals.g.stun_wrapper.log_address_cache()
+
+            # send STUN retquests for addresses that a request was not sent for
+            # them, or for ones that did not get reply previously
+            fwglobals.g.stun_wrapper.send_stun_request()
+            fwglobals.g.stun_wrapper.increase_sec()
+
+            time.sleep(1)
+            slept += 1
 
     def tunnel_stats_thread(self):
         """Tunnel statistics thread.
@@ -229,9 +249,9 @@ class FWROUTER_API:
 
         dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
 
-        # First of all remove strip out requests that have no impact
-        # on configuration, like 'remove-X' for not existing configuration
-        # items and 'add-X' for existing configuration items.
+        # First of all strip out requests that have no impact on configuration,
+        # like 'remove-X' for not existing configuration items and 'add-X' for
+        # existing configuration items.
         #
         new_request = self._strip_noop_request(request)
         if not new_request:
@@ -299,7 +319,7 @@ class FWROUTER_API:
         # the latest GW-s. That causes VPPSB to propagate the ARP information
         # into VPP FIB.
         # Note we do this even if 'modify-interface' failed, as before failure
-        # it might succeed to remove few interfaces fro Linux.
+        # it might succeed to remove few interfaces from Linux.
         ########################################################################
         if gateways:
             # Delay 5 seconds to make sure Linux interfaces were initialized
@@ -423,11 +443,19 @@ class FWROUTER_API:
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
 
+            # Connection to flexiManage can be lost on either start/stop-router
+            # success or failure, as interfaces are moved to/from Linux control.
+            # In this case re-establish connection as soon as possible.
+            #
+            if re.match('(start|stop)-router',  req):
+                fwglobals.g.fwagent.should_reconnect = True
+
         except Exception as e:
             err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
             if req == 'start-router' or req == 'stop-router':
                 self._set_router_failure("failed to " + req)
+                fwglobals.g.fwagent.should_reconnect = True
             raise e
 
         return {'ok':1}
@@ -576,34 +604,69 @@ class FWROUTER_API:
 
         :returns: request after stripping out no impact requests.
         """
-        def _should_be_stripped(_request):
+        def _should_be_stripped(_request, aggregated_requests=None):
             req    = _request['message']
-            params = _request['message']
-
+            params = _request.get('params', {})
             if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
-                return True
+                # Ensure that the aggregated request does not include correspondent 'add-X' before.
+                noop = True
+                if aggregated_requests:
+                    complement_req     = re.sub('(modify-|remove-)','add-', req)
+                    complement_request = { 'message': complement_req, 'params': params }
+                    if _exist(complement_request, aggregated_requests):
+                        noop = False
+                if noop:
+                    return True
             elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
                 # Ensure this is actually not modification request :)
-                curr_params = fwglobals.g.router_cfg.get_request_params(_request)
-                if params == curr_params:
+                existing_params = fwglobals.g.router_cfg.get_request_params(_request)
+                if fwglobals.g.router_cfg.are_params_equal(existing_params, _request.get('params')):
+                    # Ensure that the aggregated request does not include correspondent 'remove-X' before.
+                    noop = True
+                    if aggregated_requests:
+                        complement_req     = re.sub('add-','remove-', req)
+                        complement_request = { 'message': complement_req, 'params': params }
+                        if _exist(complement_request, aggregated_requests):
+                            noop = False
+                    if noop:
+                        return True
+            elif re.match('start-router', req) and fwutils.vpp_does_run():
+                return True
+            elif re.match('modify-', req):
+                # For modification request ensure that it goes to modify indeed.
+                new_params = _request.get('params')
+                old_params = fwglobals.g.router_cfg.get_params(_request)
+                if fwglobals.g.router_cfg.are_params_equal(new_params, old_params):
                     return True
             return False
+
+        def _exist(__request, requests):
+            """Checks if the list of requests has request for the same
+            configuration item as the one denoted by the provided __request.
+            """
+            for r in requests:
+                if (__request['message'] == r['message'] and
+                    fwglobals.g.router_cfg.is_same_cfg_item(__request, r)):
+                    return True
+            return False
+
 
         if request['message'] != 'aggregated':
             if _should_be_stripped(request):
                 fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
                 return None
         else:  # aggregated request
-            requests = []
-            for _request in request['params']['requests']:
-                if _should_be_stripped(_request) == False:
-                    requests.append(_request)
-            if not requests:
-                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
+            out_requests = []
+            inp_requests = request['params']['requests']
+            for _request in inp_requests:
+                if _should_be_stripped(_request, inp_requests) == False:
+                    out_requests.append(_request)
+            if not out_requests:
+                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(out_requests))
                 return None
-            if len(requests) < len(request['params']['requests']):
-                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(requests))
-            request['params']['requests'] = requests
+            if len(out_requests) < len(inp_requests):
+                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
+            request['params']['requests'] = out_requests
         return request
 
     def _analyze_request(self, request):
@@ -641,6 +704,17 @@ class FWROUTER_API:
                         information into VPP FIB.
         """
 
+        def _should_reconnect_agent_on_modify_interface(new_params):
+            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
+            if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
+                return True
+            if new_params.get('gateway') and new_params.get('gateway') != old_params.get('gateway'):
+                return True
+            if new_params.get('metric') and new_params.get('metric') != old_params.get('metric'):
+                return True
+            return False
+
+
         (restart_router, reconnect_agent, gateways) = \
         (False,          False,           [])
 
@@ -649,14 +723,15 @@ class FWROUTER_API:
                 restart_router  = True
                 reconnect_agent = True
             elif request['message'] == 'modify-interface':
-                reconnect_agent = True
+                reconnect_agent = _should_reconnect_agent_on_modify_interface(request['params'])
             elif request['message'] == 'aggregated':
                 for _request in request['params']['requests']:
                     if re.match('(add|remove)-interface', _request['message']):
                         restart_router = True
                         reconnect_agent = True
                     elif _request['message'] == 'modify-interface':
-                        reconnect_agent = True
+                        if _should_reconnect_agent_on_modify_interface(_request['params']):
+                            reconnect_agent = True
 
         if re.match('modify-interface', request['message']):
             gw = request['params'].get('gateway')
@@ -967,6 +1042,9 @@ class FWROUTER_API:
         if self.thread_dhcpc is None:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
+        if self.thread_stun is None:
+            self.thread_stun = threading.Thread(target=self.stun_thread, name='STUN Thread')
+            self.thread_stun.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -985,6 +1063,10 @@ class FWROUTER_API:
         if self.thread_dhcpc:
             self.thread_dhcpc.join()
             self.thread_dhcpc = None
+
+        if self.thread_stun:
+            self.thread_stun.join()
+            self.thread_stun = None
 
     def _on_start_router(self):
         """Handles post start VPP activities.
@@ -1067,7 +1149,7 @@ class FWROUTER_API:
         ]
         messages = fwglobals.g.router_cfg.dump(types=types)
         for msg in messages:
-            reply = fwglobals.g.router_api.call(msg)
+            reply = fwglobals.g.router_api._call_simple(msg)
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 

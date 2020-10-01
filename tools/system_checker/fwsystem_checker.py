@@ -76,7 +76,7 @@ soft_checkers = [
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
-    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' , 'interactive': 'must' }}, # 'must' as it installs the 3rd party soft, so we need user permission
+    { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
 	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
@@ -210,7 +210,7 @@ def check_soft_configuration(checker, fix=False, quiet=False):
                 elif choice == 'n' or choice == 'N' or choice == '':
                     break
                 elif choice == 'q' or choice == 'Q':
-                    exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
+                    sys.exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
         if not result and severity == 'critical':
             succeeded = False
     return succeeded
@@ -219,7 +219,7 @@ def reset_system_to_defaults(checker):
     """ reset vpp configuration to default
 
     :returns: 'True' if succeeded.
-    """ 
+    """
     # This function does the following:
     # 1. Copies the startup.conf.orig over the start.conf and startup.conf.baseline files.
     # 2. reset /etc/default/grub to a single core configuration
@@ -235,10 +235,10 @@ def reset_system_to_defaults(checker):
             if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
                 shutil.copyfile (fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
             checker.update_grub = True
-            checker.update_grub_file()
+            checker.update_grub_file(True)
             reboot_needed = True
             break
-    
+
     if reboot_needed == True:
         while True:
             choice = raw_input("Reboot the system? [Y/n]: ")
@@ -349,6 +349,19 @@ if __name__ == '__main__':
     import argparse
     global arg
 
+    # Ensure that VPP does not run.
+    # Otherwise driver interface checks might fail and user will be scared for
+    # no reason. Note it is too late to check system, if router was started :)
+    #
+    try:
+        pid = subprocess.check_output(['pidof', 'vpp'])
+        # If we reached this point, i.e. if no exception occurred, the vpp pid was found
+        print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
+        sys.exit(FW_EXIT_CODE_OK)
+    except Exception as e:
+        pass
+
+
     parser = argparse.ArgumentParser(description='FlexiEdge configuration utility')
     parser.add_argument('-c', '--check_only', action='store_true',
                         help="check configuration and exit")
@@ -363,5 +376,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     res = main(args)
     ####### For now (Dec-2019) don't block installation and agent start on failure
-    # exit(res)
-    exit(FW_EXIT_CODE_OK)
+    # sys.exit(res)
+    sys.exit(FW_EXIT_CODE_OK)

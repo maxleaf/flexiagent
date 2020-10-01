@@ -337,6 +337,8 @@ class FwAgent:
         cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
 
         self.ws.run_forever(sslopt={"cert_reqs": cert_required}, ping_interval=0)
+        self.ws = None
+
 		# DON'T USE ping_interval, ping_timeout !!!
 		# They might postpone ws.close()/ws.close(timeout=X) for ping_interval!
 		# That my stuck 'fwagent stop'/'systemtctl restart', where we clean resources on exit.
@@ -344,7 +346,9 @@ class FwAgent:
         #self.ws.run_forever(sslopt={"cert_reqs": cert_required},
         #                    ping_interval=0, ping_timeout=0)
         if self.connection_error_code:
+            fwglobals.log.error("connection to flexiWAN orchestrator was closed due to error: %s" % self.connection_error_msg)
             return False
+        fwglobals.log.info("connection to flexiWAN orchestrator was closed")
         return True
 
     def _on_error(self, ws, error):
@@ -411,12 +415,12 @@ class FwAgent:
 
         def run(*args):
             slept = 0
+
             while self.connected:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)
                 # does not help in case of Proxy in the middle, as was observed in field.
-                #
                 # Note management does not send next request until it gets
                 # response for the previous request. As a result, heavy local
                 # processing prevents receiving of 'get-device-stats'-s. To
@@ -441,9 +445,11 @@ class FwAgent:
                             break
                     else:
                         fwstats.update_stats()
+
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
+
 
         self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
@@ -468,12 +474,15 @@ class FwAgent:
         """
         pmsg    = json.loads(message)
         request = pmsg['msg']
+        seq     = str(pmsg['seq'])              # Sequence number of the received message
+        job_id  = str(pmsg.get('jobid',''))     # ID of job on flexiManage that sent this message
 
-        fwglobals.log.debug(str(pmsg['seq']) + " request=" + json.dumps(request))
+        fwglobals.log.debug(seq + " job_id=" + job_id + " request=" + json.dumps(request))
 
         reply = self.handle_received_request(request)
 
-        fwglobals.log.debug(str(pmsg['seq']) + " reply=" + json.dumps(reply))
+        reply_str = reply if not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
+        fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
 
         # Messages that change the interfaces might cause the existing connection to break
         # (for example, if the IP/mask has changed). Since sending the reply on a broken
@@ -482,14 +491,16 @@ class FwAgent:
         # We close the connection even if the request failed, as the change might have
         # taken place regardless of the request status, hence socket might not be operational.
         #
-        if self.should_reconnect == True:
-            fwglobals.log.info("_on_message: device changed, closing connection to orchestrator")
+        if self.should_reconnect == True or self.ws == None:
+            fwglobals.log.info("_on_message: re-establish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
             self.connection_error_code = fwglobals.g.WS_STATUS_DEVICE_CHANGE
             self.connection_error_msg = 'device change'
-            ws.close()
+            if self.ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
+                fwglobals.log.info("_on_message: closing connection to orchestrator")
+                self.ws.close()
         else:
-            ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
+            self.ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
 
     def disconnect(self):
         """Shutdowns the WebSocket connection.
@@ -521,7 +532,7 @@ class FwAgent:
         # expected by the agent framework.
         msg = fwutils.fix_aggregated_message_format(received_msg)
 
-        print_message = False if msg['message'] == 'get-device-stats' else print_message
+        print_message = False if re.match('get-device-', msg['message']) else print_message
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
@@ -676,6 +687,12 @@ def show(agent_info, router_info):
             fwglobals.log.info("Agent cache...")
             cache = daemon_rpc('cache')
             fwglobals.log.info(pprint.pformat(cache, indent=1))
+        if agent_info == 'threads':
+            fwglobals.log.info("Agent threads...")
+            thread_list = daemon_rpc('threads')
+            if thread_list:
+                for name in thread_list:
+                    fwglobals.log.info(name)
 
     if router_info:
         if router_info == 'state':
@@ -840,6 +857,16 @@ class FwagentDaemon(object):
         :returns: cache maps.
         """
         return (fwglobals.g.AGENT_CACHE)
+
+    def threads(self):
+        """show agent threads.
+
+        :returns: list of thread names
+        """
+        thread_list = []
+        for thd in threading.enumerate():
+            thread_list.append(thd.name)
+        return (thread_list)
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -1091,7 +1118,7 @@ if __name__ == '__main__':
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
     parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
                         help="show various router parameters")
-    parser_show.add_argument('--agent', choices=['version', 'cache'],
+    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
