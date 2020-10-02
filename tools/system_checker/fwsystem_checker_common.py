@@ -944,7 +944,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_vpp_workers_core(self, fix=False, silently=False, prompt=''):
+    def soft_check_multicore_support_requires_RSS(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -1000,7 +1000,7 @@ class Checker:
             conf = self.fw_ac_db.get_main_list()
             tup = self.fw_ac_db.create_element('cpu')
             conf.append(tup)
-            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0')) 
+            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0'))
             if input_cores == 0:
                 conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 0'))
             elif input_cores == 1:
@@ -1072,7 +1072,7 @@ class Checker:
 
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-            corelist_worker_param = 'corelist-workers 0' 
+            corelist_worker_param = 'corelist-workers 0'
             conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
 
             if workers_param:
@@ -1087,7 +1087,7 @@ class Checker:
 
             self.vpp_config_modified = True
             self.update_grub = True
-            return True 
+            return True
 
         # in case multi core configured
         if input_cores != 0:
@@ -1136,14 +1136,14 @@ class Checker:
                             conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
                     else:
                         self._add_tup_to_dpdk(input_cores)
-                        self.vpp_config_modified = True 
+                        self.vpp_config_modified = True
 
             if self.vpp_config_modified == True:
                 self.update_grub = True
             return True
 
     def _add_tup_to_dpdk(self, num_of_cores):
-        """ 
+        """
         adds 'def default' tuple to 'dpdk' and sets 'num-rx-queue' value
 
         :param num_of_cores:  num of cores to handle incoming traffic
@@ -1172,7 +1172,7 @@ class Checker:
         """
         # This function does the following:
         # 1. Ask the user if to emable power saving mode
-        # 2. If so, set poll-sleep-usec parameter in startup.conf's unix 
+        # 2. If so, set poll-sleep-usec parameter in startup.conf's unix
         #    section to some TBD value.
 
         if not fix or silently:
@@ -1193,7 +1193,7 @@ class Checker:
                     conf_param = tup[0]
 
         while True:
-            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")        
+            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")
             if str_ps_mode == 'Y' or str_ps_mode == 'y':
                 enable_ps_mode = True
                 break
@@ -1328,4 +1328,3 @@ class Checker:
         if add_grub_line == True:
             os.system ("sudo update-grub")
         return
-

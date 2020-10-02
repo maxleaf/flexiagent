@@ -181,7 +181,6 @@ class FwUnassignedIfs:
                  public IP and Port to the reconfig computation. This is to reduce STUN
                  requests.
         """
-        """
         res = ''
 
         linux_pci_list    = self._get_linux_interfaces()
@@ -207,7 +206,8 @@ class FwUnassignedIfs:
             fwglobals.log.debug('get_global_reconfig_hash: %s' % res)
             hash = hashlib.md5(res).hexdigest()
             return hash
-        """
+        else:
+            return 0
 
     def is_unassigned_addr(self, address_no_mask):
         """
@@ -229,11 +229,11 @@ class FwUnassignedIfs:
             fwglobals.log.debug('Unassigned interfaces in cache:')
             for key in self.local_cache.keys():
                 entry = self.local_cache[key]
-                string = entry.get('name','NoName') + ': {' + 'pci_address: ' + key + ', Address: '
-                string += 'None' if entry.get('addr','None') == None else entry.get('addr','None')
+                string = entry.get('name') + ': {' + 'pci_address: ' + key + ', Address: '
+                string += 'None' if entry.get('addr') == None else entry.get('addr')
                 string += ', gateway: '
-                string += 'None' if entry.get('gateway','') == '' else entry.get('gateway','None')
+                string += 'None' if entry.get('gateway') == '' else entry.get('gateway')
                 string += ', metric: '
-                string += 'None' if entry.get('metric','') == '' else entry.get('metric','None')
+                string += 'None' if entry.get('metric') == '' else entry.get('metric')
                 string += '}'
                 fwglobals.log.debug(string)

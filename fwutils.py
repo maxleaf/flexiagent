@@ -1461,12 +1461,7 @@ def get_reconfig_hash(update_public_info = False):
                         res += 'public_port:' + str(new_p_port) + ','
                 else:
                         res += 'public_port:' + '' + ','
-    if res:
-        fwglobals.log.info('get_reconfig_hash: %s' % res)
-        hash = hashlib.md5(res).hexdigest()
-        return hash
-
-    return ''
+    return res
 
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
