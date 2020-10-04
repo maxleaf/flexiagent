@@ -50,16 +50,17 @@ g_dumpers = {
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
 
-    'vpp_hard_interfaces':          { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
-    'vpp_soft_interfaces':          { 'shell_cmd': 'vppctl sh int > <dumper_out_file>' },
-    'vpp_addresses':                { 'shell_cmd': 'vppctl sh int addr > <dumper_out_file>' },
+    'vpp_interfaces_hw':            { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
+    'vpp_interfaces_sw':            { 'shell_cmd': 'vppctl sh int > <dumper_out_file>' },
+    'vpp_interfaces_addresses':     { 'shell_cmd': 'vppctl sh int addr > <dumper_out_file>' },
     'vpp_fwabf_labels':             { 'shell_cmd': 'vppctl sh fwabf label > <dumper_out_file>' },
     'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
     'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
     'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' },
     'vpp_fib_entries':              { 'shell_cmd': 'vppctl sh fib entry > <dumper_out_file>' },
     'vpp_fib_paths':                { 'shell_cmd': 'vppctl sh fib paths > <dumper_out_file>' },
-    'vpp_fib_pathlists':            { 'shell_cmd': 'vppctl sh fib path-lists > <dumper_out_file>' }
+    'vpp_fib_pathlists':            { 'shell_cmd': 'vppctl sh fib path-lists > <dumper_out_file>' },
+    'vpp_acl_dump':                 { 'shell_cmd': 'echo acl_dump > vat.txt && vpp_api_test script in vat.txt > <dumper_out_file> 2>&1 ; rm -rf vat.txt' }
 }
 
 class FwDump:
@@ -135,7 +136,7 @@ class FwDump:
         if not filename:
             filename = 'fwdump_%s.tar.gz' % self.now
         self.zip_file = filename
-        cmd = 'tar zcf %s %s' % (self.zip_file, self.temp_folder)
+        cmd = 'tar -zcf %s -C %s .' % (self.zip_file, self.temp_folder)
         try:
             subprocess.check_call(cmd, shell=True)
         except Exception as e:
@@ -154,9 +155,9 @@ class FwDump:
                     'fwagent_log',
                     'fwagent_router_cfg',
                     'fwagent_multilink_cfg',
-                    'vpp_hard_interfaces',
-                    'vpp_soft_interfaces',
-                    'vpp_addresses',
+                    'vpp_interfaces_hw',
+                    'vpp_interfaces_sw',
+                    'vpp_interfaces_addresses',
                     'vpp_fwabf_labels',
                     'vpp_fwabf_links',
                     'vpp_fwabf_policies',
