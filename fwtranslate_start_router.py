@@ -102,9 +102,8 @@ def start_router(params=None):
             # Firstly, Mark non-dpdk interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf because they don't have pci address.
             #   2. They should not be removed from linux
-            # The spacial logic for these interfaces is at add_interface translator
+            # Additional logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(iface_pci):
-
                 # create linux bridge
                 cmd = {}
                 cmd['cmd'] = {}
@@ -117,13 +116,6 @@ def start_router(params=None):
                 cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_pci, iface_pci) ]
                 cmd['revert']['descr']  = "remove linux bridge"
                 
-                cmd_list.append(cmd)
-
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "exec"
-                cmd['cmd']['params']  = [ "sudo ip addr flush dev %s" % iface_pci ]
-                cmd['cmd']['descr']   = "reset dev %s in Linux" % iface_pci
                 cmd_list.append(cmd)
                 continue
 
