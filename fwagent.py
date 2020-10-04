@@ -481,7 +481,7 @@ class FwAgent:
 
         reply = self.handle_received_request(request)
 
-        reply_str = reply if not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
+        reply_str = reply if 'message' in request and not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
         fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
 
         # Messages that change the interfaces might cause the existing connection to break
