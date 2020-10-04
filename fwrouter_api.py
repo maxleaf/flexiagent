@@ -352,14 +352,22 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
 
         for (idx, request) in enumerate(requests):
+
+            # Don't print too large requests, if needed check print on request receiving
+            #
+            if request['message'] == 'add-application' or request['message'] == 'remove-application':
+                str_request = request['message'] + '...'
+            else:
+                str_request = json.dumps(request)
+
             try:
-                fwglobals.log.debug("_call_aggregated: handle request %s" % (json.dumps(request)))
+                fwglobals.log.debug("_call_aggregated: handle request %s" % str_request)
                 self._call_simple(request)
             except Exception as e:
                 if dont_revert_on_failure:
                     raise e
                 # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % json.dumps(request))
+                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
                 for request in reversed(requests[0:idx]):
                     try:
                         op = request['message']
