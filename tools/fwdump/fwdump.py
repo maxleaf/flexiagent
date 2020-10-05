@@ -164,7 +164,8 @@ class FwDump:
                     'vpp_fwabf_attachments',
                     'vpp_fib_entries',
                     'vpp_fib_paths',
-                    'vpp_fib_pathlists'
+                    'vpp_fib_pathlists',
+                    'vpp_acl_dump'
                     ]
         self._dump(dumpers)
 
@@ -196,12 +197,12 @@ if __name__ == '__main__':
     parser.add_argument('--feature', choices=['multilink'], default=None,
                         help="dump info related to this feature only")
     parser.add_argument('--zip_file', default=None,
-                        help="filename to be used for the final tar.gz archive, can be full/relative/no path")
+                        help="filename to be used for the final archive, can be full/relative. If not specified, default name will be used and printed on exit.")
     parser.add_argument('--dont_zip', action='store_true',
-                        help="filename to be used for the final tar.gz archive, can be full/relative/no path")
+                        help="don't archive dumped data into single file. Path to folder with dumps will be printed on exit.")
     parser.add_argument('--temp_folder', default=None,
                         help="folder where to keep not zipped dumped info")
     parser.add_argument('-q', '--quiet', action='store_true',
-                        help="if you want shoot - shoot, don't talk")
+                        help="silent mode, overrides existing temporary folder if was provided with --temp_folder")
     args = parser.parse_args()
     main(args)
