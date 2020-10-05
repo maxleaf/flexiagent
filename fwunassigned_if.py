@@ -228,17 +228,18 @@ class FwUnassignedIfs:
     def add_public_ip_port_to_wan_if(self, addr_no_mask, p_ip, p_port):
         """
         Adds public information to entry in the unassigned hash.
-        : param add_no_mask : IP address without mask, to which to add the public info
+        : param addr_no_mask : IP address without mask, to which to add the public info
         : param p_ip   : public IP to add to the entry
         : param p_port : public port to add to the entry
         """
         for pci_addr in self.local_cache.keys():
             entry = self.local_cache[pci_addr]
-            if address_no_mask == entry['addr'].split('/')[0]:
-                if entry['gateway']:
-                    entry['public_ip'] = p_ip
-                    entry['public_port'] = p_port
-                    return
+            if entry['addr']:
+                if addr_no_mask == entry['addr'].split('/')[0]:
+                    if entry['gateway']:
+                        entry['public_ip'] = p_ip
+                        entry['public_port'] = p_port
+                        return
  
     def log_interfaces_cache(self):
         """

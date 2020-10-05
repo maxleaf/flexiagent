@@ -209,16 +209,25 @@ class FwStunWrap:
         we initialize 'next_time' to 1. See parameter 'wait' below.
 
         : param address :  address to reset in the cache.
-        : param wait    :  If True, start 'net_time' counter from 30 (waiting for tunnel creation, so no need
-                           to start sending STUN request when the tunnel is in the process of connectring).
-                           False: start 'next_time' counter from 1.
+        : param wait    :  If True, start 'next_time' counter from 30 (waiting for tunnel creation,
+                           so no need to start sending STUN request when the tunnel is in the process
+                           of connectring). False: start 'next_time' counter from 1.
         """
-        self.local_cache['stun_interfaces'][address] = {
-                            'public_ip':  '',
-                            'public_port':'',
-                            'sec_counter':0,
-                            'success':    False,
-                            }
+        if address in self.local_cache['stun_interfaces'].keys():
+            self.local_cache['stun_interfaces'][address]['public_ip']   = ''
+            self.local_cache['stun_interfaces'][address]['public_port'] = ''
+            self.local_cache['stun_interfaces'][address]['sec_counter'] = 0
+            self.local_cache['stun_interfaces'][address]['success']     = False
+        else:
+            self.local_cache['stun_interfaces'][address] = {
+                                'public_ip':  '',
+                                'public_port':'',
+                                'sec_counter':0,
+                                'success':    False,
+                                'stun_server': '',
+                                'stun_server_port': '',
+                                'nat_type'        : '',
+                           }
         if wait == True:
             self.local_cache['stun_interfaces'][address]['next_time'] = 30
         else:
