@@ -439,10 +439,9 @@ class Fwglobals:
             else:
                 reply = handler_func(request, result)
             if reply['ok'] == 0:
-                if 'usage' in params and params['usage'] != 'precondition':  # Don't generate error if precondition fails
-                    myCmd = 'sudo vppctl api trace save error.api'
-                    os.system(myCmd)
-                    raise Exception(reply['message'])
+                myCmd = 'sudo vppctl api trace save error.api'
+                os.system(myCmd)
+                raise Exception(reply['message'])
 
             # On router configuration request, e.g. add-interface,
             # remove-tunnel, etc. update the configuration database

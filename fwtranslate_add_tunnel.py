@@ -696,6 +696,25 @@ def add_tunnel(params):
     # --------------------------------------------------------------------------
     if 'routing' in params['loopback-iface'] and params['loopback-iface']['routing'] == 'ospf':
         ospfd_file = fwglobals.g.FRR_OSPFD_FILE
+
+        # Create /etc/frr/ospfd.conf file if it does not exist yet
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "create ospfd file if needed"
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'frr_create_ospfd',
+                                    'args': {
+                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
+                                        'ospfd_cfg_file':   ospfd_file,
+                                        'router_id':        params['loopback-iface']['addr'].split('/')[0]   # Get rid of address length
+                                    }
+                                  }
+        # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
+        cmd_list.append(cmd)
+
+        # Add point-to-point type of interface for the tunnel address
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
@@ -714,8 +733,8 @@ def add_tunnel(params):
         cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
         cmd_list.append(cmd)
 
-        # Escape slash in address with length to prevent sed confusing
-        addr = params['loopback-iface']['addr']
+        # Add network for the tunnel interface.
+        addr = params['loopback-iface']['addr']  # Escape slash in address with length to prevent sed confusing
         addr = addr.split('/')[0] + r"\/" + addr.split('/')[1]
 
         cmd = {}

@@ -1632,3 +1632,25 @@ def fix_aggregated_message_format(msg):
     # e.g. see the fwglobals.g.handle_request() assumes
     #
     return copy.deepcopy(msg)
+
+def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
+    '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
+    ensures that ospf is switched on in the frr configuration'''
+
+    if os.path.exists(ospfd_cfg_file):
+        return
+
+    # Initialize ospfd.conf
+    with open(ospfd_cfg_file,"w") as f:
+        f.write(
+            'hostname ospfd\n' + \
+            'password zebra\n' + \
+            'log file /var/log/frr/ospfd.log informational\n' + \
+            'log stdout\n' + \
+            '!\n' + \
+            'router ospf\n' + \
+            '    ospf router-id ' + router_id + '\n' + \
+            '!\n')
+
+    # Ensure that ospfd is switched on in /etc/frr/daemons.
+    subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
