@@ -86,19 +86,13 @@ class OS_DECODERS:
                 daddr[addr_af_name] = addr.address.split('%')[0]
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-            
+
             if daddr['gateway'] is not '':
-                # Send STUN request only for interfaces with Gateway
-                public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
-                if public_ip == None or public_port == None:
-                    fwglobals.g.stun_wrapper.send_single_stun_request(daddr['IPv4'],4789, None, None, True)
-                    daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
-                        fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
-                else:
-                    daddr['public_ip']   = public_ip
-                    daddr['public_port'] = public_port
-                    daddr['nat_type']    = nat_type
-            
+                # Find Public port and IP for the address. At that point
+                # the STUN interfaces cache should be already initialized.
+                daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
+                    fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
+
             out.append(daddr)
         return (out,1)
 

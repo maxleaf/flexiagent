@@ -127,16 +127,18 @@ class FWROUTER_API:
         Its function is to send STUN requests for address:4789 in a timely manner
         according to some algorithm-based calculations.
         """
-        timeout = 30
-        slept    = 0
+        slept = 0
+        reset_all_timeout = 10 * 60
 
-        while self.router_started:
+        while fwglobals.g.stun_wrapper.is_running() == True:
             # send STUN retquests for addresses that a request was not sent for
             # them, or for ones that did not get reply previously
-            
             fwglobals.g.stun_wrapper.send_stun_request()
             fwglobals.g.stun_wrapper.increase_sec()
 
+            if slept % (reset_all_timeout) == 0 and slept > 0:
+                # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
+                fwglobals.g.stun_wrapper.reset_all()
             time.sleep(1)
             slept += 1
 

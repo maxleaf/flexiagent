@@ -136,7 +136,24 @@ def tunnel_stats_get():
                 if params['tunnel-id'] == key:
                     # found tunnel, add its source IP address to the cache of addresses for which
                     # we will send STUN requests.
-                    fwglobals.g.stun_wrapper.add_addr(params['src'])
+                    fwglobals.g.stun_wrapper.add_addr(params['src'], True)
                     break
 
     return tunnel_stats
+
+def check_if_addr_in_connected_tunnel(addr_no_mask):
+    """
+    check if address is a source address in a connected tunnel
+    : param addr_no_mask : IP address with no mask
+    : return : True if addess is in connected tunnel, False if not
+    """
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for params in tunnels:
+        if params['src'] == addr_no_mask:
+            tunnel_id = params['tunnel-id']
+            tunnel_stats = tunnel_stats_get()
+            if tunnel_stats[tunnel_id]['status'] == 'up':
+                return True
+            else:
+                 return False
+    return False

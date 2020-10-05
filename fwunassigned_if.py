@@ -49,8 +49,8 @@ class FwUnassignedIfs:
 
     def _get_if_address(self, if_name):
         """Get interface address.
-        :param : if_name - Interface name.
-       :returns: address.
+        : param if_name : Interface name.
+        : returns: string address on None
        """
         interfaces = psutil.net_if_addrs()
         if if_name not in interfaces:
@@ -98,7 +98,8 @@ class FwUnassignedIfs:
     def _compute_entry_hash(self, pci_addr):
         """
         Computes a hash for an entry in the cache.
-        : param : pci_addr - the PCI address which is the key in the cache dictionary
+        : param pci_addr : the PCI address which is the key in the cache dictionary
+        : return : string of changes to calculate hash on.
         """
         res = ''
         vpp_run = fwutils.vpp_does_run()
@@ -118,26 +119,31 @@ class FwUnassignedIfs:
             if addr:
                 if not re.search(addr, entry.get('addr')):
                     res += 'addr:' + addr + ','
-            else:
-                if entry.get('addr') and entry['addr'] != None:
-                    res += 'addr:' + '' + ','
             entry['addr'] = addr
 
             if gw:
                 if not re.match(gw, entry.get('gateway')):
                     res += 'gw:' + gw + ','
-            else:
-                if entry.get('gateway') and entry['gateway'] != '':
-                    res += 'gateway:' + '' + ','
             entry['gateway'] = gw
 
             if metric:
                 if not re.match(metric, entry.get('metric')):
                     res += 'metric:' + metric + ','
-            else:
-                if entry.get('metric') and entry['metric'] != '':
-                    res += 'metric:' + '' + ','
             entry['metric'] = metric
+
+            if gw and addr:
+                # If GW exist, we need to check public info as well: compare local data
+                # against STUN cache
+                public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
+                if public_ip:
+                    if not re.match(public_ip, entry.get('public_ip')):
+                        res += 'public_ip:' + public_ip + ','
+                entry['public_ip'] = public_ip
+
+                if public_port:
+                    if not re.match(public_ip, entry.get('public_port')):
+                        res += 'public_port:' + public_port + ','
+                entry['public_port'] = public_port
         else:
             #entry is not in cache, create entry and update res
             self.local_cache[pci_addr] = {}
@@ -147,27 +153,27 @@ class FwUnassignedIfs:
             if addr:
                 res += 'addr:' + addr + ','
                 entry['addr'] = addr
-            else:
-                res += 'addr:' + '' + ','
-                entry['addr'] = None
 
             if gw:
                 res += 'gw:' + gw + ','
                 entry['gateway'] = gw
-            else:
-                res += 'gw:' + '' + ','
-                entry['gateway'] = ''
 
             if metric:
                 res += 'metric:' + metric + ','
                 entry['metric'] = metric
-            else:
-                res += 'metric:' + '' + ','
-                entry['metric'] = ''
+
+            if gw and addr:
+                public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
+                if public_ip:
+                    res += 'public_ip:' + public_ip + ','
+                    entry['public_ip'] = public_ip
+                if public_port:
+                    res += 'public_port:' + public_port + ','
+                    entry['public_port'] = public_port
 
         return res
 
-    def get_global_reconfig_hash(self, update_public_info):
+    def get_global_reconfig_hash(self):
         """
         API
         This is the main function that updates the cache and computes the overall
@@ -177,9 +183,7 @@ class FwUnassignedIfs:
         It then adds the reconfig hash of the assigned interfaces to the calculated hash
         from the cache, and run md5 on the result. This result is returned as the overall
         hahs of all the interfaces.
-        : param : update_public_info - send to get_reconfig_hash, if True it will add
-                 public IP and Port to the reconfig computation. This is to reduce STUN
-                 requests.
+        : return : md5 hash result of all the changes.
         """
         res = ''
 
@@ -200,7 +204,7 @@ class FwUnassignedIfs:
                 res += self._compute_entry_hash(pci_addr)
 
         # add the assigned-interfaces reconfig hash
-        res += fwutils.get_reconfig_hash(update_public_info)
+        res += fwutils.get_reconfig_hash()
 
         if res != '':
             fwglobals.log.debug('get_global_reconfig_hash: %s' % res)
@@ -212,7 +216,7 @@ class FwUnassignedIfs:
     def is_unassigned_addr(self, address_no_mask):
         """
         Check if an address is unassigned (part of cache)
-        : param : address_no_mask - address to look for, without mask
+        : param address_no_mask : address to look for, without mask
         : return: True if part of cache, False if not
         """
         for pci_addr in self.local_cache.keys():
@@ -221,6 +225,21 @@ class FwUnassignedIfs:
                 return True
         return False
 
+    def add_public_ip_port_to_wan_if(self, addr_no_mask, p_ip, p_port):
+        """
+        Adds public information to entry in the unassigned hash.
+        : param add_no_mask : IP address without mask, to which to add the public info
+        : param p_ip   : public IP to add to the entry
+        : param p_port : public port to add to the entry
+        """
+        for pci_addr in self.local_cache.keys():
+            entry = self.local_cache[pci_addr]
+            if address_no_mask == entry['addr'].split('/')[0]:
+                if entry['gateway']:
+                    entry['public_ip'] = p_ip
+                    entry['public_port'] = p_port
+                    return
+ 
     def log_interfaces_cache(self):
         """
         log cache into log
@@ -229,11 +248,11 @@ class FwUnassignedIfs:
             fwglobals.log.debug('Unassigned interfaces in cache:')
             for key in self.local_cache.keys():
                 entry = self.local_cache[key]
-                string = entry.get('name') + ': {' + 'pci_address: ' + key + ', Address: '
+                string = entry.get('name','NoName') + ': {' + 'pci_address: ' + key + ', Address: '
                 string += 'None' if entry.get('addr') == None else entry.get('addr')
                 string += ', gateway: '
-                string += 'None' if entry.get('gateway') == '' else entry.get('gateway')
+                string += 'None' if entry.get('gateway') == '' else entry.get('gateway','None')
                 string += ', metric: '
-                string += 'None' if entry.get('metric') == '' else entry.get('metric')
+                string += 'None' if entry.get('metric') == '' else entry.get('metric','None')
                 string += '}'
                 fwglobals.log.debug(string)

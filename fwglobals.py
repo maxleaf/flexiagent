@@ -290,6 +290,7 @@ class Fwglobals:
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper  = FwStunWrap()
         self.unassigned_interfaces = FwUnassignedIfs()
+        self.stun_wrapper.initialize() # must come after instantiation of FwUnassignedIfs()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -301,10 +302,11 @@ class Fwglobals:
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return
 
+        self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
-        del self.unassigned_interfaces 
+        del self.unassigned_interfaces
         del self.stun_wrapper
         del self.apps
         del self.policies
