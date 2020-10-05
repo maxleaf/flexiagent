@@ -36,9 +36,7 @@ def _copyfile(source_name, dest_name, buffer_size=1024*1024):
             copy_buffer = source.read(buffer_size)
             if not copy_buffer:
                 break
-            dest.write(copy_buffer)
-            dest.flush()
-            os.fsync(dest.fileno())
+            fwutils.file_write_anf_flush(dest, copy_buffer)
 
 def backup_linux_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():

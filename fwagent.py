@@ -131,8 +131,8 @@ class FwAgent:
 
     def _mark_connection_failure(self, err):
         try:
-            with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as stream:
-                stream.write('Failed to connect to MGMT: %s' % err)
+            with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as f:
+                fwutils.file_write_anf_flush(f, 'Failed to connect to MGMT: %s' % err)
                 fwglobals.log.debug("_mark_connection_failure: %s" % str(err))
         except Exception as e:
             fwglobals.log.excep("Failed to create connection failure file: %s" % str(e))
@@ -217,8 +217,8 @@ class FwAgent:
             if loadsimulator.g.enabled():
                 loadsimulator.g.simulate_device_tokens.append(data)
             else:
-                with open(fwglobals.g.DEVICE_TOKEN_FILE, 'w') as fout:
-                    fout.write(data)
+                with open(fwglobals.g.DEVICE_TOKEN_FILE, 'w') as f:
+                    fwutils.file_write_anf_flush(f, data)
             fwglobals.log.info("Registation successful with parameters:")
             fwglobals.log.info("  Hostname:  " + machine_name)
             fwglobals.log.info("  IP List:   " + ip_list)

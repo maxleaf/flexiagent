@@ -42,10 +42,6 @@ os_api_defs = {
     'interfaces':{'module':'psutil', 'api':'net_if_addrs', 'decode':'interfaces'},
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
-    'savefile':{'module':'fwutils', 'api':'save_file', 'decode':'default'},
-    'pcisub':{'module':'fwutils', 'api':'pci_sub_file', 'decode':'default'},
-    'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
-    'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
     'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
     'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
