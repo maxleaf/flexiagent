@@ -206,6 +206,8 @@ class FWROUTER_API:
                 self._start_threads()
                 netplan_files = fwnetplan.get_netplan_filenames()
                 fwnetplan._set_netplan_filename(netplan_files)
+            else:
+                fwnetplan.restore_linux_netplan_files()
             return False
 
         self._restore_vpp()
