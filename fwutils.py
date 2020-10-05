@@ -48,6 +48,7 @@ from fw_vpp_startupconf import FwStartupConf
 from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
 from fwmultilink    import FwMultilink
+from fwpolicies     import FwPolicies
 
 
 dpdk = __import__('dpdk-devbind')
@@ -844,6 +845,8 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
+    with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
+        db_policies.clean()
     fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
