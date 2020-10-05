@@ -42,25 +42,25 @@ import time
 
 g_dumpers = {
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
-    'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ps -elf | grep vpp >> <dumper_out_file>' },
+    'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
 
     'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/ ; cp /var/log/flexiwan/agent.log.1 <temp_folder>/' },
-    'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
+    'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
 
+    'vpp_acl_dump':                 { 'shell_cmd': 'echo acl_dump > vat.txt && vpp_api_test script in vat.txt > <dumper_out_file> 2>&1 ; rm -rf vat.txt' },
     'vpp_interfaces_hw':            { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
     'vpp_interfaces_sw':            { 'shell_cmd': 'vppctl sh int > <dumper_out_file>' },
     'vpp_interfaces_addresses':     { 'shell_cmd': 'vppctl sh int addr > <dumper_out_file>' },
-    'vpp_fwabf_labels':             { 'shell_cmd': 'vppctl sh fwabf label > <dumper_out_file>' },
-    'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
-    'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
-    'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' },
     'vpp_fib_entries':              { 'shell_cmd': 'vppctl sh fib entry > <dumper_out_file>' },
     'vpp_fib_paths':                { 'shell_cmd': 'vppctl sh fib paths > <dumper_out_file>' },
     'vpp_fib_pathlists':            { 'shell_cmd': 'vppctl sh fib path-lists > <dumper_out_file>' },
-    'vpp_acl_dump':                 { 'shell_cmd': 'echo acl_dump > vat.txt && vpp_api_test script in vat.txt > <dumper_out_file> 2>&1 ; rm -rf vat.txt' }
+    'vpp_fwabf_labels':             { 'shell_cmd': 'vppctl sh fwabf label > <dumper_out_file>' },
+    'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
+    'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
+    'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' }
 }
 
 class FwDump:
@@ -149,23 +149,23 @@ class FwDump:
     def dump_multilink(self):
         dumpers = [
                     'linux_interfaces',
-                    'linux_routes',
                     'linux_neighbors',
                     'linux_pidof_vpp',
+                    'linux_routes',
                     'fwagent_log',
-                    'fwagent_router_cfg',
                     'fwagent_multilink_cfg',
-                    'vpp_interfaces_hw',
-                    'vpp_interfaces_sw',
-                    'vpp_interfaces_addresses',
+                    'fwagent_router_cfg',
+                    'vpp_acl_dump',
+                    'vpp_fib_entries',
+                    'vpp_fib_paths',
+                    'vpp_fib_pathlists',
                     'vpp_fwabf_labels',
                     'vpp_fwabf_links',
                     'vpp_fwabf_policies',
                     'vpp_fwabf_attachments',
-                    'vpp_fib_entries',
-                    'vpp_fib_paths',
-                    'vpp_fib_pathlists',
-                    'vpp_acl_dump'
+                    'vpp_interfaces_hw',
+                    'vpp_interfaces_sw',
+                    'vpp_interfaces_addresses'
                     ]
         self._dump(dumpers)
 
