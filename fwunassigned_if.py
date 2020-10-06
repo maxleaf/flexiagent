@@ -255,5 +255,10 @@ class FwUnassignedIfs:
                 string += 'None' if entry.get('gateway') == '' else entry.get('gateway','None')
                 string += ', metric: '
                 string += 'None' if entry.get('metric') == '' else entry.get('metric','None')
+                if entry['gateway'] != '':
+                    string += ', public_ip : '
+                    string += 'None' if entry.get('public_ip') =='' else entry.get('public_ip', 'None')
+                    string += ', public_port : '
+                    string += 'None' if entry.get('public_port') =='' else entry.get('public_port', 'None')
                 string += '}'
                 fwglobals.log.debug(string)

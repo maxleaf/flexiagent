@@ -139,10 +139,10 @@ class FwStunWrap:
         """
         # 1 add address with public info, as received by add-address from management,
         # over-written the address if exist in cache.
-        if params and 'PublicIp' in params and 'PublicPort' in params \
+        if params and 'PublicIP' in params and 'PublicPort' in params \
                 and 'useStun' in params and params['useStun'] == True:
             self.reset_addr(addr, wait)
-            self.local_cache['stun_interfaces'][addr]['public_ip']        = params['PublicIp']
+            self.local_cache['stun_interfaces'][addr]['public_ip']        = params['PublicIP']
             self.local_cache['stun_interfaces'][addr]['public_port']      = params['PublicPort']
             self.local_cache['stun_interfaces'][addr]['success']          = True
             self.local_cache['stun_interfaces'][addr]['stun_server']      = ''
@@ -311,7 +311,7 @@ class FwStunWrap:
                         self.send_single_stun_request(addr, 4789, elem['stun_server'], \
                         elem['stun_server_port'], False)
                     self.local_cache['stun_interfaces'][addr]['sec_counter'] = 0
-                    if nat_ext_port == None:
+                    if nat_ext_port == '':
                         self._handle_stun_none_response(addr)
                     else:
                         self._handle_stun_response(addr, nat_ext_ip, nat_ext_port,\
@@ -383,7 +383,7 @@ class FwStunWrap:
         else:
             fwglobals.log.debug("send_single_stun_request: adding address %s to cache" %(str(lcl_src_ip)))
             self.reset_addr(lcl_src_ip, False)
-            if nat_ext_ip and nat_ext_port:
+            if nat_ext_ip != '' and nat_ext_port != '':
                 fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
                 self.local_cache['stun_interfaces'][lcl_src_ip]['success']     = True
                 self.local_cache['stun_interfaces'][lcl_src_ip]['nat_type']    = nat_type
