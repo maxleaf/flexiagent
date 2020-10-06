@@ -326,7 +326,7 @@ class FwStunWrap:
         """
         if self.local_cache['stun_interfaces']:
             return
-        addr_list = self.get_addresses_dict_from_router_db(self)
+        addr_list = self.get_addresses_dict_from_router_db()
         for elem in addr_list:
             self.add_addr(elem['address'], False)
         return
