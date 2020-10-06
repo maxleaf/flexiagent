@@ -181,13 +181,12 @@ class FWROUTER_API:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
             self.router_started = vpp_runs
+            fwnetplan.restore_linux_netplan_files()
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
                 netplan_files = fwnetplan.get_netplan_filenames()
                 fwnetplan._set_netplan_filename(netplan_files)
-            else:
-                fwnetplan.restore_linux_netplan_files()
             return False
 
         self._restore_vpp()
@@ -499,16 +498,6 @@ class FWROUTER_API:
 
         for idx, t in enumerate(cmd_list):      # 't' stands for command Tuple, though it is Python Dictionary :)
             cmd = t['cmd']
-
-            # If precondition exists, ensure that it is OK
-            if 'precondition' in t:
-                precondition = t['precondition']
-                reply = fwglobals.g.handle_request(
-                    { 'message': precondition['name'], 'params':  precondition.get('params') },
-                    result)
-                if reply['ok'] == 0:
-                    fwglobals.log.debug("FWROUTER_API:_execute: %s: escape as precondition is not met: %s" % (cmd['descr'], precondition['descr']))
-                    continue
 
             # If filter was provided, execute only commands that have the provided filter
             if filter:
@@ -1091,7 +1080,7 @@ class FWROUTER_API:
             if not os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
                 with open(fwglobals.g.ROUTER_STATE_FILE, 'w') as f:
                     if fwutils.valid_message_string(err_str):
-                        f.write(err_str + '\n')
+                        fwutils.file_write_and_flush(f, err_str + '\n')
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
             fwutils.stop_vpp()
