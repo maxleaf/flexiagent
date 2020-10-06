@@ -486,7 +486,7 @@ class FwAgent:
 
         reply = self.handle_received_request(request)
 
-        reply_str = reply if not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
+        reply_str = reply if 'message' in request and not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
         fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
 
         # Messages that change the interfaces might cause the existing connection to break
@@ -522,13 +522,11 @@ class FwAgent:
         in the fwglobals.py module. It dispatches requests to the appropriate
         request handlers.
 
-        :param msg:  Message instance.
+        :param received_msg:  the receive instance.
 
         :returns: (reply, msg), where reply is reply to be sent back to server,
                   msg is normalized received message.
         """
-        print_message = fwglobals.g.cfg.DEBUG
-
         self.received_request = True
         self.handling_request = True
 
@@ -537,7 +535,10 @@ class FwAgent:
         # expected by the agent framework.
         msg = fwutils.fix_aggregated_message_format(received_msg)
 
-        print_message = False if re.match('get-device-', msg['message']) else print_message
+        print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
+        print_message = False if msg['message'] == 'add-application' else print_message
+        if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
+            print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 

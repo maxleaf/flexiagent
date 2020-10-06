@@ -37,6 +37,7 @@ import fwnetplan
 
 from fwapplications import FwApps
 from fwmultilink import FwMultilink
+from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 
 import fwtunnel_stats
@@ -206,6 +207,8 @@ class FWROUTER_API:
                 self._start_threads()
                 netplan_files = fwnetplan.get_netplan_filenames()
                 fwnetplan._set_netplan_filename(netplan_files)
+            else:
+                fwnetplan.restore_linux_netplan_files()
             return False
 
         self._restore_vpp()
@@ -218,6 +221,8 @@ class FWROUTER_API:
                 db_app_rec.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
+            with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
+                db_policies.clean()
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -353,14 +358,22 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
 
         for (idx, request) in enumerate(requests):
+
+            # Don't print too large requests, if needed check print on request receiving
+            #
+            if request['message'] == 'add-application' or request['message'] == 'remove-application':
+                str_request = request['message'] + '...'
+            else:
+                str_request = json.dumps(request)
+
             try:
-                fwglobals.log.debug("_call_aggregated: handle request %s" % (json.dumps(request)))
+                fwglobals.log.debug("_call_aggregated: handle request %s" % str_request)
                 self._call_simple(request)
             except Exception as e:
                 if dont_revert_on_failure:
                     raise e
                 # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % json.dumps(request))
+                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
                 for request in reversed(requests[0:idx]):
                     try:
                         op = request['message']
