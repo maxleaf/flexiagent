@@ -520,16 +520,6 @@ class FWROUTER_API:
         for idx, t in enumerate(cmd_list):      # 't' stands for command Tuple, though it is Python Dictionary :)
             cmd = t['cmd']
 
-            # If precondition exists, ensure that it is OK
-            if 'precondition' in t:
-                precondition = t['precondition']
-                reply = fwglobals.g.handle_request(
-                    { 'message': precondition['name'], 'params':  precondition.get('params') },
-                    result)
-                if reply['ok'] == 0:
-                    fwglobals.log.debug("FWROUTER_API:_execute: %s: escape as precondition is not met: %s" % (cmd['descr'], precondition['descr']))
-                    continue
-
             # If filter was provided, execute only commands that have the provided filter
             if filter:
                 if not 'filter' in cmd or cmd['filter'] != filter:
@@ -1118,7 +1108,7 @@ class FWROUTER_API:
             if not os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
                 with open(fwglobals.g.ROUTER_STATE_FILE, 'w') as f:
                     if fwutils.valid_message_string(err_str):
-                        f.write(err_str + '\n')
+                        fwutils.file_write_and_flush(f, err_str + '\n')
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
             fwutils.stop_vpp()

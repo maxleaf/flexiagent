@@ -448,23 +448,12 @@ class FwStartupConf:
 			if indent>0:
 				self._dump_line(string + "\n", indent)
 		return
-	
+
 	def _dump_line(self, value, indent):
 		"""
 		This function dumps a value (single line) to the startup.conf file.
 
 		:param value:   the value to dump
-		:param indent:  the indentation of the value inside the startup.conf file. 
-		"""
-		self._write_string(value, indent)
-
-	def _write_string(self, value, indent):
-		"""
-		This function does the actual writing to the file pointer. We created it so we can easily switch 
-		from a real file to stdout, viewing the results on screen.
-
-		:param value:   the value to dump
-		:param indent:  the indentation of the value inside the startup.conf file. 
+		:param indent:  the indentation of the value inside the startup.conf file.
 		"""
 		self.out_fp.write("  " * indent + value)
-		return

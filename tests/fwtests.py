@@ -121,11 +121,12 @@ class TestFwagent:
             out = subprocess.check_output(grep_cmd, shell=True)
             if out:
                 lines = out.splitlines()
-                for line in lines:
+                for (idx, line) in enumerate(lines):
                     # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
                     line_time = get_log_line_time(line)
                     if line_time >= since:
-                        found.append(line)
+                        found = lines[idx:]
+                        break
                 if found and print_findings:
                     for line in found:
                         print('FwTest:grep_log(%s): %s' % (pattern, line))
