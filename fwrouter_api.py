@@ -1108,7 +1108,7 @@ class FWROUTER_API:
             if not os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
                 with open(fwglobals.g.ROUTER_STATE_FILE, 'w') as f:
                     if fwutils.valid_message_string(err_str):
-                        fwutils.file_write_anf_flush(f, err_str + '\n')
+                        fwutils.file_write_and_flush(f, err_str + '\n')
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
             fwutils.stop_vpp()

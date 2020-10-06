@@ -1531,7 +1531,7 @@ def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
 
     # Initialize ospfd.conf
     with open(ospfd_cfg_file,"w") as f:
-        file_write_anf_flush(f,
+        file_write_and_flush(f,
             'hostname ospfd\n' + \
             'password zebra\n' + \
             'log file /var/log/frr/ospfd.log informational\n' + \
@@ -1544,7 +1544,7 @@ def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
     # Ensure that ospfd is switched on in /etc/frr/daemons.
     subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
 
-def file_write_anf_flush(f, data):
+def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content
     into the disk immediately
 
