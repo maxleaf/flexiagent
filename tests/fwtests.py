@@ -116,7 +116,7 @@ class TestFwagent:
         if not since:
             since = self.log_start_time
 
-        grep_cmd = "sudo egrep '%s' /var/log/flexiwan/agent.log" % pattern
+        grep_cmd = "sudo grep -a -E '%s' /var/log/flexiwan/agent.log" % pattern
         try:
             out = subprocess.check_output(grep_cmd, shell=True)
             if out:
