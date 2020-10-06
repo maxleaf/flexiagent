@@ -68,7 +68,6 @@ class FwStunWrap:
         self.run = True
         fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
             ['add-interface', 'remove-interface'])
-        #self.is_running = True
 
     def is_running(self):
         """
@@ -79,7 +78,7 @@ class FwStunWrap:
 
     def _get_ifs_with_gw(self):
         """
-        Get all interfaces from linux, and add only the wants that have address family of AF_INET
+        Get all interfaces from linux, and add only the ones that have address family of AF_INET
         and have getway to a list.
         : return : list of WAN interfaces
         """
