@@ -211,7 +211,7 @@ class FwUnassignedIfs:
             hash = hashlib.md5(res).hexdigest()
             return hash
         else:
-            return 0
+            return ''
 
     def is_unassigned_addr(self, address_no_mask):
         """
