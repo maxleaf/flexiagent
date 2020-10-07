@@ -270,7 +270,7 @@ class FwUnassignedIfs:
             entry = self.cached_interfaces[pci]
             if entry.get('addr'):
                 if addr_no_mask == entry['addr'].split('/')[0]:
-                    if entry['gateway']:
+                    if entry.get('gateway'):
                         entry['public_ip'] = p_ip
                         entry['public_port'] = p_port
                         return
@@ -288,7 +288,7 @@ class FwUnassignedIfs:
                 string += 'None' if entry.get('gateway') == '' else entry.get('gateway','None')
                 string += ', metric: '
                 string += 'None' if entry.get('metric') == '' else entry.get('metric','None')
-                if entry['gateway'] != '':
+                if entry.get('gateway','') != '':
                     string += ', public_ip : '
                     string += 'None' if entry.get('public_ip') =='' else entry.get('public_ip', 'None')
                     string += ', public_port : '
