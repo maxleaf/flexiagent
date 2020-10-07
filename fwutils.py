@@ -1006,16 +1006,12 @@ def vpp_startup_conf_add_nat(vpp_config_filename):
     if config['nat'] == None:
         tup = p.create_element('nat')
         config.append(tup)
-    if p.get_element(config['nat'], 'endpoint-dependent') == None:
         config['nat'].append(p.create_element('endpoint-dependent'))
-    if p.get_element(config['nat'], 'translation hash buckets 1048576') == None:
         config['nat'].append(p.create_element('translation hash buckets 1048576'))
-    if p.get_element(config['nat'], 'translation hash memory 268435456') == None:
         config['nat'].append(p.create_element('translation hash memory 268435456'))
-    if p.get_element(config['nat'], 'user hash buckets 1024') == None:
         config['nat'].append(p.create_element('user hash buckets 1024'))
-    if p.get_element(config['nat'], 'max translations per user 10000') == None:
         config['nat'].append(p.create_element('max translations per user 10000'))
+
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 

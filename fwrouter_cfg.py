@@ -598,7 +598,7 @@ class FwRouterCfg:
 
         return output_requests
 
-    def get_interface_addresses_from_db(self):
+    def get_interface_public_addresses(self):
         """
         builds a list of WAN interfaces from router DB. if 'useStun' does not exist or False,
         do not add this interface to the list.
@@ -607,17 +607,13 @@ class FwRouterCfg:
         addr_list = []
         for key in self.db.keys():
             if 'add-interface' in key:
-                address = self.db[key]['params']['addr']
-                if 'gateway' not in self.db[key]['params'] or  \
-                   'gateway' in self.db[key]['params'] and \
-                       self.db[key]['params']['gateway'] == '':
+                if self.db[key]['params'].get('gateway', '') == '':
                     pass
-                elif 'useStun' not in self.db[key]['params'] or  \
-                        'useStun' in self.db[key]['params'] and \
-                       self.db[key]['params']['useStun'] == 'False':
+                elif self.db[key]['params'].get('useStun', False) == False:
                     pass
                 else:
                     entry = {}
+                    address = self.db[key]['params']['addr']
                     entry['address'] = address.split('/')[0]
                     entry['public_ip'] = self.db[key]['params'].get('PublicIP','')
                     entry['public_port'] = self.db[key]['params'].get('PublicPort','')
