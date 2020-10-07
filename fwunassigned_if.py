@@ -117,68 +117,51 @@ class FwUnassignedIfs:
             entry = self.cached_interfaces[pci]
             # entry is in cache, check for differences between real-time info and cached info.
             # if the is a difference, add it to the computation, and update the cache.
-            if addr:
-                if not re.search(addr, entry.get('addr')):
-                    res += 'addr:' + addr + ','
-            entry['addr'] = addr
-
-            if gw:
-                if not re.match(gw, entry.get('gateway')):
-                    res += 'gw:' + gw + ','
-            entry['gateway'] = gw
-
-            if metric:
-                if not re.match(metric, entry.get('metric')):
-                    res += 'metric:' + metric + ','
-            entry['metric'] = metric
-
+            res += self._reconfig_section(entry,'addr',addr,True, True)
+            res += self._reconfig_section(entry,'gateway',gw,True, True)
+            res += self._reconfig_section(entry,'metric',metric,True, True)
             if gw and addr:
                 # If GW exist, we need to check public info as well: compare local data
                 # against STUN cache
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
-                if public_ip:
-                    if not re.match(public_ip, entry.get('public_ip')):
-                        res += 'public_ip:' + public_ip + ','
-                entry['public_ip'] = public_ip
-
-                if public_port:
-                    if not re.match(public_port, entry.get('public_port')):
-                        res += 'public_port:' + public_port + ','
-                entry['public_port'] = public_port
+                res += self._reconfig_section(entry,'public_ip',public_ip,True, True)
+                res += self._reconfig_section(entry,'public_port',public_port,True, True)
         else:
             #entry is not in cache, create entry and update res
             self.cached_interfaces[pci] = {}
             entry = self.cached_interfaces[pci]
             entry['name'] = name
 
-            if addr:
-                res += self._reconfig_section(entry, 'addr', addr)
-
-            if gw:
-                res += self._reconfig_section(entry, 'gateway', gw)
-
-            if metric:
-                res += self._reconfig_section(entry, 'metric', metric)
+            res += self._reconfig_section(entry, 'addr', addr, False, True)
+            res += self._reconfig_section(entry, 'gateway', gw, False, True)
+            res += self._reconfig_section(entry, 'metric', metric, False, True)
+            res += self._reconfig_section(entry, 'metric', metric, False, True)
 
             if gw and addr:
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
-                if public_ip:
-                    res += self._reconfig_section(entry, 'public_ip', public_ip)
-
-                if public_port:
-                    res += self._reconfig_section(entry, 'public_port', public_port)
+                res += self._reconfig_section(entry, 'public_ip', public_ip, False, True)
+                res += self._reconfig_section(entry, 'public_port', public_port, False, True)
         return res
 
-    def _reconfig_section(self, dct, key, value):
-        """ compute reconfig diff on value
+    def _reconfig_section(self, dct, key, value, compare, assignment):
+        """ compute reconfig diff when setting new value
 
         : param dct   : dictionary
         : param key   : dictionary's key
         : param value : dictionary's value
+        : compare     : should compare before assignment
+        : assignment  : should the dict be updated with new value
         : return : string of diff
         """
-        res = key + ':' + value + ','
-        dct[key] = value
+        res = ''
+        if value:
+            if compare == True:
+                if not re.match(value, dct.get(key)):
+                    res = key + ':' + value + ','
+            else:
+                res = key + ':' + value + ','
+        if assignment == True:
+            dct[key] = value
         return res
 
     def _get_unassigned_reconfig_hash(self):
@@ -202,23 +185,16 @@ class FwUnassignedIfs:
                 return ''
 
             addr = fwutils.get_interface_address(name)
-            if addr:
-                if not re.search(addr, interface.get('addr')):
-                    res += 'addr:' + addr + ','
+            res += self._reconfig_section(interface, 'addr', addr, True, False)
 
             gw, metric = fwutils.get_linux_interface_gateway(name)
-            if gw: # Lan interfaces might not have GW
-                if not re.match(gw, interface.get('gateway')):
-                    res += 'gw:' + gw + ','
-
-            if metric:
-                if not re.match(metric, interface.get('metric')):
-                    res += 'metric:' + metric + ','
+            res += self._reconfig_section(interface, 'gateway', gw, True, False)
+            res += self._reconfig_section(interface, 'metric', metric, True, False)
 
             if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
                 nomaskaddr = addr.split('/')[0]
                 new_p_ip, new_p_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
-                addr_list = fwglobals.g.router_cfg.get_interface_addresses_from_db()
+                addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
                 for elem in addr_list:
                     if elem['address'] == nomaskaddr:
                         # compare public data between router-db and STUN cache
@@ -292,7 +268,7 @@ class FwUnassignedIfs:
         """
         for pci in self.cached_interfaces.keys():
             entry = self.cached_interfaces[pci]
-            if entry['addr']:
+            if entry.get('addr'):
                 if addr_no_mask == entry['addr'].split('/')[0]:
                     if entry['gateway']:
                         entry['public_ip'] = p_ip
