@@ -39,6 +39,7 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
+from fwunassigned_if import FwUnassignedIfs
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -102,10 +103,6 @@ request_handlers = {
     'interfaces':                   {'name': '_call_os_api'},
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
-    'savefile':                     {'name': '_call_os_api'},
-    'pcisub':                       {'name': '_call_os_api'},
-    'tapsub':                       {'name': '_call_os_api'},
-    'gresub':                       {'name': '_call_os_api'},
     'ifcount':                      {'name': '_call_os_api'},
     'ifstats':                      {'name': '_call_os_api'},
     'connect_to_router':            {'name': '_call_os_api'},
@@ -288,6 +285,8 @@ class Fwglobals:
         self.apps          = FwApps(self.APP_REC_DB_FILE)
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper  = FwStunWrap()
+        self.unassigned_interfaces = FwUnassignedIfs()
+        self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -299,9 +298,11 @@ class Fwglobals:
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return
 
+        self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+        del self.unassigned_interfaces
         del self.stun_wrapper
         del self.apps
         del self.policies
@@ -439,10 +440,9 @@ class Fwglobals:
             else:
                 reply = handler_func(request, result)
             if reply['ok'] == 0:
-                if 'usage' in params and params['usage'] != 'precondition':  # Don't generate error if precondition fails
-                    myCmd = 'sudo vppctl api trace save error.api'
-                    os.system(myCmd)
-                    raise Exception(reply['message'])
+                myCmd = 'sudo vppctl api trace save error.api'
+                os.system(myCmd)
+                raise Exception(reply['message'])
 
             # On router configuration request, e.g. add-interface,
             # remove-tunnel, etc. update the configuration database

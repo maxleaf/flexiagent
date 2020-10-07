@@ -37,6 +37,7 @@ import fwnetplan
 
 from fwapplications import FwApps
 from fwmultilink import FwMultilink
+from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 
 import fwtunnel_stats
@@ -94,7 +95,6 @@ class FWROUTER_API:
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
-        self.thread_stun     = None
 
     def finalize(self):
         """Destructor method
@@ -121,25 +121,6 @@ class FWROUTER_API:
             except Exception as e:
                 fwglobals.log.error("watchdog: exception: %s" % str(e))
                 pass
-
-    def stun_thread(self):
-        """STUN thread
-        Its function is to send STUN requests for address:4789 in a timely manner
-        according to some algorithm-based calculations.
-        """
-        timeout = 30
-        slept    = 0
-        while self.router_started:
-            if (slept % timeout) == 0:
-                fwglobals.g.stun_wrapper.log_address_cache()
-
-            # send STUN retquests for addresses that a request was not sent for
-            # them, or for ones that did not get reply previously
-            fwglobals.g.stun_wrapper.send_stun_request()
-            fwglobals.g.stun_wrapper.increase_sec()
-
-            time.sleep(1)
-            slept += 1
 
     def tunnel_stats_thread(self):
         """Tunnel statistics thread.
@@ -200,6 +181,7 @@ class FWROUTER_API:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
             self.router_started = vpp_runs
+            fwnetplan.restore_linux_netplan_files()
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
@@ -217,6 +199,8 @@ class FWROUTER_API:
                 db_app_rec.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
+            with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
+                db_policies.clean()
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -352,14 +336,22 @@ class FWROUTER_API:
         fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
 
         for (idx, request) in enumerate(requests):
+
+            # Don't print too large requests, if needed check print on request receiving
+            #
+            if request['message'] == 'add-application' or request['message'] == 'remove-application':
+                str_request = request['message'] + '...'
+            else:
+                str_request = json.dumps(request)
+
             try:
-                fwglobals.log.debug("_call_aggregated: handle request %s" % (json.dumps(request)))
+                fwglobals.log.debug("_call_aggregated: handle request %s" % str_request)
                 self._call_simple(request)
             except Exception as e:
                 if dont_revert_on_failure:
                     raise e
                 # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % json.dumps(request))
+                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
                 for request in reversed(requests[0:idx]):
                     try:
                         op = request['message']
@@ -506,16 +498,6 @@ class FWROUTER_API:
 
         for idx, t in enumerate(cmd_list):      # 't' stands for command Tuple, though it is Python Dictionary :)
             cmd = t['cmd']
-
-            # If precondition exists, ensure that it is OK
-            if 'precondition' in t:
-                precondition = t['precondition']
-                reply = fwglobals.g.handle_request(
-                    { 'message': precondition['name'], 'params':  precondition.get('params') },
-                    result)
-                if reply['ok'] == 0:
-                    fwglobals.log.debug("FWROUTER_API:_execute: %s: escape as precondition is not met: %s" % (cmd['descr'], precondition['descr']))
-                    continue
 
             # If filter was provided, execute only commands that have the provided filter
             if filter:
@@ -1042,9 +1024,6 @@ class FWROUTER_API:
         if self.thread_dhcpc is None:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
-        if self.thread_stun is None:
-            self.thread_stun = threading.Thread(target=self.stun_thread, name='STUN Thread')
-            self.thread_stun.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -1063,10 +1042,6 @@ class FWROUTER_API:
         if self.thread_dhcpc:
             self.thread_dhcpc.join()
             self.thread_dhcpc = None
-
-        if self.thread_stun:
-            self.thread_stun.join()
-            self.thread_stun = None
 
     def _on_start_router(self):
         """Handles post start VPP activities.
@@ -1105,7 +1080,7 @@ class FWROUTER_API:
             if not os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
                 with open(fwglobals.g.ROUTER_STATE_FILE, 'w') as f:
                     if fwutils.valid_message_string(err_str):
-                        f.write(err_str + '\n')
+                        fwutils.file_write_and_flush(f, err_str + '\n')
                     else:
                         fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
             fwutils.stop_vpp()

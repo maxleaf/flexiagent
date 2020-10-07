@@ -266,43 +266,22 @@ def add_interface(params):
     ospfd_file = fwglobals.g.FRR_OSPFD_FILE
     if 'routing' in params and params['routing'].lower() == 'ospf':
 
-        router_id = iface_addr.split('/')[0]    # Get rid of address length
+        # Create /etc/frr/ospfd.conf file if it does not exist yet
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "initialize %s with router id %s" % (ospfd_file, router_id)
-        cmd['cmd']['params']  = [
-            'sudo printf "' + \
-            'hostname ospfd\n' + \
-            'password zebra\n' + \
-            'log file /var/log/frr/ospfd.log informational\n' + \
-            'log stdout\n' + \
-            '!\n' + \
-            'router ospf\n' + \
-            '    ospf router-id ' + router_id + '\n' + \
-            '!\n' + \
-            '" > ' + ospfd_file ]
-        cmd['precondition'] = {}
-        cmd['precondition']['usage']   = "precondition"
-        cmd['precondition']['name']    = "exec"
-        cmd['precondition']['descr']   = "%s doesn't exists" % ospfd_file
-        cmd['precondition']['params']  = [ "! test -f %s" % ospfd_file ]
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "create ospfd file if needed"
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'frr_create_ospfd',
+                                    'args': {
+                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
+                                        'ospfd_cfg_file':   ospfd_file,
+                                        'router_id':        iface_addr.split('/')[0]   # Get rid of address length
+                                    }
+                                  }
         # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
         cmd_list.append(cmd)
-
-        # Ensure that ospfd is switched on in /etc/frr/daemons.
-        frr_filename = fwglobals.g.FRR_CONFIG_FILE
-        ospfd_status = os.popen('grep ospfd=no %s' % frr_filename).read()
-        if re.match('ospfd=no', ospfd_status):
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['params']  = [ 'sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_filename ]
-            cmd['cmd']['descr']   = "enable ospf daemon"
-            # There is no revert on purpose: we leave it always ON to simplify code.
-            # If there is no OSPF interfaces, frr will not send OSPF messages.
-            # Implement revert on demand :)
-            cmd_list.append(cmd)
 
         # Escape slash in address with length to prevent sed confusing
         addr = iface_addr.split('/')[0] + r"\/" + iface_addr.split('/')[1]
