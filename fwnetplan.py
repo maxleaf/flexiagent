@@ -70,9 +70,7 @@ def restore_linux_netplan_files():
             os.remove(fname_backup)
 
     if files:
-        cmd = 'netplan apply'
-        fwglobals.log.debug('restore_linux_netplan_files: ' + cmd)
-        subprocess.check_output(cmd, shell=True)
+        fwutils.netplan_apply('restore_linux_netplan_files')
 
 def _get_netplan_interface_name(name, section):
     if 'set-name' in section:
@@ -240,9 +238,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
             stream.flush()
             os.fsync(stream.fileno())
 
-        cmd = 'netplan apply'
-        fwglobals.log.debug('add_remove_netplan_interface: ' + cmd)
-        subprocess.check_output(cmd, shell=True)
+        fwutils.netplan_apply('add_remove_netplan_interface')
 
         # make sure IP address is applied in Linux
         if is_add == 1:

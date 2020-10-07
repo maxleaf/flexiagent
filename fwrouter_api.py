@@ -154,9 +154,7 @@ class FWROUTER_API:
 
             if apply_netplan:
                 try:
-                    cmd = 'netplan apply'
-                    fwglobals.log.debug('dhcpc_thread: ' + cmd)
-                    subprocess.check_output(cmd, shell=True)
+                    fwutils.netplan_apply('dhcpc_thread')
                     fwglobals.g.fwagent.disconnect()
                     time.sleep(10)  # 10 sec
 
