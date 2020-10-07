@@ -608,47 +608,6 @@ def vpp_ip_to_sw_if_index(ip):
             if network == int_address:
                 return sw_if.sw_if_index
 
-def save_file(txt, fname, dir='/tmp'):
-    """Save txt to file under a dir (default = /tmp)
-
-     :param txt:      Text.
-     :param fname:    File name.
-     :param dir:      Folder path.
-
-     :returns: Error message and status code.
-     """
-    # Make sure fname doesn't include /
-    #print ("fname="+fname+", txt="+txt+", dir="+dir)
-    if not (isinstance(fname, str) or isinstance(fname, unicode)) or fname.find('/') != -1:
-        return {'message':'File name error', 'ok':0}
-    datapath = os.path.join(dir, fname)
-    if os.path.exists(dir):
-        with open(datapath, 'w') as fout:
-            fout.write(txt)
-        return {'message':'File written', 'ok':1}
-    else:
-        return {'message':'Directory not exist', 'ok':0}
-
-def _sub_file(fname, smap):
-    """Replace words in file.
-
-    :param fname:     File name.
-    :param smap:      Dictionary with original and new words.
-
-    :returns: Error message and status code.
-    """
-    if os.path.exists(fname):
-        with open(fname, "r") as sfile:
-            data = sfile.readlines()
-        txt = ''.join(data)
-        for k,v in smap.items():
-            txt = txt.replace(k,v)
-        with open(fname, "w") as sfile:
-            sfile.write(txt)
-        return {'message':'File substituted', 'ok':1}
-    else:
-        return {'message':'File does not exist', 'ok':0}
-
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
 
@@ -685,27 +644,6 @@ def _vppctl_read(cmd, wait=True):
         return None
     return data
 
-def tap_sub_file(fname):
-    """Substitute a file with tap VPP names.
-
-    :param fname:      File name.
-
-    :returns: Error message and status code.
-    """
-    taps = _vppctl_read('sh tap-inject')
-    if taps == None:
-        return {'message':'Tap read error', 'ok':0}
-    if_map = {}
-    tap_split = taps.split('\r\n')[:-1]
-    if len(tap_split) == 0:
-        return {'message':'No taps found', 'ok':0}
-    for m in tap_split:
-        ifs = m.split(' -> ')
-        if len(ifs) != 2:
-            return {'message':'Tap mapping error', 'ok':0}
-        if_map[ifs[0]] = ifs[1]
-    return _sub_file(fname, if_map)
-
 def _parse_vppname_map(s, valregex, keyregex):
     """Find key and value in a string using regex.
 
@@ -725,58 +663,6 @@ def _parse_vppname_map(s, valregex, keyregex):
     else: return (None, None)   # key not found, don't add and return
     # Return values
     return (key_data, val_data)
-
-def pci_sub_file(fname):
-    """Substitute a file with pci address to VPP names.
-
-    :param fname:      File name.
-
-    :returns: Error message and status code.
-    """
-    shif = _vppctl_read('show hardware-interfaces')
-    shif_vmxnet3 = _vppctl_read('show vmxnet3')
-    if shif == None or shif_vmxnet3 == None:
-        return {'message':'Error reading interface info', 'ok':0}
-    data = shif.splitlines()
-    datav = shif_vmxnet3.splitlines()
-    pci_map = {}
-    for intf in _get_group_delimiter(data, r"^\w.*?\d"):
-        # Contains data for a given interface
-        ifdata = ''.join(intf)
-        (k,v) = _parse_vppname_map(ifdata,
-            valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
-            keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
-        if k and v: pci_map[pci_addr_full(k)] = v
-    for intf in _get_group_delimiter(datav, r"^Interface:\s\w.*?\d"):
-        # Contains data for a given interface
-        ifdata = '\n'.join(intf)
-        (k,v) = _parse_vppname_map(ifdata,
-            valregex=r"^Interface:\s(\w[^\s]+)\s+",
-            keyregex=r"\s+PCI\sAddress:\s(.*)")
-        if k and v: pci_map[pci_addr_full(k)] = v
-
-    return _sub_file(fname, pci_map)
-
-def gre_sub_file(fname):
-    """Substitute a file with tunnels to VPP names.
-
-    :param fname:      File name.
-
-    :returns: Error message and status code.
-    """
-    shtun = _vppctl_read('show ipsec gre tunnel')
-    if shtun == None:
-        return {'message':'Error reading tunnel info', 'ok':0}
-    data = shtun.splitlines()
-    tres = {}
-    for tunnel in _get_group_delimiter(data, r"^\[\d+\].*"):
-        # Contains data for a given tunnel
-        tunneldata = '\n'.join(tunnel)
-        (k,v) = _parse_vppname_map(tunneldata,
-                       valregex=r"^\[(\d+)\].*local-sa",
-                       keyregex=r"^\[\d+\].*local-sa\s(\d+)\s")
-        if k and v: tres["ipsec-gre-"+k] = "ipsec-gre" + v
-    return _sub_file(fname, tres)
 
 def stop_vpp():
     """Stop VPP and rebind Linux interfaces.
@@ -1403,57 +1289,6 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def get_reconfig_hash():
-    """ Compute reconfig hash on interfaces in router-db.
-    public_ip and public_port will be added to the computation only if the update_public_info
-    is True, to reduce STUN traffic, as reconfig is computed every second.
-    """
-    res = ''
-    if_list = fwglobals.g.router_cfg.get_interfaces()
-    if len(if_list) == 0:
-        return res
-
-    vpp_run = vpp_does_run()
-    for interface in if_list:
-        name = pci_to_linux_iface(interface.get('pci'))
-
-        if name is None and vpp_run:
-            name = pci_to_tap(interface.get('pci'))
-
-        if name is None:
-            return ''
-
-        addr = get_interface_address(name)
-        if addr:
-            if not re.search(addr, interface.get('addr')):
-                res += 'addr:' + addr + ','
-
-        gw, metric = get_linux_interface_gateway(name)
-        if gw: # Lan interfaces might not have GW
-            if not re.match(gw, interface.get('gateway')):
-                res += 'gw:' + gw + ','
-
-        if metric:
-            if not re.match(metric, interface.get('metric')):
-                res += 'metric:' + metric + ','
-
-        if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
-            nomaskaddr = addr.split('/')[0]
-            public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
-            addr_list = fwglobals.g.stun_wrapper.get_addresses_dict_from_router_db()
-            for elem in addr_list:
-                if elem['address'] == nomaskaddr:
-                    # compare public data between router-db and STUN cache
-                    new_p_ip, new_p_port = elem['public_ip'], elem['public_port']
-                    if new_p_ip:
-                        if public_ip != new_p_ip:
-                              res += 'public_ip:' + new_p_ip + ','
-                    if new_p_port:
-                        if public_port != new_p_port:
-                            res += 'public_port:' + str(new_p_port) + ','
-                    break
-    return res
-
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 
@@ -1653,3 +1488,36 @@ def fix_aggregated_message_format(msg):
     # e.g. see the fwglobals.g.handle_request() assumes
     #
     return copy.deepcopy(msg)
+
+def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
+    '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
+    ensures that ospf is switched on in the frr configuration'''
+
+    if os.path.exists(ospfd_cfg_file):
+        return
+
+    # Initialize ospfd.conf
+    with open(ospfd_cfg_file,"w") as f:
+        file_write_and_flush(f,
+            'hostname ospfd\n' + \
+            'password zebra\n' + \
+            'log file /var/log/frr/ospfd.log informational\n' + \
+            'log stdout\n' + \
+            '!\n' + \
+            'router ospf\n' + \
+            '    ospf router-id ' + router_id + '\n' + \
+            '!\n')
+
+    # Ensure that ospfd is switched on in /etc/frr/daemons.
+    subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
+
+def file_write_and_flush(f, data):
+    '''Wrapper over the f.write() method that flushes wrote content
+    into the disk immediately
+
+    :param f:       the python file object
+    :param data:    the data to write into file
+    '''
+    f.write(data)
+    f.flush()
+    os.fsync(f.fileno())
