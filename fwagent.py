@@ -130,9 +130,6 @@ class FwAgent:
         if self.thread_statistics:
             self.thread_statistics.join()
             self.thread_statistics = None
-        if self.thread_stun:
-            self.thread_stun.join()
-            self.thread_stun = None
 
     def _mark_connection_failure(self, err):
         try:
@@ -451,42 +448,13 @@ class FwAgent:
                     else:
                         fwstats.update_stats()
 
-                # dump STUN and unassigned interfaces information every 'timeout' seconds.
-                # Wait 1 cycle so that the caches will be populated.
-                if (slept % timeout) == 0 and slept > timeout:
-                    fwglobals.g.unassigned_interfaces.log_interfaces_cache()
-                    fwglobals.g.stun_wrapper.log_address_cache()
                 # Sleep 1 second and make another iteration
-                time.sleep(1)
-                slept += 1
-
-        def stun_thread(*args):
-            """STUN thread
-            Its function is to send STUN requests for address:4789 in a timely manner
-            according to some algorithm-based calculations.
-            """
-            slept = 0
-            reset_all_timeout = 10 * 60
-
-            while fwglobals.g.stun_wrapper.is_running() == True:
-                # send STUN retquests for addresses that a request was not sent for
-                # them, or for ones that did not get reply previously
-                fwglobals.g.stun_wrapper.send_stun_request()
-                fwglobals.g.stun_wrapper.increase_sec()
-
-                if slept % (reset_all_timeout) == 0 and slept > 0:
-                    # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
-                    fwglobals.g.stun_wrapper.reset_all()
                 time.sleep(1)
                 slept += 1
 
         self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
         self.thread_statistics.start()
-
-        if self.thread_stun is None:
-            self.thread_stun = threading.Thread(target=stun_thread, name='STUN Thread')
-            self.thread_stun.start()
 
         if not fwutils.vpp_does_run():
             fwglobals.log.info("connect: router is not running, start it in orchestrator")

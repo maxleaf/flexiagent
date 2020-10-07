@@ -286,7 +286,7 @@ class Fwglobals:
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper  = FwStunWrap()
         self.unassigned_interfaces = FwUnassignedIfs()
-        self.stun_wrapper.initialize() # must come after instantiation of FwUnassignedIfs()
+        self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
 

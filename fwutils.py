@@ -1284,57 +1284,6 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def get_reconfig_hash():
-    """ Compute reconfig hash on interfaces in router-db.
-    public_ip and public_port will be added to the computation only if the update_public_info
-    is True, to reduce STUN traffic, as reconfig is computed every second.
-    """
-    res = ''
-    if_list = fwglobals.g.router_cfg.get_interfaces()
-    if len(if_list) == 0:
-        return res
-
-    vpp_run = vpp_does_run()
-    for interface in if_list:
-        name = pci_to_linux_iface(interface.get('pci'))
-
-        if name is None and vpp_run:
-            name = pci_to_tap(interface.get('pci'))
-
-        if name is None:
-            return ''
-
-        addr = get_interface_address(name)
-        if addr:
-            if not re.search(addr, interface.get('addr')):
-                res += 'addr:' + addr + ','
-
-        gw, metric = get_linux_interface_gateway(name)
-        if gw: # Lan interfaces might not have GW
-            if not re.match(gw, interface.get('gateway')):
-                res += 'gw:' + gw + ','
-
-        if metric:
-            if not re.match(metric, interface.get('metric')):
-                res += 'metric:' + metric + ','
-
-        if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
-            nomaskaddr = addr.split('/')[0]
-            public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
-            addr_list = fwglobals.g.stun_wrapper.get_addresses_dict_from_router_db()
-            for elem in addr_list:
-                if elem['address'] == nomaskaddr:
-                    # compare public data between router-db and STUN cache
-                    new_p_ip, new_p_port = elem['public_ip'], elem['public_port']
-                    if new_p_ip:
-                        if public_ip != new_p_ip:
-                              res += 'public_ip:' + new_p_ip + ','
-                    if new_p_port:
-                        if public_port != new_p_port:
-                            res += 'public_port:' + str(new_p_port) + ','
-                    break
-    return res
-
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 

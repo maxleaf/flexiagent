@@ -158,7 +158,7 @@ def get_stats():
     res_update_list = list(updates_list)
     del updates_list[:]
 
-    reconfig = fwglobals.g.unassigned_interfaces.get_global_reconfig_hash()
+    reconfig = fwglobals.g.unassigned_interfaces.get_reconfig_hash()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
