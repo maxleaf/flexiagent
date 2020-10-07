@@ -95,7 +95,6 @@ class FWROUTER_API:
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
-        self.thread_stun     = None
 
     def finalize(self):
         """Destructor method
@@ -122,25 +121,6 @@ class FWROUTER_API:
             except Exception as e:
                 fwglobals.log.error("watchdog: exception: %s" % str(e))
                 pass
-
-    def stun_thread(self):
-        """STUN thread
-        Its function is to send STUN requests for address:4789 in a timely manner
-        according to some algorithm-based calculations.
-        """
-        timeout = 30
-        slept    = 0
-        while self.router_started:
-            if (slept % timeout) == 0:
-                fwglobals.g.stun_wrapper.log_address_cache()
-
-            # send STUN retquests for addresses that a request was not sent for
-            # them, or for ones that did not get reply previously
-            fwglobals.g.stun_wrapper.send_stun_request()
-            fwglobals.g.stun_wrapper.increase_sec()
-
-            time.sleep(1)
-            slept += 1
 
     def tunnel_stats_thread(self):
         """Tunnel statistics thread.
@@ -1044,9 +1024,6 @@ class FWROUTER_API:
         if self.thread_dhcpc is None:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
-        if self.thread_stun is None:
-            self.thread_stun = threading.Thread(target=self.stun_thread, name='STUN Thread')
-            self.thread_stun.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -1065,10 +1042,6 @@ class FWROUTER_API:
         if self.thread_dhcpc:
             self.thread_dhcpc.join()
             self.thread_dhcpc = None
-
-        if self.thread_stun:
-            self.thread_stun.join()
-            self.thread_stun = None
 
     def _on_start_router(self):
         """Handles post start VPP activities.

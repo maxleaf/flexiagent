@@ -91,6 +91,7 @@ class FwAgent:
         self.versions             = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.ws                   = None
         self.thread_statistics    = None
+        self.thread_stun          = None
         self.should_reconnect     = False
         self.pending_msg_replies  = []
         self.handling_request     = False
@@ -128,6 +129,7 @@ class FwAgent:
         # Stop threads
         if self.thread_statistics:
             self.thread_statistics.join()
+            self.thread_statistics = None
 
     def _mark_connection_failure(self, err):
         try:
@@ -449,7 +451,6 @@ class FwAgent:
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
                 slept += 1
-
 
         self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
