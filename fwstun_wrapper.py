@@ -65,6 +65,7 @@ class FwStunWrap:
         self.local_cache = fwglobals.g.AGENT_CACHE
         self.local_cache['stun_interfaces'] = {}
         self.thread_stun = None
+        self.is_running = False
         fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
             ['add-interface', 'remove-interface'])
 
@@ -102,6 +103,7 @@ class FwStunWrap:
                 self._send_single_stun_request(ip, 4789, None, None, True)
             self.log_address_cache()
 
+        self.is_running = True
         fwglobals.log.debug("Starting STUN thread")
         if self.thread_stun is None:
             self.thread_stun = threading.Thread(target=self._stun_thread, name='STUN Thread')
@@ -109,6 +111,7 @@ class FwStunWrap:
 
     def finalize(self):
         """ Stop the STUN thread """
+        self.is_running = False
         if self.thread_stun:
             self.thread_stun.join()
             self.thread_stun = None
@@ -322,7 +325,7 @@ class FwStunWrap:
         """
         if self.local_cache['stun_interfaces']:
             return
-        addr_list = fwglobals.g.router_cfg.get_interface_addresses_from_db()
+        addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
         for elem in addr_list:
             self.add_addr(elem['address'], False)
         return
@@ -383,7 +386,7 @@ class FwStunWrap:
         timeout = 30
         reset_all_timeout = 10 * 60
 
-        while True:
+        while self.is_running == True:
             # send STUN retquests for addresses that a request was not sent for
             # them, or for ones that did not get reply previously
             self._send_stun_request()
