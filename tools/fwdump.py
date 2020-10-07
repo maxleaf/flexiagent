@@ -70,6 +70,8 @@ class FwDump:
         self.quiet          = quiet
         self.prompt         = 'fwdump>> '
         self.zip_file       = None
+        self.hostname       = os.uname()[1]
+
 
         self.now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         if not temp_folder:
@@ -134,7 +136,7 @@ class FwDump:
 
     def zip(self, filename=None, delete_temp_folder=True):
         if not filename:
-            filename = 'fwdump_%s.tar.gz' % self.now
+            filename = 'fwdump_%s_%s.tar.gz' % (self.hostname, self.now)
         self.zip_file = filename
         cmd = 'tar -zcf %s -C %s .' % (self.zip_file, self.temp_folder)
         try:
