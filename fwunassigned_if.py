@@ -117,33 +117,33 @@ class FwUnassignedIfs:
             entry = self.cached_interfaces[pci]
             # entry is in cache, check for differences between real-time info and cached info.
             # if the is a difference, add it to the computation, and update the cache.
-            res += self._reconfig_section(entry,'addr',addr,True, True)
-            res += self._reconfig_section(entry,'gateway',gw,True, True)
-            res += self._reconfig_section(entry,'metric',metric,True, True)
+            res += self._reconfig_section(entry,'addr',addr,only_if_different=True, update=True)
+            res += self._reconfig_section(entry,'gateway',gw,only_if_different=True, update=True)
+            res += self._reconfig_section(entry,'metric',metric,only_if_different=True, update=True)
             if gw and addr:
                 # If GW exist, we need to check public info as well: compare local data
                 # against STUN cache
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
-                res += self._reconfig_section(entry,'public_ip',public_ip,True, True)
-                res += self._reconfig_section(entry,'public_port',public_port,True, True)
+                res += self._reconfig_section(entry,'public_ip',public_ip,only_if_different=True, update=True)
+                res += self._reconfig_section(entry,'public_port',public_port,only_if_different=True, update=True)
         else:
             #entry is not in cache, create entry and update res
             self.cached_interfaces[pci] = {}
             entry = self.cached_interfaces[pci]
             entry['name'] = name
 
-            res += self._reconfig_section(entry, 'addr', addr, False, True)
-            res += self._reconfig_section(entry, 'gateway', gw, False, True)
-            res += self._reconfig_section(entry, 'metric', metric, False, True)
-            res += self._reconfig_section(entry, 'metric', metric, False, True)
+            res += self._reconfig_section(entry, 'addr', addr, only_if_different=False, update=True)
+            res += self._reconfig_section(entry, 'gateway', gw, only_if_different=False, update=True)
+            res += self._reconfig_section(entry, 'metric', metric, only_if_different=False, update=True)
+            res += self._reconfig_section(entry, 'metric', metric, only_if_different=False, update=True)
 
             if gw and addr:
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
-                res += self._reconfig_section(entry, 'public_ip', public_ip, False, True)
-                res += self._reconfig_section(entry, 'public_port', public_port, False, True)
+                res += self._reconfig_section(entry, 'public_ip', public_ip, only_if_different=False, update=True)
+                res += self._reconfig_section(entry, 'public_port', public_port, only_if_different=False, update=True)
         return res
 
-    def _reconfig_section(self, dct, key, value, compare, assignment):
+    def _reconfig_section(self, dct, key, value, only_if_different, update):
         """ compute reconfig diff when setting new value
 
         : param dct   : dictionary
@@ -155,12 +155,12 @@ class FwUnassignedIfs:
         """
         res = ''
         if value:
-            if compare == True:
+            if only_if_different == True:
                 if not re.match(value, dct.get(key)):
                     res = key + ':' + value + ','
             else:
                 res = key + ':' + value + ','
-        if assignment == True:
+        if update == True:
             dct[key] = value
         return res
 
@@ -185,11 +185,11 @@ class FwUnassignedIfs:
                 return ''
 
             addr = fwutils.get_interface_address(name)
-            res += self._reconfig_section(interface, 'addr', addr, True, False)
+            res += self._reconfig_section(interface, 'addr', addr, only_if_different=True, update=False)
 
             gw, metric = fwutils.get_linux_interface_gateway(name)
-            res += self._reconfig_section(interface, 'gateway', gw, True, False)
-            res += self._reconfig_section(interface, 'metric', metric, True, False)
+            res += self._reconfig_section(interface, 'gateway', gw, only_if_different=True, update=False)
+            res += self._reconfig_section(interface, 'metric', metric, only_if_different=True, update=False)
 
             if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
                 nomaskaddr = addr.split('/')[0]
