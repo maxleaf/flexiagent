@@ -136,7 +136,7 @@ class FwStartupConf:
 					]
 		T('key4', L[])
 	]
-	
+
 	User should create an instance of that class, and then call the load() API, with the file name. The return
 	value of load is a populated L-type list. Several APIs are created to help traverse the DB, add elements and
 	remove them, etc.
@@ -168,14 +168,14 @@ class FwStartupConf:
 		key {
 		or
 		key { val
-		
+
 		:param lst: list to populate
 		"""
 		if self.value != '':
 			"""
 			case of key { val. In this case val is the first element in the list of its owner
 			tuple. So we create tuple and an inner tuple which is the first element in the list.
-			""" 
+			"""
 			sub_tup = self.create_element(self.value)
 			tup = self.create_element(self.key)
 			tup.append(sub_tup)
@@ -253,16 +253,16 @@ class FwStartupConf:
 				return self.ADD_LIST
 			else:
 				"""
-				Case of multi line list as a value of a the 2nd element of a tuple: 
-				dev 0000:02:00.1 {             
-				name eth0   
-				num-rx-queues 2               
+				Case of multi line list as a value of a the 2nd element of a tuple:
+				dev 0000:02:00.1 {
+				name eth0
+				num-rx-queues 2
 				}
 				"""
 				self.key = line.split('{')[0].strip()
 				self.value = ''
 				return self.ADD_LIST
-				
+
 		elif line.strip('{}') == line:
 			"""
 			a simple line to add to the list: num-mbufs 128000
@@ -331,7 +331,7 @@ class FwStartupConf:
 				lst.remove(element)
 
 	def get_element(self, lst, search_str):
-		""" 
+		"""
 		API.
 		This function gets the key from a tuple. Should be used when the tuple represents a string line in the
 		correspoding startup.conf file. Strings in startup.conf file are translated to tuples with key and empty
@@ -398,7 +398,6 @@ class FwStartupConf:
 			indent = 0
 			self._dump_list(db,indent)
 
-			
 	def _dump_list(self, value, indent):
 		"""
 		This function dumps a list, recursively, into the startup.conf file. For each element in the given value,
@@ -406,7 +405,7 @@ class FwStartupConf:
 		the type is tuple, it calls the tuple dump function.
 
 		:param value:   the value to dump
-		:param indent:  the indentation of the value inside the startup.conf file. 
+		:param indent:  the indentation of the value inside the startup.conf file.
 		"""
 		for element in value:
 			if str(type(element)) == "<class 'fw_vpp_startupconf.T'>":
@@ -421,9 +420,9 @@ class FwStartupConf:
 		This function dumps a tuple, recursively, into the startup.conf file. For each element in the given value,
 		it checks the type. If the type is a list, it calls the list dump function. If this is a tuple, it dumps
 		its value to the startup.conf
-		
+
 		:param value:   the value to dump
-		:param indent:  the indentation of the value inside the startup.conf file. 
+		:param indent:  the indentation of the value inside the startup.conf file.
 		"""
 		string = value[0]
 		string = string.strip('\'')
@@ -436,7 +435,7 @@ class FwStartupConf:
 		elif (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])>0:
 			if len(value[1]) == 1 and indent > 1:
 				#list[tuple[0]], value[1] is a list, so val is the 1st element of the first tuple in the list
-				val = value[1][0][0] 
+				val = value[1][0][0]
 				string = string + " { " + val + " }\n"
 				self._dump_line(string, indent)
 			else:
@@ -456,4 +455,15 @@ class FwStartupConf:
 		:param value:   the value to dump
 		:param indent:  the indentation of the value inside the startup.conf file.
 		"""
+		self._write_string(value, indent)
+
+	def _write_string(self, value, indent):
+		"""
+		This function does the actual writing to the file pointer. We created it so we can easily switch 
+		from a real file to stdout, viewing the results on screen.
+
+		:param value:   the value to dump
+		:param indent:  the indentation of the value inside the startup.conf file.
+		"""
 		self.out_fp.write("  " * indent + value)
+		return
