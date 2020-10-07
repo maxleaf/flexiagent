@@ -312,7 +312,7 @@ class FwUnassignedIfs:
                 string += 'None' if entry.get('gateway') == '' else entry.get('gateway','None')
                 string += ', metric: '
                 string += 'None' if entry.get('metric') == '' else entry.get('metric','None')
-                if entry['gateway'] != '':
+                if entry.get('gateway') != '':
                     string += ', public_ip : '
                     string += 'None' if entry.get('public_ip') =='' else entry.get('public_ip', 'None')
                     string += ', public_port : '
