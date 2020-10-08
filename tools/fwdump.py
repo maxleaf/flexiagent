@@ -43,10 +43,15 @@ import time
 g_dumpers = {
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
+    'linux_netplan':                { 'shell_cmd': 'mkdir -p <temp_folder>/linux_netplan && cp /etc/netplan/* <temp_folder>/linux_netplan/' },
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ps -elf | grep vpp >> <dumper_out_file>' },
     'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
+    'linux_syslog':                 { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && cp /var/log/syslog <temp_folder>/linux_syslog/ ; cp /var/log/syslog.1 <temp_folder>/linux_syslog/' },
 
-    'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/ ; cp /var/log/flexiwan/agent.log.1 <temp_folder>/' },
+    'frr_conf':                     { 'shell_cmd': 'mkdir -p <temp_folder>/frr && cp /etc/frr/* <temp_folder>/frr/' },
+
+    'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && cp /etc/flexiwan/agent/* <temp_folder>/fwagent/' },
+    'fwagent_log':                  { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && cp /var/log/flexiwan/agent.log <temp_folder>/fwagent/ ; cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent/' },
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
 
@@ -60,7 +65,8 @@ g_dumpers = {
     'vpp_fwabf_labels':             { 'shell_cmd': 'vppctl sh fwabf label > <dumper_out_file>' },
     'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
     'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
-    'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' }
+    'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' },
+    'vpp_startup_conf':             { 'shell_cmd': 'mkdir -p <temp_folder>/vpp_startup_conf &&  cp /etc/vpp/* <temp_folder>/vpp_startup_conf/' },
 }
 
 class FwDump:
@@ -70,6 +76,8 @@ class FwDump:
         self.quiet          = quiet
         self.prompt         = 'fwdump>> '
         self.zip_file       = None
+        self.hostname       = os.uname()[1]
+
 
         self.now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         if not temp_folder:
@@ -134,7 +142,7 @@ class FwDump:
 
     def zip(self, filename=None, delete_temp_folder=True):
         if not filename:
-            filename = 'fwdump_%s.tar.gz' % self.now
+            filename = 'fwdump_%s_%s.tar.gz' % (self.hostname, self.now)
         self.zip_file = filename
         cmd = 'tar -zcf %s -C %s .' % (self.zip_file, self.temp_folder)
         try:

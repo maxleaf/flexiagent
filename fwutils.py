@@ -694,7 +694,7 @@ def stop_vpp():
                 dpdk.bind_one(dpdk.devices[d]["Slot"], drv, False)
                 break
     fwstats.update_state(False)
-    os.system('sudo netplan apply')
+    netplan_apply('stop_vpp')
 
 def connect_to_router():
     """Connect to VPP Python API.
@@ -1517,3 +1517,16 @@ def file_write_and_flush(f, data):
     f.write(data)
     f.flush()
     os.fsync(f.fileno())
+
+def netplan_apply(caller_name=None):
+    '''Wrapper over the f.write() method that flushes wrote content
+    into the disk immediately
+
+    :param f:       the python file object
+    :param data:    the data to write into file
+    '''
+    cmd = 'netplan apply'
+    log_str = caller_name + ': ' + cmd if caller_name else cmd
+    fwglobals.log.debug(log_str)
+    os.system(cmd)
+    time.sleep(1)  # Give a second to Linux to configure interfaces
