@@ -167,6 +167,7 @@ def get_stats():
         status = True
         state = 'running'
         reason = ''
+        reconfig = ''
     else:
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()

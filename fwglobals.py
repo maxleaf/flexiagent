@@ -275,7 +275,7 @@ class Fwglobals:
         if self.fwagent:
             global log
             log.warning('Fwglobals.initialize_agent: agent exists')
-            return
+            return self.fwagent
 
         self.fwagent       = FwAgent(handle_signals=False)
         self.router_cfg    = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
@@ -289,6 +289,8 @@ class Fwglobals:
         self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
+
+        return self.fwagent
 
     def finalize_agent(self):
         """Destructor method
