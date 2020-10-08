@@ -53,10 +53,9 @@ class FwStunWrap:
         """ prints the content on the local cache
         """
         if self.local_cache['stun_interfaces']:
-            fwglobals.log.debug('stun_interfaces in Cache:')
             for addr in self.local_cache['stun_interfaces'].keys():
                 if addr:
-                    fwglobals.log.debug(addr+':'+str(self.local_cache['stun_interfaces'][addr]))
+                    fwglobals.log.debug("FwStunWrap: " + addr+':'+str(self.local_cache['stun_interfaces'][addr]))
 
     def __init__(self):
         """ Init function. This function inits the cache, gets the router-db handle
@@ -161,7 +160,6 @@ class FwStunWrap:
         # 3 Address in cache but we still need its public data. Just make sure we are
         # continuing sending STUN request on that address
             self.local_cache['stun_interfaces'][addr]['success']          = False
-            fwglobals.log.debug("address %s already in Cache" %(str(addr)))
 
     def remove_addr(self, addr):
         """ remove address from cache. The interface is no longer valid, no need to send
@@ -301,9 +299,6 @@ class FwStunWrap:
         for addr in self.local_cache['stun_interfaces'].keys():
             if self.local_cache['stun_interfaces'][addr]['success'] == True:
                 pass
-            # No need to send STUN for addresses that are part of connected tunnel
-            elif fwtunnel_stats.check_if_addr_in_connected_tunnel(addr) == True:
-                self.local_cache['stun_interfaces'][addr]['success'] = True
             else:
                 elem = self.local_cache['stun_interfaces'][addr]
                 if elem['sec_counter'] == elem['next_time']:
@@ -319,9 +314,9 @@ class FwStunWrap:
 
     def check_if_cache_empty(self):
         """ If the agent and management are disconnected for some time,
-        the cache can become empty. In that case, we will go to the router
-        configuration, retreive interfaces with gateway, and fill the cache
-        with those addresses.
+        the cache can become empty (for example, if disconnection came after remove-interface).
+        In that case, we will go to the router configuration, retreive interfaces with gateway,
+        and fill the cache with those addresses.
         """
         if self.local_cache['stun_interfaces']:
             return

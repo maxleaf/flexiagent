@@ -279,10 +279,10 @@ class FwUnassignedIfs:
         """ log cache into log
         """
         if self.cached_interfaces:
-            fwglobals.log.debug('Unassigned interfaces in cache:')
             for key in self.cached_interfaces.keys():
                 entry = self.cached_interfaces[key]
-                string = entry.get('name','NoName') + ': {' + 'pci_address: ' + key + ', Address: '
+                string = "FwUnassignedIfs: "
+                string += entry.get('name','NoName') + ': {' + 'pci_address: ' + key + ', Address: '
                 string += 'None' if entry.get('addr') == None else entry.get('addr')
                 string += ', gateway: '
                 string += 'None' if entry.get('gateway') == '' else entry.get('gateway','None')
@@ -292,6 +292,6 @@ class FwUnassignedIfs:
                     string += ', public_ip : '
                     string += 'None' if entry.get('public_ip') =='' else entry.get('public_ip', 'None')
                     string += ', public_port : '
-                    string += 'None' if entry.get('public_port') =='' else entry.get('public_port', 'None')
+                    string += 'None' if str(entry.get('public_port')) =='' else str(entry.get('public_port', 'None'))
                 string += '}'
                 fwglobals.log.debug(string)
