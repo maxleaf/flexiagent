@@ -1270,7 +1270,7 @@ class Checker:
         read_file  = open(grub_read_file, "r")
         write_file = open(grub_write_file, "w")
         for line in read_file:
-            if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
+            if prefix_val in line:
                 # no need to handle lines which are remarked
                 if line.startswith("#"):
                     write_file.write(line)
@@ -1289,12 +1289,10 @@ class Checker:
             add_grub_line = True
             # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
             val_line = grub_line.split('=\"')[1].strip()
-            # take the GRUB_CMDLINE_LINUX_DEFAULT part
-            prefix_val = grub_line.split('=\"')[0]
             val_line = val_line.strip('\" ')
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
-            #remove old values, if exist, so we can replace them with ourts
+            #remove old values, if exist, so we can replace them with ours
             results = []
             for elem in val_line_list:
                 if elem.startswith('iommu'):

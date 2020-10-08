@@ -140,3 +140,23 @@ def tunnel_stats_get():
                     break
 
     return tunnel_stats
+
+def check_if_addr_in_connected_tunnel(addr_no_mask):
+    """
+    check if address is a source address in a connected tunnel
+    : param addr_no_mask : IP address with no mask
+    : return : True if addess is in connected tunnel, False if not
+    """
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for params in tunnels:
+        if params['src'] == addr_no_mask:
+            tunnel_id = params['tunnel-id']
+            tunnel_stats = tunnel_stats_get()
+            if tunnel_stats.get(tunnel_id) != None:
+                if tunnel_stats[tunnel_id]['status'] == 'up':
+                    return True
+                else:
+                    return False
+            else:
+                return False
+    return False

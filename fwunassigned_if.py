@@ -164,7 +164,7 @@ class FwUnassignedIfs:
             dct[key] = value
         return res
 
-    def _get_unassigned_reconfig_hash(self):
+    def _get_assigned_reconfig_hash(self):
         """ Compute reconfig hash on interfaces in router-db.
 
         : return : string of changes in unassigned interfaces to calculate reconfig hash on
@@ -238,7 +238,7 @@ class FwUnassignedIfs:
                 res += self._get_entry_fingerprint(pci)
 
         # add the assigned-interfaces reconfig hash
-        res += self._get_unassigned_reconfig_hash()
+        res += self._get_assigned_reconfig_hash()
 
         if res != '':
             fwglobals.log.debug('get_reconfig_hash: %s' % res)

@@ -237,9 +237,14 @@ class FwStunWrap:
         return self.local_cache['stun_interfaces'][address]
 
     def reset_all(self):
-        """ reset all data in the STUN cache for every interface.
+        """ reset all data in the STUN cache for every interface that is not part
+        of an connected tunnel. If the tunnel will get disconnected, it will add
+        the address back to the STUN cache and reset it.
         """
         for addr in self.local_cache['stun_interfaces']:
+            # Do not reset info on interface participating in a connected tunnel
+            if fwtunnel_stats.check_if_addr_in_connected_tunnel(addr) == True:
+                continue
             self.initialize_addr(addr, False)
 
     def _increase_sec(self):
@@ -298,7 +303,7 @@ class FwStunWrap:
         #now start sending STUN request
         for addr in self.local_cache['stun_interfaces'].keys():
             if self.local_cache['stun_interfaces'][addr]['success'] == True:
-                pass
+                continue
             else:
                 elem = self.local_cache['stun_interfaces'][addr]
                 if elem['sec_counter'] == elem['next_time']:
