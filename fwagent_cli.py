@@ -61,8 +61,7 @@ class FwagentCli:
 
     def __enter__(self):
         if not self.daemon:
-	        fwglobals.g.initialize_agent()
-	        self.agent = fwglobals.g.fwagent
+	        self.agent = fwglobals.g.initialize_agent()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
