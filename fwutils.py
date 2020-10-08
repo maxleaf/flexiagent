@@ -523,6 +523,27 @@ def pci_to_vpp_sw_if_index(pci):
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
     return None
 
+# 'linux_if_name_to_vpp_sw_if_index' function maps linux interface referenced by interface name, e.g 'eth0'
+# into index of this tapcli interface in VPP, eg. tapcli-0
+def linux_if_name_to_vpp_sw_if_index(interface_name):
+    """Convert Linux Interface Name into VPP sw_if_index.
+
+    :param interface_name:      Linux interface name.
+
+    :returns: sw_if_index.
+    """
+    vpp_if_name = vpp_tapcli_by_linux_interface_name(interface_name)
+    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, str(vpp_if_name)))
+    if vpp_if_name is None:
+        return None
+
+    sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
+    for sw_if in sw_ifs:
+        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
+            return sw_if.sw_if_index
+    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, yaml.dump(sw_ifs, canonical=True)))
+    return None
+
 # 'pci_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
 # To do that we convert firstly the pci into name of interface in VPP,
@@ -572,9 +593,13 @@ def vpp_if_name_to_tap(vpp_if_name):
     return tap
 
 def vpp_tap_by_linux_interface_name(linux_if_name):
+    tapcli = vpp_tapcli_by_linux_interface_name(linux_if_name)
+    return vpp_if_name_to_tap(tapcli)
+
+def vpp_tapcli_by_linux_interface_name(linux_if_name):
     linux_tap = linux_tap_by_interface_name(linux_if_name)
     words = linux_tap.split('cli-')
-    return vpp_if_name_to_tap("tapcli-%s" % words[-1])
+    return "tapcli-%s" % words[-1]
 
 def linux_tap_by_interface_name(linux_if_name):
     try:
@@ -1848,19 +1873,31 @@ def get_interface_driver(interface_name):
     except subprocess.CalledProcessError:
         return ''   
 
-def is_non_dpdk_interface(interface_name):
+def is_non_dpdk_interface(interface_name, pci):
     """Check if interface is not supported by dpdk.                            
 
     :param interface_name: Interface name to check.
 
     :returns: boolean.
     """  
+
+    # 0000:06:00.00 'I210 Gigabit Network Connection' if=eth0 drv=igb unused= 192.168.1.11
+    # 0000:0a:00.00 'Ethernet Connection X553 1GbE' if=eth4 drv=ixgbe unused= 10.0.0.1
+    # 0000:07:00.00 'I210 Gigabit Network Connection' if=eth2 drv=igb unused=vfio-pci,uio_pci_generic =192.168.0.1
+
+    if pci:
+        if str(pci) == "0000:06:00.00":
+            return True
+
+
+    # if interface_name == 'eth2'or interface_name == 'eth5':
+    #     return True
+
     if is_wifi_interface(interface_name):
         return True
     if is_lte_interface(interface_name):
         return True
-    if interface_name == 'eth2':
-        return True
+
     return False
 
 

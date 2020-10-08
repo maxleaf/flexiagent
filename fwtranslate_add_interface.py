@@ -118,7 +118,7 @@ def add_interface(params):
         }
         cmd_list.append(cmd)
 
-    if fwutils.is_non_dpdk_interface(iface_name):
+    if fwutils.is_non_dpdk_interface(iface_name, iface_pci):
         # create tap for this interface in vpp and linux
         cmd = {}
         cmd['cmd'] = {}
@@ -225,6 +225,38 @@ def add_interface(params):
         }
         cmd['revert']['descr'] = "remove interface from netplan config file"
         cmd_list.append(cmd)
+
+        # Enable NAT.
+        # On WAN interfaces run
+        #   'nat44 add interface address GigabitEthernet0/9/0'
+        #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
+        # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
+        if 'type' not in params or params['type'].lower() == 'wan':
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "nat44_add_del_interface_addr"
+            cmd['cmd']['descr']   = "enable NAT for tapcli interface"
+            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':1, 'twice_nat':0 }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "nat44_add_del_interface_addr"
+            cmd['revert']['descr']  = "disable NAT for tapcli interface"
+            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':0, 'twice_nat':0 }
+            cmd_list.append(cmd)
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
+            cmd['cmd']['descr']   = "add interface tapcli to output path" 
+            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':1, 'is_inside':0 }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
+            cmd['revert']['descr']  = "remove interface tapcli from output path"
+            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':0, 'is_inside':0 }
+            cmd_list.append(cmd)
     else:
         # add interface into netplan configuration
         cmd = {}
