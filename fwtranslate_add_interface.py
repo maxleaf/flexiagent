@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
 import re
 
@@ -312,6 +313,42 @@ def add_interface(params):
         cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
+    return cmd_list
+
+def modify_interface(new_params, old_params):
+    """Generate commands to modify interface configuration in Linux and VPP
+
+    :param new_params:  The new configuration received from flexiManage.
+    :param old_params:  The current configuration of interface.
+
+    :returns: List of commands.
+    """
+    cmd_list = []
+
+    # For now we don't support real translation to command list.
+    # We just return empty list if new parameters have no impact on Linux or
+    # VPP, like PublicPort, and non-empty dummy list if parameters do have impact
+    # and translation is needed. In last case the modification will be performed
+    # by replacing modify-interface with pair of remove-interface & add-interface.
+    # I am an optimistic person, so I believe that hack will be removed at some
+    # point and real translation will be implemented.
+
+    # Remove all not impacting parameters from both new and old parameters and
+    # compare them. If they are same, no translation is needed.
+    #
+    not_impacting_params = [ 'PublicIP', 'PublicPort', 'useStun']
+    copy_old_params = copy.deepcopy(old_params)
+    copy_new_params = copy.deepcopy(new_params)
+
+    for param in not_impacting_params:
+        if param in copy_old_params:
+            del copy_old_params[param]
+        if param in copy_new_params:
+            del copy_new_params[param]
+
+    same = fwutils.compare_request_params(copy_new_params, copy_old_params)
+    if not same:    # There are different impacting parameters
+        cmd_list = [ 'stub' ]
     return cmd_list
 
 def get_request_key(params):

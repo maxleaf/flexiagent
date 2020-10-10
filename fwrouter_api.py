@@ -42,9 +42,6 @@ from vpp_api import VPP_API
 
 import fwtunnel_stats
 
-import fwtranslate_add_tunnel
-import fwtranslate_add_interface
-
 fwrouter_modules = {
     'fwtranslate_revert':          __import__('fwtranslate_revert') ,
     'fwtranslate_start_router':    __import__('fwtranslate_start_router'),
@@ -61,6 +58,7 @@ fwrouter_translators = {
     'stop-router':              {'module':'fwtranslate_revert',          'api':'revert'},
     'add-interface':            {'module':'fwtranslate_add_interface',   'api':'add_interface'},
     'remove-interface':         {'module':'fwtranslate_revert',          'api':'revert'},
+    'modify-interface':         {'module':'fwtranslate_add_interface',   'api':'modify_interface'},
     'add-route':                {'module':'fwtranslate_add_route',       'api':'add_route'},
     'remove-route':             {'module':'fwtranslate_revert',          'api':'revert'},
     'add-tunnel':               {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel'},
@@ -157,9 +155,8 @@ class FWROUTER_API:
                     fwutils.netplan_apply('dhcpc_thread')
                     fwglobals.g.fwagent.disconnect()
                     time.sleep(10)  # 10 sec
-
                 except Exception as e:
-                    fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
+                    fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
@@ -456,7 +453,7 @@ class FWROUTER_API:
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: list of commands.
         """
         req    = request['message']
         params = request.get('params')
@@ -475,6 +472,36 @@ class FWROUTER_API:
             return cmd_list
 
         cmd_list = func(params) if params else func()
+        return cmd_list
+
+    def _translate_modify(self, request):
+        """Translate modify request in a series of commands.
+
+        :param request: The request received from flexiManage.
+
+        :returns: list of commands.
+        """
+        req         = request['message']
+        params      = request.get('params')
+        old_params  = fwglobals.g.router_cfg.get_params(request)
+
+        # First of all check if the received parameters differs from the existing ones
+        same = fwutils.compare_request_params(params, old_params)
+        if same:
+            return []
+
+        api_defs = fwrouter_translators.get(req)
+        if not api_defs:
+            # This 'modify-X' is not supported (yet?)
+            return []
+
+        module = fwrouter_modules.get(fwrouter_translators[req]['module'])
+        assert module, 'FWROUTER_API: there is no module for request "%s"' % req
+
+        func = getattr(module, fwrouter_translators[req]['api'])
+        assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
+
+        cmd_list = func(params, old_params)
         return cmd_list
 
     def _execute(self, request, cmd_list, filter=None):
@@ -600,7 +627,7 @@ class FWROUTER_API:
             elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
                 # Ensure this is actually not modification request :)
                 existing_params = fwglobals.g.router_cfg.get_request_params(_request)
-                if fwglobals.g.router_cfg.are_params_equal(existing_params, _request.get('params')):
+                if fwutils.compare_request_params(existing_params, _request.get('params')):
                     # Ensure that the aggregated request does not include correspondent 'remove-X' before.
                     noop = True
                     if aggregated_requests:
@@ -613,10 +640,23 @@ class FWROUTER_API:
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 return True
             elif re.match('modify-', req):
-                # For modification request ensure that it goes to modify indeed.
-                new_params = _request.get('params')
-                old_params = fwglobals.g.router_cfg.get_params(_request)
-                if fwglobals.g.router_cfg.are_params_equal(new_params, old_params):
+                # For modification request ensure that it goes to modify indeed:
+                # translate request into commands to execute in order to modify
+                # configuration item in Linux/VPP. If this list is empty,
+                # the request can be stripped out.
+                #
+                cmd_list = self._translate_modify(_request)
+                if not cmd_list:
+                    # Save modify request into database, as it might contain parameters
+                    # that don't impact on interface configuration in Linux or in VPP,
+                    # like PublicPort, PublicIP, useStun, etc.
+                    #
+                    # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
+                    # We assume the 'modify-X' request includes full set of
+                    # parameters and not only modified ones!
+                    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    #
+                    fwglobals.g.router_cfg.update(_request)
                     return True
             return False
 
@@ -639,7 +679,9 @@ class FWROUTER_API:
             out_requests = []
             inp_requests = request['params']['requests']
             for _request in inp_requests:
-                if _should_be_stripped(_request, inp_requests) == False:
+                if _should_be_stripped(_request, inp_requests):
+                    fwglobals.log.debug("_strip_noop_request: embedded request has no impact: %s" % json.dumps(request))
+                else:
                     out_requests.append(_request)
             if not out_requests:
                 fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(out_requests))

@@ -1530,3 +1530,50 @@ def netplan_apply(caller_name=None):
     fwglobals.log.debug(log_str)
     os.system(cmd)
     time.sleep(1)  # Give a second to Linux to configure interfaces
+
+def compare_request_params(params1, params2):
+    """ Compares two dictionaries while normalizing them for comparison
+    and ignoring orphan keys that have None or empty string value.
+        The orphans keys are keys that present in one dict and don't
+    present in the other dict, thanks to Scooter Software Co. for the term :)
+        We need this function to pay for bugs in flexiManage code, where
+    is provides add-/modify-/remove-X requests for same configuration
+    item with inconsistent letter case, None/empty string,
+    missing parameters, etc.
+        Note! The normalization is done for top level keys only!
+    """
+    if not params1 or not params2:
+        return False
+    if type(params1) != type(params2):
+        return False
+    if type(params1) != dict:
+        return (params1 == params2)
+
+    set_keys1   = set(params1.keys())
+    set_keys2   = set(params2.keys())
+    keys1_only  = list(set_keys1 - set_keys2)
+    keys2_only  = list(set_keys2 - set_keys1)
+    keys_common = set_keys1.intersection(set_keys2)
+
+    for key in keys1_only:
+        if type(params1[key]) == bool or params1[key]:
+            # params1 has non-empty string/value that does not present in params2
+            return False
+
+    for key in keys2_only:
+        if type(params2[key]) == bool or params2[key]:
+            # params2 has non-empty string/value that does not present in params1
+            return False
+
+    for key in keys_common:
+        val1 = params1[key]
+        val2 = params2[key]
+        if val1 and val2:   # Both values are neither None-s nor empty strings.
+            if type(val1) != type(val2):
+                return False        # Not comparable types
+            if type(val1) == str:
+                if val1.lower() != val2.lower():
+                    return False    # Strings are not equal
+            elif val1 != val2:
+                return False        # Values are not equal
+    return True

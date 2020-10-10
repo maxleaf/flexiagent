@@ -62,6 +62,8 @@ class TestFwagent:
             print("!!!! TestFwagent got exception !!!")
             tb.print_tb(traceback)
 
+    def set_log_start_time(self):
+        self.log_start_time = get_log_time()
 
     def cli(self, args, daemon=False, print_output_on_error=True):
 
@@ -343,6 +345,8 @@ def router_is_configured(expected_cfg_dump_filename,
 
 def get_log_time(log='/var/log/flexiwan/agent.log'):
     out = subprocess.check_output(['tail','-1','/var/log/flexiwan/agent.log'])
+    # Ensure that output is in the following format:
+    # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
     tokens = out.split()[0:3]
     if len(tokens) < 3:  # If it is not (for example due to partially flushed line), take the one line before
         out = subprocess.check_output(['tail','-2','/var/log/flexiwan/agent.log'])
@@ -361,5 +365,3 @@ def get_log_line_time(log_line):
     else:
         log_time = "%s %s %s" % (tokens[0], tokens[1], tokens[2])
     return datetime.datetime.strptime(log_time, '%b %d %H:%M:%S')
-
-
