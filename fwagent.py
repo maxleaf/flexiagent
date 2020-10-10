@@ -669,7 +669,7 @@ def start(start_router):
     daemon_rpc('start', start_vpp=start_router) # if daemon runs, start connection loop and router if required
     fwglobals.log.info("done")
 
-def show(agent_info, router_info):
+def show(agent_info, router_info, daemon_info):
     """Handles 'fwagent show' command.
     This commands prints various information about device and it's components,
     like router configuration, software version, etc.
@@ -677,6 +677,7 @@ def show(agent_info, router_info):
 
     :param agent_info:   Agent information.
     :param router_info:  Router information.
+    :param daemon_info:  Daemon information.
 
     :returns: None.
     """
@@ -707,6 +708,15 @@ def show(agent_info, router_info):
             fwutils.print_router_config(basic=False, signature=True)
         elif router_info == 'multilink-policy':
             fwutils.print_router_config(basic=False, multilink=True)
+
+    if daemon_info:
+        if daemon_info == 'status':
+            try:
+                daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
+                daemon.ping()   # Check if daemon runs
+                fwglobals.log.info("running")
+            except Pyro4.errors.CommunicationError:
+                fwglobals.log.info("not running")
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -1080,7 +1090,8 @@ if __name__ == '__main__':
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
                     'show': lambda args: show(
                         agent_info=args.agent,
-                        router_info=args.router),
+                        router_info=args.router,
+                        daemon_info=args.daemon),
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
@@ -1122,6 +1133,8 @@ if __name__ == '__main__':
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
+    parser_show.add_argument('--daemon', choices=['status'],
+                        help="show various daemon parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
