@@ -611,10 +611,10 @@ class FWROUTER_API:
 
         :returns: request after stripping out no impact requests.
         """
-        def _should_be_stripped(_request, aggregated_requests=None):
-            req    = _request['message']
-            params = _request.get('params', {})
-            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
+        def _should_be_stripped(__request, aggregated_requests=None):
+            req    = __request['message']
+            params = __request.get('params', {})
+            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(__request):
                 # Ensure that the aggregated request does not include correspondent 'add-X' before.
                 noop = True
                 if aggregated_requests:
@@ -624,10 +624,10 @@ class FWROUTER_API:
                         noop = False
                 if noop:
                     return True
-            elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
+            elif re.match('add-', req) and fwglobals.g.router_cfg.exists(__request):
                 # Ensure this is actually not modification request :)
-                existing_params = fwglobals.g.router_cfg.get_request_params(_request)
-                if fwutils.compare_request_params(existing_params, _request.get('params')):
+                existing_params = fwglobals.g.router_cfg.get_request_params(__request)
+                if fwutils.compare_request_params(existing_params, __request.get('params')):
                     # Ensure that the aggregated request does not include correspondent 'remove-X' before.
                     noop = True
                     if aggregated_requests:
@@ -645,7 +645,7 @@ class FWROUTER_API:
                 # configuration item in Linux/VPP. If this list is empty,
                 # the request can be stripped out.
                 #
-                cmd_list = self._translate_modify(_request)
+                cmd_list = self._translate_modify(__request)
                 if not cmd_list:
                     # Save modify request into database, as it might contain parameters
                     # that don't impact on interface configuration in Linux or in VPP,
@@ -656,7 +656,7 @@ class FWROUTER_API:
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
-                    fwglobals.g.router_cfg.update(_request)
+                    fwglobals.g.router_cfg.update(__request)
                     return True
             return False
 
