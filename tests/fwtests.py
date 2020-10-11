@@ -62,15 +62,28 @@ class TestFwagent:
             print("!!!! TestFwagent got exception !!!")
             tb.print_tb(traceback)
 
+    def set_log_start_time(self):
+        self.log_start_time = get_log_time()
 
     def cli(self, args, daemon=False, print_output_on_error=True):
 
         # Create instance of background fwagent if asked.
         if daemon:
-            cmd = '%s daemon --dont_connect &' % (self.fwagent_py)
             try:
+                cmd = '%s daemon --dont_connect &' % (self.fwagent_py)
                 os.system(cmd)
-                time.sleep(1)  # Give a second to fwagent to be initialized
+
+                # Poll daemon status until it becomes 'running'
+                #
+                timeout = 120
+                cmd = '%s show --daemon status' % (self.fwagent_py)
+                out = subprocess.check_output(cmd, shell=True)
+                while out.strip() != 'running' and timeout > 0:
+                    time.sleep(1)
+                    timeout -= 1
+                    out = subprocess.check_output(cmd, shell=True)
+                if timeout == 0:
+                    return (False, "timeout (%s seconds) on wainting for daemon to start" % (timeout))
             except Exception as e:
                 return (False, "'%s' failed: %s" % (cmd, str(e)))
 
@@ -332,8 +345,14 @@ def router_is_configured(expected_cfg_dump_filename,
 
 def get_log_time(log='/var/log/flexiwan/agent.log'):
     out = subprocess.check_output(['tail','-1','/var/log/flexiwan/agent.log'])
-    if not out:
-        out = "Jan 01 00:00:01"
+    # Ensure that output is in the following format:
+    # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
+    tokens = out.split()[0:3]
+    if len(tokens) < 3:  # If it is not (for example due to partially flushed line), take the one line before
+        out = subprocess.check_output(['tail','-2','/var/log/flexiwan/agent.log'])
+        tokens = out.split()[0:3]
+        if len(tokens) < 3:     # If still no luck, start from epoch
+            out = "Jan 01 00:00:01"
     return get_log_line_time(out)
 
 def get_log_line_time(log_line):
@@ -346,5 +365,3 @@ def get_log_line_time(log_line):
     else:
         log_time = "%s %s %s" % (tokens[0], tokens[1], tokens[2])
     return datetime.datetime.strptime(log_time, '%b %d %H:%M:%S')
-
-

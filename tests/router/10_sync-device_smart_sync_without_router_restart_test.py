@@ -89,8 +89,8 @@ def test():
             # running on background, so it could receive further injects.
             #
             daemon = True if idx == 0 else False
-            (ok, _) = agent.cli('-f %s' % step, daemon=daemon)
-            assert ok
+            (ok, error_str) = agent.cli('-f %s' % step, daemon=daemon)
+            assert ok, error_str
 
             # Ensure validity of VPP and database configurations.
             #

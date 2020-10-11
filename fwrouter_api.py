@@ -42,9 +42,6 @@ from vpp_api import VPP_API
 
 import fwtunnel_stats
 
-import fwtranslate_add_tunnel
-import fwtranslate_add_interface
-
 fwrouter_modules = {
     'fwtranslate_revert':          __import__('fwtranslate_revert') ,
     'fwtranslate_start_router':    __import__('fwtranslate_start_router'),
@@ -61,6 +58,7 @@ fwrouter_translators = {
     'stop-router':              {'module':'fwtranslate_revert',          'api':'revert'},
     'add-interface':            {'module':'fwtranslate_add_interface',   'api':'add_interface'},
     'remove-interface':         {'module':'fwtranslate_revert',          'api':'revert'},
+    'modify-interface':         {'module':'fwtranslate_add_interface',   'api':'modify_interface'},
     'add-route':                {'module':'fwtranslate_add_route',       'api':'add_route'},
     'remove-route':             {'module':'fwtranslate_revert',          'api':'revert'},
     'add-tunnel':               {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel'},
@@ -157,9 +155,8 @@ class FWROUTER_API:
                     fwutils.netplan_apply('dhcpc_thread')
                     fwglobals.g.fwagent.disconnect()
                     time.sleep(10)  # 10 sec
-
                 except Exception as e:
-                    fwglobals.log.debug("dhcpc_thread: %s failed: %s " % (cmd, str(e)))
+                    fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
@@ -433,19 +430,9 @@ class FWROUTER_API:
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
 
-            # Connection to flexiManage can be lost on either start/stop-router
-            # success or failure, as interfaces are moved to/from Linux control.
-            # In this case re-establish connection as soon as possible.
-            #
-            if re.match('(start|stop)-router',  req):
-                fwglobals.g.fwagent.should_reconnect = True
-
         except Exception as e:
             err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
-            if req == 'start-router' or req == 'stop-router':
-                self._set_router_failure("failed to " + req)
-                fwglobals.g.fwagent.should_reconnect = True
             raise e
 
         return {'ok':1}
@@ -456,7 +443,7 @@ class FWROUTER_API:
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: list of commands.
         """
         req    = request['message']
         params = request.get('params')
@@ -475,6 +462,36 @@ class FWROUTER_API:
             return cmd_list
 
         cmd_list = func(params) if params else func()
+        return cmd_list
+
+    def _translate_modify(self, request):
+        """Translate modify request in a series of commands.
+
+        :param request: The request received from flexiManage.
+
+        :returns: list of commands.
+        """
+        req         = request['message']
+        params      = request.get('params')
+        old_params  = fwglobals.g.router_cfg.get_params(request)
+
+        # First of all check if the received parameters differs from the existing ones
+        same = fwutils.compare_request_params(params, old_params)
+        if same:
+            return []
+
+        api_defs = fwrouter_translators.get(req)
+        if not api_defs:
+            # This 'modify-X' is not supported (yet?)
+            return []
+
+        module = fwrouter_modules.get(fwrouter_translators[req]['module'])
+        assert module, 'FWROUTER_API: there is no module for request "%s"' % req
+
+        func = getattr(module, fwrouter_translators[req]['api'])
+        assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
+
+        cmd_list = func(params, old_params)
         return cmd_list
 
     def _execute(self, request, cmd_list, filter=None):
@@ -584,10 +601,10 @@ class FWROUTER_API:
 
         :returns: request after stripping out no impact requests.
         """
-        def _should_be_stripped(_request, aggregated_requests=None):
-            req    = _request['message']
-            params = _request.get('params', {})
-            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(_request):
+        def _should_be_stripped(__request, aggregated_requests=None):
+            req    = __request['message']
+            params = __request.get('params', {})
+            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(__request):
                 # Ensure that the aggregated request does not include correspondent 'add-X' before.
                 noop = True
                 if aggregated_requests:
@@ -597,10 +614,10 @@ class FWROUTER_API:
                         noop = False
                 if noop:
                     return True
-            elif re.match('add-', req) and fwglobals.g.router_cfg.exists(_request):
+            elif re.match('add-', req) and fwglobals.g.router_cfg.exists(__request):
                 # Ensure this is actually not modification request :)
-                existing_params = fwglobals.g.router_cfg.get_request_params(_request)
-                if fwglobals.g.router_cfg.are_params_equal(existing_params, _request.get('params')):
+                existing_params = fwglobals.g.router_cfg.get_request_params(__request)
+                if fwutils.compare_request_params(existing_params, __request.get('params')):
                     # Ensure that the aggregated request does not include correspondent 'remove-X' before.
                     noop = True
                     if aggregated_requests:
@@ -613,10 +630,23 @@ class FWROUTER_API:
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 return True
             elif re.match('modify-', req):
-                # For modification request ensure that it goes to modify indeed.
-                new_params = _request.get('params')
-                old_params = fwglobals.g.router_cfg.get_params(_request)
-                if fwglobals.g.router_cfg.are_params_equal(new_params, old_params):
+                # For modification request ensure that it goes to modify indeed:
+                # translate request into commands to execute in order to modify
+                # configuration item in Linux/VPP. If this list is empty,
+                # the request can be stripped out.
+                #
+                cmd_list = self._translate_modify(__request)
+                if not cmd_list:
+                    # Save modify request into database, as it might contain parameters
+                    # that don't impact on interface configuration in Linux or in VPP,
+                    # like PublicPort, PublicIP, useStun, etc.
+                    #
+                    # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
+                    # We assume the 'modify-X' request includes full set of
+                    # parameters and not only modified ones!
+                    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    #
+                    fwglobals.g.router_cfg.update(__request)
                     return True
             return False
 
@@ -639,7 +669,9 @@ class FWROUTER_API:
             out_requests = []
             inp_requests = request['params']['requests']
             for _request in inp_requests:
-                if _should_be_stripped(_request, inp_requests) == False:
+                if _should_be_stripped(_request, inp_requests):
+                    fwglobals.log.debug("_strip_noop_request: embedded request has no impact: %s" % json.dumps(request))
+                else:
                     out_requests.append(_request)
             if not out_requests:
                 fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(out_requests))
@@ -713,13 +745,17 @@ class FWROUTER_API:
                         if _should_reconnect_agent_on_modify_interface(_request['params']):
                             reconnect_agent = True
 
-        if re.match('modify-interface', request['message']):
+        if re.match('(start|stop)-router', request['message']):
+            reconnect_agent = True
+        elif re.match('modify-interface', request['message']):
             gw = request['params'].get('gateway')
             if gw:
                 gateways.append(gw)
         elif request['message'] == 'aggregated':
             for _request in request['params']['requests']:
-                if re.match('modify-interface', _request['message']):
+                if re.match('(start|stop)-router', _request['message']):
+                    reconnect_agent = True
+                elif re.match('modify-interface', _request['message']):
                     gw = _request['params'].get('gateway')
                     if gw:
                         gateways.append(gw)
