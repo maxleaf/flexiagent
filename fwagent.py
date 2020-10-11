@@ -21,6 +21,7 @@
 ################################################################################
 
 import json
+import loadsimulator
 import os
 
 
@@ -480,10 +481,19 @@ class FwAgent:
 
         fwglobals.log.debug(seq + " job_id=" + job_id + " request=" + json.dumps(request))
 
-        reply = self.handle_received_request(request)
+        # In load simulator mode always reply ok on sync message
+        if loadsimulator.g.enabled() and request["message"] == "sync-device":
+            reply = {"ok":1}
+        else:
+            reply = self.handle_received_request(request)
 
         reply_str = reply if 'message' in request and not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
         fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
+
+        # In load simulator mode self.ws is not initialized as far as connections are created
+        # outside the agent.
+        if not loadsimulator.g.enabled():
+            ws = self.ws
 
         # Messages that change the interfaces might cause the existing connection to break
         # (for example, if the IP/mask has changed). Since sending the reply on a broken
@@ -492,16 +502,16 @@ class FwAgent:
         # We close the connection even if the request failed, as the change might have
         # taken place regardless of the request status, hence socket might not be operational.
         #
-        if self.should_reconnect == True or self.ws == None:
+        if self.should_reconnect == True or ws == None:
             fwglobals.log.info("_on_message: re-establish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
             self.connection_error_code = fwglobals.g.WS_STATUS_DEVICE_CHANGE
             self.connection_error_msg = 'device change'
-            if self.ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
+            if ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
                 fwglobals.log.info("_on_message: closing connection to orchestrator")
-                self.ws.close()
+                ws.close()
         else:
-            self.ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
+            ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
 
     def disconnect(self):
         """Shutdowns the WebSocket connection.
@@ -751,8 +761,7 @@ class FwagentDaemon(object):
         exit(1)
 
     def __enter__(self):
-        fwglobals.g.initialize_agent()
-        self.agent = fwglobals.g.fwagent
+        self.agent = fwglobals.g.initialize_agent()
         return self
 
     def __exit__(self, exc_type, exc_value, tb):

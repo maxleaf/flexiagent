@@ -21,6 +21,7 @@
 ################################################################################
 
 import json
+import loadsimulator
 import yaml
 import sys
 import os
@@ -109,7 +110,10 @@ class FWAGENT_API:
             # Load network configuration.
             info['network'] = {}
             info['network']['interfaces'] = fwglobals.g.handle_request({ 'message': 'interfaces'})['message']
-            info['reconfig'] = fwglobals.g.unassigned_interfaces.get_reconfig_hash()
+            if loadsimulator.g.enabled():
+                info['reconfig'] = ''
+            else:
+                info['reconfig'] = fwglobals.g.unassigned_interfaces.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
