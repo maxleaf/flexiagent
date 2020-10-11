@@ -79,7 +79,7 @@ soft_checkers = [
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_multicore_support_requires_RSS'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_multithread_support_requires_RSS'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
 
 ]
@@ -227,7 +227,7 @@ def reset_system_to_defaults(checker):
 
     reboot_needed = False
     while True:
-        choice = raw_input("Resetting to Factory Defauls. Resetting will reboot the system. Are you sure? [y/N]: ")
+        choice = raw_input("Resetting to Factory Defaults. Are you sure? [y/N]: ")
         if choice == 'n' or choice == 'N' or choice == '':
             return True
         elif choice == 'y' or choice == 'Y':
@@ -330,7 +330,7 @@ def main(args):
                     checker.save_config()
                     if checker.update_grub == True:
 		                rebootSys = 'x'
-                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
+                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
                                     rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
                                                     "Would you like to reboot now (Y/n)?")
                                     if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
@@ -341,7 +341,7 @@ def main(args):
 
                 os.system("sudo systemctl start flexiwan-router")
                 print ("Done.")
-		
+
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
         return (soft_status_code | hard_status_code)
 

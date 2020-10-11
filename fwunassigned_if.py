@@ -146,11 +146,11 @@ class FwUnassignedIfs:
     def _reconfig_section(self, dct, key, value, only_if_different, update):
         """ compute reconfig diff when setting new value
 
-        : param dct   : dictionary
-        : param key   : dictionary's key
-        : param value : dictionary's value
-        : compare     : should compare before assignment
-        : assignment  : should the dict be updated with new value
+        : param dct         : dictionary
+        : param key         : dictionary's key
+        : param value       : dictionary's value
+        : only_if_different : should compare before assignment
+        : update            : should the dict be updated with new value
         : return : string of diff
         """
         res = ''
@@ -164,7 +164,7 @@ class FwUnassignedIfs:
             dct[key] = value
         return res
 
-    def _get_unassigned_reconfig_hash(self):
+    def _get_assigned_reconfig_hash(self):
         """ Compute reconfig hash on interfaces in router-db.
 
         : return : string of changes in unassigned interfaces to calculate reconfig hash on
@@ -199,12 +199,8 @@ class FwUnassignedIfs:
                     if elem['address'] == nomaskaddr:
                         # compare public data between router-db and STUN cache
                         public_ip, public_port = elem['public_ip'], elem['public_port']
-                        if public_ip:
-                            if public_ip != new_p_ip:
-                                  res += 'public_ip:' + new_p_ip + ','
-                        if public_port:
-                            if public_port != str(new_p_port):
-                                res += 'public_port:' + str(new_p_port) + ','
+                        res += self._reconfig_section(elem, 'public_ip', new_p_ip, only_if_different=True, update=False)
+                        res += self._reconfig_section(elem, 'public_port', str(new_p_port), only_if_different=True, update=False)
                         break
         return res
 
@@ -238,7 +234,7 @@ class FwUnassignedIfs:
                 res += self._get_entry_fingerprint(pci)
 
         # add the assigned-interfaces reconfig hash
-        res += self._get_unassigned_reconfig_hash()
+        res += self._get_assigned_reconfig_hash()
 
         if res != '':
             fwglobals.log.debug('get_reconfig_hash: %s' % res)
