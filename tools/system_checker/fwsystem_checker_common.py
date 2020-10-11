@@ -944,7 +944,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multicore_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multithread_support_requires_RSS(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -1081,10 +1081,12 @@ class Checker:
             conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
 
             if num_of_rx_queues_param:
-                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
-            num_of_rx_queues_param = 'num-rx-queues 0'
-            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
-
+                if conf['dpdk'].get(dev_default_key):
+                    self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
+                    num_of_rx_queues_param = 'num-rx-queues 0'
+                    conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
+                else:
+                    self._add_tup_to_dpdk(0)
             self.vpp_config_modified = True
             self.update_grub = True
             return True

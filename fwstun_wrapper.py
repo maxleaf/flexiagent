@@ -144,9 +144,8 @@ class FwStunWrap:
             cached_addr['public_ip']        = params['PublicIP']
             cached_addr['public_port']      = params['PublicPort']
             cached_addr['success']          = True
-            cached_addr['stun_server']      = ''
-            cached_addr['stun_server_port'] = ''
-            cached_addr['nat_type']         = ''
+            # if we are here, it is because agent sent the data previously to Fleximanage.
+            # In that case, the STUN server and port are already updated, no need to reset them.
             fwglobals.log.debug("adding address %s to Cache with public information" %(str(addr)))
 
         # 2 if address already in cache, do not add it, so its counters won't reset
@@ -238,12 +237,13 @@ class FwStunWrap:
 
     def reset_all(self):
         """ reset all data in the STUN cache for every interface that is not part
-        of an connected tunnel. If the tunnel will get disconnected, it will add
+        of a connected tunnel. If the tunnel will get disconnected, it will add
         the address back to the STUN cache and reset it.
         """
+        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels()
         for addr in self.local_cache['stun_interfaces']:
             # Do not reset info on interface participating in a connected tunnel
-            if fwtunnel_stats.check_if_addr_in_connected_tunnel(addr) == True:
+            if addr in ip_up_set:
                 continue
             self.initialize_addr(addr, False)
 
@@ -369,6 +369,7 @@ class FwStunWrap:
                 cached_addr['public_port'] = nat_ext_port
                 cached_addr['stun_server'] = stun_host
                 cached_addr['stun_server_port'] = stun_port
+                fwglobals.g.unassigned_interfaces.update_public(lcl_src_ip, nat_ext_ip, nat_ext_port)
                 return None
             else:
                 fwglobals.log.debug("failed to find external ip:port for %s:%d" %(lcl_src_ip,lcl_src_port))

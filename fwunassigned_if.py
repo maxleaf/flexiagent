@@ -146,11 +146,11 @@ class FwUnassignedIfs:
     def _reconfig_section(self, dct, key, value, only_if_different, update):
         """ compute reconfig diff when setting new value
 
-        : param dct   : dictionary
-        : param key   : dictionary's key
-        : param value : dictionary's value
-        : compare     : should compare before assignment
-        : assignment  : should the dict be updated with new value
+        : param dct         : dictionary
+        : param key         : dictionary's key
+        : param value       : dictionary's value
+        : only_if_different : should compare before assignment
+        : update            : should the dict be updated with new value
         : return : string of diff
         """
         res = ''
