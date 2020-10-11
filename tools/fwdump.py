@@ -54,6 +54,7 @@ g_dumpers = {
     'fwagent_log':                  { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && cp /var/log/flexiwan/agent.log <temp_folder>/fwagent/ ; cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent/' },
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
+    'fwagent_version':              { 'shell_cmd': 'fwagent version > <dumper_out_file>' },
 
     'vpp_acl_dump':                 { 'shell_cmd': 'echo acl_dump > vat.txt && vpp_api_test script in vat.txt > <dumper_out_file> 2>&1 ; rm -rf vat.txt' },
     'vpp_interfaces_hw':            { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
