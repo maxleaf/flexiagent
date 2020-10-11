@@ -299,7 +299,7 @@ class Fwglobals:
         if not self.fwagent:
             global log
             log.warning('Fwglobals.finalize_agent: agent does not exists')
-            return
+            return None
 
         self.stun_wrapper.finalize()
         self.router_api.finalize()
@@ -314,6 +314,7 @@ class Fwglobals:
         del self.agent_api
         del self.fwagent
         self.fwagent = None
+        return None
 
     def __str__(self):
         """Get string representation of configuration.

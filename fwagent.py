@@ -775,7 +775,7 @@ class FwagentDaemon(object):
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
         self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
-        fwglobals.g.finalize_agent()
+        self.agent = fwglobals.g.finalize_agent()
         fwglobals.log.debug("FwagentDaemon: exited")
 
     def _check_system(self):
