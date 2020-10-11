@@ -188,11 +188,13 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "connect_to_router"
-    cmd['cmd']['descr']   = "connect to vpp papi"
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "connect to vpp papi"
+    cmd['cmd']['params']    = { 'object': 'fwglobals.g.router_api.vpp_api', 'func': 'connect_to_vpp' }
     cmd['revert'] = {}
-    cmd['revert']['name']   = "disconnect_from_router"
+    cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "disconnect from vpp papi"
+    cmd['revert']['params'] = { 'object': 'fwglobals.g.router_api.vpp_api', 'func': 'disconnect_from_vpp' }
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}

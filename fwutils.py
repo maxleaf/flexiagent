@@ -696,20 +696,6 @@ def stop_vpp():
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
 
-def connect_to_router():
-    """Connect to VPP Python API.
-
-     :returns: None.
-     """
-    fwglobals.g.router_api.vpp_api.connect()
-
-def disconnect_from_router():
-    """Disconnect from VPP Python API.
-
-     :returns: None.
-     """
-    fwglobals.g.router_api.vpp_api.disconnect()
-
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.
 
