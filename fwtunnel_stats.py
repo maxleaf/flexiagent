@@ -158,8 +158,7 @@ def get_if_addr_in_connected_tunnels(tunnel_stats=None):
     tunnels = fwglobals.g.router_cfg.get_tunnels()
     for tunnel in tunnels:
         tunnel_id = tunnel['tunnel-id']
-        for tnd_id in tunnel_stats:
-            if tunnel_stats.get(tunnel_id):
-                if tunnel_stats[tunnel_id].get('status') == 'up':
-                    ip_up_set.add(tunnel['src'])
+        if tunnel_stats.get(tunnel_id):
+            if tunnel_stats[tunnel_id].get('status') == 'up':
+                ip_up_set.add(tunnel['src'])
     return ip_up_set
