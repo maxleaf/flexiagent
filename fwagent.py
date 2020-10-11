@@ -349,7 +349,11 @@ class FwAgent:
         #self.ws.run_forever(sslopt={"cert_reqs": cert_required},
         #                    ping_interval=0, ping_timeout=0)
         if self.connection_error_code:
-            fwglobals.log.error("connection to flexiWAN orchestrator was closed due to error: %s" % self.connection_error_msg)
+            error_str = "connection to flexiWAN orchestrator was closed due to: %s" % self.connection_error_msg
+            if self.connection_error_code < fwglobals.g.WS_STATUS_OK:
+                fwglobals.log.error(error_str)
+            else:
+                fwglobals.log.info(error_str)
             return False
         fwglobals.log.info("connection to flexiWAN orchestrator was closed")
         return True
@@ -367,10 +371,10 @@ class FwAgent:
         if 'status_code' in dir(error):
             self.connection_error_code = error.status_code
             self.connection_error_msg  = "not approved" \
-                if error.status_code == fwglobals.g.WS_STATUS_CODE_NOT_APPROVED \
+                if error.status_code == fwglobals.g.WS_STATUS_ERROR_NOT_APPROVED \
                 else str(error)
         else:
-            self.connection_error_code = fwglobals.g.WS_STATUS_LOCAL_ERROR
+            self.connection_error_code = fwglobals.g.WS_STATUS_ERROR_LOCAL_ERROR
             self.connection_error_msg  = str(error)
         fwglobals.log.error("connection got error: " + self.connection_error_msg)
 
@@ -505,7 +509,7 @@ class FwAgent:
         if self.should_reconnect == True or ws == None:
             fwglobals.log.info("_on_message: re-establish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
-            self.connection_error_code = fwglobals.g.WS_STATUS_DEVICE_CHANGE
+            self.connection_error_code = fwglobals.g.WS_STATUS_OK_DEVICE_CHANGE
             self.connection_error_msg = 'device change'
             if ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
                 fwglobals.log.info("_on_message: closing connection to orchestrator")

@@ -216,9 +216,10 @@ class Fwglobals:
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
         self.FWAGENT_DAEMON_URI  = 'PYRO:%s@%s:%d' % (self.FWAGENT_DAEMON_NAME, self.FWAGENT_DAEMON_HOST, self.FWAGENT_DAEMON_PORT)
-        self.WS_STATUS_CODE_NOT_APPROVED = 403
-        self.WS_STATUS_DEVICE_CHANGE     = 900
-        self.WS_STATUS_LOCAL_ERROR       = 999
+        self.WS_STATUS_ERROR_NOT_APPROVED = 403
+        self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
+        self.WS_STATUS_OK                 = 1000
+        self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
         # Cache to save various global data
         self.AGENT_CACHE = {}
         # PCI to VPP names, assuming names and PCI are unique and not changed during operation
