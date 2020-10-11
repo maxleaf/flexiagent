@@ -289,8 +289,6 @@ class FwStunWrap:
         cached_addr['public_port']      = p_port
         cached_addr['stun_server']      = st_host
         cached_addr['stun_server_port'] = st_port
-        # add the info to unassigned interfaces in their dedicated cache
-        fwglobals.g.unassigned_interfaces.update_public(address, p_ip, p_port)
 
     def _send_stun_request(self):
         """ Send STUN request for each address that has no public IP and port
@@ -369,7 +367,6 @@ class FwStunWrap:
                 cached_addr['public_port'] = nat_ext_port
                 cached_addr['stun_server'] = stun_host
                 cached_addr['stun_server_port'] = stun_port
-                fwglobals.g.unassigned_interfaces.update_public(lcl_src_ip, nat_ext_ip, nat_ext_port)
                 return None
             else:
                 fwglobals.log.debug("failed to find external ip:port for %s:%d" %(lcl_src_ip,lcl_src_port))

@@ -605,18 +605,17 @@ class FwRouterCfg:
         : return : list if WAN interfaces from router DB
         """
         addr_list = []
-        for key in self.db.keys():
-            if 'add-interface' in key:
-                if self.db[key]['params'].get('gateway', '') == '':
-                    pass
-                elif self.db[key]['params'].get('useStun', False) == False:
-                    pass
-                else:
-                    entry = {}
-                    address = self.db[key]['params']['addr']
-                    entry['address'] = address.split('/')[0]
-                    entry['public_ip'] = self.db[key]['params'].get('PublicIP','')
-                    entry['public_port'] = self.db[key]['params'].get('PublicPort','')
-                    addr_list.append(entry)
+        wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+        for wan in wan_list:
+            if wan.get('gateway', '') == '':
+                continue
+            elif wan.get('useStun', False) == False:
+                continue
+            else:
+                entry = {}
+                address              = wan.get('addr')
+                entry['address']     = address.split('/')[0]
+                entry['public_ip']   = wan.get('PublicIP','')
+                entry['public_port'] = wan.get('PublicPort','')
+                addr_list.append(entry)
         return addr_list
-

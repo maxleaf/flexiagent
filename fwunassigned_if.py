@@ -199,12 +199,8 @@ class FwUnassignedIfs:
                     if elem['address'] == nomaskaddr:
                         # compare public data between router-db and STUN cache
                         public_ip, public_port = elem['public_ip'], elem['public_port']
-                        if public_ip:
-                            if public_ip != new_p_ip:
-                                  res += 'public_ip:' + new_p_ip + ','
-                        if public_port:
-                            if public_port != str(new_p_port):
-                                res += 'public_port:' + str(new_p_port) + ','
+                        res += self._reconfig_section(elem, 'public_ip', new_p_ip, only_if_different=True, update=False)
+                        res += self._reconfig_section(elem, 'public_port', str(new_p_port), only_if_different=True, update=False)
                         break
         return res
 

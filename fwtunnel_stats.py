@@ -148,7 +148,7 @@ def tunnel_stats_get():
 
 def get_if_addr_in_connected_tunnels(tunnel_stats=None):
     """
-    get set of addresses that are part of any connected interfaces
+    get set of addresses that are part of any connected tunnels
     : param tunnel_stat : statistics of tunnels.
     : return : set of IP addresses prt of connected interfaces
     """
@@ -156,10 +156,10 @@ def get_if_addr_in_connected_tunnels(tunnel_stats=None):
     if tunnel_stats == None:
         tunnel_stats = tunnel_stats_get()
     tunnels = fwglobals.g.router_cfg.get_tunnels()
-    for tunnel_id in tunnel_stats:
-        if tunnel_stats[tunnel_id].get('status') == 'up':
-            for tnl in tunnels:
-                if tnl['tunnel-id'] == tunnel_id:
-                    ip_up_set.add(tnl['src'])
-
+    for tunnel in tunnels:
+        tunnel_id = tunnel['tunnel-id']
+        for tnd_id in tunnel_stats:
+            if tunnel_stats.get(tunnel_id):
+                if tunnel_stats[tunnel_id].get('status') == 'up':
+                    ip_up_set.add(tunnel['src'])
     return ip_up_set
