@@ -70,19 +70,6 @@ class FwUnassignedIfs:
 
         return None
 
-    def _get_linux_pcis(self):
-        """ Get the list of all linux interfaces, according to their linux name.
-        Then it convert the name to PCI address, and add them to a list.
-        """
-        pci_list = []
-        interfaces = psutil.net_if_addrs()
-        for nicname, addrs in interfaces.items():
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr and pciaddr[0] == "":
-                continue
-            pci_list.append(pciaddr[0])
-        return pci_list
-
     def _get_assigned_interfaces(self):
         """ Get the list of assigned interfaces from the router-db. Those interfaces
         are already listed according to their PCI address, so we just add them to a
@@ -221,7 +208,7 @@ class FwUnassignedIfs:
         """
         res = ''
 
-        linux_pci_list    = self._get_linux_pcis()
+        linux_pci_list    = fwutils.get_linux_pcis()
         assigned_pci_list = self._get_assigned_interfaces()
 
         for pci in linux_pci_list:
