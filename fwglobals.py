@@ -105,8 +105,6 @@ request_handlers = {
     'exec':                         {'name': '_call_os_api'},
     'ifcount':                      {'name': '_call_os_api'},
     'ifstats':                      {'name': '_call_os_api'},
-    'connect_to_router':            {'name': '_call_os_api'},
-    'disconnect_from_router':       {'name': '_call_os_api'},
 
     # VPP API
     'abf_itf_attach_add_del':       {'name': '_call_vpp_api'},
@@ -369,6 +367,8 @@ class Fwglobals:
                 func = getattr(self, params['func'])
             elif params['object'] == 'fwglobals.g.router_api':
                 func = getattr(self.router_api, params['func'])
+            elif params['object'] == 'fwglobals.g.router_api.vpp_api':
+                func = getattr(self.router_api.vpp_api, params['func'])
             elif params['object'] == 'fwglobals.g.apps':
                 func = getattr(self.apps, params['func'])
             else:

@@ -43,8 +43,6 @@ os_api_defs = {
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
-    'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
 }
 
 class OS_DECODERS:
