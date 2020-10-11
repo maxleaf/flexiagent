@@ -144,9 +144,8 @@ class FwStunWrap:
             cached_addr['public_ip']        = params['PublicIP']
             cached_addr['public_port']      = params['PublicPort']
             cached_addr['success']          = True
-            cached_addr['stun_server']      = ''
-            cached_addr['stun_server_port'] = ''
-            cached_addr['nat_type']         = ''
+            # if we are here, it is because agent sent the data previously to flexiManage.
+            # In that case, the STUN server and port are already updated, no need to reset them.
             fwglobals.log.debug("adding address %s to Cache with public information" %(str(addr)))
 
         # 2 if address already in cache, do not add it, so its counters won't reset
@@ -237,9 +236,15 @@ class FwStunWrap:
         return self.local_cache['stun_interfaces'][address]
 
     def reset_all(self):
-        """ reset all data in the STUN cache for every interface.
+        """ reset all data in the STUN cache for every interface that is not part
+        of a connected tunnel. If the tunnel will get disconnected, it will add
+        the address back to the STUN cache and reset it.
         """
+        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels()
         for addr in self.local_cache['stun_interfaces']:
+            # Do not reset info on interface participating in a connected tunnel
+            if addr in ip_up_set:
+                continue
             self.initialize_addr(addr, False)
 
     def _increase_sec(self):
@@ -284,8 +289,6 @@ class FwStunWrap:
         cached_addr['public_port']      = p_port
         cached_addr['stun_server']      = st_host
         cached_addr['stun_server_port'] = st_port
-        # add the info to unassigned interfaces in their dedicated cache
-        fwglobals.g.unassigned_interfaces.update_public(address, p_ip, p_port)
 
     def _send_stun_request(self):
         """ Send STUN request for each address that has no public IP and port
@@ -298,7 +301,7 @@ class FwStunWrap:
         #now start sending STUN request
         for addr in self.local_cache['stun_interfaces'].keys():
             if self.local_cache['stun_interfaces'][addr]['success'] == True:
-                pass
+                continue
             else:
                 elem = self.local_cache['stun_interfaces'][addr]
                 if elem['sec_counter'] == elem['next_time']:

@@ -944,7 +944,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multicore_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multithread_support_requires_RSS(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -1081,10 +1081,12 @@ class Checker:
             conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
 
             if num_of_rx_queues_param:
-                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
-            num_of_rx_queues_param = 'num-rx-queues 0'
-            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
-
+                if conf['dpdk'].get(dev_default_key):
+                    self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
+                    num_of_rx_queues_param = 'num-rx-queues 0'
+                    conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
+                else:
+                    self._add_tup_to_dpdk(0)
             self.vpp_config_modified = True
             self.update_grub = True
             return True
@@ -1270,7 +1272,7 @@ class Checker:
         read_file  = open(grub_read_file, "r")
         write_file = open(grub_write_file, "w")
         for line in read_file:
-            if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
+            if prefix_val in line:
                 # no need to handle lines which are remarked
                 if line.startswith("#"):
                     write_file.write(line)
@@ -1289,12 +1291,10 @@ class Checker:
             add_grub_line = True
             # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
             val_line = grub_line.split('=\"')[1].strip()
-            # take the GRUB_CMDLINE_LINUX_DEFAULT part
-            prefix_val = grub_line.split('=\"')[0]
             val_line = val_line.strip('\" ')
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
-            #remove old values, if exist, so we can replace them with ourts
+            #remove old values, if exist, so we can replace them with ours
             results = []
             for elem in val_line_list:
                 if elem.startswith('iommu'):
