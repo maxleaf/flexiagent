@@ -1280,8 +1280,6 @@ class Checker:
                     #if line is found, remark it, and save its contents for later processing
                     grub_line_found = True
                     grub_line = line
-                    line = "# "+line
-                    write_file.write(line)
             else:
                 write_file.write(line)
 
