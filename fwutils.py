@@ -1563,3 +1563,13 @@ def compare_request_params(params1, params2):
             elif val1 != val2:
                 return False        # Values are not equal
     return True
+
+def check_if_virtual_environment():
+    vm = os.popen('lspci | grep -i -E vmware| grep -i -E System| grep -E -i peripheral"').read()
+    vb = os.popen('lspci | grep -i -E "virtualbox| grep -i -E system| grep -i -E peripheral"').read()
+
+    if vm =='' and vb == '':
+        return False
+    else:
+        return True
+

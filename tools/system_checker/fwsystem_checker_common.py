@@ -1256,12 +1256,16 @@ class Checker:
                         tmp = re.split('\s+', workers_param.strip())
                         num_of_workers_cores = int(tmp[1])
 
+        update_line = ''
         if num_of_workers_cores == 0:
             update_line = ''
-        elif num_of_workers_cores == 1:
-            update_line = 'iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1'
         else:
-            update_line = 'iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
+            if fwutils.check_if_virtual_environment() == True:
+                update_line += 'iommu=pt intel_iommu=on '
+            if num_of_workers_cores == 1:
+                update_line += 'isolcpus=1 nohz_full=1 rcu_nocbs=1'
+            else:
+                update_line += 'isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
         grub_read_file  = '/etc/default/grub'
         grub_write_file = '/etc/default/grub.tmp'
 
@@ -1280,6 +1284,8 @@ class Checker:
                     #if line is found, remark it, and save its contents for later processing
                     grub_line_found = True
                     grub_line = line
+                    line = "# "+line
+                    write_file.write(line)
             else:
                 write_file.write(line)
 
