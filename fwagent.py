@@ -639,7 +639,7 @@ def reset(soft=False):
     CEND = "\x1b[0m"
     choice = raw_input(CSTART + "Device must be deleted from the orchestrator before resetting the agent. " +
                       "Already deleted from orchestrator y/n [n]" + CEND)
-    if choice == 'y':
+    if choice == 'y' or choice == 'Y':
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)
         fwglobals.log.info("Done")
