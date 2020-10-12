@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
 import re
 
@@ -266,43 +267,22 @@ def add_interface(params):
     ospfd_file = fwglobals.g.FRR_OSPFD_FILE
     if 'routing' in params and params['routing'].lower() == 'ospf':
 
-        router_id = iface_addr.split('/')[0]    # Get rid of address length
+        # Create /etc/frr/ospfd.conf file if it does not exist yet
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "initialize %s with router id %s" % (ospfd_file, router_id)
-        cmd['cmd']['params']  = [
-            'sudo printf "' + \
-            'hostname ospfd\n' + \
-            'password zebra\n' + \
-            'log file /var/log/frr/ospfd.log informational\n' + \
-            'log stdout\n' + \
-            '!\n' + \
-            'router ospf\n' + \
-            '    ospf router-id ' + router_id + '\n' + \
-            '!\n' + \
-            '" > ' + ospfd_file ]
-        cmd['precondition'] = {}
-        cmd['precondition']['usage']   = "precondition"
-        cmd['precondition']['name']    = "exec"
-        cmd['precondition']['descr']   = "%s doesn't exists" % ospfd_file
-        cmd['precondition']['params']  = [ "! test -f %s" % ospfd_file ]
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "create ospfd file if needed"
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'frr_create_ospfd',
+                                    'args': {
+                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
+                                        'ospfd_cfg_file':   ospfd_file,
+                                        'router_id':        iface_addr.split('/')[0]   # Get rid of address length
+                                    }
+                                  }
         # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
         cmd_list.append(cmd)
-
-        # Ensure that ospfd is switched on in /etc/frr/daemons.
-        frr_filename = fwglobals.g.FRR_CONFIG_FILE
-        ospfd_status = os.popen('grep ospfd=no %s' % frr_filename).read()
-        if re.match('ospfd=no', ospfd_status):
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['params']  = [ 'sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_filename ]
-            cmd['cmd']['descr']   = "enable ospf daemon"
-            # There is no revert on purpose: we leave it always ON to simplify code.
-            # If there is no OSPF interfaces, frr will not send OSPF messages.
-            # Implement revert on demand :)
-            cmd_list.append(cmd)
 
         # Escape slash in address with length to prevent sed confusing
         addr = iface_addr.split('/')[0] + r"\/" + iface_addr.split('/')[1]
@@ -333,6 +313,42 @@ def add_interface(params):
         cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
+    return cmd_list
+
+def modify_interface(new_params, old_params):
+    """Generate commands to modify interface configuration in Linux and VPP
+
+    :param new_params:  The new configuration received from flexiManage.
+    :param old_params:  The current configuration of interface.
+
+    :returns: List of commands.
+    """
+    cmd_list = []
+
+    # For now we don't support real translation to command list.
+    # We just return empty list if new parameters have no impact on Linux or
+    # VPP, like PublicPort, and non-empty dummy list if parameters do have impact
+    # and translation is needed. In last case the modification will be performed
+    # by replacing modify-interface with pair of remove-interface & add-interface.
+    # I am an optimistic person, so I believe that hack will be removed at some
+    # point and real translation will be implemented.
+
+    # Remove all not impacting parameters from both new and old parameters and
+    # compare them. If they are same, no translation is needed.
+    #
+    not_impacting_params = [ 'PublicIP', 'PublicPort', 'useStun']
+    copy_old_params = copy.deepcopy(old_params)
+    copy_new_params = copy.deepcopy(new_params)
+
+    for param in not_impacting_params:
+        if param in copy_old_params:
+            del copy_old_params[param]
+        if param in copy_new_params:
+            del copy_new_params[param]
+
+    same = fwutils.compare_request_params(copy_new_params, copy_old_params)
+    if not same:    # There are different impacting parameters
+        cmd_list = [ 'stub' ]
     return cmd_list
 
 def get_request_key(params):

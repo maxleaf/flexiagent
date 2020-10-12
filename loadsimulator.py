@@ -23,14 +23,12 @@
 import threading
 import uuid
 import fwglobals
-import fwagent
 import random
 import time
 import json
 import websocket
 import fwutils
 import ssl
-import fwagent
 import traceback
 import signal
 import sys
@@ -54,8 +52,8 @@ class LoadSimulator:
         self.machine_ids = []
         self.simulate_stats = {'tx_pkts': 0, 'tx_bytes': 0, 'rx_bytes': 0, 'rx_pkts': 0}
         self.simulate_tunnel_stats = {"1": {"status": "up", "rtt": 10, "drop_rate": 0}}
-        self.interface_wan = 'GigabitEthernet0/8/0'
-        self.interface_lan = 'GigabitEthernet0/3/0'
+        self.interface_wan = '0000:00:03.00'
+        self.interface_lan = '0000:00:08.00'
         self.data = ''
         self.versions = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.thread_statistics = None
@@ -128,7 +126,7 @@ class LoadSimulator:
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
         header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
 
-        self.simulate_threads[self.simulate_id] = threading.Thread(target=fwagent.Fwagent().websocket_thread,
+        self.simulate_threads[self.simulate_id] = threading.Thread(target=self.agent.websocket_thread,
                                              name='Websocket Thread ' + str(self.simulate_id),
                                              args=(url, header_UserAgent, self.simulate_id))
         self.simulate_threads[self.simulate_id].start()
@@ -147,35 +145,36 @@ class LoadSimulator:
         """
         fwglobals.log.info("started in simulate mode")
 
-        with fwagent.FwAgent(handle_signals=False) as agent:
+        self.agent = fwglobals.g.initialize_agent()
+        self.enable(int(count))
 
-            self.enable(int(count))
+        # Generate temporary machine IDs
+        # -------------------------------------
+        for self.simulate_id in range(self.count()):
+            self.generate_machine_id()
+            if not self.started:
+                break
 
-            # Generate temporary machine IDs
+            # Register with Manager
             # -------------------------------------
-            for self.simulate_id in range(self.count()):
-                self.generate_machine_id()
-                if not self.started:
-                    break
+            while not self.agent.register() and self.started:
+                retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                fwglobals.log.info("retry registration in %d seconds" % retry_sec)
+                time.sleep(retry_sec)
 
-                # Register with Manager
-                # -------------------------------------
-                while not agent.register() and self.started:
-                    retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-                    fwglobals.log.info("retry registration in %d seconds" % retry_sec)
-                    time.sleep(retry_sec)
+        self.simulate_id = 0
+        for self.simulate_id in range(self.count()):
+            # Establish main connection to Manager
+            # and start infinite receive-send loop.
+            # -------------------------------------
+            if not self.started:
+                break
+            self.connect()
 
-            self.simulate_id = 0
-            for self.simulate_id in range(self.count()):
-                # Establish main connection to Manager
-                # and start infinite receive-send loop.
-                # -------------------------------------
-                if not self.started:
-                    break
-                self.connect()
+        while self.started is True:
+            time.sleep(1)
 
-            while self.started is True:
-                time.sleep(1)
+        self.agent = fwglobals.g.finalize_agent()
 
     def update_stats(self):
         """Update fake statistics.

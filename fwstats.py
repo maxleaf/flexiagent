@@ -158,7 +158,7 @@ def get_stats():
     res_update_list = list(updates_list)
     del updates_list[:]
 
-    reconfig = fwutils.get_reconfig_hash()
+    reconfig = fwglobals.g.unassigned_interfaces.get_reconfig_hash()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
@@ -167,6 +167,7 @@ def get_stats():
         status = True
         state = 'running'
         reason = ''
+        reconfig = ''
     else:
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()

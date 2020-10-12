@@ -177,6 +177,10 @@ class FwRouterCfg:
 
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
+            elif re.match('modify-', req):
+                entry = self.db[req_key]
+                entry.update({'params' : params})
+                self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
             else:
                 del self.db[req_key]
 
@@ -246,53 +250,6 @@ class FwRouterCfg:
         if req_key in self.db:
             return self.db[req_key].get('params')
         return None
-
-    def are_params_equal(self, params1, params2):
-        """ Compares two dictionaries while normalizing them for comparison
-        and ignoring orphan keys that have None or empty string value.
-            The orphans keys are keys that present in one dict and don't
-        present in the other dict, thanks to Scooter Software Co. for the term :)
-            We need this function to pay for bugs in flexiManage code, where
-        is provides add-/modify-/remove-X requests for same configuration
-        item with inconsistent letter case, None/empty string,
-        missing parameters, etc.
-            Note! The normalization is done for top level keys only!
-        """
-        if not params1 or not params2:
-            return False
-        if type(params1) != type(params2):
-            return False
-        if type(params1) != dict:
-            return (params1 == params2)
-
-        set_keys1   = set(params1.keys())
-        set_keys2   = set(params2.keys())
-        keys1_only  = list(set_keys1 - set_keys2)
-        keys2_only  = list(set_keys2 - set_keys1)
-        keys_common = set_keys1.intersection(set_keys2)
-
-        for key in keys1_only:
-            if not params1[key]:
-                # params1 has non-empty string/value that does not present in params2
-                return False
-
-        for key in keys2_only:
-            if not params2[key]:
-                # params2 has non-empty string/value that does not present in params1
-                return False
-
-        for key in keys_common:
-            val1 = params1[key]
-            val2 = params2[key]
-            if val1 and val2:   # Both values are neither None-s nor empty strings.
-                if type(val1) != type(val2):
-                    return False        # Not comparable types
-                if type(val1) == str:
-                    if val1.lower() != val2.lower():
-                        return False    # Strings are not equal
-                elif val1 != val2:
-                    return False        # Values are not equal
-        return True
 
     def is_same_cfg_item(self, request1, request2):
         """Checks if provided requests stand for the same configuration item.
@@ -558,7 +515,7 @@ class FwRouterCfg:
                 #
                 dumped_params = dumped_request.get('params')
                 input_params  = input_requests[dumped_key].get('params')
-                if self.are_params_equal(dumped_params, input_params):
+                if fwutils.compare_request_params(dumped_params, input_params):
                     # The configuration item has exactly same parameters.
                     # It does not require sync, so remove it from input list.
                     #
@@ -597,4 +554,25 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
+
+    def get_interface_public_addresses(self):
+        """
+        builds a list of WAN interfaces from router DB. if 'useStun' does not exist or False,
+        do not add this interface to the list.
+        : return : list if WAN interfaces from router DB
+        """
+        addr_list = []
+        wan_list = self.get_interfaces(type='wan')
+        for wan in wan_list:
+            if wan.get('gateway', '') == '':
+                continue
+            elif wan.get('useStun', False) == False:
+                continue
+            else:
+                entry = {}
+                entry['address']     = wan.get('addr').split('/')[0]
+                entry['public_ip']   = wan.get('PublicIP','')
+                entry['public_port'] = wan.get('PublicPort','')
+                addr_list.append(entry)
+        return addr_list
 

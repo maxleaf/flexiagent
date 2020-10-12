@@ -11,8 +11,6 @@ sys.path.append(globals)
 import fwglobals
 
 __version__ = '1.0.0'
-#logging.basicConfig(filename='/etc/flexiwan/agent/pystun3.log',level=logging.DEBUG)
-#log = logging.getLogger("pystun3")
 
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
@@ -231,7 +229,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
             if stop_after_one_try == True:
                 break
     if not resp:
-        return Blocked, ret, None, None
+        return Blocked, ret, '', ''
     fwglobals.log.debug("Stun: Result: %s" %(ret))
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
@@ -301,13 +299,14 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         fwglobals.log.debug("get_ip_info, binding to %s:%d" %(source_ip, source_port))
         s.bind((source_ip, source_port))
     except Exception as e:
-        fwglobals.log.error("Got exception from bind: %s, %s" % (str(e), str(traceback.format_exc())))
+        fwglobals.log.debug("get_ip_info: bind: %s" % str(e))
         s.close()
-        return (None, None, None, None, None)
+        return ('', '', '', '', '')
     else:
         nat_type, nat, stun_h, stun_p = get_nat_type(s, source_ip, source_port,
                                  stun_host=stun_host, stun_port=stun_port, stop_after_one_try=stop_after_one_try)
-        external_ip = nat['ExternalIP']
-        external_port = nat['ExternalPort']
+        external_ip = nat['ExternalIP'] if nat['ExternalIP'] != None else ''
+        external_port = nat['ExternalPort'] if nat['ExternalPort'] != None else ''
         s.close()
+        nat_type = '' if nat_type == None else nat_type
         return (nat_type, external_ip, external_port, stun_h, stun_p)

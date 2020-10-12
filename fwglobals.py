@@ -39,6 +39,7 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
+from fwunassigned_if import FwUnassignedIfs
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -102,14 +103,8 @@ request_handlers = {
     'interfaces':                   {'name': '_call_os_api'},
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
-    'savefile':                     {'name': '_call_os_api'},
-    'pcisub':                       {'name': '_call_os_api'},
-    'tapsub':                       {'name': '_call_os_api'},
-    'gresub':                       {'name': '_call_os_api'},
     'ifcount':                      {'name': '_call_os_api'},
     'ifstats':                      {'name': '_call_os_api'},
-    'connect_to_router':            {'name': '_call_os_api'},
-    'disconnect_from_router':       {'name': '_call_os_api'},
 
     # VPP API
     'abf_itf_attach_add_del':       {'name': '_call_vpp_api'},
@@ -222,14 +217,17 @@ class Fwglobals:
         self.FWAGENT_DAEMON_HOST = '127.0.0.1'
         self.FWAGENT_DAEMON_PORT = 9090
         self.FWAGENT_DAEMON_URI  = 'PYRO:%s@%s:%d' % (self.FWAGENT_DAEMON_NAME, self.FWAGENT_DAEMON_HOST, self.FWAGENT_DAEMON_PORT)
-        self.WS_STATUS_CODE_NOT_APPROVED = 403
-        self.WS_STATUS_DEVICE_CHANGE     = 900
-        self.WS_STATUS_LOCAL_ERROR       = 999
+        self.WS_STATUS_ERROR_NOT_APPROVED = 403
+        self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
+        self.WS_STATUS_OK                 = 1000
+        self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
         # Cache to save various global data
         self.AGENT_CACHE = {}
         # PCI to VPP names, assuming names and PCI are unique and not changed during operation
         self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
         self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
+        self.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
+        self.AGENT_CACHE['PCIS'] = []
         self.fwagent = None
 
         # Load configuration from file
@@ -279,7 +277,7 @@ class Fwglobals:
         if self.fwagent:
             global log
             log.warning('Fwglobals.initialize_agent: agent exists')
-            return
+            return self.fwagent
 
         self.fwagent       = FwAgent(handle_signals=False)
         self.router_cfg    = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
@@ -289,8 +287,12 @@ class Fwglobals:
         self.apps          = FwApps(self.APP_REC_DB_FILE)
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper  = FwStunWrap()
+        self.unassigned_interfaces = FwUnassignedIfs()
+        self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
+
+        return self.fwagent
 
     def finalize_agent(self):
         """Destructor method
@@ -298,11 +300,13 @@ class Fwglobals:
         if not self.fwagent:
             global log
             log.warning('Fwglobals.finalize_agent: agent does not exists')
-            return
+            return None
 
+        self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+        del self.unassigned_interfaces
         del self.stun_wrapper
         del self.apps
         del self.policies
@@ -311,6 +315,7 @@ class Fwglobals:
         del self.agent_api
         del self.fwagent
         self.fwagent = None
+        return None
 
     def __str__(self):
         """Get string representation of configuration.
@@ -367,6 +372,8 @@ class Fwglobals:
                 func = getattr(self, params['func'])
             elif params['object'] == 'fwglobals.g.router_api':
                 func = getattr(self.router_api, params['func'])
+            elif params['object'] == 'fwglobals.g.router_api.vpp_api':
+                func = getattr(self.router_api.vpp_api, params['func'])
             elif params['object'] == 'fwglobals.g.apps':
                 func = getattr(self.apps, params['func'])
             else:
@@ -440,10 +447,9 @@ class Fwglobals:
             else:
                 reply = handler_func(request, result)
             if reply['ok'] == 0:
-                if 'usage' in params and params['usage'] != 'precondition':  # Don't generate error if precondition fails
-                    myCmd = 'sudo vppctl api trace save error.api'
-                    os.system(myCmd)
-                    raise Exception(reply['message'])
+                myCmd = 'sudo vppctl api trace save error.api'
+                os.system(myCmd)
+                raise Exception(reply['message'])
 
             # On router configuration request, e.g. add-interface,
             # remove-tunnel, etc. update the configuration database

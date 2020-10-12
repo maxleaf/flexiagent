@@ -62,7 +62,7 @@ def test():
         assert vpp_pid_after != vpp_pid_before, "pid before kill %s, pid after kill %s" % (vpp_pid_before, vpp_pid_after)
 
         # Ensure that restore finished
-        restored = agent.wait_log_line("restore finished", timeout=10)
+        restored = agent.wait_log_line("restore finished", timeout=40)
         assert restored
 
         # Ensure that configuration was restored

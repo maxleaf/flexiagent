@@ -49,6 +49,7 @@ from fw_vpp_startupconf import FwStartupConf
 from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
 from fwmultilink    import FwMultilink
+from fwpolicies     import FwPolicies
 
 
 dpdk = __import__('dpdk-devbind')
@@ -211,22 +212,16 @@ def get_linux_interface_gateway(if_name):
     :returns: Gateway ip address.
     """
     try:
-        dgw = os.popen('ip route list match default | grep via').read()
+        cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
+        route = os.popen(cmd).read()
+        if not route:
+            return '', ''
     except:
         return '', ''
 
-    routes = dgw.splitlines()
-    for route in routes:
-        metric = ''
-        rip = route.split('via ')[1].split(' ')[0]
-        rdev = route.split('dev ')[1].split(' ')[0]
-        metric_str = route.split('metric ')
-        if len(metric_str) > 1:
-            metric = route.split('metric ')[1].split(' ')[0]
-        if re.match(if_name, rdev):
-            return rip, metric
-
-    return '', ''
+    rip    = route.split('via ')[1].split(' ')[0]
+    metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
+    return rip, metric
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -284,6 +279,19 @@ def pci_full_to_short(pci):
     if len(l[1]) == 2 and l[1][0] == '0':
         pci = l[0] + '.' + l[1][1]
     return pci
+
+def get_linux_pcis():
+    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """
+    pci_list = fwglobals.g.get_cache_data('PCIS')
+    if not pci_list:
+        interfaces = psutil.net_if_addrs()
+        for (nicname, _) in interfaces.items():
+            pciaddr = linux_to_pci_addr(nicname)
+            if pciaddr and pciaddr[0] == "":
+                continue
+            pci_list.append(pciaddr[0])
+    return pci_list
 
 def linux_to_pci_addr(linuxif):
     """Convert Linux interface name into PCI address.
@@ -523,14 +531,21 @@ def pci_to_vpp_sw_if_index(pci):
 def pci_to_tap(pci):
     """Convert PCI address into TAP name.
 
-     :param pci:      PCI address.
+    :param pci:      PCI address.
 
-     :returns: Linux TAP interface name.
-     """
+    :returns: Linux TAP interface name.
+    """
+    cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+    tap = cache.get(pci)
+    if tap:
+        return tap
+
     vpp_if_name = pci_to_vpp_if_name(pci)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
+    if tap:
+        cache[pci] = tap
     return tap
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
@@ -608,47 +623,6 @@ def vpp_ip_to_sw_if_index(ip):
             if network == int_address:
                 return sw_if.sw_if_index
 
-def save_file(txt, fname, dir='/tmp'):
-    """Save txt to file under a dir (default = /tmp)
-
-     :param txt:      Text.
-     :param fname:    File name.
-     :param dir:      Folder path.
-
-     :returns: Error message and status code.
-     """
-    # Make sure fname doesn't include /
-    #print ("fname="+fname+", txt="+txt+", dir="+dir)
-    if not (isinstance(fname, str) or isinstance(fname, unicode)) or fname.find('/') != -1:
-        return {'message':'File name error', 'ok':0}
-    datapath = os.path.join(dir, fname)
-    if os.path.exists(dir):
-        with open(datapath, 'w') as fout:
-            fout.write(txt)
-        return {'message':'File written', 'ok':1}
-    else:
-        return {'message':'Directory not exist', 'ok':0}
-
-def _sub_file(fname, smap):
-    """Replace words in file.
-
-    :param fname:     File name.
-    :param smap:      Dictionary with original and new words.
-
-    :returns: Error message and status code.
-    """
-    if os.path.exists(fname):
-        with open(fname, "r") as sfile:
-            data = sfile.readlines()
-        txt = ''.join(data)
-        for k,v in smap.items():
-            txt = txt.replace(k,v)
-        with open(fname, "w") as sfile:
-            sfile.write(txt)
-        return {'message':'File substituted', 'ok':1}
-    else:
-        return {'message':'File does not exist', 'ok':0}
-
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
 
@@ -685,27 +659,6 @@ def _vppctl_read(cmd, wait=True):
         return None
     return data
 
-def tap_sub_file(fname):
-    """Substitute a file with tap VPP names.
-
-    :param fname:      File name.
-
-    :returns: Error message and status code.
-    """
-    taps = _vppctl_read('sh tap-inject')
-    if taps == None:
-        return {'message':'Tap read error', 'ok':0}
-    if_map = {}
-    tap_split = taps.split('\r\n')[:-1]
-    if len(tap_split) == 0:
-        return {'message':'No taps found', 'ok':0}
-    for m in tap_split:
-        ifs = m.split(' -> ')
-        if len(ifs) != 2:
-            return {'message':'Tap mapping error', 'ok':0}
-        if_map[ifs[0]] = ifs[1]
-    return _sub_file(fname, if_map)
-
 def _parse_vppname_map(s, valregex, keyregex):
     """Find key and value in a string using regex.
 
@@ -725,58 +678,6 @@ def _parse_vppname_map(s, valregex, keyregex):
     else: return (None, None)   # key not found, don't add and return
     # Return values
     return (key_data, val_data)
-
-def pci_sub_file(fname):
-    """Substitute a file with pci address to VPP names.
-
-    :param fname:      File name.
-
-    :returns: Error message and status code.
-    """
-    shif = _vppctl_read('show hardware-interfaces')
-    shif_vmxnet3 = _vppctl_read('show vmxnet3')
-    if shif == None or shif_vmxnet3 == None:
-        return {'message':'Error reading interface info', 'ok':0}
-    data = shif.splitlines()
-    datav = shif_vmxnet3.splitlines()
-    pci_map = {}
-    for intf in _get_group_delimiter(data, r"^\w.*?\d"):
-        # Contains data for a given interface
-        ifdata = ''.join(intf)
-        (k,v) = _parse_vppname_map(ifdata,
-            valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
-            keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
-        if k and v: pci_map[pci_addr_full(k)] = v
-    for intf in _get_group_delimiter(datav, r"^Interface:\s\w.*?\d"):
-        # Contains data for a given interface
-        ifdata = '\n'.join(intf)
-        (k,v) = _parse_vppname_map(ifdata,
-            valregex=r"^Interface:\s(\w[^\s]+)\s+",
-            keyregex=r"\s+PCI\sAddress:\s(.*)")
-        if k and v: pci_map[pci_addr_full(k)] = v
-
-    return _sub_file(fname, pci_map)
-
-def gre_sub_file(fname):
-    """Substitute a file with tunnels to VPP names.
-
-    :param fname:      File name.
-
-    :returns: Error message and status code.
-    """
-    shtun = _vppctl_read('show ipsec gre tunnel')
-    if shtun == None:
-        return {'message':'Error reading tunnel info', 'ok':0}
-    data = shtun.splitlines()
-    tres = {}
-    for tunnel in _get_group_delimiter(data, r"^\[\d+\].*"):
-        # Contains data for a given tunnel
-        tunneldata = '\n'.join(tunnel)
-        (k,v) = _parse_vppname_map(tunneldata,
-                       valregex=r"^\[(\d+)\].*local-sa",
-                       keyregex=r"^\[\d+\].*local-sa\s(\d+)\s")
-        if k and v: tres["ipsec-gre-"+k] = "ipsec-gre" + v
-    return _sub_file(fname, tres)
 
 def stop_vpp():
     """Stop VPP and rebind Linux interfaces.
@@ -808,21 +709,7 @@ def stop_vpp():
                 dpdk.bind_one(dpdk.devices[d]["Slot"], drv, False)
                 break
     fwstats.update_state(False)
-    os.system('sudo netplan apply')
-
-def connect_to_router():
-    """Connect to VPP Python API.
-
-     :returns: None.
-     """
-    fwglobals.g.router_api.vpp_api.connect()
-
-def disconnect_from_router():
-    """Disconnect from VPP Python API.
-
-     :returns: None.
-     """
-    fwglobals.g.router_api.vpp_api.disconnect()
+    netplan_apply('stop_vpp')
 
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.
@@ -845,6 +732,8 @@ def reset_router_config():
         db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
+    with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
+        db_policies.clean()
     fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
@@ -1115,13 +1004,14 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
 def vpp_startup_conf_add_nat(vpp_config_filename):
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
-    tup = p.create_element('nat')
-    config.append(tup)
-    config['nat'].append(p.create_element('endpoint-dependent'))
-    config['nat'].append(p.create_element('translation hash buckets 1048576'))
-    config['nat'].append(p.create_element('translation hash memory 268435456'))
-    config['nat'].append(p.create_element('user hash buckets 1024'))
-    config['nat'].append(p.create_element('max translations per user 10000'))
+    if config['nat'] == None:
+        tup = p.create_element('nat')
+        config.append(tup)
+        config['nat'].append(p.create_element('endpoint-dependent'))
+        config['nat'].append(p.create_element('translation hash buckets 1048576'))
+        config['nat'].append(p.create_element('translation hash memory 268435456'))
+        config['nat'].append(p.create_element('user hash buckets 1024'))
+        config['nat'].append(p.create_element('max translations per user 10000'))
 
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
@@ -1396,44 +1286,6 @@ def get_interface_gateway(ip):
     pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ipaddress.ip_address(gw_ip)
 
-def get_reconfig_hash():
-    res = ''
-    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
-    if len(wan_list) == 0:
-        return res
-        
-    vpp_run = vpp_does_run()
-    for wan in wan_list:
-        name = pci_to_linux_iface(wan['pci'])
-
-        if name is None and vpp_run:
-            name = pci_to_tap(wan['pci'])
-
-        if name is None:
-            return ''
-
-        addr = get_interface_address(name)
-        if addr != None:
-            if not re.search(addr, wan['addr']):
-                res += 'addr:' + addr + ','
-
-        gw, metric = get_linux_interface_gateway(name)
-        if not re.match(gw, wan['gateway']):
-            res += 'gw:' + gw + ','
-
-        if addr:
-            nomaskaddr = addr.split('/')[0]
-            public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
-            if public_ip and public_port:
-                res += 'public_ip:' + public_ip + ',' + 'public_port:' + str(public_port) + ','
-
-    if res:
-        fwglobals.log.info('get_reconfig_hash: %s' % res)
-        hash = hashlib.md5(res).hexdigest()
-        return hash
-
-    return ''
-
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 
@@ -1627,9 +1479,112 @@ def fix_aggregated_message_format(msg):
                 'params' : { 'requests': requests }
             }
 
+    # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
+    #
+    if msg['message'] == 'aggregated':
+        requests = [r for r in msg['params']['requests'] if r]
+        return \
+            {
+                'message': 'aggregated',
+                'params' : { 'requests': requests }
+            }
+
     # No conversion is needed here.
     # We return copy of object in order to be consistent with previous 'return'-s
     # which return new object. The caller function might rely on this,
     # e.g. see the fwglobals.g.handle_request() assumes
     #
     return copy.deepcopy(msg)
+
+def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
+    '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
+    ensures that ospf is switched on in the frr configuration'''
+
+    if os.path.exists(ospfd_cfg_file):
+        return
+
+    # Initialize ospfd.conf
+    with open(ospfd_cfg_file,"w") as f:
+        file_write_and_flush(f,
+            'hostname ospfd\n' + \
+            'password zebra\n' + \
+            'log file /var/log/frr/ospfd.log informational\n' + \
+            'log stdout\n' + \
+            '!\n' + \
+            'router ospf\n' + \
+            '    ospf router-id ' + router_id + '\n' + \
+            '!\n')
+
+    # Ensure that ospfd is switched on in /etc/frr/daemons.
+    subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
+
+def file_write_and_flush(f, data):
+    '''Wrapper over the f.write() method that flushes wrote content
+    into the disk immediately
+
+    :param f:       the python file object
+    :param data:    the data to write into file
+    '''
+    f.write(data)
+    f.flush()
+    os.fsync(f.fileno())
+
+def netplan_apply(caller_name=None):
+    '''Wrapper over the f.write() method that flushes wrote content
+    into the disk immediately
+
+    :param f:       the python file object
+    :param data:    the data to write into file
+    '''
+    cmd = 'netplan apply'
+    log_str = caller_name + ': ' + cmd if caller_name else cmd
+    fwglobals.log.debug(log_str)
+    os.system(cmd)
+    time.sleep(1)  # Give a second to Linux to configure interfaces
+
+def compare_request_params(params1, params2):
+    """ Compares two dictionaries while normalizing them for comparison
+    and ignoring orphan keys that have None or empty string value.
+        The orphans keys are keys that present in one dict and don't
+    present in the other dict, thanks to Scooter Software Co. for the term :)
+        We need this function to pay for bugs in flexiManage code, where
+    is provides add-/modify-/remove-X requests for same configuration
+    item with inconsistent letter case, None/empty string,
+    missing parameters, etc.
+        Note! The normalization is done for top level keys only!
+    """
+    if not params1 or not params2:
+        return False
+    if type(params1) != type(params2):
+        return False
+    if type(params1) != dict:
+        return (params1 == params2)
+
+    set_keys1   = set(params1.keys())
+    set_keys2   = set(params2.keys())
+    keys1_only  = list(set_keys1 - set_keys2)
+    keys2_only  = list(set_keys2 - set_keys1)
+    keys_common = set_keys1.intersection(set_keys2)
+
+    for key in keys1_only:
+        if type(params1[key]) == bool or params1[key]:
+            # params1 has non-empty string/value that does not present in params2
+            return False
+
+    for key in keys2_only:
+        if type(params2[key]) == bool or params2[key]:
+            # params2 has non-empty string/value that does not present in params1
+            return False
+
+    for key in keys_common:
+        val1 = params1[key]
+        val2 = params2[key]
+        if val1 and val2:   # Both values are neither None-s nor empty strings.
+            if type(val1) != type(val2):
+                return False        # Not comparable types
+            if type(val1) == str:
+                if val1.lower() != val2.lower():
+                    return False    # Strings are not equal
+            elif val1 != val2:
+                return False        # Values are not equal
+    return True
