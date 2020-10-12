@@ -1094,7 +1094,7 @@ if __name__ == '__main__':
     fwglobals.initialize()
     loadsimulator.initialize()
 
-    command_funcs = {
+    command_functions = {
                     'version':lambda args: version(),
                     'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
@@ -1165,4 +1165,4 @@ if __name__ == '__main__':
         fwglobals.log.set_target(to_syslog=True, to_terminal=False)
 
     fwglobals.log.debug("---> exec " + str(args), to_terminal=False)
-    command_funcs[args.command](args)
+    command_functions[args.command](args)

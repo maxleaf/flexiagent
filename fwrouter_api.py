@@ -34,6 +34,7 @@ import fwagent
 import fwglobals
 import fwutils
 import fwnetplan
+import fwtranslate_add_tunnel
 
 from fwapplications import FwApps
 from fwmultilink import FwMultilink
@@ -434,6 +435,8 @@ class FWROUTER_API:
         except Exception as e:
             err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
+            if req == 'start-router':
+                self._set_router_failure('failed to start router')
             raise e
 
         return {'ok':1}
@@ -1078,21 +1081,27 @@ class FWROUTER_API:
             self.thread_dhcpc.join()
             self.thread_dhcpc = None
 
-    def _on_start_router(self):
-        """Handles post start VPP activities.
+    def _on_start_router_before(self):
+        """Handles pre start VPP activities.
         :returns: None.
         """
-
-        # Reset failure state before start- hopefully we will succeed.
-        # On no luck the start will set failure again
+        # Reset failure state - hopefully we will succeed.
+        # On no luck the failure will be recorded again.
         #
         self._unset_router_failure()
 
+        fwtranslate_add_tunnel.init_tunnels()
+
+
+    def _on_start_router_after(self):
+        """Handles post start VPP activities.
+        :returns: None.
+        """
         self.router_started = True
         self._start_threads()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
-    def _on_stop_router(self):
+    def _on_stop_router_before(self):
         """Handles pre-VPP stop activities.
         :returns: None.
         """
@@ -1126,10 +1135,10 @@ class FWROUTER_API:
 
         :returns: None.
         """
-        if self.router_failure:
-            self.router_failure = False
-            if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
-                os.remove(fwglobals.g.ROUTER_STATE_FILE)
+        fwglobals.log.debug("_unset_router_failure")
+        self.router_failure = False
+        if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
+            os.remove(fwglobals.g.ROUTER_STATE_FILE)
 
     def _test_router_failure(self):
         """Get router failure state.
