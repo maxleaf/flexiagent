@@ -1478,6 +1478,16 @@ def fix_aggregated_message_format(msg):
                 'params' : { 'requests': requests }
             }
 
+    # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
+    #
+    if msg['message'] == 'aggregated':
+        requests = [r for r in msg['params']['requests'] if r]
+        return \
+            {
+                'message': 'aggregated',
+                'params' : { 'requests': requests }
+            }
+
     # No conversion is needed here.
     # We return copy of object in order to be consistent with previous 'return'-s
     # which return new object. The caller function might rely on this,
