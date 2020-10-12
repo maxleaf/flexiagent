@@ -111,9 +111,9 @@ class FWROUTER_API:
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
                     fwglobals.log.debug("watchdog: initiate restore")
 
-                    self.vpp_api.disconnect()   # Reset connection to vpp to force connection renewal
-                    self.router_started = False # Reset state so configuration will applied correctly (no simulated remove-X-s)
-                    self._restore_vpp()         # Rerun VPP and apply configuration
+                    self.vpp_api.disconnect_from_vpp()      # Reset connection to vpp to force connection renewal
+                    self.router_started = False             # Reset state so configuration will applied correctly
+                    self._restore_vpp()                     # Rerun VPP and apply configuration
 
                     fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
