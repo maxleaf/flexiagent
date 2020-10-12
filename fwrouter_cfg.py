@@ -562,7 +562,7 @@ class FwRouterCfg:
         : return : list if WAN interfaces from router DB
         """
         addr_list = []
-        wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+        wan_list = self.get_interfaces(type='wan')
         for wan in wan_list:
             if wan.get('gateway', '') == '':
                 continue
@@ -570,9 +570,9 @@ class FwRouterCfg:
                 continue
             else:
                 entry = {}
-                address              = wan.get('addr')
-                entry['address']     = address.split('/')[0]
+                entry['address']     = wan.get('addr').split('/')[0]
                 entry['public_ip']   = wan.get('PublicIP','')
                 entry['public_port'] = wan.get('PublicPort','')
                 addr_list.append(entry)
         return addr_list
+

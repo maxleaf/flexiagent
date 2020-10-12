@@ -73,7 +73,7 @@ class FwagentCli:
             # If we used local instance of Fwagent and not daemon, kill it.
             # Otherwise we might hang up in vpp watchdog,
             # if router was started by cli execution.
-            fwglobals.g.finalize_agent()
+            self.agent = fwglobals.g.finalize_agent()
 
     def run_loop(self):
         while True:

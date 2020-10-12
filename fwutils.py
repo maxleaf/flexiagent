@@ -211,22 +211,16 @@ def get_linux_interface_gateway(if_name):
     :returns: Gateway ip address.
     """
     try:
-        dgw = os.popen('ip route list match default | grep via').read()
+        cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
+        route = os.popen(cmd).read()
+        if not route:
+            return '', ''
     except:
         return '', ''
 
-    routes = dgw.splitlines()
-    for route in routes:
-        metric = ''
-        rip = route.split('via ')[1].split(' ')[0]
-        rdev = route.split('dev ')[1].split(' ')[0]
-        metric_str = route.split('metric ')
-        if len(metric_str) > 1:
-            metric = route.split('metric ')[1].split(' ')[0]
-        if re.match(if_name, rdev):
-            return rip, metric
-
-    return '', ''
+    rip    = route.split('via ')[1].split(' ')[0]
+    metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
+    return rip, metric
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -284,6 +278,19 @@ def pci_full_to_short(pci):
     if len(l[1]) == 2 and l[1][0] == '0':
         pci = l[0] + '.' + l[1][1]
     return pci
+
+def get_linux_pcis():
+    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """
+    pci_list = fwglobals.g.get_cache_data('PCIS')
+    if not pci_list:
+        interfaces = psutil.net_if_addrs()
+        for (nicname, _) in interfaces.items():
+            pciaddr = linux_to_pci_addr(nicname)
+            if pciaddr and pciaddr[0] == "":
+                continue
+            pci_list.append(pciaddr[0])
+    return pci_list
 
 def linux_to_pci_addr(linuxif):
     """Convert Linux interface name into PCI address.
@@ -523,14 +530,21 @@ def pci_to_vpp_sw_if_index(pci):
 def pci_to_tap(pci):
     """Convert PCI address into TAP name.
 
-     :param pci:      PCI address.
+    :param pci:      PCI address.
 
-     :returns: Linux TAP interface name.
-     """
+    :returns: Linux TAP interface name.
+    """
+    cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+    tap = cache.get(pci)
+    if tap:
+        return tap
+
     vpp_if_name = pci_to_vpp_if_name(pci)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
+    if tap:
+        cache[pci] = tap
     return tap
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
@@ -1458,6 +1472,16 @@ def fix_aggregated_message_format(msg):
                     'params' : params
                 })
 
+        return \
+            {
+                'message': 'aggregated',
+                'params' : { 'requests': requests }
+            }
+
+    # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
+    #
+    if msg['message'] == 'aggregated':
+        requests = [r for r in msg['params']['requests'] if r]
         return \
             {
                 'message': 'aggregated',

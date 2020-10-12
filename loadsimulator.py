@@ -57,7 +57,6 @@ class LoadSimulator:
         self.data = ''
         self.versions = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.thread_statistics = None
-        self.agent = fwglobals.g.initialize_agent()
 
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT,  self._signal_handler)
@@ -146,6 +145,7 @@ class LoadSimulator:
         """
         fwglobals.log.info("started in simulate mode")
 
+        self.agent = fwglobals.g.initialize_agent()
         self.enable(int(count))
 
         # Generate temporary machine IDs
@@ -173,6 +173,8 @@ class LoadSimulator:
 
         while self.started is True:
             time.sleep(1)
+
+        self.agent = fwglobals.g.finalize_agent()
 
     def update_stats(self):
         """Update fake statistics.

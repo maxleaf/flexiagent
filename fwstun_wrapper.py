@@ -144,7 +144,7 @@ class FwStunWrap:
             cached_addr['public_ip']        = params['PublicIP']
             cached_addr['public_port']      = params['PublicPort']
             cached_addr['success']          = True
-            # if we are here, it is because agent sent the data previously to Fleximanage.
+            # if we are here, it is because agent sent the data previously to flexiManage.
             # In that case, the STUN server and port are already updated, no need to reset them.
             fwglobals.log.debug("adding address %s to Cache with public information" %(str(addr)))
 
