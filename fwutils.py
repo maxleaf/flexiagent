@@ -211,22 +211,16 @@ def get_linux_interface_gateway(if_name):
     :returns: Gateway ip address.
     """
     try:
-        dgw = os.popen('ip route list match default | grep via').read()
+        cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
+        route = os.popen(cmd).read()
+        if not route:
+            return '', ''
     except:
         return '', ''
 
-    routes = dgw.splitlines()
-    for route in routes:
-        metric = ''
-        rip = route.split('via ')[1].split(' ')[0]
-        rdev = route.split('dev ')[1].split(' ')[0]
-        metric_str = route.split('metric ')
-        if len(metric_str) > 1:
-            metric = route.split('metric ')[1].split(' ')[0]
-        if re.match(if_name, rdev):
-            return rip, metric
-
-    return '', ''
+    rip    = route.split('via ')[1].split(' ')[0]
+    metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
+    return rip, metric
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -284,6 +278,19 @@ def pci_full_to_short(pci):
     if len(l[1]) == 2 and l[1][0] == '0':
         pci = l[0] + '.' + l[1][1]
     return pci
+
+def get_linux_pcis():
+    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """
+    pci_list = fwglobals.g.get_cache_data('PCIS')
+    if not pci_list:
+        interfaces = psutil.net_if_addrs()
+        for (nicname, _) in interfaces.items():
+            pciaddr = linux_to_pci_addr(nicname)
+            if pciaddr and pciaddr[0] == "":
+                continue
+            pci_list.append(pciaddr[0])
+    return pci_list
 
 def linux_to_pci_addr(linuxif):
     """Convert Linux interface name into PCI address.
@@ -523,14 +530,21 @@ def pci_to_vpp_sw_if_index(pci):
 def pci_to_tap(pci):
     """Convert PCI address into TAP name.
 
-     :param pci:      PCI address.
+    :param pci:      PCI address.
 
-     :returns: Linux TAP interface name.
-     """
+    :returns: Linux TAP interface name.
+    """
+    cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+    tap = cache.get(pci)
+    if tap:
+        return tap
+
     vpp_if_name = pci_to_vpp_if_name(pci)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
+    if tap:
+        cache[pci] = tap
     return tap
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
@@ -695,20 +709,6 @@ def stop_vpp():
                 break
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
-
-def connect_to_router():
-    """Connect to VPP Python API.
-
-     :returns: None.
-     """
-    fwglobals.g.router_api.vpp_api.connect()
-
-def disconnect_from_router():
-    """Disconnect from VPP Python API.
-
-     :returns: None.
-     """
-    fwglobals.g.router_api.vpp_api.disconnect()
 
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.
@@ -1478,6 +1478,16 @@ def fix_aggregated_message_format(msg):
                 'params' : { 'requests': requests }
             }
 
+    # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
+    #
+    if msg['message'] == 'aggregated':
+        requests = [r for r in msg['params']['requests'] if r]
+        return \
+            {
+                'message': 'aggregated',
+                'params' : { 'requests': requests }
+            }
+
     # No conversion is needed here.
     # We return copy of object in order to be consistent with previous 'return'-s
     # which return new object. The caller function might rely on this,
@@ -1530,3 +1540,50 @@ def netplan_apply(caller_name=None):
     fwglobals.log.debug(log_str)
     os.system(cmd)
     time.sleep(1)  # Give a second to Linux to configure interfaces
+
+def compare_request_params(params1, params2):
+    """ Compares two dictionaries while normalizing them for comparison
+    and ignoring orphan keys that have None or empty string value.
+        The orphans keys are keys that present in one dict and don't
+    present in the other dict, thanks to Scooter Software Co. for the term :)
+        We need this function to pay for bugs in flexiManage code, where
+    is provides add-/modify-/remove-X requests for same configuration
+    item with inconsistent letter case, None/empty string,
+    missing parameters, etc.
+        Note! The normalization is done for top level keys only!
+    """
+    if not params1 or not params2:
+        return False
+    if type(params1) != type(params2):
+        return False
+    if type(params1) != dict:
+        return (params1 == params2)
+
+    set_keys1   = set(params1.keys())
+    set_keys2   = set(params2.keys())
+    keys1_only  = list(set_keys1 - set_keys2)
+    keys2_only  = list(set_keys2 - set_keys1)
+    keys_common = set_keys1.intersection(set_keys2)
+
+    for key in keys1_only:
+        if type(params1[key]) == bool or params1[key]:
+            # params1 has non-empty string/value that does not present in params2
+            return False
+
+    for key in keys2_only:
+        if type(params2[key]) == bool or params2[key]:
+            # params2 has non-empty string/value that does not present in params1
+            return False
+
+    for key in keys_common:
+        val1 = params1[key]
+        val2 = params2[key]
+        if val1 and val2:   # Both values are neither None-s nor empty strings.
+            if type(val1) != type(val2):
+                return False        # Not comparable types
+            if type(val1) == str:
+                if val1.lower() != val2.lower():
+                    return False    # Strings are not equal
+            elif val1 != val2:
+                return False        # Values are not equal
+    return True

@@ -299,7 +299,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         fwglobals.log.debug("get_ip_info, binding to %s:%d" %(source_ip, source_port))
         s.bind((source_ip, source_port))
     except Exception as e:
-        fwglobals.log.error("Got exception from bind: %s, %s" % (str(e), str(traceback.format_exc())))
+        fwglobals.log.debug("get_ip_info: bind: %s" % str(e))
         s.close()
         return ('', '', '', '', '')
     else:
