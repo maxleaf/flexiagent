@@ -297,32 +297,26 @@ def pci_full_to_short(pci):
     return pci
 
 def linux_to_pci_addr(linuxif):
-    """Convert Linux interface name into PCI address.
+    """Convert Linux interface name into PCI address or into BUS address
 
     :param linuxif:      Linux interface name.
 
     :returns: PCI address.
     """
-    NETWORK_BASE_CLASS = "02"
-    vpp_run = vpp_does_run()
-    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-    for line in lines:
-        vals = line.decode().split("\t", 1)
-        if len(vals) == 2:
-            # keep slot number
-            if vals[0] == 'Slot:':
-                slot = vals[1]
-            if vals[0] == 'Class:':
-                if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    interface = pci_to_linux_iface(slot)
-                    if not interface and vpp_run:
-                        interface = pci_to_tap(slot)
-                    if not interface:
-                        continue
-                    if interface == linuxif:
-                        driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
-                        return (pci_addr_full(slot), "" if driver=='driver' else driver)
-    return ("","")
+    test = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
+
+    if re.search('pci', test):
+        if re.search('usb', test):
+            address = 'usb%s' % re.search('usb(.+?)/net', test).group(1)
+        else:
+            address = test.split('/net')[0].split('/')[-1]
+            address = pci_addr_full(address)
+
+        driver = get_interface_driver(linuxif)
+        return (address, driver)
+
+    
+    return ("", "")
 
 def pci_to_linux_iface(pci):
     """Convert PCI address into Linux interface name.
@@ -339,9 +333,8 @@ def pci_to_linux_iface(pci):
     # lrwxrwxrwx 1 root root 0 Jul  4 16:21 lo -> ../../devices/virtual/net/lo
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_full_to_short(pci)
-
     try:
+        pci = pci_full_to_short(pci)
         output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True)
     except:
         return None
@@ -1771,7 +1764,7 @@ def connect_to_wifi(params):
         is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
         
         if (is_success.strip() == 'COMPLETED'):
-            subprocess.check_output('dhclient %s' % interface_name, shell=True)
+            # subprocess.check_output('dhclient %s' % interface_name, shell=True)
             return True
         else:
             return False
@@ -1885,9 +1878,9 @@ def is_non_dpdk_interface(interface_name, pci):
     # 0000:0a:00.00 'Ethernet Connection X553 1GbE' if=eth4 drv=ixgbe unused= 10.0.0.1
     # 0000:07:00.00 'I210 Gigabit Network Connection' if=eth2 drv=igb unused=vfio-pci,uio_pci_generic =192.168.0.1
 
-    if pci:
-        if str(pci) == "0000:06:00.00":
-            return True
+    # if pci:
+    #     if str(pci) == "0000:06:00.00":
+    #         return True
 
 
     # if interface_name == 'eth2'or interface_name == 'eth5':

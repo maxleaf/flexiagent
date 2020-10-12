@@ -362,8 +362,12 @@ class FWAGENT_API:
         
         try:
             result = fwutils.connect_to_wifi(params)
-            fwglobals.log.info("FWAGENT_API: _connect_to_wifi FINISHED")
-            return {'message': result, 'ok': result}
+
+            if result:
+                fwglobals.log.info("FWAGENT_API: _connect_to_wifi FINISHED")
+                return {'message': result, 'ok': result}
+
+            return {'message': False, 'ok': 0}    
         except:
             raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
 
