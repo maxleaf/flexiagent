@@ -26,20 +26,21 @@
   "params": {
     "src": "192.168.0.104",
     "dst": "192.168.0.105",
+    "dstPort": "4789",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {
          "spi": 4,
          "crypto-alg": "aes-cbc-128",
          "crypto-key": "4a506a794f574265564551694d653768",
-         "integr-alg": "sha1-96",
+         "integr-alg": "sha-256-128",
          "integr-key": "4339314b55523947594d6d3547666b45764e6a58"
       },
       "remote-sa": {
          "spi": 5,
          "crypto-alg": "aes-cbc-128",
          "crypto-key": "4a506a794f574265564551694d653768",
-         "integr-alg": "sha1-96",
+         "integr-alg": "sha-256-128",
          "integr-key": "4339314b55523947594d6d3547666b45764e6a58"
       }
     },
