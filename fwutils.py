@@ -1,5 +1,3 @@
-#! /usr/bin/python
-
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
@@ -963,6 +961,7 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
+        dev = pci_full_to_short(dev)
         config_param = 'dev %s' % dev
         if p.get_element(config['dpdk'],config_param) == None:
             tup = p.create_element(config_param)
