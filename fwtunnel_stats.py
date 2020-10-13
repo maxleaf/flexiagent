@@ -141,6 +141,8 @@ def tunnel_stats_get():
                     # add its source IP address to the cache of addresses for which
                     # we will send STUN requests.
                     if params['src'] not in ip_up_set:
+                        fwglobals.log.debug("Tunnel-id %d is down, adding address %s to STUN interfaces cache"\
+                            %(key, params['src']))
                         fwglobals.g.stun_wrapper.add_addr(params['src'], True)
                     break
 

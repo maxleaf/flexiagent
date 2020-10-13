@@ -143,7 +143,7 @@ class FwUnassignedIfs:
         res = ''
         if value:
             if only_if_different == True:
-                if not re.match(value, dct.get(key)):
+                if value != dct.get(key):
                     res = key + ':' + value + ','
             else:
                 res = key + ':' + value + ','

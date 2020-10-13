@@ -323,6 +323,7 @@ class FwStunWrap:
         """
         if self.local_cache['stun_interfaces']:
             return
+        fwglobals.log.debug("check_if_cache_empty: adding WAN addresses from Router-DB")
         addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
         for elem in addr_list:
             self.add_addr(elem['address'], False)
