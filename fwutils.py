@@ -1564,10 +1564,8 @@ def compare_request_params(params1, params2):
     return True
 
 def check_if_virtual_environment():
-    vm = os.popen('lspci | grep -i vmware| grep -i System| grep -i peripheral').read()
-    vb = os.popen('lspci | grep -i virtualbox| grep -i system| grep -i peripheral').read()
-
-    if vm =='' and vb == '':
+    virt_exist = os.popen('dmesg |grep -i hypervisor').read()
+    if virt_exist =='':
         return False
     else:
         return True
