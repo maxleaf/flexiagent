@@ -25,6 +25,7 @@ from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
 import fwglobals
+import fwutils
 
 tunnel_stats_global = {}
 
@@ -129,13 +130,23 @@ def tunnel_stats_get():
 
         if tunnel_stats[key]['status'] == 'down':
             ip_up_set = get_if_addr_in_connected_tunnels(tunnel_stats)
+            ip_addr_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
             # if tunnel status is down, we add the source IP of that tunnel to the list
             # of addresses that we will send STUN requests on their behalf.
-            # go to router configuration db, and find this tunnel
+            # go to router configuration db, and find this tunnel.
             tunnels = fwglobals.g.router_cfg.get_tunnels()
             for params in tunnels:
                 if params['tunnel-id'] == key:
-                    # found tunnel, check if the IP is part of other connected tunnels. If so,
+                    # Tunnel found. However, the tunnel might be disconnected due to changes in
+                    # source IP address. In that case, the current source address of the tunnel
+                    # is no longer valid. To make things safe, we check if the IP address exists
+                    # in the system. If it is not, no point on adding it to the STUN cache.
+                    if params['src'] not in ip_addr_list:
+                        fwglobals.log.debug("Tunnel-id %d is down, but its source address %s no longer valid"\
+                            %(key, params['src']))
+                        break
+
+                    # If valid IP, check if the IP is part of other connected tunnels. If so,
                     # do not add it to the STUN hash, as it might cause other connected tunnels
                     # with that IP to disconnect. If it is not part of any connected tunnel,
                     # add its source IP address to the cache of addresses for which

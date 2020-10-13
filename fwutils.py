@@ -220,6 +220,32 @@ def get_linux_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
+def get_interfaces_ip_addr(filtr=None):
+    """ Get all interfaces from linux, and add only the ones that have address family of
+    AF_INET. if filter=='gw', add only interfaces with GW.
+    : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
+                    if filtr is None, return all IP addresses in the system.
+    : return : list of WAN interfaces
+    """
+    ip_list = []
+    interfaces = psutil.net_if_addrs()
+    for nicname, addrs in interfaces.items():
+        pciaddr = linux_to_pci_addr(nicname)
+        if pciaddr and pciaddr[0] == "":
+            continue
+        for addr in addrs:
+            if addr.family == socket.AF_INET:
+                ip = addr.address.split('%')[0]
+                if filtr == 'gw':
+                    gateway, _ = get_linux_interface_gateway(nicname)
+                    if gateway != '':
+                        ip_list.append(ip)
+                        break
+                else:
+                    ip_list.append(ip)
+                    break
+    return ip_list
+
 def get_interface_address(if_name):
     """Get interface IP address.
 

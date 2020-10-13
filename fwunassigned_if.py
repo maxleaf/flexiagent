@@ -22,7 +22,6 @@ import fwglobals
 import fwutils
 import hashlib
 import socket
-import re
 from netaddr import IPAddress
 
 class FwUnassignedIfs:
@@ -185,9 +184,8 @@ class FwUnassignedIfs:
                 for elem in addr_list:
                     if elem['address'] == nomaskaddr:
                         # compare public data between router-db and STUN cache
-                        public_ip, public_port = elem['public_ip'], elem['public_port']
-                        res += self._reconfig_section(elem, 'public_ip', new_p_ip, only_if_different=True, update=False)
-                        res += self._reconfig_section(elem, 'public_port', str(new_p_port), only_if_different=True, update=False)
+                        res += self._reconfig_section(elem, 'PublicIP', new_p_ip, only_if_different=True, update=False)
+                        res += self._reconfig_section(elem, 'PublicPort', str(new_p_port), only_if_different=True, update=False)
                         break
         return res
 

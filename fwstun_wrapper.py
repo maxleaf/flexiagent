@@ -68,27 +68,6 @@ class FwStunWrap:
         fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
             ['add-interface', 'remove-interface'])
 
-    def _get_ifs_with_gw(self):
-        """ Get all interfaces from linux, and add only the ones that have address family of
-        AF_INET and have getway to a list.
-
-        : return : list of WAN interfaces
-        """
-        ip_list = []
-        interfaces = psutil.net_if_addrs()
-        for nicname, addrs in interfaces.items():
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr and pciaddr[0] == "":
-                continue
-            for addr in addrs:
-                if addr.family == socket.AF_INET:
-                    ip = addr.address.split('%')[0]
-                    gateway, _ = fwutils.get_linux_interface_gateway(nicname)
-                    if gateway != '':
-                        ip_list.append(ip)
-                        break
-        return ip_list
-
     def initialize(self):
         """ Initialize STUN cache by sending STUN requests on all WAN interfaces before the first
         get-device-info is received. That way, the STUN cache will be ready with data when the
@@ -96,7 +75,7 @@ class FwStunWrap:
         After that, it starts the stun thread.
         """
         fwglobals.log.debug("Start sending STUN requests for all WAN interfaces")
-        ip_list = self._get_ifs_with_gw()
+        ip_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
         if ip_list:
             for ip in ip_list:
                 self._send_single_stun_request(ip, 4789, None, None, True)
