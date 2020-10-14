@@ -28,6 +28,7 @@ import psutil
 
 from fwtunnel_stats import tunnel_stats_get
 import fwglobals
+import fwtunnel_stats
 
 # Globals
 # Keep updates up to 1 hour ago
@@ -68,6 +69,8 @@ def update_stats():
             if_bytes = {}
             tunnel_bytes = {}
             tunnel_stats = tunnel_stats_get()
+            tunnels = fwglobals.g.router_cfg.get_tunnels()
+            fwtunnel_stats.add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels)
             for intf, counts in stats['last'].items():
                 if (intf.startswith('ipsec-gre') or
                     intf.startswith('loop')): continue

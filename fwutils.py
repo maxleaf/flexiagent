@@ -1,5 +1,3 @@
-#! /usr/bin/python
-
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
@@ -221,6 +219,32 @@ def get_linux_interface_gateway(if_name):
     rip    = route.split('via ')[1].split(' ')[0]
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
+
+def get_interfaces_ip_addr(filtr=None):
+    """ Get all interfaces from linux, and add only the ones that have address family of
+    AF_INET. if filter=='gw', add only interfaces with GW.
+    : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
+                    if filtr is None, return all IP addresses in the system.
+    : return : list of WAN interfaces
+    """
+    ip_list = []
+    interfaces = psutil.net_if_addrs()
+    for nicname, addrs in interfaces.items():
+        pciaddr = linux_to_pci_addr(nicname)
+        if pciaddr and pciaddr[0] == "":
+            continue
+        for addr in addrs:
+            if addr.family == socket.AF_INET:
+                ip = addr.address.split('%')[0]
+                if filtr == 'gw':
+                    gateway, _ = get_linux_interface_gateway(nicname)
+                    if gateway != '':
+                        ip_list.append(ip)
+                        break
+                else:
+                    ip_list.append(ip)
+                    break
+    return ip_list
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -977,6 +1001,7 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
+        dev = pci_full_to_short(dev)
         config_param = 'dev %s' % dev
         if p.get_element(config['dpdk'],config_param) == None:
             tup = p.create_element(config_param)
@@ -1587,3 +1612,11 @@ def compare_request_params(params1, params2):
             elif val1 != val2:
                 return False        # Values are not equal
     return True
+
+def check_if_virtual_environment():
+    virt_exist = os.popen('dmesg |grep -i hypervisor| grep -i detected').read()
+    if virt_exist =='':
+        return False
+    else:
+        return True
+
