@@ -220,7 +220,8 @@ class FwStunWrap:
         the address back to the STUN cache and reset it.
         """
         tunnel_stats = fwtunnel_stats.tunnel_stats_get()
-        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats)
+        tunnels = fwglobals.g.router_cfg.get_tunnels()
+        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
         for addr in self.local_cache['stun_interfaces']:
             # Do not reset info on interface participating in a connected tunnel
             if addr in ip_up_set:

@@ -130,9 +130,10 @@ def tunnel_stats_get():
 
     return tunnel_stats
 
-def get_if_addr_in_connected_tunnels(tunnel_stats):
+def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):
     """ get set of addresses that are part of any connected tunnels
     : param tunnel_stat : statistics of tunnels.
+    : param tunnels     : list of tunnels and their properties
     : return : set of IP addresses part of connected tunnels
     """
     ip_up_set = set()
@@ -145,7 +146,7 @@ def get_if_addr_in_connected_tunnels(tunnel_stats):
                     ip_up_set.add(tunnel['src'])
         return ip_up_set
 
-def add_address_of_down_tunnels_to_stun(tunnel_stats):
+def add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels):
     """ Run over all tunnels and get the source IP address of the tunnels that are not connected.
     If it was disconnected due to changes in its source IP address, check if this IP address is still
     valid. If it is, check that it is not used in other connected tunnels. If it is not used but still
@@ -155,14 +156,12 @@ def add_address_of_down_tunnels_to_stun(tunnel_stats):
 
     : param tunnel_stats : dictionary of tunnel statistics. One of its properties is the tunnel status
                            ("up" or "down")
+    : param tunnels      : list of tunnels and their properties
     """
-    if not tunnel_stats:
-        return
-    tunnels = fwglobals.g.router_cfg.get_tunnels()
-    if not tunnels:
+    if not tunnel_stats or not tunnels:
         return
     # Get list if IP addresses used by tunnels
-    ip_up_set = get_if_addr_in_connected_tunnels(tunnel_stats)
+    ip_up_set = get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
     # Get list of all IP addresses in the system
     ip_addr_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
     for tunnel in tunnels:
