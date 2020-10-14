@@ -219,7 +219,8 @@ class FwStunWrap:
         of a connected tunnel. If the tunnel will get disconnected, it will add
         the address back to the STUN cache and reset it.
         """
-        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels()
+        tunnel_stats = fwtunnel_stats.tunnel_stats_get()
+        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats)
         for addr in self.local_cache['stun_interfaces']:
             # Do not reset info on interface participating in a connected tunnel
             if addr in ip_up_set:

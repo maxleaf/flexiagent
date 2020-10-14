@@ -1614,7 +1614,7 @@ def compare_request_params(params1, params2):
     return True
 
 def check_if_virtual_environment():
-    virt_exist = os.popen('dmesg |grep -i hypervisor').read()
+    virt_exist = os.popen('dmesg |grep -i hypervisor| grep -i detected').read()
     if virt_exist =='':
         return False
     else:
