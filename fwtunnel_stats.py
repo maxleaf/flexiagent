@@ -137,7 +137,6 @@ def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):
     : return : set of IP addresses part of connected tunnels
     """
     ip_up_set = set()
-    tunnels = fwglobals.g.router_cfg.get_tunnels()
     if tunnels and tunnel_stats:
         for tunnel in tunnels:
             tunnel_id = tunnel.get('tunnel-id')
