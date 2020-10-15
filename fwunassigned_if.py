@@ -97,6 +97,7 @@ class FwUnassignedIfs:
             return res
 
         addr       = self._get_if_address(name)
+        addr       = addr.split('/')[0]
         gw, metric = fwutils.get_linux_interface_gateway(name)
 
         if pci in self.cached_interfaces:
@@ -111,7 +112,7 @@ class FwUnassignedIfs:
                 # against STUN cache
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
                 res += self._reconfig_section(entry,'public_ip',public_ip,only_if_different=True, update=True)
-                res += self._reconfig_section(entry,'public_port',public_port,only_if_different=True, update=True)
+                res += self._reconfig_section(entry,'public_port',str(public_port),only_if_different=True, update=True)
         else:
             #entry is not in cache, create entry and update res
             self.cached_interfaces[pci] = {}
@@ -126,7 +127,7 @@ class FwUnassignedIfs:
             if gw and addr:
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
                 res += self._reconfig_section(entry, 'public_ip', public_ip, only_if_different=False, update=True)
-                res += self._reconfig_section(entry, 'public_port', public_port, only_if_different=False, update=True)
+                res += self._reconfig_section(entry, 'public_port', str(public_port), only_if_different=False, update=True)
         return res
 
     def _reconfig_section(self, dct, key, value, only_if_different, update):
@@ -184,8 +185,8 @@ class FwUnassignedIfs:
                 for elem in addr_list:
                     if elem['address'] == nomaskaddr:
                         # compare public data between router-db and STUN cache
-                        res += self._reconfig_section(elem, 'PublicIP', new_p_ip, only_if_different=True, update=False)
-                        res += self._reconfig_section(elem, 'PublicPort', str(new_p_port), only_if_different=True, update=False)
+                        res += self._reconfig_section(elem, 'public_ip', new_p_ip, only_if_different=True, update=False)
+                        res += self._reconfig_section(elem, 'public_port', str(new_p_port), only_if_different=True, update=False)
                         break
         return res
 
@@ -270,9 +271,9 @@ class FwUnassignedIfs:
                 string += ', metric: '
                 string += 'None' if entry.get('metric') == '' else entry.get('metric','None')
                 if entry.get('gateway','') != '':
-                    string += ', public_ip : '
+                    string += ', public_ip: '
                     string += 'None' if entry.get('public_ip') =='' else entry.get('public_ip', 'None')
-                    string += ', public_port : '
+                    string += ', public_port: '
                     string += 'None' if str(entry.get('public_port')) =='' else str(entry.get('public_port', 'None'))
                 string += '}'
                 fwglobals.log.debug(string)
