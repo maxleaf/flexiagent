@@ -1081,7 +1081,7 @@ class Checker:
             conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
 
             if num_of_rx_queues_param:
-                if conf['dpdk'].get(dev_default_key):
+                if conf['dpdk'][dev_default_key]:
                     self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
                     num_of_rx_queues_param = 'num-rx-queues 0'
                     conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
@@ -1293,9 +1293,12 @@ class Checker:
     # zero cores means reset to old line, without our additions
         if grub_line_found == True:
             add_grub_line = True
-            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
-            val_line = grub_line.split('=\"')[1].strip()
-            val_line = val_line.strip('\" ')
+            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part, if exist
+            splt = grub_line.split('=\"')
+            if splt > 1:
+                val_line = splt[1].strip().strip('\" ')
+            else:
+                val_line = ''
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
             #remove old values, if exist, so we can replace them with ours
@@ -1322,7 +1325,7 @@ class Checker:
                 grub_line = prefix_val+ '=\"' + val_line +'\"'
             write_file.write(grub_line+'\n')
         else:
-            grub_line = prefix_val+'\"' + update_line + '\"'
+            grub_line = prefix_val+ '=\"' + update_line + '\"'
             write_file.write(grub_line+'\n')
 
         write_file.close()
