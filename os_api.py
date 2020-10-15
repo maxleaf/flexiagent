@@ -67,6 +67,7 @@ class OS_DECODERS:
             daddr = {
                 'name':nicname,
                 'pciaddr':'',
+                'usbaddr':'',
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',
@@ -86,11 +87,14 @@ class OS_DECODERS:
                 daddr['connectivity_type'] = 'lte'
 
             pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] == "":
+            usbaddr = fwutils.linux_to_usb_addr(nicname)
+            if pciaddr == "" and usbaddr == "":
                 continue
             
-            daddr['pciaddr'] = pciaddr[0]
-            daddr['driver'] = pciaddr[1]
+            daddr['pciaddr'] = pciaddr
+            daddr['usbaddr'] = usbaddr 
+
+            daddr['driver'] = fwutils.get_interface_driver(nicname)
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             
             daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)

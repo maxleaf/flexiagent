@@ -101,10 +101,10 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            pci = fwutils.linux_to_pci_addr(name)[0]
+                            pci = fwutils.linux_to_pci_addr(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            pci = fwutils.linux_to_pci_addr(dev)[0]
+                            pci = fwutils.linux_to_pci_addr(dev)
                         if fname in our_files:
                             our_files[fname].append({'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name})
                         else:
@@ -130,6 +130,7 @@ def _add_netplan_file(fname):
     with open(fname, 'w+') as stream:
         yaml.safe_dump(config, stream, default_flow_style=False)
 
+# need to change after i will change  the add_remove_netplan_interface function
 def add_remove_inf_from_netplan(is_add, linux_interface):
     config = {}
     fname_run = '/etc/netplan/01-netcfg.fwrun.yaml'

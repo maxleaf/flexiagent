@@ -297,6 +297,33 @@ def pci_full_to_short(pci):
     return pci
 
 def linux_to_pci_addr(linuxif):
+    """Convert Linux interface name into PCI address.
+
+    :param linuxif:      Linux interface name.
+
+    :returns: PCI address.
+    """
+    NETWORK_BASE_CLASS = "02"
+    vpp_run = vpp_does_run()
+    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+    for line in lines:
+        vals = line.decode().split("\t", 1)
+        if len(vals) == 2:
+            # keep slot number
+            if vals[0] == 'Slot:':
+                slot = vals[1]
+            if vals[0] == 'Class:':
+                if vals[1][0:2] == NETWORK_BASE_CLASS:
+                    interface = pci_to_linux_iface(slot)
+                    if not interface and vpp_run:
+                        interface = pci_to_tap(slot)
+                    if not interface:
+                        continue
+                    if interface == linuxif:
+                        return pci_addr_full(slot)
+    return ""
+
+def linux_to_usb_addr(linuxif):
     """Convert Linux interface name into PCI address or into BUS address
 
     :param linuxif:      Linux interface name.
@@ -305,18 +332,11 @@ def linux_to_pci_addr(linuxif):
     """
     test = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-    if re.search('pci', test):
-        if re.search('usb', test):
-            address = 'usb%s' % re.search('usb(.+?)/net', test).group(1)
-        else:
-            address = test.split('/net')[0].split('/')[-1]
-            address = pci_addr_full(address)
+    if re.search('usb', test):
+        address = 'usb%s' % re.search('usb(.+?)/net', test).group(1)
+        return address
 
-        driver = get_interface_driver(linuxif)
-        return (address, driver)
-
-    
-    return ("", "")
+    return ""
 
 def pci_to_linux_iface(pci):
     """Convert PCI address into Linux interface name.
@@ -1851,16 +1871,17 @@ def is_wifi_interface(interface_name):
         return False   
 
 def get_interface_driver(interface_name):
-    """Get WIFI interface driver.                            
+    """Get Linux interface driver.                            
 
     :param interface_name: Interface name to check.
 
     :returns: driver name.
     """    
     #   -i wlxd0374523abfb
+
     try:
         cmd = 'ethtool -i %s' % interface_name        
-        out = subprocess.check_output(cmd, shell=True).splitlines()
+        out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
         vals = out[0].decode().split("driver: ", 1)
         return str(vals[-1])
     except subprocess.CalledProcessError:
