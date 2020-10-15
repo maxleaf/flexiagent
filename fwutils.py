@@ -19,7 +19,6 @@
 ################################################################################
 
 import copy
-import errno
 import glob
 import hashlib
 import inspect
@@ -1623,12 +1622,7 @@ def check_if_virtual_environment():
         return True
 
 def check_root_access():
-    try:
-        os.system('touch /etc/test.txt 2> /dev/null ')
-        os.remove('/etc/test.txt')
-    except Exception as e:
-        if (e[0] == errno.ENOENT):
-           print("access denied, try with 'sudo'")
-           return False
-    return True
+    if os.geteuid() == 0: return True
+    print("Error: requires root privileges, try to run 'sudo'")
+    return False
 
