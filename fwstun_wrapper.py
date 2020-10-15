@@ -155,16 +155,16 @@ class FwStunWrap:
             else:
                 fwglobals.log.debug("Address %s in unassigned cache, not removing" %(str(addr)))
 
-    def find_addr(self,addr):
+    def find_addr(self,addr_no_mask):
         """ find address in cache, and return its params, empty strings if not found
 
-        : param addr : address to find in cache.
+        : param addr_no_mask : address to find in cache.
         : return :  public_ip of a local address or emptry string
                     public_port of a local 4789 port or empty string
                     nat_type which is the NAT server the device is behind or empty string
         """
-        if addr in self.local_cache['stun_interfaces'].keys():
-            c = self.local_cache['stun_interfaces'][addr]
+        if addr_no_mask in self.local_cache['stun_interfaces'].keys():
+            c = self.local_cache['stun_interfaces'][addr_no_mask]
             return c.get('public_ip'), c.get('public_port'), c.get('nat_type')
         else:
             return '', '', ''
