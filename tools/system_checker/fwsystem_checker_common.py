@@ -944,7 +944,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multithread_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multi_core_support_requires_RSS(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -971,6 +971,7 @@ class Checker:
             str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
             try:
                 if len(str_cores) == 0:
+                    input_cores = num_worker_cores
                     break
                 input_cores = int(str_cores)
                 if input_cores > num_worker_cores:
