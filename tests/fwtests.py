@@ -230,8 +230,8 @@ def vpp_is_configured(config_entities, print_error=True):
         if e == 'tunnels':
             # Count number of existing tunnel
             # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
-            cmd          = "sudo vppctl sh ipsec gre tunnel | grep src | wc -l"
-            cmd_on_error = "sudo vppctl sh ipsec gre tunnel"
+            cmd          = "sudo vppctl sh gre tunnel | grep src | wc -l"
+            cmd_on_error = "sudo vppctl sh gre tunnel"
             if not _check_command_output(cmd, output, 'tunnels', cmd_on_error, print_error):
                 cmd          = "sudo vppctl show vxlan tunnel | grep src | wc -l"
                 cmd_on_error = "sudo vppctl show vxlan tunnel"
@@ -244,7 +244,7 @@ def vpp_is_configured(config_entities, print_error=True):
             continue
         if e == 'multilink-policies':
             # Count number of existing tunnel
-            # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
+            # Firstly try  tunnels. If not found, try the vxlan tunnels.
             cmd          = "sudo vppctl show fwabf policy | grep fwabf: | wc -l"
             cmd_on_error = "sudo vppctl show fwabf policy"
             if not _check_command_output(cmd, output, 'multilink-policies', cmd_on_error, print_error):

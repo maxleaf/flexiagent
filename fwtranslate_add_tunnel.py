@@ -96,7 +96,8 @@ from vpp_papi import VppEnum
 #    ipsec sa add 21 spi 1020 esp crypto-alg aes-cbc-128 crypto-key 1020aa794f574265564551694d653768 integr-alg sha1-96 integr-key 1020ff4b55523947594d6d3547666b45764e6a58
 #    ipsec sa add 22 spi 2010 espcrypto-alg aes-cbc-128 crypto-key 2010aa794f574265564551694d653768 integr-alg sha1-96 integr-key 2010ff4b55523947594d6d3547666b45764e6a58
 #
-#    create ipsec gre tunnel src 10.101.0.7 dst 10.101.0.6 local-sa 10 remote-sa 20
+#    create gre tunnel src 10.101.0.7 dst 10.101.0.6 teb
+#    ipsec tunnel protect gre0 sa-in 10 sa-out 20
 #    set int state ipsec-gre0 up
 #    set int l2 bridge loop0 1 bvi
 #    set int l2 bridge ipsec_gre0 1 1
