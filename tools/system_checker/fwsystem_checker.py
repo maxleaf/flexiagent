@@ -349,6 +349,9 @@ if __name__ == '__main__':
     import argparse
     global arg
 
+    if not fwutils.check_root_access():
+        sys.exit(1)
+
     # Ensure that VPP does not run.
     # Otherwise driver interface checks might fail and user will be scared for
     # no reason. Note it is too late to check system, if router was started :)

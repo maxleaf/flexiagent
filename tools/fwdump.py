@@ -36,6 +36,10 @@ import subprocess
 import sys
 import time
 
+agent_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..')
+sys.path.append(agent_root_dir)
+import fwutils
+
 # Special variables in the dumper commands are substituted in run time as follows:
 #   <dumper_out_file> -> '<temporary_folder>/<dumper>.log'
 #   <temp_folder>     -> current folder or --temp_folder script argument
@@ -221,6 +225,9 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     global arg
+
+    if not fwutils.check_root_access():
+        sys.exit(1)
 
     parser = argparse.ArgumentParser(description='FlexiEdge dump utility')
     parser.add_argument('--feature', choices=['multilink'], default=None,

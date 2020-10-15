@@ -1154,5 +1154,9 @@ if __name__ == '__main__':
     if hasattr(args, 'quiet') and args.quiet:
         fwglobals.log.set_target(to_syslog=True, to_terminal=False)
 
+    if not args.command in [ 'show', 'version' ]:
+        if not fwutils.check_root_access():
+            sys.exit(1)
+
     fwglobals.log.debug("---> exec " + str(args), to_terminal=False)
     command_functions[args.command](args)
