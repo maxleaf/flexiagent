@@ -52,9 +52,10 @@ class FwagentCli:
         self.agent        = None
         self.prompt       = 'fwagent> '
 
-        import fwagent
-        state = fwagent.daemon_rpc('show', state=True)
-        if not state:
+        try:
+            self.daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
+            self.daemon.ping()   # Check if daemon runs. If it does not, create local instance of Fwagent
+        except Pyro4.errors.CommunicationError:
             fwglobals.log.warning("FwagentCli: no daemon Fwagent was found, use local instance")
             self.daemon = None
 

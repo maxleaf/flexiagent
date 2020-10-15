@@ -31,9 +31,9 @@ class FwStunWrap:
     every 60 seconds. Note, those counters are managed for each of the addresses
     separately.
 
-    From globals, we use the global cache, and create fwglobals.g.cache['stun_interfaces']
+    From globals, we use the global cache, and create fwglobals.g.AGENT_CACHE['stun_interfaces']
     sub dictionary. This dictionary has the following structure:
-    fwglobals.g.cache['stun_interfaces'][IP address] = {
+    fwglobals.g.AGENT_CACHE['stun_interfaces'][IP address] = {
         'public_ip':
         'public_port':
         'sec_counter':
@@ -61,7 +61,7 @@ class FwStunWrap:
         """ Init function. This function inits the cache, gets the router-db handle
             and register callback and request names to listen too.
         """
-        self.local_cache = fwglobals.g.cache
+        self.local_cache = fwglobals.g.AGENT_CACHE
         self.local_cache['stun_interfaces'] = {}
         self.thread_stun = None
         self.is_running = False

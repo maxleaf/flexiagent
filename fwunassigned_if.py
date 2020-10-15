@@ -42,9 +42,9 @@ class FwUnassignedIfs:
     def __init__(self):
         """ init function, initializing the cache for un-assigned interfaces.
         """
-        fwglobals.g.cache['linux_ifs'] = {}
+        fwglobals.g.AGENT_CACHE['linux_ifs'] = {}
         # Shorthand to the global cache
-        self.cached_interfaces = fwglobals.g.cache['linux_ifs']
+        self.cached_interfaces = fwglobals.g.AGENT_CACHE['linux_ifs']
 
     def _get_if_address(self, if_name):
         """ Get interface address.

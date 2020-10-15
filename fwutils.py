@@ -307,16 +307,14 @@ def pci_full_to_short(pci):
 def get_linux_pcis():
     """ Get the list of PCI-s of all network interfaces available in Linux.
     """
-    pci_list = fwglobals.g.cache_get(fwglobals.g.CACHE_PCIS, 'all')
+    pci_list = fwglobals.g.get_cache_data('PCIS')
     if not pci_list:
-        pci_list   = []
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
             pciaddr = linux_to_pci_addr(nicname)
             if pciaddr and pciaddr[0] == "":
                 continue
             pci_list.append(pciaddr[0])
-        fwglobals.g.cache_set(fwglobals.g.CACHE_PCIS, 'all', pci_list)
     return pci_list
 
 def linux_to_pci_addr(linuxif):
@@ -415,8 +413,8 @@ def pci_to_vpp_if_name(pci):
 
     :returns: VPP interface name.
     """
-    pci_full = pci_addr_full(pci)
-    vpp_if_name = fwglobals.g.cache_get(fwglobals.g.CACHE_PCI_TO_VPP_IF_NAME, pci_full)
+    pci = pci_addr_full(pci)
+    vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
     if vpp_if_name: return vpp_if_name
     else: return _build_pci_to_vpp_if_name_maps(pci, None)
 
@@ -430,7 +428,7 @@ def vpp_if_name_to_pci(vpp_if_name):
 
     :returns: PCI address.
     """
-    pci = fwglobals.g.cache_get(fwglobals.g.CACHE_VPP_IF_NAME_TO_PCI, vpp_if_name)
+    pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
     if pci: return pci
     else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
 
@@ -460,21 +458,21 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
-            fwglobals.g.cache_set(fwglobals.g.CACHE_PCI_TO_VPP_IF_NAME, pci_addr_full(k), v)
-            fwglobals.g.cache_set(fwglobals.g.CACHE_VPP_IF_NAME_TO_PCI, v, pci_addr_full(k))
+            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_addr_full(k)
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
         pci_addr = pci_bytes_to_str(hw_if.pci_addr)
-        fwglobals.g.cache_set(fwglobals.g.CACHE_PCI_TO_VPP_IF_NAME, pci_addr, vpp_if_name)
-        fwglobals.g.cache_set(fwglobals.g.CACHE_VPP_IF_NAME_TO_PCI, vpp_if_name, pci_addr)
+        fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[vpp_if_name] = pci_addr
 
     if pci:
-        vpp_if_name = fwglobals.g.cache_get(fwglobals.g.CACHE_PCI_TO_VPP_IF_NAME, pci)
+        vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        pci = fwglobals.g.cache_get(fwglobals.g.CACHE_VPP_IF_NAME_TO_PCI, vpp_if_name)
+        pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
         if pci: return pci
 
     fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
@@ -562,7 +560,8 @@ def pci_to_tap(pci):
     :returns: Linux TAP interface name.
     """
     pci_full = pci_addr_full(pci)
-    tap      = fwglobals.g.cache_get(fwglobals.g.CACHE_PCI_TO_VPP_TAP_NAME, pci_full)
+    cache    = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+    tap = cache.get(pci_full)
     if tap:
         return tap
 
@@ -571,7 +570,7 @@ def pci_to_tap(pci):
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
     if tap:
-        fwglobals.g.cache_set(fwglobals.g.CACHE_PCI_TO_VPP_TAP_NAME, pci_full, tap)
+        cache[pci_full] = tap
     return tap
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,

@@ -220,11 +220,13 @@ class Fwglobals:
         self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
         self.WS_STATUS_OK                 = 1000
         self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
-        self.cache   = {}                       # Cache some global data
-        self.CACHE_PCI_TO_VPP_IF_NAME  = 'CACHE_PCI_TO_VPP_IF_NAME'
-        self.CACHE_VPP_IF_NAME_TO_PCI  = 'CACHE_VPP_IF_NAME_TO_PCI'
-        self.CACHE_PCI_TO_VPP_TAP_NAME = 'CACHE_PCI_TO_VPP_TAP_NAME'
-        self.CACHE_PCIS                = 'CACHE_PCIS'
+        # Cache to save various global data
+        self.AGENT_CACHE = {}
+        # PCI to VPP names, assuming names and PCI are unique and not changed during operation
+        self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
+        self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
+        self.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
+        self.AGENT_CACHE['PCIS'] = []
         self.fwagent = None
 
         # Load configuration from file
@@ -241,57 +243,12 @@ class Fwglobals:
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
 
-    def cache_get(self, path, key):
-        """Retrieves data from the global cache.
+    def get_cache_data(self, key):
+        """get the cache data for a given key
 
-        :param path: the path to the leaf of the cache dict that is supposed
-                     to include key.
-        :param key:  the key to be used to fetch value of the leaf element.
-
-        :returns: data for a given key, None if key does not exist.
+        :returns: data for a given key, None if key does not exist
         """
-        child = self.cache
-        steps = path.split('/')
-        for step in steps:
-            if step not in child:
-                return None
-            child = child[step]
-        return child.get(key)
-
-    def cache_set(self, path, key, val):
-        """Stores data in the global cache.
-
-        :param path: the path to the leaf of the cache dict that should include
-                     key. If any step of this path does not exist, it will be
-                     created.
-        :param key:  the key to be used to store value in the leaf element,
-                     identified by the 'path' parameter.
-        :param val:  the value to be stored in the leaf dict by the 'key'.
-        """
-        child = self.cache
-        steps = path.split('/')
-        for step in steps:
-            if step not in child:
-                child[step] = {}
-            child = child[step]
-        child[key] = val
-
-    def cache_del(self, path, key):
-        """Deletes data from the global cache.
-
-        :param path: the path to the leaf of the cache dict that is supposed
-                     to include key.
-        :param key:  the key to be deleted.
-        """
-        child = self.cache
-        steps = path.split('/')
-        for step in steps:
-            if step not in child:
-                return
-            child = child[step]
-        if key not in child:
-            return
-        del child[key]
+        return self.AGENT_CACHE.get(key)
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.

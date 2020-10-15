@@ -700,6 +700,16 @@ def show(agent_info, router_info, daemon_info):
             fwglobals.log.info('Agent version: %s'
                 % fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version'],
                 to_syslog=False)
+        if agent_info == 'cache':
+            fwglobals.log.info("Agent cache...")
+            cache = daemon_rpc('cache')
+            fwglobals.log.info(pprint.pformat(cache, indent=1))
+        if agent_info == 'threads':
+            fwglobals.log.info("Agent threads...")
+            thread_list = daemon_rpc('threads')
+            if thread_list:
+                for name in thread_list:
+                    fwglobals.log.info(name)
 
     if router_info:
         if router_info == 'state':
@@ -715,17 +725,12 @@ def show(agent_info, router_info, daemon_info):
 
     if daemon_info:
         if daemon_info == 'status':
-            state = daemon_rpc('dump', quiet=True, state=True)
-            fwglobals.log.info('running' if state=='active' else 'not running')
-        elif daemon_info == 'cache':
-            cache = daemon_rpc('dump', quiet=True, cache=True)
-            if cache:
-                fwglobals.log.info(pprint.pformat(cache, indent=1))
-        elif daemon_info == 'threads':
-            threads = daemon_rpc('dump', quiet=True, threads=True)
-            if threads:
-                for name in threads:
-                    fwglobals.log.info(name)
+            try:
+                daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
+                daemon.ping()   # Check if daemon runs
+                fwglobals.log.info("running")
+            except Pyro4.errors.CommunicationError:
+                fwglobals.log.info("not running")
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -871,15 +876,22 @@ class FwagentDaemon(object):
         self.stop()
         self.start()
 
-    def dump(self, state=False, cache=False, threads=False):
-        """Dumps various info regarding the daemon.
+    def cache(self):
+        """Show Agent cache.
+
+        :returns: cache maps.
         """
-        if state:
-            return 'active'
-        if cache:
-            return fwglobals.g.cache
-        if threads:
-            return [thd.name for thd in threading.enumerate()]
+        return (fwglobals.g.AGENT_CACHE)
+
+    def threads(self):
+        """show agent threads.
+
+        :returns: list of thread names
+        """
+        thread_list = []
+        for thd in threading.enumerate():
+            thread_list.append(thd.name)
+        return (thread_list)
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -992,7 +1004,7 @@ def daemon(start_loop=True):
             ns=False,
             verbose=False)
 
-def daemon_rpc(func, quiet=False, **kwargs):
+def daemon_rpc(func, **kwargs):
     """Wrapper for methods of the FwagentDaemon object that runs on background
     as a daemon. It is used to fullfil CLI commands that can be designated
     either to the FwagentDaemon object itself or to the Fwagent object managed
@@ -1006,12 +1018,10 @@ def daemon_rpc(func, quiet=False, **kwargs):
     try:
         agent_daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
         remote_func = getattr(agent_daemon, func)
-        if not quiet:
-            fwglobals.log.debug("invoke remote FwagentDaemon::%s(%s)" % (func, json.dumps(kwargs)))
+        fwglobals.log.debug("invoke remote FwagentDaemon::%s(%s)" % (func, json.dumps(kwargs)))
         return remote_func(**kwargs)
     except Pyro4.errors.CommunicationError:
-        if not quiet:
-            fwglobals.log.debug("ignore FwagentDaemon::%s(%s): daemon does not run" % (func, json.dumps(kwargs)))
+        fwglobals.log.debug("ignore FwagentDaemon::%s(%s): daemon does not run" % (func, json.dumps(kwargs)))
         return None
     except Exception as e:
         fwglobals.log.debug("FwagentDaemon::%s(%s) failed: %s" % (func, json.dumps(kwargs), str(e)))
@@ -1134,9 +1144,9 @@ if __name__ == '__main__':
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
     parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
                         help="show various router parameters")
-    parser_show.add_argument('--agent', choices=['version'],
+    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
-    parser_show.add_argument('--daemon', choices=['status', 'cache', 'threads'],
+    parser_show.add_argument('--daemon', choices=['status'],
                         help="show various daemon parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
