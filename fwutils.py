@@ -230,8 +230,8 @@ def get_interfaces_ip_addr(filtr=None):
     ip_list = []
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
-        pciaddr = linux_to_pci_addr(nicname)
-        if pciaddr and pciaddr[0] == "":
+        hw_if_addr = linux_to_hw_addr(nicname)
+        if hw_if_addr and hw_if_addr == "":
             continue
         for addr in addrs:
             if addr.family == socket.AF_INET:
@@ -310,39 +310,90 @@ def get_linux_pcis():
     if not pci_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
-            pciaddr = linux_to_pci_addr(nicname)
-            if pciaddr and pciaddr[0] == "":
+            hw_if_Addr = linux_to_hw_addr(nicname)
+            if hw_if_Addr and hw_if_Addr == "":
                 continue
-            pci_list.append(pciaddr[0])
+            pci_list.append(hw_if_Addr)
     return pci_list
 
-def linux_to_pci_addr(linuxif):
-    """Convert Linux interface name into PCI address.
+def get_interface_driver(interface_name):
+    """Get interface driver.                            
+
+    :param interface_name: Interface name to check.
+
+    :returns: driver name.
+    """    
+    #   -i wlxd0374523abfb
+    try:
+        cmd = 'ethtool -i %s' % interface_name        
+        out = subprocess.check_output(cmd, shell=True).splitlines()
+        vals = out[0].decode().split("driver: ", 1)
+        return str(vals[-1])
+    except subprocess.CalledProcessError:
+        return '' 
+
+
+def hw_if_addr_to_type_and_addr(hw_if_addr):
+    """Convert an hardware address name into a tuple contained address type (pci, usb) and address.
 
     :param linuxif:      Linux interface name.
 
-    :returns: PCI address.
+    :returns: hardware address.
     """
-    NETWORK_BASE_CLASS = "02"
-    vpp_run = vpp_does_run()
-    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-    for line in lines:
-        vals = line.decode().split("\t", 1)
-        if len(vals) == 2:
-            # keep slot number
-            if vals[0] == 'Slot:':
-                slot = vals[1]
-            if vals[0] == 'Class:':
-                if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    interface = pci_to_linux_iface(slot)
-                    if not interface and vpp_run:
-                        interface = pci_to_tap(slot)
-                    if not interface:
-                        continue
-                    if interface == linuxif:
-                        driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
-                        return (pci_addr_full(slot), "" if driver=='driver' else driver)
-    return ("","")
+    type_and_addr = hw_if_addr.split(':', 1)
+    if type_and_addr:
+        return (type_and_addr[0], type_and_addr[1])
+    
+    return ("", "")
+
+def linux_to_hw_addr(linuxif):
+    """Convert Linux interface name into an hardware address.
+
+    :param linuxif:      Linux interface name.
+
+    :returns: hardware address.
+    """
+    if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
+
+    if re.search('pci', if_addr):
+        if re.search('usb', if_addr):
+            address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
+            return 'usb:%s' % address 
+        else:
+            address = if_addr.split('/net')[0].split('/')[-1]
+            address = pci_addr_full(address)
+            return 'pci:%s' % address
+
+    return ""
+
+
+# def linux_to_pci_addr(linuxif):
+#     """Convert Linux interface name into PCI address.
+
+#     :param linuxif:      Linux interface name.
+
+#     :returns: PCI address.
+#     """
+#     NETWORK_BASE_CLASS = "02"
+#     vpp_run = vpp_does_run()
+#     lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+#     for line in lines:
+#         vals = line.decode().split("\t", 1)
+#         if len(vals) == 2:
+#             # keep slot number
+#             if vals[0] == 'Slot:':
+#                 slot = vals[1]
+#             if vals[0] == 'Class:':
+#                 if vals[1][0:2] == NETWORK_BASE_CLASS:
+#                     interface = pci_to_linux_iface(slot)
+#                     if not interface and vpp_run:
+#                         interface = pci_to_tap(slot)
+#                     if not interface:
+#                         continue
+#                     if interface == linuxif:
+#                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
+#                         return (pci_addr_full(slot), "" if driver=='driver' else driver)
+#     return ("","")
 
 def pci_to_linux_iface(pci):
     """Convert PCI address into Linux interface name.

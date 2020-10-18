@@ -115,14 +115,14 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            pci = fwutils.linux_to_pci_addr(name)[0]
+                            hw_if_addr = fwutils.linux_to_hw_addr(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            pci = fwutils.linux_to_pci_addr(dev)[0]
+                            hw_if_addr = fwutils.linux_to_hw_addr(dev)
                         if fname in our_files:
-                            our_files[fname].append({'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name})
+                            our_files[fname].append({'ifname': dev, 'gateway': gateway, 'hw_if_addr': hw_if_addr, 'set-name': name})
                         else:
-                            our_files[fname] = [{'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name}]
+                            our_files[fname] = [{'ifname': dev, 'gateway': gateway, 'hw_if_addr': hw_if_addr, 'set-name': name}]
     return our_files
 
 def _set_netplan_filename(files):
