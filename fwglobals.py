@@ -225,7 +225,7 @@ class Fwglobals:
         # PCI to VPP names, assuming names and PCI are unique and not changed during operation
         self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
         self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
-        self.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
+        self.AGENT_CACHE['HW_ADDR_TO_VPP_TAP_NAME_MAP'] = {}
         self.AGENT_CACHE['PCIS'] = []
         self.fwagent = None
 

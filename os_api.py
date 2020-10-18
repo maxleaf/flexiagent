@@ -58,23 +58,22 @@ class OS_DECODERS:
         out = []
         for nicname, addrs in inp.items():
             hw_if_addr = fwutils.linux_to_hw_addr(nicname)
-            # create function to drive
-            if hw_if_addr and hw_if_addr == "":
+            if hw_if_addr == '':
                 continue
 
             daddr = {
-                        'name':nicname,
-                        'pciaddr':hw_if_addr,# TODO: need to change to hw_addr
-                        'driver':'',
-                        'MAC':'',
-                        'IPv4':'',
-                        'IPv4Mask':'',
-                        'IPv6':'',
-                        'IPv6Mask':'',
-                        'dhcp':'',
-                        'gateway':'',
-                        'metric': '',
-                    }
+                'name':nicname,
+                'pciaddr':hw_if_addr,# TODO: need to change to hw_addr
+                'driver':'',
+                'MAC':'',
+                'IPv4':'',
+                'IPv4Mask':'',
+                'IPv6':'',
+                'IPv6Mask':'',
+                'dhcp':'',
+                'gateway':'',
+                'metric': '',
+            }
                     
             daddr['driver'] = fwutils.get_interface_driver(nicname)
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)

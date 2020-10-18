@@ -231,7 +231,7 @@ def get_interfaces_ip_addr(filtr=None):
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         hw_if_addr = linux_to_hw_addr(nicname)
-        if hw_if_addr and hw_if_addr == "":
+        if hw_if_addr == '':
             continue
         for addr in addrs:
             if addr.family == socket.AF_INET:
@@ -278,17 +278,20 @@ def is_ip_in_subnet(ip, subnet):
     """
     return True if IPAddress(ip) in IPNetwork(subnet) else False
 
-def pci_addr_full(pci_addr):
+def pci_addr_full(hw_addr):
     """Convert short PCI into full representation.
 
     :param pci_addr:      Short PCI address.
 
     :returns: Full PCI address.
     """
-    pc = pci_addr.split('.')
+    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
+    if addr_type == 'usb' return hw_addr
+    
+    pc = hw_addr.split('.')
     if len(pc) == 2:
         return pc[0]+'.'+"%02x"%(int(pc[1],16))
-    return pci_addr
+    return hw_addr
 
 # Convert 0000:00:08.01 provided by management to 0000:00:08.1 used by Linux
 def pci_full_to_short(pci):
@@ -317,20 +320,19 @@ def get_linux_pcis():
     return pci_list
 
 def get_interface_driver(interface_name):
-    """Get interface driver.                            
+    """Get Linux interface driver.                            
 
     :param interface_name: Interface name to check.
 
     :returns: driver name.
-    """    
-    #   -i wlxd0374523abfb
+    """
     try:
         cmd = 'ethtool -i %s' % interface_name        
-        out = subprocess.check_output(cmd, shell=True).splitlines()
+        out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
         vals = out[0].decode().split("driver: ", 1)
         return str(vals[-1])
     except subprocess.CalledProcessError:
-        return '' 
+        return ''  
 
 
 def hw_if_addr_to_type_and_addr(hw_if_addr):
@@ -338,7 +340,7 @@ def hw_if_addr_to_type_and_addr(hw_if_addr):
 
     :param linuxif:      Linux interface name.
 
-    :returns: hardware address.
+    :returns: Tuple (type, address)
     """
     type_and_addr = hw_if_addr.split(':', 1)
     if type_and_addr:
@@ -594,6 +596,13 @@ def pci_to_vpp_sw_if_index(pci):
     fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
     return None
 
+def hw_addr_to_tap(hw_if_addr):
+    (addr_type, address) = hw_if_addr_to_type_and_addr(hw_if_addr)
+    if addr_type == 'usb' return None
+
+    return pci_to_tap(address)
+
+
 # 'pci_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
 # To do that we convert firstly the pci into name of interface in VPP,
@@ -610,7 +619,7 @@ def pci_to_tap(pci):
     :returns: Linux TAP interface name.
     """
     pci_full = pci_addr_full(pci)
-    cache    = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+    cache    = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_TAP_NAME_MAP')
     tap = cache.get(pci_full)
     if tap:
         return tap

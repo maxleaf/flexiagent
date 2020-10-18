@@ -128,12 +128,12 @@ def get_netplan_filenames():
 def _set_netplan_filename(files):
     for fname, devices in files.items():
         for dev in devices:
-            pci = dev.get('pci')
+            hw_if_addr = dev.get('hw_if_addr')
             ifname = dev.get('ifname')
             set_name = dev.get('set-name')
-            if pci:
-                fwglobals.g.NETPLAN_FILES[pci] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
-                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, pci, fname))
+            if hw_if_addr:
+                fwglobals.g.NETPLAN_FILES[hw_if_addr] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
+                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, hw_if_addr, fname))
 
 def _add_netplan_file(fname):
     if os.path.exists(fname):
@@ -147,29 +147,29 @@ def _add_netplan_file(fname):
         os.fsync(stream.fileno())
 
 
-def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
+def add_remove_netplan_interface(is_add, hw_if_addr, ip, gw, metric, dhcp):
     config_section = {}
     old_ethernets = {}
 
     set_name = ''
     old_ifname = ''
-    ifname = fwutils.pci_to_tap(pci)
+    ifname = fwutils.hw_addr_to_tap(hw_if_addr)
     if not ifname:
-        err_str = "add_remove_netplan_interface: %s was not found" % pci
+        err_str = "add_remove_netplan_interface: %s was not found" % hw_if_addr
         fwglobals.log.error(err_str)
         return (False, err_str)
 
-    if pci in fwglobals.g.NETPLAN_FILES:
-        fname = fwglobals.g.NETPLAN_FILES[pci].get('fname')
+    if hw_if_addr in fwglobals.g.NETPLAN_FILES:
+        fname = fwglobals.g.NETPLAN_FILES[hw_if_addr].get('fname')
         fname_run = fname.replace('yaml', 'fwrun.yaml')
         if (not os.path.exists(fname_run)):
             _add_netplan_file(fname_run)
 
         fname_backup = fname + '.fw_run_orig'
 
-        old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
-        if fwglobals.g.NETPLAN_FILES[pci].get('set-name'):
-            set_name = fwglobals.g.NETPLAN_FILES[pci].get('set-name')
+        old_ifname = fwglobals.g.NETPLAN_FILES[hw_if_addr].get('ifname')
+        if fwglobals.g.NETPLAN_FILES[hw_if_addr].get('set-name'):
+            set_name = fwglobals.g.NETPLAN_FILES[hw_if_addr].get('set-name')
 
         with open(fname_backup, 'r') as stream:
             old_config = yaml.safe_load(stream)
@@ -240,19 +240,19 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # Remove pci-to-tap cached value for this pci, as netplan might change
+        # If needed, remove hw-addr-to-tap cached value for this hardware address, as netplan might change
         # interface name.
         #
-        cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
-        pci_full = fwutils.pci_addr_full(pci)
-        if pci_full in cache:
-            del cache[pci_full]
+        cache = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_TAP_NAME_MAP')
+        hw_addr = fwutils.pci_addr_full(hw_if_addr)
+        if hw_addr in cache:
+            del cache[hw_addr]
 
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
             for _ in range(50):
-                ifname = fwutils.pci_to_tap(pci)
+                ifname = fwutils.hw_addr_to_tap(hw_if_addr)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
@@ -263,8 +263,8 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
                 return (False, err_str)
 
     except Exception as e:
-        err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
-              % (pci, fname_run, str(e))
+        err_str = "add_remove_netplan_interface failed: hw_if_addr: %s, file: %s, error: %s"\
+              % (hw_if_addr, fname_run, str(e))
         fwglobals.log.error(err_str)
         if fname_run:
             with open(fname_run, 'r') as f:

@@ -126,11 +126,11 @@ def add_interface(params):
                 'module': 'fwnetplan',
                 'func': 'add_remove_netplan_interface',
                 'args': { 'is_add': 1,
-                          'pci'   : iface_pci,
-                          'ip'    : iface_addr,
-                          'gw'    : gw,
-                          'metric': metric,
-                          'dhcp'  : dhcp
+                          'hw_if_addr': iface_pci,
+                          'ip'        : iface_addr,
+                          'gw'        : gw,
+                          'metric'    : metric,
+                          'dhcp'      : dhcp
                          }
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -141,11 +141,11 @@ def add_interface(params):
                 'func': 'add_remove_netplan_interface',
                 'args': {
                           'is_add': 0,
-                          'pci'   : iface_pci,
-                          'ip'    : iface_addr,
-                          'gw'    : gw,
-                          'metric': metric,
-                          'dhcp'  : dhcp
+                          'hw_if_addr'   : iface_pci,
+                          'ip'           : iface_addr,
+                          'gw'           : gw,
+                          'metric'       : metric,
+                          'dhcp'         : dhcp
                 }
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"
