@@ -1296,7 +1296,7 @@ class Checker:
             add_grub_line = True
             # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part, if exist
             splt = grub_line.split('=\"')
-            if splt > 1:
+            if len(splt) > 1:
                 val_line = splt[1].strip().strip('\" ')
             else:
                 val_line = ''
