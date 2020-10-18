@@ -1621,3 +1621,8 @@ def check_if_virtual_environment():
     else:
         return True
 
+def check_root_access():
+    if os.geteuid() == 0: return True
+    print("Error: requires root privileges, try to run 'sudo'")
+    return False
+

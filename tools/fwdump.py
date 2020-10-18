@@ -36,6 +36,10 @@ import subprocess
 import sys
 import time
 
+agent_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..')
+sys.path.append(agent_root_dir)
+import fwutils
+
 # Special variables in the dumper commands are substituted in run time as follows:
 #   <dumper_out_file> -> '<temporary_folder>/<dumper>.log'
 #   <temp_folder>     -> current folder or --temp_folder script argument
@@ -53,8 +57,11 @@ g_dumpers = {
                                                    'ps -elf | grep vpp >> <dumper_out_file>' },
     'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
     'linux_syslog':                 { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && ' +
-                                                   'cp /var/log/syslog <temp_folder>/linux_syslog/ 2>/dev/null; ' +
-                                                   'cp /var/log/syslog.1 <temp_folder>/linux_syslog/ 2>/dev/null' },
+                                                   'cp /var/log/syslog <temp_folder>/linux_syslog/ 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+    'linux_syslog.1':               { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && ' +
+                                                   'cp /var/log/syslog.156 <temp_folder>/linux_syslog/ 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
     ############################################################################
     # FRR stuff - !!! PLEASE KEEP ALPHABET ORDER !!!
@@ -67,8 +74,11 @@ g_dumpers = {
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
                                                    'cp /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
     'fwagent_log':                  { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
-                                                   'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent/ 2>/dev/null; ' +
-                                                   'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent/ 2>/dev/null' },
+                                                   'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent/ 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+    'fwagent_log.1':                { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
+                                                   'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent/ 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
     'fwagent_version':              { 'shell_cmd': 'fwagent version > <dumper_out_file>' },
@@ -87,7 +97,8 @@ g_dumpers = {
     'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
     'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
     'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' },
-    'vpp_startup_conf':             { 'shell_cmd': 'mkdir -p <temp_folder>/vpp_startup_conf && cp /etc/vpp/* <temp_folder>/vpp_startup_conf/ 2>/dev/null' },
+    'vpp_startup_conf':             { 'shell_cmd': 'mkdir -p <temp_folder>/vpp_startup_conf && cp /etc/vpp/* <temp_folder>/vpp_startup_conf/ 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 }
 
 class FwDump:
@@ -157,8 +168,8 @@ class FwDump:
                 cmd = re.sub('<dumper_out_file>', output_file, cmd)
                 try:
                     subprocess.check_call(cmd, shell=True)
-                except Exception as e:
-                    print(self.prompt + 'ERROR: %s: "%s" failed: %s' % (dumper, cmd, str(e)))
+                except Exception:
+                    print(self.prompt + 'warning: dumper %s failed' % (dumper))
                     continue
 
     def zip(self, filename=None, delete_temp_folder=True):
@@ -182,6 +193,7 @@ class FwDump:
                     'linux_pidof_vpp',
                     'linux_routes',
                     'fwagent_log',
+                    'fwagent_log.1',
                     'fwagent_multilink_cfg',
                     'fwagent_router_cfg',
                     'vpp_acl_dump',
@@ -213,14 +225,17 @@ def main(args):
 
         if args.dont_zip == False:
             dump.zip(filename=args.zip_file)
-            print('Done: %s' % dump.zip_file)
+            print(dump.prompt + 'done: %s' % dump.zip_file)
         else:
-            print('Done, result are here: %s' % dump.temp_folder)
+            print(dump.prompt + 'done: %s' % dump.temp_folder)
 
 
 if __name__ == '__main__':
     import argparse
     global arg
+
+    if not fwutils.check_root_access():
+        sys.exit(1)
 
     parser = argparse.ArgumentParser(description='FlexiEdge dump utility')
     parser.add_argument('--feature', choices=['multilink'], default=None,
