@@ -1876,8 +1876,7 @@ def get_interface_driver(interface_name):
     :param interface_name: Interface name to check.
 
     :returns: driver name.
-    """    
-    #   -i wlxd0374523abfb
+    """
 
     try:
         cmd = 'ethtool -i %s' % interface_name        
@@ -1885,7 +1884,8 @@ def get_interface_driver(interface_name):
         vals = out[0].decode().split("driver: ", 1)
         return str(vals[-1])
     except subprocess.CalledProcessError:
-        return ''   
+        return ''  
+  
 
 def is_non_dpdk_interface(interface_name, pci):
     """Check if interface is not supported by dpdk.                            
