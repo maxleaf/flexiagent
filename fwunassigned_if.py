@@ -97,7 +97,7 @@ class FwUnassignedIfs:
             return res
 
         addr       = self._get_if_address(name)
-        addr       = addr.split('/')[0]
+        addr       = addr.split('/')[0] if addr else ''
         gw, metric = fwutils.get_linux_interface_gateway(name)
 
         if pci in self.cached_interfaces:
