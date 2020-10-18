@@ -143,7 +143,7 @@ def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):
             if tunnel_id and tunnel_stats.get(tunnel_id):
                 if tunnel_stats[tunnel_id].get('status') == 'up':
                     ip_up_set.add(tunnel['src'])
-        return ip_up_set
+    return ip_up_set
 
 def add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels):
     """ Run over all tunnels and get the source IP address of the tunnels that are not connected.

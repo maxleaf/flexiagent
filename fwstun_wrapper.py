@@ -77,6 +77,7 @@ class FwStunWrap:
         fwglobals.log.debug("Start sending STUN requests for all WAN interfaces")
         ip_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
         if ip_list:
+            fwglobals.log.debug("stun_thread initialize: collected IPs: %s" %str(ip_list))
             for ip in ip_list:
                 self._send_single_stun_request(ip, 4789, None, None, True)
             self.log_address_cache()
