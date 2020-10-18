@@ -145,7 +145,7 @@ class FWROUTER_API:
                 if dhcp == 'no':
                     continue
 
-                name = fwutils.pci_to_tap(wan['pci'])
+                name = fwutils.hw_addr_to_tap(wan['hw_addr'])
                 addr = fwutils.get_interface_address(name)
                 if not addr:
                     fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
@@ -721,7 +721,7 @@ class FWROUTER_API:
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
-            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
+            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['hw_addr'])[0]
             if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
                 return True
             if new_params.get('gateway') and new_params.get('gateway') != old_params.get('gateway'):
@@ -827,7 +827,7 @@ class FWROUTER_API:
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
         # The remove-* request might have partial set of parameters only.
-        # For example, 'remove-interface' has 'pci' parameter only and
+        # For example, 'remove-interface' has 'hw_addr' parameter only and
         # has no IP, LAN/WAN type, etc.
         # That makes it impossible to revert these partial remove-X requests
         # on aggregated message rollback that might happen due to failure in
