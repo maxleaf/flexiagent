@@ -33,13 +33,9 @@ globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..'
 sys.path.append(globals)
 
 import fwglobals
-import fwdb_requests
 import fwutils
 
-from fwdb_requests import FwDbRequests
-
-SQLITE_DB_FILE = '/etc/flexiwan/agent/.requests.sqlite'
-
+from fwrouter_cfg import FwRouterCfg
 
 def _find_primary_ip():
     output = subprocess.check_output('ip route show default', shell=True).strip()
@@ -55,7 +51,6 @@ def _find_primary_ip():
 
     return ''
 
-
 def _find_gateway_ip(pci):
     ip = ''
     ifname = fwutils.hw_addr_to_linux_if(pci)
@@ -69,6 +64,32 @@ def _find_gateway_ip(pci):
 
     return ''
 
+def _update_metric():
+    metric = 100
+    primary_ip = _find_primary_ip()
+
+    with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
+        wan_list = router_cfg.get_interfaces(type='wan')
+        for wan in wan_list:
+            if not 'gateway' in wan:
+                gw_ip = _find_gateway_ip(wan['pci'])
+                wan['gateway'] = gw_ip
+
+            if not 'metric' in wan:
+                if not primary_ip:
+                    primary_ip = wan['addr']
+                if primary_ip == wan['addr']:
+                    wan['metric'] = str(0)
+                else:
+                    wan['metric'] = str(metric)
+                    metric += 1
+
+            new_request = {
+                'message':   'add-interface',
+                'params':    wan,
+                'internals': {}
+            }
+            router_cfg.update(new_request, [], False)
 
 def migrate(prev_version, new_version, upgrade):
     if upgrade != 'upgrade':
@@ -76,26 +97,7 @@ def migrate(prev_version, new_version, upgrade):
 
     try:
         print("* Migrating interface DHCP and Metrics configuration...")
-        metric = 100
-        primary_ip = _find_primary_ip()
-        with FwDbRequests(SQLITE_DB_FILE) as db_requests:
-            for key, request in db_requests.db.items():
-                if re.match('add-interface', key):
-                    if re.match('wan', request['params']['type'], re.IGNORECASE):
-                        if not 'gateway' in request['params']:
-                            gw_ip = _find_gateway_ip(request['params']['pci'])
-                            request['params']['gateway'] = gw_ip
-
-                        if not 'metric' in request['params']:
-                            if not primary_ip:
-                                primary_ip = request['params']['addr']
-                            if primary_ip == request['params']['addr']:
-                                request['params']['metric'] = str(0)
-                            else:
-                                request['params']['metric'] = str(metric)
-                                metric += 1
-                        db_requests.update(key, request['request'], request['params'], request['cmd_list'],
-                                           request['executed'])
+        _update_metric()
 
     except Exception as e:
         print("Migration error: %s : %s" % (__file__, str(e)))
