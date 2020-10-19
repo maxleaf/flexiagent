@@ -49,7 +49,7 @@ class OS_DECODERS:
     """OS DECODERS class representation.
     """
     def interfaces(self, inp):
-        """Get PCI address from Linux interface name for a list of interfaces.
+        """Get hardware address from Linux interface name for a list of interfaces.
 
         :param inp:         Interfaces.
 
@@ -63,7 +63,7 @@ class OS_DECODERS:
 
             daddr = {
                 'name':nicname,
-                'pciaddr':hw_if_addr,# TODO: need to change to hw_addr
+                'hw_addr':hw_if_addr,# TODO: need to change to hw_addr
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',
