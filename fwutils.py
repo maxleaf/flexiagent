@@ -286,7 +286,8 @@ def pci_addr_full(hw_addr):
     :returns: Full PCI address.
     """
     (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
-    if addr_type == 'usb' return hw_addr
+    if addr_type == 'usb':
+        return hw_addr
     
     pc = hw_addr.split('.')
     if len(pc) == 2:
@@ -422,10 +423,10 @@ def pci_to_linux_iface(pci):
         return None
     return output.rstrip().split('/')[-1]
 
-def pci_is_vmxnet3(pci):
+def hw_addr_is_vmxnet3(hw_if_addr):
     """Check if PCI address is vmxnet3.
 
-    :param pci:      PCI address.
+    :param hw_if_addr:     hardware address.
 
     :returns: 'True' if it is vmxnet3, 'False' otherwise.
     """
@@ -435,7 +436,11 @@ def pci_is_vmxnet3(pci):
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:13:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_full_to_short(pci)
+    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
+    if addr_type == 'usb':
+        return False
+
+    pci = pci_full_to_short(addr)
 
     try:
         # The 'ls -l /sys/bus/pci/devices/*/driver' approach doesn't work well.
@@ -598,9 +603,18 @@ def pci_to_vpp_sw_if_index(pci):
 
 def hw_addr_to_tap(hw_if_addr):
     (addr_type, address) = hw_if_addr_to_type_and_addr(hw_if_addr)
-    if addr_type == 'usb' return None
+    if addr_type == 'usb':
+        return None
 
     return pci_to_tap(address)
+
+def hw_addr_to_linux_if(hw_if_addr):
+    (addr_type, address) = hw_if_addr_to_type_and_addr(hw_if_addr)
+    if addr_type == 'usb':
+       return address # TODO: need to be fixed
+
+    return pci_to_linux_iface(address)
+
 
 
 # 'pci_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'

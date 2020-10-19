@@ -35,7 +35,7 @@ import fwutils
 #      "entity": "agent",
 #      "message": "start-router",
 #      "params": {
-#        "pci": [
+#        "hw_addr": [
 #           "0000:00:08.00",
 #           "0000:00:09.00"
 #        ]
@@ -97,9 +97,9 @@ def start_router(params=None):
     pci_list         = []
     pci_list_vmxnet3 = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
-    for params in interfaces:
-        iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
-        if iface_pci:
+    for params in interfaces:        
+        linux_if  = fwutils.hw_addr_to_linux_if(params['hw_addr'])
+        if linux_if:
             # Firstly mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
             #      If they appear in /etc/vpp/startup.conf, vpp will capture
@@ -107,16 +107,16 @@ def start_router(params=None):
             #      command will fail with 'device in use'.
             #   2. They require additional VPP call vmxnet3_create on start
             #      and complement vmxnet3_delete on stop
-            if fwutils.pci_is_vmxnet3(params['pci']):
-                pci_list_vmxnet3.append(params['pci'])
+            if fwutils.hw_addr_is_vmxnet3(params['hw_addr']):
+                pci_list_vmxnet3.append(params['hw_addr'])
             else:
-                pci_list.append(params['pci'])
+                pci_list.append(params['hw_addr'])
 
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "exec"
-            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
-            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
+            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
+            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
             cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
