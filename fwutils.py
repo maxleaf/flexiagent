@@ -357,6 +357,18 @@ def hw_if_addr_to_type_and_addr(hw_if_addr):
     
     return ("", "")
 
+def add_type_to_hw_addr(hw_addr):
+    """Add address type at the begining of the address.
+
+    :param hw_addr:      hardware address.
+
+    :returns: hardware address with type.
+    """
+    if re.search('usb', if_addr):
+        return 'usb:%s' % hw_addr
+    
+    return 'pci:%s' % hw_addr
+
 def linux_to_hw_addr(linuxif):
     """Convert Linux interface name into an hardware address.
 
@@ -369,11 +381,11 @@ def linux_to_hw_addr(linuxif):
     if re.search('pci', if_addr):
         if re.search('usb', if_addr):
             address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-            return 'usb:%s' % address 
+            return add_type_to_hw_addr(address)
         else:
             address = if_addr.split('/net')[0].split('/')[-1]
             address = hw_addr_to_full(address)
-            return 'pci:%s' % address
+            return add_type_to_hw_addr(address)
 
     return ""
 
@@ -442,17 +454,17 @@ def hw_addr_is_vmxnet3(hw_if_addr):
 # 'pci_to_vpp_if_name' function maps interface referenced by pci, eg. '0000:00:08.00'
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
-def pci_to_vpp_if_name(pci):
+def pci_to_vpp_if_name(hw_addr):
     """Convert PCI address into VPP interface name.
 
-    :param pci:      PCI address.
+    :param hw_addr:      hardware address.
 
     :returns: VPP interface name.
     """
-    pci = hw_addr_to_full(pci)
-    vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+    hw_addr = hw_addr_to_full(hw_addr)
+    vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
     if vpp_if_name: return vpp_if_name
-    else: return _build_pci_to_vpp_if_name_maps(pci, None)
+    else: return _build_hw_addr_to_vpp_if_name_maps(hw_addr, None)
 
 # 'vpp_if_name_to_pci' function maps interface name, eg. 'GigabitEthernet0/8/0'
 # into the pci of that interface, eg. '0000:00:08.00'.
@@ -464,17 +476,17 @@ def vpp_if_name_to_pci(vpp_if_name):
 
     :returns: PCI address.
     """
-    pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
-    if pci: return pci
-    else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
+    hw_addr = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP').get(vpp_if_name)
+    if hw_addr: return hw_addr
+    else: return _build_hw_addr_to_vpp_if_name_maps(None, vpp_if_name)
 
-# '_build_pci_to_vpp_if_name_maps' function build the local caches of
-# pci to vpp_if_name and vise vera
-# if pci provided, return the name found for this pci,
-# else, if name provided, return the pci for this name,
+# '_build_hw_addr_to_vpp_if_name_maps' function build the local caches of
+# hardware address to vpp_if_name and vise vera
+# if hw_addr provided, return the name found for this hw_addr,
+# else, if name provided, return the hw_addr for this name,
 # else, return None
 # To do that we dump all hardware interfaces, split the dump into list by empty line,
-# and search list for interface that includes the pci name.
+# and search list for interface that includes the hw_addr name.
 # The dumps brings following table:
 #              Name                Idx    Link  Hardware
 # GigabitEthernet0/8/0               1    down  GigabitEthernet0/8/0
@@ -482,10 +494,10 @@ def vpp_if_name_to_pci(vpp_if_name):
 #   ...
 #   pci: device 8086:100e subsystem 8086:001e address 0000:00:08.00 numa 0
 #
-def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
+def _build_hw_addr_to_vpp_if_name_maps(hw_addr, vpp_if_name):
     shif = _vppctl_read('show hardware-interfaces')
     if shif == None:
-        fwglobals.log.debug("_build_pci_to_vpp_if_name_maps: Error reading interface info")
+        fwglobals.log.debug("_build_hw_addr_to_vpp_if_name_maps: Error reading interface info")
     data = shif.splitlines()
     for intf in _get_group_delimiter(data, r"^\w.*?\d"):
         # Contains data for a given interface
@@ -494,25 +506,25 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
-            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[hw_addr_to_full(k)] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = hw_addr_to_full(k)
+            fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[hw_addr_to_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[v] = hw_addr_to_full(k)
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
         pci_addr = pci_bytes_to_str(hw_if.pci_addr)
-        fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
-        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[vpp_if_name] = pci_addr
+        fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[vpp_if_name] = pci_addr
 
-    if pci:
-        vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+    if hw_addr:
+        vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
-        if pci: return pci
+        hw_addr = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP').get(vpp_if_name)
+        if hw_addr: return hw_addr
 
-    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
-    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
+    fwglobals.log.debug("_build_hw_addr_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (hw_addr, vpp_if_name, shif))
+    fwglobals.log.debug("_build_hw_addr_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (hw_addr, vpp_if_name, vmxnet3hw))
     fwglobals.log.debug(str(traceback.extract_stack()))
     return None
 
