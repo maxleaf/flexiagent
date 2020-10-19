@@ -307,8 +307,11 @@ class FwStunWrap:
             return
         fwglobals.log.debug("check_if_cache_empty: adding WAN addresses from Router-DB")
         addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
+        ip_addr_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
         for elem in addr_list:
-            self.add_addr(elem['address'], False)
+            # filter out left overs from previous unhandled router shut-down
+            if elem['address'] in ip_addr_list:
+                self.add_addr(elem['address'], False)
         return
 
     def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port, try_once):

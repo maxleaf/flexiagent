@@ -237,7 +237,7 @@ class FwUnassignedIfs:
         """
         for pci in self.cached_interfaces.keys():
             entry = self.cached_interfaces[pci]
-            if address_no_mask == entry['addr'].split('/')[0]:
+            if entry['addr'] != None and address_no_mask==entry['addr'].split('/')[0]:
                 return True
         return False
 
