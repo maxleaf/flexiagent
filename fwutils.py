@@ -1136,7 +1136,7 @@ def modify_dhcpd(is_add, params):
     dns         = params.get('dns', {})
     mac_assign  = params.get('mac_assign', {})
 
-    interfaces = fwglobals.g.router_cfg.get_interfaces(pci=pci)
+    interfaces = fwglobals.g.router_cfg.get_interfaces(hw_addr=pci)
     if not interfaces:
         return (False, "modify_dhcpd: %s was not found" % (pci))
 
@@ -1336,10 +1336,10 @@ def get_interface_sw_if_index(ip):
     :returns: sw_if_index.
     """
 
-    pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    if not pci:
+    hw_addr, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not hw_addr:
         return None
-    return pci_to_vpp_sw_if_index(pci)
+    return pci_to_vpp_sw_if_index(hw_addr)
 
 def get_interface_vpp_names(type=None):
     res = []
@@ -1368,7 +1368,7 @@ def get_interface_gateway(ip):
     :returns: IP address.
     """
 
-    pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    hw_addr, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
 def add_static_route(addr, via, metric, remove, pci=None):

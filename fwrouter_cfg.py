@@ -367,15 +367,15 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None, pci=None, ip=None):
+    def get_interfaces(self, type=None, hw_addr=None, ip=None):
         interfaces = self._get_requests('add-interface')
-        if not type and not pci and not ip:
+        if not type and not hw_addr and not ip:
             return interfaces
         result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
                 continue
-            elif pci and pci != params['pci']:
+            elif hw_addr and hw_addr != params['hw_addr']:
                 continue
             elif ip and not re.match(ip, params['addr']):
                 continue
@@ -400,28 +400,28 @@ class FwRouterCfg:
         interfaces = self.get_interfaces(type='wan', ip=ip)
         if not interfaces:
             return (None, None)
-        pci = interfaces[0]['pci']
+        hw_addr = interfaces[0]['hw_addr']
         gw  = interfaces[0].get('gateway')
         # If gateway not exist in interface configuration, use default
         # This is needed when upgrading from version 1.1.52 to 1.2.X
         if not gw:
-            tap = fwutils.pci_to_tap(pci)
+            tap = fwutils.hw_addr_to_tap(hw_addr)
             rip, _ = fwutils.get_linux_interface_gateway(tap)
-            return pci, rip
+            return hw_addr, rip
         else:
-            return pci, gw
+            return hw_addr, gw
 
-    def get_interface_ips(self, pci_list=None):
+    def get_interface_ips(self, hw_addr_list=None):
         """Fetches IP-s of interfaces stored in the configuration database.
 
-        :param pci_list: filter interfaces to be handled by pci.
+        :param hw_addr_list: filter interfaces to be handled by hw_addr.
 
         :returns: list of IP addresses. The addresses are without length.
         """
         if_ips = []
         interfaces = self.get_interfaces()
         for params in interfaces:
-            if not pci_list or params['pci'] in pci_list:
+            if not hw_addr_list or params['hw_addr'] in hw_addr_list:
                 if_ips.append(params['addr'].split('/')[0])
         return if_ips
 
