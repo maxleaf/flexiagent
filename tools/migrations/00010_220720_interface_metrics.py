@@ -58,7 +58,7 @@ def _find_primary_ip():
 
 def _find_gateway_ip(pci):
     ip = ''
-    ifname = fwutils.pci_to_linux_iface(pci)
+    ifname = fwutils.hw_addr_to_linux_if(pci)
     if ifname:
         ip, metric = fwutils.get_linux_interface_gateway(ifname)
         return ip

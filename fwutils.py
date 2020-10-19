@@ -278,12 +278,14 @@ def is_ip_in_subnet(ip, subnet):
     """
     return True if IPAddress(ip) in IPNetwork(subnet) else False
 
-def pci_addr_full(hw_addr):
+def hw_addr_to_full(hw_addr):
     """Convert short PCI into full representation.
+    the 'hw_addr' param could be either a pci or a usb address.
+    in case of pci address - the function will convert into a full address
 
-    :param pci_addr:      Short PCI address.
+    :param hw_addr:      hardware address.
 
-    :returns: Full PCI address.
+    :returns: full hardware address.
     """
     (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
     if addr_type == 'usb':
@@ -295,17 +297,23 @@ def pci_addr_full(hw_addr):
     return hw_addr
 
 # Convert 0000:00:08.01 provided by management to 0000:00:08.1 used by Linux
-def pci_full_to_short(pci):
+def hw_addr_full_to_short(hw_addr):
     """Convert full PCI into short representation.
-
-    :param pci_addr:      Full PCI address.
+    the 'hw_addr' param could be either a pci or a usb address.
+    in case of pci address - convert pci provided by management into a short address used by Linux
+    
+    :param hw_addr:      Full PCI address.
 
     :returns: Short PCI address.
     """
-    l = pci.split('.')
+    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
+    if addr_type == 'usb':
+        return hw_addr
+
+    l = hw_addr.split('.')
     if len(l[1]) == 2 and l[1][0] == '0':
-        pci = l[0] + '.' + l[1][1]
-    return pci
+        hw_addr = l[0] + '.' + l[1][1]
+    return hw_addr
 
 def get_linux_hw_addresses():
     """ Get the list of PCI-s of all network interfaces available in Linux.
@@ -364,44 +372,15 @@ def linux_to_hw_addr(linuxif):
             return 'usb:%s' % address 
         else:
             address = if_addr.split('/net')[0].split('/')[-1]
-            address = pci_addr_full(address)
+            address = hw_addr_to_full(address)
             return 'pci:%s' % address
 
     return ""
 
+def hw_addr_to_linux_if(hw_addr):
+    """Convert hardware address into Linux interface name.
 
-# def linux_to_pci_addr(linuxif):
-#     """Convert Linux interface name into PCI address.
-
-#     :param linuxif:      Linux interface name.
-
-#     :returns: PCI address.
-#     """
-#     NETWORK_BASE_CLASS = "02"
-#     vpp_run = vpp_does_run()
-#     lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-#     for line in lines:
-#         vals = line.decode().split("\t", 1)
-#         if len(vals) == 2:
-#             # keep slot number
-#             if vals[0] == 'Slot:':
-#                 slot = vals[1]
-#             if vals[0] == 'Class:':
-#                 if vals[1][0:2] == NETWORK_BASE_CLASS:
-#                     interface = pci_to_linux_iface(slot)
-#                     if not interface and vpp_run:
-#                         interface = pci_to_tap(slot)
-#                     if not interface:
-#                         continue
-#                     if interface == linuxif:
-#                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
-#                         return (pci_addr_full(slot), "" if driver=='driver' else driver)
-#     return ("","")
-
-def pci_to_linux_iface(pci):
-    """Convert PCI address into Linux interface name.
-
-    :param pci:      PCI address.
+    :param hw_addr:      Hardware address.
 
     :returns: Linux interface name.
     """
@@ -413,10 +392,10 @@ def pci_to_linux_iface(pci):
     # lrwxrwxrwx 1 root root 0 Jul  4 16:21 lo -> ../../devices/virtual/net/lo
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_full_to_short(pci)
+    hw_addr = hw_addr_full_to_short(hw_addr)
 
     try:
-        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True)
+        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + hw_addr, shell=True)
     except:
         return None
     if output is None:
@@ -440,7 +419,7 @@ def hw_addr_is_vmxnet3(hw_if_addr):
     if addr_type == 'usb':
         return False
 
-    pci = pci_full_to_short(addr)
+    pci = hw_addr_full_to_short(addr)
 
     try:
         # The 'ls -l /sys/bus/pci/devices/*/driver' approach doesn't work well.
@@ -470,7 +449,7 @@ def pci_to_vpp_if_name(pci):
 
     :returns: VPP interface name.
     """
-    pci = pci_addr_full(pci)
+    pci = hw_addr_to_full(pci)
     vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
     if vpp_if_name: return vpp_if_name
     else: return _build_pci_to_vpp_if_name_maps(pci, None)
@@ -515,8 +494,8 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
-            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr_full(k)] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_addr_full(k)
+            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[hw_addr_to_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = hw_addr_to_full(k)
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
@@ -608,15 +587,6 @@ def hw_addr_to_tap(hw_if_addr):
 
     return pci_to_tap(address)
 
-def hw_addr_to_linux_if(hw_if_addr):
-    (addr_type, address) = hw_if_addr_to_type_and_addr(hw_if_addr)
-    if addr_type == 'usb':
-       return address # TODO: need to be fixed
-
-    return pci_to_linux_iface(address)
-
-
-
 # 'pci_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
 # To do that we convert firstly the pci into name of interface in VPP,
@@ -632,7 +602,7 @@ def pci_to_tap(pci):
 
     :returns: Linux TAP interface name.
     """
-    pci_full = pci_addr_full(pci)
+    pci_full = hw_addr_to_full(pci)
     cache    = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_TAP_NAME_MAP')
     tap = cache.get(pci_full)
     if tap:
@@ -1076,7 +1046,7 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev = pci_full_to_short(dev)
+        dev = hw_addr_full_to_short(dev)
         config_param = 'dev %s' % dev
         if p.get_element(config['dpdk'],config_param) == None:
             tup = p.create_element(config_param)
