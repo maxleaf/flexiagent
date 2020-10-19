@@ -307,17 +307,17 @@ def pci_full_to_short(pci):
         pci = l[0] + '.' + l[1][1]
     return pci
 
-def get_linux_pcis():
+def get_linux_hw_addresses():
     """ Get the list of PCI-s of all network interfaces available in Linux.
     """
-    pci_list = fwglobals.g.get_cache_data('PCIS')
-    if not pci_list:
+    hw_addr_list = fwglobals.g.get_cache_data('HW_ADDR')
+    if not hw_addr_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
-            hw_if_Addr = linux_to_hw_addr(nicname)
-            if hw_if_Addr and hw_if_Addr == "":
+            hw_if_addr = linux_to_hw_addr(nicname)
+            if hw_if_addr and hw_if_addr == "":
                 continue
-            pci_list.append(hw_if_Addr)
+            pci_list.append(hw_if_addr)
     return pci_list
 
 def get_interface_driver(interface_name):
