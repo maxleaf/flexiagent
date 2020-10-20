@@ -68,7 +68,7 @@ def add_route(params):
                                     'via':    params['via'],
                                     'metric': params.get('metric'),
                                     'remove': False,
-                                    'pci':    params.get('hw_addr')
+                                    'hw_addr':    params.get('hw_addr')
                                 }
                               }
     cmd['revert'] = {}
@@ -82,7 +82,7 @@ def add_route(params):
                                     'via':    params['via'],
                                     'metric': params.get('metric'),
                                     'remove': True,
-                                    'pci':    params.get('hw_addr')
+                                    'hw_addr':    params.get('hw_addr')
                                 }
                               }
     cmd_list.append(cmd)

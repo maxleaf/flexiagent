@@ -451,25 +451,29 @@ def hw_addr_is_vmxnet3(hw_if_addr):
         return False
     return True
 
-# 'pci_to_vpp_if_name' function maps interface referenced by pci, eg. '0000:00:08.00'
+# 'hw_addr_to_vpp_if_name' function maps interface referenced by hardware address - pci or usb - eg. '0000:00:08.00'
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
-def pci_to_vpp_if_name(hw_addr):
+def hw_addr_to_vpp_if_name(hw_addr):
     """Convert PCI address into VPP interface name.
 
     :param hw_addr:      hardware address.
 
     :returns: VPP interface name.
     """
-    hw_addr = hw_addr_to_full(hw_addr)
-    vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
-    if vpp_if_name: return vpp_if_name
-    else: return _build_hw_addr_to_vpp_if_name_maps(hw_addr, None)
+    addr_type, _ = hw_if_addr_to_type_and_addr(hw_addr)
+    if addr_type === "pci":
+        hw_addr = hw_addr_to_full(hw_addr)
+        vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
+        if vpp_if_name: return vpp_if_name
+        else: return _build_hw_addr_to_vpp_if_name_maps(hw_addr, None)
 
-# 'vpp_if_name_to_pci' function maps interface name, eg. 'GigabitEthernet0/8/0'
+    return None
+
+# 'vpp_if_name_to_hw_addr' function maps interface name, eg. 'GigabitEthernet0/8/0'
 # into the pci of that interface, eg. '0000:00:08.00'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
-def vpp_if_name_to_pci(vpp_if_name):
+def vpp_if_name_to_hw_addr(vpp_if_name):
     """Convert PCI address into VPP interface name.
 
     :param vpp_if_name:      VPP interface name.
@@ -567,21 +571,21 @@ def pci_bytes_to_str(pci_bytes):
     function = (bytes) & 0x7
     return "%04x:%02x:%02x.%02x" % (domain, bus, slot, function)
 
-# 'pci_to_vpp_sw_if_index' function maps interface referenced by pci, e.g '0000:00:08.00'
+# 'hw_addr_to_vpp_sw_if_index' function maps interface referenced by hardware address, e.g pci - '0000:00:08.00'
 # into index of this interface in VPP, eg. 1.
-# To do that we convert firstly the pci into name of interface in VPP,
+# To do that we convert firstly the hardware address into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
-def pci_to_vpp_sw_if_index(pci):
-    """Convert PCI address into VPP sw_if_index.
+def hw_addr_to_vpp_sw_if_index(hw_addr):
+    """Convert hardware address into VPP sw_if_index.
 
-    :param pci:      PCI address.
+    :param hw_addr:      hw_addr address.
 
     :returns: sw_if_index.
     """
-    vpp_if_name = pci_to_vpp_if_name(pci)
-    fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, str(vpp_if_name)))
+    vpp_if_name = hw_addr_to_vpp_if_name(hw_addr)
+    fwglobals.log.debug("hw_addr_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (hw_addr, str(vpp_if_name)))
     if vpp_if_name is None:
         return None
 
@@ -589,17 +593,11 @@ def pci_to_vpp_sw_if_index(pci):
     for sw_if in sw_ifs:
         if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
             return sw_if.sw_if_index
-    fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
+    fwglobals.log.debug("hw_addr_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (hw_addr, yaml.dump(sw_ifs, canonical=True)))
+    
     return None
 
-def hw_addr_to_tap(hw_if_addr):
-    (addr_type, address) = hw_if_addr_to_type_and_addr(hw_if_addr)
-    if addr_type == 'usb':
-        return None
-
-    return pci_to_tap(address)
-
-# 'pci_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
+# 'hw_addr_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
 # To do that we convert firstly the pci into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0' and than we grep output of 'vppctl sh tap-inject'
@@ -607,20 +605,24 @@ def hw_addr_to_tap(hw_if_addr):
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def pci_to_tap(pci):
+def hw_addr_to_tap(hw_if_addr):
     """Convert PCI address into TAP name.
 
     :param pci:      PCI address.
 
     :returns: Linux TAP interface name.
     """
-    pci_full = hw_addr_to_full(pci)
+    addr_type, _ = hw_if_addr_to_type_and_addr(hw_if_addr)
+    if addr_type == 'usb':
+        return None
+
+    pci_full = hw_addr_to_full(hw_if_addr)
     cache    = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_TAP_NAME_MAP')
     tap = cache.get(pci_full)
     if tap:
         return tap
 
-    vpp_if_name = pci_to_vpp_if_name(pci)
+    vpp_if_name = hw_addr_to_vpp_if_name(pci)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1058,11 +1060,13 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev = hw_addr_full_to_short(dev)
-        config_param = 'dev %s' % dev
-        if p.get_element(config['dpdk'],config_param) == None:
-            tup = p.create_element(config_param)
-            config['dpdk'].append(tup)
+        addr_type, _ = hw_if_addr_to_type_and_addr(dev)
+        if addr_type === "pci":
+            dev = hw_addr_full_to_short(dev)
+            config_param = 'dev %s' % dev
+            if p.get_element(config['dpdk'],config_param) == None:
+                tup = p.create_element(config_param)
+                config['dpdk'].append(tup)
 
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
@@ -1126,15 +1130,15 @@ def modify_dhcpd(is_add, params):
 
     :returns: String with sed commands.
     """
-    pci         = params['interface']
+    hw_addr         = params['interface']
     range_start = params.get('range_start', '')
     range_end   = params.get('range_end', '')
     dns         = params.get('dns', {})
     mac_assign  = params.get('mac_assign', {})
 
-    interfaces = fwglobals.g.router_cfg.get_interfaces(hw_addr=pci)
+    interfaces = fwglobals.g.router_cfg.get_interfaces(hw_addr=hw_addr)
     if not interfaces:
-        return (False, "modify_dhcpd: %s was not found" % (pci))
+        return (False, "modify_dhcpd: %s was not found" % (hw_addr))
 
     address = IPNetwork(interfaces[0]['addr'])
     router = str(address.ip)
@@ -1206,7 +1210,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     :param params: labels      - python list of labels
                    is_dia      - type of labels (DIA - Direct Internet Access)
                    remove      - True to remove labels, False to add.
-                   dev         - PCI if device to apply labels to.
+                   dev         - Hardware address of device to apply labels to.
                    next_hop_ip - IP address of next hop.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
@@ -1216,11 +1220,14 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     ids = ','.join(map(str, ids_list))
 
     if dev:
-        vpp_if_name = pci_to_vpp_if_name(dev)
+        vpp_if_name = hw_addr_to_vpp_if_name(dev)
     elif sw_if_index:
         vpp_if_name = vpp_sw_if_index_to_name(sw_if_index)
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
+    
+    if not vpp_if_name:
+        return (False, "'vpp_if_name' was not found")
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1335,14 +1342,14 @@ def get_interface_sw_if_index(ip):
     hw_addr, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     if not hw_addr:
         return None
-    return pci_to_vpp_sw_if_index(hw_addr)
+    return hw_addr_to_vpp_sw_if_index(hw_addr)
 
 def get_interface_vpp_names(type=None):
     res = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
     for params in interfaces:
         if type == None or re.match(type, params['type'], re.IGNORECASE):
-            sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+            sw_if_index = hw_addr_to_vpp_sw_if_index(params['hw_addr'])
             if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
             res.append(if_vpp_name)
     return res
@@ -1364,10 +1371,10 @@ def get_interface_gateway(ip):
     :returns: IP address.
     """
 
-    hw_addr, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    _, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
     return ip_str_to_bytes(gw_ip)[0]
 
-def add_static_route(addr, via, metric, remove, pci=None):
+def add_static_route(addr, via, metric, remove, hw_addr=None):
     """Add static route.
 
     :param params: params:
@@ -1375,7 +1382,7 @@ def add_static_route(addr, via, metric, remove, pci=None):
                         via     - Gateway address.
                         metric  - Metric.
                         remove  - True to remove route.
-                        pci     - Device to be used for outgoing packets.
+                        hw_addr - Hardware address of device to be used for outgoing packets.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1409,10 +1416,10 @@ def add_static_route(addr, via, metric, remove, pci=None):
             op = 'del'
         cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
     else:
-        if not pci:
+        if not hw_addr:
             cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
-            tap = pci_to_tap(pci)
+            tap = hw_addr_to_tap(hw_addr)
             cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
@@ -1423,18 +1430,23 @@ def add_static_route(addr, via, metric, remove, pci=None):
 
     return True
 
-def vpp_set_dhcp_detect(pci, remove):
+def vpp_set_dhcp_detect(hw_addr, remove):
     """Enable/disable DHCP detect feature.
 
     :param params: params:
-                        pci     -  Interface PCI.
+                        hw_addr -  Interface hardware address.
                         remove  - True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
+    addr_type, _ = hw_if_addr_to_type_and_addr(hw_addr)
+
+    if addr_type != "pci":
+        return (False, "addr type needs to be a pci address")
+    
     op = 'del' if remove else ''
 
-    sw_if_index = pci_to_vpp_sw_if_index(pci)
+    sw_if_index = hw_addr_to_vpp_sw_if_index(pci)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
 
 

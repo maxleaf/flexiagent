@@ -93,8 +93,8 @@ def update_stats():
                         if t_stats:
                             t_stats.update(calc_stats)
                     else:
-                        # For other interfaces try to get pci index
-                        hw_addr = fwutils.vpp_if_name_to_pci(intf)
+                        # For other interfaces try to get hw addr
+                        hw_addr = fwutils.vpp_if_name_to_hw_addr(intf)
                         if hw_addr:
                             if_bytes[hw_addr] = calc_stats
 
