@@ -559,8 +559,9 @@ def pci_to_tap(pci):
 
     :returns: Linux TAP interface name.
     """
-    cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
-    tap = cache.get(pci)
+    pci_full = pci_addr_full(pci)
+    cache    = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+    tap = cache.get(pci_full)
     if tap:
         return tap
 
@@ -569,7 +570,7 @@ def pci_to_tap(pci):
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
     if tap:
-        cache[pci] = tap
+        cache[pci_full] = tap
     return tap
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
@@ -1620,4 +1621,9 @@ def check_if_virtual_environment():
         return False
     else:
         return True
+
+def check_root_access():
+    if os.geteuid() == 0: return True
+    print("Error: requires root privileges, try to run 'sudo'")
+    return False
 

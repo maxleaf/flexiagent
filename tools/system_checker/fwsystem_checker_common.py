@@ -944,7 +944,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multithread_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multi_core_support_requires_RSS(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -971,6 +971,7 @@ class Checker:
             str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
             try:
                 if len(str_cores) == 0:
+                    input_cores = num_worker_cores
                     break
                 input_cores = int(str_cores)
                 if input_cores > num_worker_cores:
@@ -1067,26 +1068,18 @@ class Checker:
         if input_cores == 0:
             if main_core_param:
                 self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
-            main_core_param = 'main-core 0'
-            conf['cpu'].append(self.fw_ac_db.create_element(main_core_param))
 
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-            corelist_worker_param = 'corelist-workers 0'
-            conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
 
             if workers_param:
                 self.fw_ac_db.remove_element(conf['cpu'], workers_param)
-            workers_param = 'workers 0'
-            conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
 
             if num_of_rx_queues_param:
-                if conf['dpdk'].get(dev_default_key):
+                if conf['dpdk'][dev_default_key]:
                     self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
-                    num_of_rx_queues_param = 'num-rx-queues 0'
-                    conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
-                else:
-                    self._add_tup_to_dpdk(0)
+                    if len(conf['dpdk'][dev_default_key]) == 0:
+                        self.fw_ac_db.remove_element(conf['dpdk'],dev_default_key)
             self.vpp_config_modified = True
             self.update_grub = True
             return True
@@ -1128,14 +1121,14 @@ class Checker:
 
             if num_of_rx_queues_param_val != input_cores:
                 if conf['dpdk'] != None:
-                    if conf['dpdk'][dev_default_key]:
+                    if conf['dpdk'][dev_default_key] != None:
                         new_num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
                         string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key], 'num-rx-queues')
                         if string:
                             tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
                             if tup:
                                 self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], string)
-                            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
+                        conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
                     else:
                         self._add_tup_to_dpdk(input_cores)
                         self.vpp_config_modified = True
@@ -1293,9 +1286,12 @@ class Checker:
     # zero cores means reset to old line, without our additions
         if grub_line_found == True:
             add_grub_line = True
-            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
-            val_line = grub_line.split('=\"')[1].strip()
-            val_line = val_line.strip('\" ')
+            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part, if exist
+            splt = grub_line.split('=\"')
+            if len(splt) > 1:
+                val_line = splt[1].strip().strip('\" ')
+            else:
+                val_line = ''
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
             #remove old values, if exist, so we can replace them with ours
@@ -1322,7 +1318,7 @@ class Checker:
                 grub_line = prefix_val+ '=\"' + val_line +'\"'
             write_file.write(grub_line+'\n')
         else:
-            grub_line = prefix_val+'\"' + update_line + '\"'
+            grub_line = prefix_val+ '=\"' + update_line + '\"'
             write_file.write(grub_line+'\n')
 
         write_file.close()

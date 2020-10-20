@@ -79,7 +79,7 @@ soft_checkers = [
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_multithread_support_requires_RSS'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_multi_core_support_requires_RSS'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
 
 ]
@@ -305,8 +305,8 @@ def main(args):
                             "\t 1  - check system configuration\n" +
                             "\t 2  - configure system silently\n" +
                             "\t 3  - configure system interactively\n" +
-                            "\t 4  - restore system to factory defaults\n" +
-                            "\t-----------------------------------------\n" +
+                            "\t 4  - restore system checker settings to default\n" +
+                            "\t------------------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
             	print('')
@@ -348,6 +348,9 @@ def main(args):
 if __name__ == '__main__':
     import argparse
     global arg
+
+    if not fwutils.check_root_access():
+        sys.exit(1)
 
     # Ensure that VPP does not run.
     # Otherwise driver interface checks might fail and user will be scared for

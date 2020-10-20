@@ -79,4 +79,8 @@ def main():
         print ("Done")
 
 if __name__ == '__main__':
+
+    if not fwutils.check_root_access():
+        sys.exit(1)
+
     main()
