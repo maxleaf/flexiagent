@@ -283,12 +283,10 @@ class FwStunWrap:
 
         #now start sending STUN request
         for addr in self.local_cache['stun_interfaces'].keys():
-            elem = copy.deepcopy(self.local_cache['stun_interfaces'][addr])
-            if elem.get('success',False) == True:
+            elem = copy.deepcopy(self.local_cache['stun_interfaces'].get(addr))
+            if not elem or elem.get('success',False) == True:
                 continue
             else:
-                if elem == None:
-                    continue
                 if elem['sec_counter'] == elem['next_time']:
                     nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
                         self._send_single_stun_request(addr, 4789, elem['stun_server'], \
