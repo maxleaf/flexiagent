@@ -1478,6 +1478,26 @@ def tunnel_change_postprocess(add, addr):
     for policy_id, priority in policies.items():
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
+def fix_params(params):
+    fwglobals.log.debug("fix_params: incoming: %s" %(params))
+    if 'pci' in params:
+        params['hw_addr'] = params.pop('pci')
+        # del params['pci']
+
+    return params
+
+def fix_request_params(params):    
+    fwglobals.log.debug("fix_request_params: incoming: %s" %(params))
+    if 'requests' in params:        
+        requests = params['requests']     
+        for request in requests:
+            if 'params' in request:
+                request['params'] = fix_params(request['params'])
+    else:
+        a = "A"
+
+    return params
+
 # Today (May-2019) message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:
 #   1. 'start-router' aggregation: requests are embedded into 'params' field on some request

@@ -40,6 +40,7 @@ from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
 from fwunassigned_if import FwUnassignedIfs
+import fwutils
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -421,6 +422,9 @@ class Fwglobals:
             req    = request['message']
             params = request.get('params')
 
+            if params:
+                params = fwutils.fix_request_params(params)
+
             if req != 'aggregated':
                 handler = request_handlers.get(req)
                 assert handler, 'fwglobals: "%s" request is not supported' % req
@@ -441,6 +445,7 @@ class Fwglobals:
                 received_msg = copy.deepcopy(request)
 
             handler_func = getattr(self, handler.get('name'))
+            
             if result is None:
                 reply = handler_func(request)
             else:
