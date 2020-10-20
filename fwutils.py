@@ -364,7 +364,7 @@ def add_type_to_hw_addr(hw_addr):
 
     :returns: hardware address with type.
     """
-    if re.search('usb', if_addr):
+    if re.search('usb', hw_addr):
         return 'usb:%s' % hw_addr
     
     return 'pci:%s' % hw_addr
@@ -462,7 +462,7 @@ def hw_addr_to_vpp_if_name(hw_addr):
     :returns: VPP interface name.
     """
     addr_type, _ = hw_if_addr_to_type_and_addr(hw_addr)
-    if addr_type === "pci":
+    if addr_type == "pci":
         hw_addr = hw_addr_to_full(hw_addr)
         vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
         if vpp_if_name: return vpp_if_name
@@ -1061,7 +1061,7 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         config.append(tup)
     for dev in devices:
         addr_type, _ = hw_if_addr_to_type_and_addr(dev)
-        if addr_type === "pci":
+        if addr_type == "pci":
             dev = hw_addr_full_to_short(dev)
             config_param = 'dev %s' % dev
             if p.get_element(config['dpdk'],config_param) == None:

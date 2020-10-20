@@ -240,7 +240,7 @@ def start_router(params=None):
     # that and it causes problems in FIB, when default route interface is deleted.
     for hw_addr in hw_addr_list_vmxnet3:
         addr_type, _ = fwutils.hw_if_addr_to_type_and_addr(hw_addr)
-        if (addr_type === "pci"):
+        if (addr_type == "pci"):
             pci_bytes = fwutils.pci_str_to_bytes(hw_addr)
             cmd = {}
             cmd['cmd'] = {}
