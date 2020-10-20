@@ -284,7 +284,7 @@ class FwStunWrap:
         #now start sending STUN request
         for addr in self.local_cache['stun_interfaces'].keys():
             elem = copy.deepcopy(self.local_cache['stun_interfaces'][addr])
-            if elem['success'] == True:
+            if elem.get('success',False) == True:
                 continue
             else:
                 if elem == None:
