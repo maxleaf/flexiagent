@@ -9,6 +9,7 @@ import fwglobals
 import fwtunnel_stats
 import fwutils
 import time
+import copy
 
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
 sys.path.append(tools)
@@ -118,7 +119,7 @@ class FwStunWrap:
         """
         # 1 add address with public info, as received by add-address from management,
         # over-written the address if exist in cache.
-        if params and 'PublicIP' in params and 'PublicPort' in params \
+        if params and params.get('PublicIP','') != '' and params.get('PublicPort','') != '' \
                 and params.get('useStun', False) == True:
             cached_addr = self.initialize_addr(addr, wait)
             cached_addr['public_ip']        = params['PublicIP']
@@ -282,15 +283,21 @@ class FwStunWrap:
 
         #now start sending STUN request
         for addr in self.local_cache['stun_interfaces'].keys():
-            if self.local_cache['stun_interfaces'][addr]['success'] == True:
+            elem = copy.deepcopy(self.local_cache['stun_interfaces'].get(addr))
+            if not elem or elem.get('success',False) == True:
                 continue
             else:
-                elem = self.local_cache['stun_interfaces'][addr]
                 if elem['sec_counter'] == elem['next_time']:
                     nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
                         self._send_single_stun_request(addr, 4789, elem['stun_server'], \
                         elem['stun_server_port'], False)
-                    self.local_cache['stun_interfaces'][addr]['sec_counter'] = 0
+                    elem['sec_counter'] = 0
+                    # address can be removed by another thread while iterating
+                    if addr in self.local_cache['stun_interfaces'].keys():
+                        self.local_cache['stun_interfaces'][addr] = copy.deepcopy(elem)
+                    else:
+                        continue
+
                     if nat_ext_port == '':
                         self._handle_stun_none_response(addr)
                     else:
@@ -307,8 +314,11 @@ class FwStunWrap:
             return
         fwglobals.log.debug("check_if_cache_empty: adding WAN addresses from Router-DB")
         addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
+        ip_addr_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
         for elem in addr_list:
-            self.add_addr(elem['address'], False)
+            # filter out left overs from previous unhandled router shut-down
+            if elem['address'] in ip_addr_list:
+                self.add_addr(elem['address'], False)
         return
 
     def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port, try_once):
