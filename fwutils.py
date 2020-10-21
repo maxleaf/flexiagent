@@ -323,10 +323,10 @@ def get_linux_hw_addresses():
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
             hw_if_addr = linux_to_hw_addr(nicname)
-            if hw_if_addr and hw_if_addr == "":
+            if hw_if_addr == "":
                 continue
-            pci_list.append(hw_if_addr)
-    return pci_list
+            hw_addr_list.append(hw_if_addr)
+    return hw_addr_list
 
 def get_interface_driver(interface_name):
     """Get Linux interface driver.                            
@@ -381,11 +381,13 @@ def linux_to_hw_addr(linuxif):
     if re.search('pci', if_addr):
         if re.search('usb', if_addr):
             address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-            return add_type_to_hw_addr(address)
+            # return add_type_to_hw_addr(address)
+            return address
         else:
             address = if_addr.split('/net')[0].split('/')[-1]
             address = hw_addr_to_full(address)
-            return add_type_to_hw_addr(address)
+            return address
+            # return add_type_to_hw_addr(address)
 
     return ""
 
