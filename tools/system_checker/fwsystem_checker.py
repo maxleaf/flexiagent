@@ -305,8 +305,8 @@ def main(args):
                             "\t 1  - check system configuration\n" +
                             "\t 2  - configure system silently\n" +
                             "\t 3  - configure system interactively\n" +
-                            "\t 4  - restore system to factory defaults\n" +
-                            "\t-----------------------------------------\n" +
+                            "\t 4  - restore system checker settings to default\n" +
+                            "\t------------------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
             	print('')
