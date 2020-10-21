@@ -306,14 +306,14 @@ def hw_addr_full_to_short(hw_addr):
 
     :returns: Short PCI address.
     """
-    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
+    addr_type, addr = hw_if_addr_to_type_and_addr(hw_addr)
     if addr_type == 'usb':
         return hw_addr
 
-    l = hw_addr.split('.')
+    l = addr.split('.')
     if len(l[1]) == 2 and l[1][0] == '0':
-        hw_addr = l[0] + '.' + l[1][1]
-    return hw_addr
+        addr = l[0] + '.' + l[1][1]
+    return addr
 
 def get_linux_hw_addresses():
     """ Get the list of PCI-s of all network interfaces available in Linux.
@@ -381,13 +381,11 @@ def linux_to_hw_addr(linuxif):
     if re.search('pci', if_addr):
         if re.search('usb', if_addr):
             address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-            # return add_type_to_hw_addr(address)
-            return address
+            return add_type_to_hw_addr(address)
         else:
             address = if_addr.split('/net')[0].split('/')[-1]
-            address = hw_addr_to_full(address)
-            return address
-            # return add_type_to_hw_addr(address)
+            address = add_type_to_hw_addr(address)
+            return hw_addr_to_full(address)
 
     return ""
 
@@ -429,11 +427,11 @@ def hw_addr_is_vmxnet3(hw_if_addr):
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:13:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_if_addr)
+    addr_type, _ = hw_if_addr_to_type_and_addr(hw_if_addr)
     if addr_type == 'usb':
         return False
 
-    pci = hw_addr_full_to_short(addr)
+    pci = hw_addr_full_to_short(hw_if_addr)
 
     try:
         # The 'ls -l /sys/bus/pci/devices/*/driver' approach doesn't work well.
@@ -1448,7 +1446,7 @@ def vpp_set_dhcp_detect(hw_addr, remove):
     
     op = 'del' if remove else ''
 
-    sw_if_index = hw_addr_to_vpp_sw_if_index(pci)
+    sw_if_index = hw_addr_to_vpp_sw_if_index(addr_type)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
 
 
