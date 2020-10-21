@@ -123,13 +123,21 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
     str_data = ''.join([BindRequestMsg, str_len, tranid, send_data])
     data = binascii.a2b_hex(str_data)
     recvCorr = False
-    while not recvCorr:
+    # while not recvCorr:
+    #FLEXIWAN_FIX
+    for first_loop_guard in range (20):
+        if recvCorr == True:
+            break
         num_bytes = 0
         buf = None
         addr = None
         received = False
         count = 3
-        while not received:
+        # while not received:
+        #FLEXIWAN_FIX
+        for second_loop_guard in range (10):
+            if received == True:
+                break
             if port != None and host != None:
                 fwglobals.log.debug("Stun: sendto: %s:%d" %(host, port))
             try:
@@ -154,9 +162,10 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
             # from some reason we sometimes get msgtype u'00800' resulting KeyError exception
             bind_resp_msg = dictValToMsgType[msgtype] == "BindResponseMsg"
         except KeyError:
-            bind_resp_msg = None
-        else:
-            tranid_match = tranid.upper() == b2a_hexstr(buf[4:20]).upper()
+            fwglobals.log.debug("Stun: received unknown message type: %s" %(msgtype))
+            retVal['Resp'] = False
+            return retVal
+        tranid_match = tranid.upper() == b2a_hexstr(buf[4:20]).upper()
         if bind_resp_msg and tranid_match:
             recvCorr = True
             retVal['Resp'] = True
@@ -200,7 +209,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                     # serverName = buf[(base+4):(base+4+attr_len)]
                 base = base + 4 + attr_len
                 len_remain = len_remain - (4 + attr_len)
-    # s.close()
+
     return retVal
 
 def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one_try):
