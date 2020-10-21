@@ -622,7 +622,7 @@ def hw_addr_to_tap(hw_if_addr):
     if tap:
         return tap
 
-    vpp_if_name = hw_addr_to_vpp_if_name(pci)
+    vpp_if_name = hw_addr_to_vpp_if_name(hw_if_addr)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
