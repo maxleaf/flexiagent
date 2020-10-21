@@ -153,6 +153,7 @@ def add_remove_netplan_interface(is_add, hw_if_addr, ip, gw, metric, dhcp):
 
     set_name = ''
     old_ifname = ''
+    hw_if_addr = fwutils.hw_addr_full_to_short(hw_if_addr)
     ifname = fwutils.hw_addr_to_tap(hw_if_addr)
     if not ifname:
         err_str = "add_remove_netplan_interface: %s was not found" % hw_if_addr
