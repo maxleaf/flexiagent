@@ -291,9 +291,9 @@ def hw_addr_to_full(hw_addr):
     if addr_type == 'usb':
         return hw_addr
     
-    pc = hw_addr.split('.')
+    pc = addr.split('.')
     if len(pc) == 2:
-        return pc[0]+'.'+"%02x"%(int(pc[1],16))
+        return add_type_to_hw_addr(pc[0]+'.'+"%02x"%(int(pc[1],16)))
     return hw_addr
 
 # Convert 0000:00:08.01 provided by management to 0000:00:08.1 used by Linux
@@ -308,12 +308,12 @@ def hw_addr_full_to_short(hw_addr):
     """
     addr_type, addr = hw_if_addr_to_type_and_addr(hw_addr)
     if addr_type == 'usb':
-        return hw_addr
+        return addr_type
 
     l = addr.split('.')
     if len(l[1]) == 2 and l[1][0] == '0':
-        addr = l[0] + '.' + l[1][1]
-    return addr
+        return add_type_to_hw_addr(l[0] + '.' + l[1][1])
+    return addr_type
 
 def get_linux_hw_addresses():
     """ Get the list of PCI-s of all network interfaces available in Linux.
@@ -510,6 +510,7 @@ def _build_hw_addr_to_vpp_if_name_maps(hw_addr, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
+            k = add_type_to_hw_addr(k)
             fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[hw_addr_to_full(k)] = v
             fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[v] = hw_addr_to_full(k)
 
@@ -1446,7 +1447,7 @@ def vpp_set_dhcp_detect(hw_addr, remove):
     
     op = 'del' if remove else ''
 
-    sw_if_index = hw_addr_to_vpp_sw_if_index(addr_type)
+    sw_if_index = hw_addr_to_vpp_sw_if_index(hw_addr)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
 
 
