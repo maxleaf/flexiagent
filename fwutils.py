@@ -427,7 +427,7 @@ def hw_addr_is_vmxnet3(hw_if_addr):
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:13:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
+    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_if_addr)
     if addr_type == 'usb':
         return False
 
