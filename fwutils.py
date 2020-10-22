@@ -1505,6 +1505,9 @@ def fix_request_params(params):
         for request in requests:
             if 'params' in request:
                 request['params'] = fix_params(request['params'])
+
+    if 'pci' in params:
+        params = fix_params(params)
    
     fwglobals.log.debug("fix_request_params: output: %s" %(params))
 
