@@ -119,88 +119,82 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
               'SourceIP': None, 'SourcePort': None, 'ChangedIP': None,
               'ChangedPort': None}
     str_len = "%#04d" % (len(send_data) / 2)
-    tranid = gen_tran_id()
-    str_data = ''.join([BindRequestMsg, str_len, tranid, send_data])
+    trans_id = gen_tran_id()
+    str_data = ''.join([BindRequestMsg, str_len, trans_id, send_data])
     data = binascii.a2b_hex(str_data)
-    recvCorr = False
-    while not recvCorr:
-        num_bytes = 0
-        buf = None
-        addr = None
-        received = False
-        count = 3
-        while not received:
-            if port != None and host != None:
-                fwglobals.log.debug("Stun: sendto: %s:%d" %(host, port))
-            try:
-                num_bytes = sock.sendto(data, (host, port))
-            except Exception as e:
-                retVal['Resp'] = False
-                return retVal
-            try:
-                buf, addr = sock.recvfrom(2048)
-                fwglobals.log.debug("Stun: recvfrom: %s" %(str(addr)))
-                received = True
-            except Exception as e:
-                received = False
-                if count > 0:
-                    count -= 1
-                else:
-                    retVal['Resp'] = False
-                    return retVal
+
+    for _ in range (3):
+        fwglobals.log.debug("Stun: sendto: %s:%s" %(str(host), str(port)))
+        try:
+            sock.sendto(data, (host, port))
+        except Exception as e:
+            retVal['Resp'] = False
+            return retVal
+        try:
+            buf, addr = sock.recvfrom(2048)
+            fwglobals.log.debug("Stun: recvfrom: %s" %(str(addr)))
+        except Exception as e:
+            fwglobals.log.warning("Stun: recvfrom: %s" %(str(e)))
+            continue
+
         msgtype = b2a_hexstr(buf[0:2])
-        #FLEXIWAN_FIX
         try:
             # from some reason we sometimes get msgtype u'00800' resulting KeyError exception
             bind_resp_msg = dictValToMsgType[msgtype] == "BindResponseMsg"
         except KeyError:
-            bind_resp_msg = None
-        else:
-            tranid_match = tranid.upper() == b2a_hexstr(buf[4:20]).upper()
-        if bind_resp_msg and tranid_match:
-            recvCorr = True
-            retVal['Resp'] = True
-            len_message = int(b2a_hexstr(buf[2:4]), 16)
-            len_remain = len_message
-            base = 20
-            while len_remain:
-                attr_type = b2a_hexstr(buf[base:(base + 2)])
-                attr_len = int(b2a_hexstr(buf[(base + 2):(base + 4)]), 16)
-                if attr_type == MappedAddress:
-                    port = int(b2a_hexstr(buf[base + 6:base + 8]), 16)
-                    ip = ".".join([
-                        str(int(b2a_hexstr(buf[base + 8:base + 9]), 16)),
-                        str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
-                        str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
-                        str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
-                    ])
-                    retVal['ExternalIP'] = ip
-                    retVal['ExternalPort'] = port
-                if attr_type == SourceAddress:
-                    port = int(b2a_hexstr(buf[base + 6:base + 8]), 16)
-                    ip = ".".join([
-                        str(int(b2a_hexstr(buf[base + 8:base + 9]), 16)),
-                        str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
-                        str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
-                        str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
-                    ])
-                    retVal['SourceIP'] = ip
-                    retVal['SourcePort'] = port
-                if attr_type == ChangedAddress:
-                    port = int(b2a_hexstr(buf[base + 6:base + 8]), 16)
-                    ip = ".".join([
-                        str(int(b2a_hexstr(buf[base + 8:base + 9]), 16)),
-                        str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
-                        str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
-                        str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
-                    ])
-                    retVal['ChangedIP'] = ip
-                    retVal['ChangedPort'] = port
-                # if attr_type == ServerName:
-                    # serverName = buf[(base+4):(base+4+attr_len)]
-                base = base + 4 + attr_len
-                len_remain = len_remain - (4 + attr_len)
-    # s.close()
+            fwglobals.log.debug("Stun: received unknown message type: %s" %(msgtype))
+            retVal['Resp'] = False
+            return retVal
+        trans_id_match = trans_id.upper() == b2a_hexstr(buf[4:20]).upper()
+        if not bind_resp_msg or not trans_id_match:
+            continue
+
+        len_message = int(b2a_hexstr(buf[2:4]), 16)
+        len_remain = len_message
+        base = 20
+        while len_remain:
+            attr_type = b2a_hexstr(buf[base:(base + 2)])
+            attr_len = int(b2a_hexstr(buf[(base + 2):(base + 4)]), 16)
+            # add protection for buffer boundaries
+            if attr_len > len_remain and attr_len <= 12:
+                retVal['Resp'] = True
+                return retVal
+            if attr_type == MappedAddress:
+                port = int(b2a_hexstr(buf[base + 6:base + 8]), 16)
+                ip = ".".join([
+                    str(int(b2a_hexstr(buf[base + 8:base + 9]), 16)),
+                    str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
+                    str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
+                    str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
+                ])
+                retVal['ExternalIP'] = ip
+                retVal['ExternalPort'] = port
+            if attr_type == SourceAddress:
+                port = int(b2a_hexstr(buf[base + 6:base + 8]), 16)
+                ip = ".".join([
+                    str(int(b2a_hexstr(buf[base + 8:base + 9]), 16)),
+                    str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
+                    str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
+                    str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
+                ])
+                retVal['SourceIP'] = ip
+                retVal['SourcePort'] = port
+            if attr_type == ChangedAddress:
+                port = int(b2a_hexstr(buf[base + 6:base + 8]), 16)
+                ip = ".".join([
+                    str(int(b2a_hexstr(buf[base + 8:base + 9]), 16)),
+                    str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
+                    str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
+                    str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
+                ])
+                retVal['ChangedIP'] = ip
+                retVal['ChangedPort'] = port
+
+            base = base + 4 + attr_len
+            len_remain = len_remain - (4 + attr_len)
+        retVal['Resp'] = True
+        return retVal
+
     return retVal
 
 def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one_try):
