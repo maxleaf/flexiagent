@@ -250,6 +250,8 @@ class FwStunWrap:
         if self.local_cache['stun_interfaces'][address]['next_time'] > 60:
             self.local_cache['stun_interfaces'][address]['next_time'] = 60
         self.local_cache['stun_interfaces'][address]['success'] = False
+        self.local_cache['stun_interfaces'][address]['stun_server'] = ''
+        self.local_cache['stun_interfaces'][address]['stun_server_port'] = ''
 
     def _handle_stun_response(self, address, p_ip, p_port, nat_type, st_host, st_port):
         """ Handle STUN response for an address. Reset all the counters,
