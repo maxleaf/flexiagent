@@ -1512,6 +1512,12 @@ def fix_request_params(params):
 
     if 'pci' in params:
         params = fix_params(params)
+
+    # spaciel fix for add-dhcp-config
+    if 'args' in params and 'params' in params['args']:
+        nested_params = params['args']['params']
+        if 'interface' in nested_params:
+            nested_params['interface'] = add_type_to_hw_addr(nested_params['interface'])
    
     fwglobals.log.debug("fix_request_params: output: %s" %(params))
 
