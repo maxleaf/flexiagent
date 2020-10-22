@@ -1056,6 +1056,9 @@ def obj_dump_attributes(obj, level=1):
 
 
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
+    fwglobals.log.debug("\n\n\n*****************************************\n\n\n %s" %(params))
+    fwglobals.log.debug("\n\n\nDEVICES: \n\n\n %s" %(devices))
+    fwglobals.log.debug("\n\n\n*****************************************\n\n\n %s" %(params))
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
 
@@ -1067,6 +1070,10 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         addr_type, addr = hw_if_addr_to_type_and_addr(dev)
         if addr_type == "pci":
             config_param = 'dev %s' % addr
+            fwglobals.log.debug("\n\n\n*****************************************\n\n\n %s" %(params))
+            fwglobals.log.debug("\n\n\DEV: \n\n\n %s" %(dev))
+            fwglobals.log.debug("\n\n\CONFIG_PARAMS: \n\n\n %s" %(config_param))
+            fwglobals.log.debug("\n\n\n*****************************************\n\n\n %s" %(params))
             if p.get_element(config['dpdk'],config_param) == None:
                 tup = p.create_element(config_param)
                 config['dpdk'].append(tup)
@@ -1484,11 +1491,8 @@ def tunnel_change_postprocess(add, addr):
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
 def fix_params(params):
-    fwglobals.log.debug("fix_params: incoming: %s" %(params))
     if 'pci' in params:
         params['hw_addr'] = params.pop('pci')
-        # del params['pci']
-
     return params
 
 def fix_request_params(params):    
@@ -1498,8 +1502,8 @@ def fix_request_params(params):
         for request in requests:
             if 'params' in request:
                 request['params'] = fix_params(request['params'])
-    else:
-        a = "A"
+   
+    fwglobals.log.debug("fix_request_params: output: %s" %(params))
 
     return params
 
