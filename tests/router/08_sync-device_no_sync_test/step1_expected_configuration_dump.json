@@ -143,12 +143,12 @@
   ], 
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config 0000:00:09.00", 
+      "Key": "add-dhcp-config pci:0000:00:09.00", 
       "Params": {
         "dns": [
           "8.8.8.8"
         ], 
-        "interface": "0000:00:09.00", 
+        "interface": "pci:0000:00:09.00", 
         "range_end": "20.20.20.150", 
         "range_start": "20.20.20.100"
       }
