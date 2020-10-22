@@ -1495,7 +1495,11 @@ def tunnel_change_postprocess(add, addr):
 
 def fix_params(params):
     if 'pci' in params:
-        params['hw_addr'] = add_type_to_hw_addr(params.pop('pci'))
+        if type(params['pci']) == list:
+            for pci in params['pci']:
+                pci = add_type_to_hw_addr(pci)
+        else:
+            params['hw_addr'] = add_type_to_hw_addr(params.pop('pci'))
     return params
 
 def fix_request_params(params):    
