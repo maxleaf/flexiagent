@@ -405,9 +405,10 @@ def hw_addr_to_linux_if(hw_addr):
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
     hw_addr = hw_addr_full_to_short(hw_addr)
+    _, addr = hw_if_addr_to_type_and_addr(hw_addr)
 
     try:
-        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + hw_addr, shell=True)
+        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + addr, shell=True)
     except:
         return None
     if output is None:
@@ -511,8 +512,9 @@ def _build_hw_addr_to_vpp_if_name_maps(hw_addr, vpp_if_name):
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
             k = add_type_to_hw_addr(k)
-            fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[hw_addr_to_full(k)] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[v] = hw_addr_to_full(k)
+            full_addr = hw_addr_to_full(k)
+            fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[full_addr] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[v] = full_addr
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
@@ -1061,10 +1063,10 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        addr_type, _ = hw_if_addr_to_type_and_addr(dev)
+        dev = hw_addr_full_to_short(dev)
+        addr_type, addr = hw_if_addr_to_type_and_addr(dev)
         if addr_type == "pci":
-            dev = hw_addr_full_to_short(dev)
-            config_param = 'dev %s' % dev
+            config_param = 'dev %s' % addr
             if p.get_element(config['dpdk'],config_param) == None:
                 tup = p.create_element(config_param)
                 config['dpdk'].append(tup)
@@ -1079,7 +1081,9 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     if config['dpdk'] == None:
         return
     for dev in devices:
-        config_param = 'dev %s' % dev
+        dev = hw_addr_full_to_short(dev)
+        addr_type, addr = hw_if_addr_to_type_and_addr(dev)
+        config_param = 'dev %s' % addr
         key = p.get_element(config['dpdk'],config_param)
         if key:
             p.remove_element(config['dpdk'], key)
