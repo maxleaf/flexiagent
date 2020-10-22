@@ -364,6 +364,9 @@ def add_type_to_hw_addr(hw_addr):
 
     :returns: hardware address with type.
     """
+    if hw_addr.startswith('pci:') or hw_addr.startswith('usb:'):
+        return hw_addr
+
     if re.search('usb', hw_addr):
         return 'usb:%s' % hw_addr
     
@@ -1492,7 +1495,7 @@ def tunnel_change_postprocess(add, addr):
 
 def fix_params(params):
     if 'pci' in params:
-        params['hw_addr'] = params.pop('pci')
+        params['hw_addr'] = add_type_to_hw_addr(params.pop('pci'))
     return params
 
 def fix_request_params(params):    
