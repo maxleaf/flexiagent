@@ -206,7 +206,8 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
         ret = stun_test(s, stun_host, port, source_ip, source_port)
         resp = ret['Resp']
     else:
-        for stun_host_ in stun_servers_list:
+        random_server_list = [stun_servers_list[x] for x in random.sample(range (0, len(stun_servers_list)-1),2)]
+        for stun_host_ in random_server_list:
             #FLEXIWAN_FIX: handle STUN server addresses in the form of ip:port
             stun_info = stun_host_.split(':')
             stun_host_ = stun_info[0]
