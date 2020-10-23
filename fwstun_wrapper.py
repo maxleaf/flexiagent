@@ -107,7 +107,7 @@ class FwStunWrap:
                 self.add_addr(params['addr'].split('/')[0], False, params)
         else:
             # We know it is "remove" because we only registered for "add" and "remove"
-            self.remove_addr(params['addr'].split('/')[0])
+            self.remove_addr(params['addr'].split('/')[0], params)
 
     def add_addr(self, addr, wait=False, params=None):
         """ Add address to cache.
@@ -141,21 +141,23 @@ class FwStunWrap:
         # continuing sending STUN request on that address
             self.local_cache['stun_interfaces'][addr]['success']          = False
 
-    def remove_addr(self, addr):
+    def remove_addr(self, addr, params=None):
         """ remove address from cache. The interface is no longer valid, no need to send
         STUN request on its behalf.
         Note that if the address is in the unassigned-interfaces cache, we will not
         remove it from current cache, as we still want to be able to get public IP:PORT
         on unassigned interfaces as well.
 
-        : param addr : address to remove from cache.
+        : param addr   : address to remove from cache.
+        : param params : interface parameters
         """
         if addr in self.local_cache['stun_interfaces'].keys():
-            if fwglobals.g.unassigned_interfaces.is_unassigned_addr(addr) == False:
-                del self.local_cache['stun_interfaces'][addr]
-                fwglobals.log.debug("Removing address %s from Cache" %(str(addr)))
+            if (fwglobals.g.unassigned_interfaces.is_unassigned_addr(addr) == True) or \
+                (params and params.get('gateway','')!= ''):
+                    fwglobals.log.debug("remove_addr: Address %s has gateway, not removing" %(str(addr)))
             else:
-                fwglobals.log.debug("Address %s in unassigned cache, not removing" %(str(addr)))
+                del self.local_cache['stun_interfaces'][addr]
+                fwglobals.log.debug("remove_addr: Removed address %s from Cache" %(str(addr)))
 
     def find_addr(self,addr_no_mask):
         """ find address in cache, and return its params, empty strings if not found
