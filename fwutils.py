@@ -1493,13 +1493,17 @@ def tunnel_change_postprocess(add, addr):
     for policy_id, priority in policies.items():
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
-def fix_params(params):
+def fix_params(params, message=None):
     if 'pci' in params:
         if type(params['pci']) == list:
             for pci in params['pci']:
                 pci = add_type_to_hw_addr(pci)
         else:
             params['hw_addr'] = add_type_to_hw_addr(params.pop('pci'))
+
+    if message == 'add-dhcp-config' and 'interface' in params:
+        params['interface'] = add_type_to_hw_addr(params['interface'])
+
     return params
 
 def fix_request_params(params, message=None):    
@@ -1508,7 +1512,7 @@ def fix_request_params(params, message=None):
         requests = params['requests']     
         for request in requests:
             if 'params' in request:
-                request['params'] = fix_params(request['params'])
+                request['params'] = fix_params(request['params'], request['message'])
 
     if 'pci' in params:
         params = fix_params(params)
