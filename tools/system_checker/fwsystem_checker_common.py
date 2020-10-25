@@ -904,7 +904,7 @@ class Checker:
         buffers = 16384  # Set default
         conf    = self.vpp_configuration
         conf_param = None
-        if conf and conf['dpdk']:
+        if conf and conf['dpdk'] != None:
             key = self.fw_ac_db.get_element(conf['dpdk'], 'num-mbufs')
             if key:
                 tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'], key)
@@ -936,7 +936,7 @@ class Checker:
 
         if not conf:
             conf = self.fw_ac_db.get_main_list()
-        if conf['dpdk'] is None:
+        if conf['dpdk'] == None:
             tup = self.fw_ac_db.create_element('dpdk')
             conf.append(tup)
 
@@ -954,16 +954,16 @@ class Checker:
         :returns: 'True' if check is successful and 'False' otherwise.
         """
         # This function does the following:
-        # 1. sets "main-core", "corelist-worrkers" and "workers" in "cpu" section in /etc/vpp/startup.conf
+        # 1. sets "main-core", "corelist-workers" and "workers" in "cpu" section in /etc/vpp/startup.conf
         # 2. sets "num-rx-queues" in "dpdk" section in /etc/vpp/startup.conf
-        # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/defualt/grub
+        # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/default/grub
         # 4. sudo update-grub
 
         if not fix or silently:
             return True
         # 'Fix' and 'silently' has no meaning for vpp configuration parameters,
         # as any value is good for it, and if no value was configured,
-        # the exisiting values will be used, or zero if none.
+        # the existing values will be used, or zero if none.
 
         num_worker_cores = psutil.cpu_count() - 1
         input_cores = 0
@@ -1047,9 +1047,9 @@ class Checker:
                 tmp = re.split('\s+', workers_param.strip())
                 workers_param_val = int(tmp[1])
 
-        if conf and not conf['dpdk']:
+        if conf and conf['dpdk'] == None:
             conf.append(self.fw_ac_db.create_element('dpdk'))
-        if conf['dpdk'][dev_default_key]:
+        if conf['dpdk'][dev_default_key] != None:
             string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key],'num-rx-queues')
             if string:
                 tup_num_rx = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
@@ -1076,7 +1076,7 @@ class Checker:
                 self.fw_ac_db.remove_element(conf['cpu'], workers_param)
 
             if num_of_rx_queues_param:
-                if conf['dpdk'][dev_default_key]:
+                if conf['dpdk'][dev_default_key] != None:
                     self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
                     if len(conf['dpdk'][dev_default_key]) == 0:
                         self.fw_ac_db.remove_element(conf['dpdk'],dev_default_key)
