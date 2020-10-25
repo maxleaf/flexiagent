@@ -1501,7 +1501,7 @@ def fix_params(params, message=None):
         else:
             params['hw_addr'] = add_type_to_hw_addr(params.pop('pci'))
 
-    if message == 'add-dhcp-config' and 'interface' in params:
+    if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
         params['interface'] = add_type_to_hw_addr(params['interface'])
 
     return params
@@ -1523,7 +1523,7 @@ def fix_request_params(params, message=None):
         if 'interface' in nested_params:
             nested_params['interface'] = add_type_to_hw_addr(nested_params['interface'])
 
-    if message == 'add-dhcp-config' and 'interface' in params:
+    if re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
         params['interface'] = add_type_to_hw_addr(params['interface'])
    
     fwglobals.log.debug("fix_request_params: output: %s" %(params))
