@@ -423,7 +423,7 @@ class Fwglobals:
             params = request.get('params')
 
             if params:
-                params = fwutils.fix_request_params(params)
+                params = fwutils.fix_request_params(params, req)
 
             if req != 'aggregated':
                 handler = request_handlers.get(req)
