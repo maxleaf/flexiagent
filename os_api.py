@@ -63,7 +63,7 @@ class OS_DECODERS:
 
             daddr = {
                 'name':nicname,
-                'hw_addr':hw_if_addr,# TODO: need to change to hw_addr
+                'pciaddr':hw_if_addr,# TODO: need to change to hw_addr when flexiManage will be ready
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',

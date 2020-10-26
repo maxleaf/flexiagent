@@ -345,7 +345,7 @@ def get_interface_driver(interface_name):
 
 
 def hw_if_addr_to_type_and_addr(hw_if_addr):
-    """Convert an hardware address name into a tuple contained address type (pci, usb) and address.
+    """Convert an hardware address into a tuple contained address type (pci, usb) and address.
 
     :param linuxif:      Linux interface name.
 
@@ -422,7 +422,7 @@ def hw_addr_to_linux_if(hw_addr):
     return output.rstrip().split('/')[-1]
 
 def hw_addr_is_vmxnet3(hw_if_addr):
-    """Check if PCI address is vmxnet3.
+    """Check if hardware address is vmxnet3.
 
     :param hw_if_addr:     hardware address.
 
@@ -1062,9 +1062,6 @@ def obj_dump_attributes(obj, level=1):
 
 
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
-    fwglobals.log.debug("\n\n\n*****************************************\n\n\n")
-    fwglobals.log.debug("\n\n\nDEVICES: \n\n\n %s" %(devices))
-    fwglobals.log.debug("\n\n\n*****************************************\n\n\n")
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
 
@@ -1076,10 +1073,6 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         addr_type, addr = hw_if_addr_to_type_and_addr(dev)
         if addr_type == "pci":
             config_param = 'dev %s' % addr
-            fwglobals.log.debug("\n\n\n*****************************************\n\n\n")
-            fwglobals.log.debug("\n\n\DEV: \n\n\n %s" %(dev))
-            fwglobals.log.debug("\n\n\CONFIG_PARAMS: \n\n\n %s" %(config_param))
-            fwglobals.log.debug("\n\n\n*****************************************\n\n\n")
             if p.get_element(config['dpdk'],config_param) == None:
                 tup = p.create_element(config_param)
                 config['dpdk'].append(tup)
@@ -1509,6 +1502,11 @@ def fix_params(params, message=None):
 
     return params
 
+
+# The purpose of this function is to fix 'params' that contains the pci as interface identification.
+# The function changes the pci address into an hardware address which is the new interface identifier.
+# Since we have different types of `params` object, 
+# we need to use several if/else statements in order to handle all of them. 
 def fix_request_params(params, message=None):    
     fwglobals.log.debug("fix_request_params: incoming: %s" %(params))
     if 'requests' in params:        
@@ -1519,8 +1517,7 @@ def fix_request_params(params, message=None):
 
     if 'pci' in params:
         params = fix_params(params)
-
-    # spaciel fix for add-dhcp-config
+        
     if 'args' in params and 'params' in params['args']:
         nested_params = params['args']['params']
         if 'interface' in nested_params:
