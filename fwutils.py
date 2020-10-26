@@ -379,16 +379,19 @@ def linux_to_hw_addr(linuxif):
 
     :returns: hardware address.
     """
-    if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
+    try:
+        if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-    if re.search('pci', if_addr):
-        if re.search('usb', if_addr):
-            address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-            return add_type_to_hw_addr(address)
-        else:
-            address = if_addr.split('/net')[0].split('/')[-1]
-            address = add_type_to_hw_addr(address)
-            return hw_addr_to_full(address)
+        if re.search('pci', if_addr):
+            if re.search('usb', if_addr):
+                address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
+                return add_type_to_hw_addr(address)
+            else:
+                address = if_addr.split('/net')[0].split('/')[-1]
+                address = add_type_to_hw_addr(address)
+                return hw_addr_to_full(address)
+    except:
+        return ""
 
     return ""
 
