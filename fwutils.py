@@ -1639,10 +1639,10 @@ def set_linux_reverse_path_filter(dev_name, on):
     if on == False:
         val = 0
     else:
-        val = 0
-    os.system('sysctl net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
-    os.system('sysctl net.ipv4.conf.all.rp_filter=%d' %(val))
-    os.system('sysctl net.ipv4.conf.default.rp_filter')
+        val = 1
+    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
+    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
+    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
 
 def get_if_name_by_ip_addr(ip_no_mask):
     """ Get interface name based on IP address
