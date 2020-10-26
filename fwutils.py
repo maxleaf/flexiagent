@@ -1626,3 +1626,34 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
+def set_linux_reverse_path_filter(dev_name, on):
+    """ set rp_filter value of Linux property
+
+    : param dev_name : device name to set the property for
+    : param on       : if on is False, disable rp_filter. Else, enable it
+    """
+    _, metric = ip,metric = get_linux_interface_gateway(dev_name)
+    # for default interface, skip the setting as it is redundant
+    if metric == '' or int(metric) == 0:
+        return
+    if on == False:
+        val = 0
+    else:
+        val = 0
+    os.system('sysctl net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
+    os.system('sysctl net.ipv4.conf.all.rp_filter=%d' %(val))
+    os.system('sysctl net.ipv4.conf.default.rp_filter')
+
+def get_if_name_by_ip_addr(ip_no_mask):
+    """ Get interface name based on IP address
+
+    : param ip_no_mask: ip address with no mask
+    : returns : if_name - interface name
+    """
+    interfaces = psutil.net_if_addrs()
+    for if_name in interfaces:
+        addresses = interfaces[if_name]
+        for address in addresses:
+            if address.family == socket.AF_INET and address.address == ip_no_mask:
+                return if_name
+    return ''

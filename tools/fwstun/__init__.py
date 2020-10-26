@@ -123,7 +123,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
     str_data = ''.join([BindRequestMsg, str_len, trans_id, send_data])
     data = binascii.a2b_hex(str_data)
 
-    for _ in range (3):
+    for _ in range (2):
         fwglobals.log.debug("Stun: sendto: %s:%s" %(str(host), str(port)))
         try:
             sock.sendto(data, (host, port))
@@ -206,8 +206,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
         ret = stun_test(s, stun_host, port, source_ip, source_port)
         resp = ret['Resp']
     else:
-        random_server_list = [stun_servers_list[x] for x in random.sample(range (0, len(stun_servers_list)-1),2)]
-        for stun_host_ in random_server_list:
+        for stun_host_ in stun_servers_list:
             #FLEXIWAN_FIX: handle STUN server addresses in the form of ip:port
             stun_info = stun_host_.split(':')
             stun_host_ = stun_info[0]
@@ -275,23 +274,26 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
 
 
 def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
-                stun_port=3478, stop_after_one_try = False):
+                stun_port=3478, stop_after_one_try = False, dev_name = ''):
     """
     This function is the outside API to the stun client module.
     It retrieves the STUN type, the public IP as seen from the STUN on the other side of the
     NAT, and the public port.
-    : param : source_ip          - the local source IP on behalf NAT request is sent
-    : param : source_port        - the local source port on behalf NAT request is sent
-    : param : stun_host          - the stun server host name or IP address
-    : param : stun_port          - the stun server port
-    : param : stop_after_one_try - in case of Register message, we want to sent only one
+    : param source_ip   : the local source IP on behalf NAT request is sent
+    : param source_port : the local source port on behalf NAT request is sent
+    : param stun_host   : the stun server host name or IP address
+    : param stun_port   : the stun server port
+    : param stop_after_one_try : in case of Register message, we want to sent only one
               request. In that case, stop_after_one_try will be True
+    : param dev_name    : device name to bind() to
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.settimeout(2)
+    s.settimeout(3)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         fwglobals.log.debug("get_ip_info, binding to %s:%d" %(source_ip, source_port))
+        if dev_name != '':
+            s.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
         s.bind((source_ip, source_port))
     except Exception as e:
         fwglobals.log.debug("get_ip_info: bind: %s" % str(e))
@@ -305,3 +307,8 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         s.close()
         nat_type = '' if nat_type == None else nat_type
         return (nat_type, external_ip, external_port, stun_h, stun_p)
+
+def log_str(log, deubg_lvl_func, str):
+    if log != None:
+        if hasattr(deubg_lvl_func.__name__,log):
+            log.deubg_lvl_func(str)
