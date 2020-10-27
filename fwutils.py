@@ -1007,7 +1007,6 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
-
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
@@ -1016,10 +1015,13 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev = pci_full_to_short(dev)
-        config_param = 'dev %s' % dev
-        if p.get_element(config['dpdk'],config_param) == None:
-            tup = p.create_element(config_param)
+        dev_short = pci_full_to_short(dev)
+        old_config_param = 'dev %s' % dev
+        new_config_param = 'dev %s' % dev_short
+        if p.get_element(config['dpdk'],old_config_param) != None:
+            p.remove_element(config['dpdk'], old_config_param)
+        if p.get_element(config['dpdk'],new_config_param) == None:
+            tup = p.create_element(new_config_param)
             config['dpdk'].append(tup)
 
     p.dump(config, vpp_config_filename)
@@ -1032,7 +1034,8 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     if config['dpdk'] == None:
         return
     for dev in devices:
-        config_param = 'dev %s' % dev
+        dev_short = pci_full_to_short(dev)
+        config_param = 'dev %s' % dev_short
         key = p.get_element(config['dpdk'],config_param)
         if key:
             p.remove_element(config['dpdk'], key)
