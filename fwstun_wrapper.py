@@ -11,8 +11,6 @@ import fwutils
 import time
 import copy
 
-from fwutils import file_write_and_flush
-
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
 sys.path.append(tools)
 import fwstun
@@ -78,11 +76,11 @@ class FwStunWrap:
         After that, it starts the stun thread.
         """
         fwglobals.log.debug("Start sending STUN requests for all WAN interfaces")
-        ip_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
+        ip_list = fwutils.get_interface_address_all(filtr = 'gw')
         if ip_list:
             fwglobals.log.debug("stun_thread initialize: collected IPs: %s" %str(ip_list))
             for ip in ip_list:
-                dev_name = fwutils.get_if_name_by_ip_addr(ip)
+                dev_name = fwutils.get_interface_name(ip)
                 self._send_single_stun_request(ip, 4789, None, None, True, dev_name)
             self.log_address_cache()
 
@@ -294,8 +292,8 @@ class FwStunWrap:
             if not elem or elem.get('success',False) == True:
                 continue
             else:
-                if elem['sec_counter'] == elem['next_time']:
-                    dev_name = fwutils.get_if_name_by_ip_addr(addr)
+                if elem['sec_counter'] >= elem['next_time']:
+                    dev_name = fwutils.get_interface_name(addr)
                     nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
                         self._send_single_stun_request(addr, 4789, elem['stun_server'], \
                         elem['stun_server_port'], False, dev_name)
@@ -322,7 +320,7 @@ class FwStunWrap:
             return
         fwglobals.log.debug("check_if_cache_empty: adding WAN addresses from Router-DB")
         addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
-        ip_addr_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
+        ip_addr_list = fwutils.get_interface_address_all(filtr = 'gw')
         for elem in addr_list:
             # filter out left overs from previous unhandled router shut-down
             if elem['address'] in ip_addr_list:

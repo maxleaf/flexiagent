@@ -274,7 +274,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
 
 
 def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
-                stun_port=3478, stop_after_one_try = False, dev_name = ''):
+                stun_port=3478, stop_after_one_try = False, dev_name = None):
     """
     This function is the outside API to the stun client module.
     It retrieves the STUN type, the public IP as seen from the STUN on the other side of the
@@ -292,7 +292,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         fwglobals.log.debug("get_ip_info, binding to %s:%d" %(source_ip, source_port))
-        if dev_name != '':
+        if dev_name != None:
             s.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
         s.bind((source_ip, source_port))
     except Exception as e:
@@ -307,8 +307,3 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         s.close()
         nat_type = '' if nat_type == None else nat_type
         return (nat_type, external_ip, external_port, stun_h, stun_p)
-
-def log_str(log, deubg_lvl_func, str):
-    if log != None:
-        if hasattr(deubg_lvl_func.__name__,log):
-            log.deubg_lvl_func(str)
