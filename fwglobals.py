@@ -422,9 +422,6 @@ class Fwglobals:
             req    = request['message']
             params = request.get('params')
 
-            if params:
-                params = fwutils.fix_request_params(params, req)
-
             if req != 'aggregated':
                 handler = request_handlers.get(req)
                 assert handler, 'fwglobals: "%s" request is not supported' % req
