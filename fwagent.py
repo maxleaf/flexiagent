@@ -540,10 +540,10 @@ class FwAgent:
         self.received_request = True
         self.handling_request = True
 
-        # Aggregation is not well defined in today protocol (May-2019),
-        # so align all kind of aggregations to the common request format
-        # expected by the agent framework.
-        msg = fwutils.fix_aggregated_message_format(received_msg)
+        # Messages are not well defined in protocol,
+        # so align all kind of messages to the request format
+        # expected by the agent framework
+        msg = fwutils.fix_message(received_msg)
 
         print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
         print_message = False if msg['message'] == 'add-application' else print_message

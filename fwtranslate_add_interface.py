@@ -77,7 +77,7 @@ def add_interface(params):
      """
     cmd_list = []
 
-    iface_hw_addr  = params['hw_addr']
+    hw_addr  = params['hw_addr']
     iface_addr = params.get('addr', '')
     iface_addr_bytes = ''
     if iface_addr:
@@ -106,7 +106,7 @@ def add_interface(params):
         cmd['cmd']['params'] = {
                         'module': 'fwutils',
                         'func': 'vpp_set_dhcp_detect',
-                        'args': {'hw_addr': iface_hw_addr, 'remove': False}
+                        'args': {'hw_addr': hw_addr, 'remove': False}
         }
         cmd['revert'] = {}
         cmd['revert']['name']   = "python"
@@ -114,7 +114,7 @@ def add_interface(params):
         cmd['revert']['params'] = {
                         'module': 'fwutils',
                         'func': 'vpp_set_dhcp_detect',
-                        'args': {'hw_Addr': iface_hw_addr, 'remove': True}
+                        'args': {'hw_addr': hw_addr, 'remove': True}
         }
         cmd_list.append(cmd)
 
@@ -125,12 +125,12 @@ def add_interface(params):
     cmd['cmd']['params'] = {
                 'module': 'fwnetplan',
                 'func': 'add_remove_netplan_interface',
-                'args': { 'is_add': 1,
-                          'hw_if_addr': iface_hw_addr,
-                          'ip'        : iface_addr,
-                          'gw'        : gw,
-                          'metric'    : metric,
-                          'dhcp'      : dhcp
+                'args': { 'is_add'   : 1,
+                          'hw_addr'  : hw_addr,
+                          'ip'       : iface_addr,
+                          'gw'       : gw,
+                          'metric'   : metric,
+                          'dhcp'     : dhcp
                          }
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -140,12 +140,12 @@ def add_interface(params):
                 'module': 'fwnetplan',
                 'func': 'add_remove_netplan_interface',
                 'args': {
-                          'is_add': 0,
-                          'hw_if_addr'   : iface_hw_addr,
-                          'ip'           : iface_addr,
-                          'gw'           : gw,
-                          'metric'       : metric,
-                          'dhcp'         : dhcp
+                          'is_add'  : 0,
+                          'hw_addr' : hw_addr,
+                          'ip'      : iface_addr,
+                          'gw'      : gw,
+                          'metric'  : metric,
+                          'dhcp'    : dhcp
                 }
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"
@@ -154,13 +154,13 @@ def add_interface(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, iface_hw_addr)
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'hw_addr_to_tap', 'arg':iface_hw_addr } ]},
+    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, hw_addr)
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'hw_addr_to_tap', 'arg':hw_addr } ]},
                                 "sudo ip link set dev DEV-STUB up" ]
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_hw_addr)
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'hw_addr_to_tap', 'arg':iface_hw_addr } ]},
+    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, hw_addr)
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'hw_addr_to_tap', 'arg':hw_addr } ]},
                                 "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)
 

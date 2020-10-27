@@ -197,7 +197,7 @@ class FWROUTER_API:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
-            fwglobals.g.AGENT_CACHE['HW_ADDR_TO_VPP_TAP_NAME_MAP'] = {}
+            fwglobals.g.AGENT_CACHE['DEV_TO_VPP_TAP_NAME_MAP'] = {}
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -1108,7 +1108,7 @@ class FWROUTER_API:
         self.router_started = False
         self._stop_threads()
         fwutils.reset_dhcpd()
-        fwglobals.g.AGENT_CACHE['HW_ADDR_TO_VPP_TAP_NAME_MAP'] = {}
+        fwglobals.g.AGENT_CACHE['DEV_TO_VPP_TAP_NAME_MAP'] = {}
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _set_router_failure(self, err_str):

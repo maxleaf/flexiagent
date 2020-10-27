@@ -57,13 +57,13 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-            hw_if_addr = fwutils.linux_to_hw_addr(nicname)
-            if hw_if_addr == '':
+            hw_addr = fwutils.linux_to_hw_addr(nicname)
+            if hw_addr == '':
                 continue
 
             daddr = {
                 'name':nicname,
-                'pciaddr':hw_if_addr,# TODO: need to change to hw_addr when flexiManage will be ready
+                'pciaddr':hw_addr,
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',
@@ -74,7 +74,7 @@ class OS_DECODERS:
                 'gateway':'',
                 'metric': '',
             }
-                    
+
             daddr['driver'] = fwutils.get_interface_driver(nicname)
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)

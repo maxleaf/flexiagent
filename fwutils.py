@@ -230,8 +230,8 @@ def get_interfaces_ip_addr(filtr=None):
     ip_list = []
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
-        hw_if_addr = linux_to_hw_addr(nicname)
-        if hw_if_addr == '':
+        hw_addr = linux_to_hw_addr(nicname)
+        if hw_addr == '':
             continue
         for addr in addrs:
             if addr.family == socket.AF_INET:
@@ -287,26 +287,26 @@ def hw_addr_to_full(hw_addr):
 
     :returns: full hardware address.
     """
-    (addr_type, addr) = hw_if_addr_to_type_and_addr(hw_addr)
+    (addr_type, addr) = hw_addr_parse(hw_addr)
     if addr_type == 'usb':
         return hw_addr
-    
+
     pc = addr.split('.')
     if len(pc) == 2:
         return add_type_to_hw_addr(pc[0]+'.'+"%02x"%(int(pc[1],16)))
     return hw_addr
 
 # Convert 0000:00:08.01 provided by management to 0000:00:08.1 used by Linux
-def hw_addr_full_to_short(hw_addr):
+def hw_addr_to_short(hw_addr):
     """Convert full PCI into short representation.
     the 'hw_addr' param could be either a pci or a usb address.
     in case of pci address - convert pci provided by management into a short address used by Linux
-    
+
     :param hw_addr:      Full PCI address.
 
     :returns: Short PCI address.
     """
-    addr_type, addr = hw_if_addr_to_type_and_addr(hw_addr)
+    addr_type, addr = hw_addr_parse(hw_addr)
     if addr_type == 'usb':
         return addr_type
 
@@ -318,43 +318,43 @@ def hw_addr_full_to_short(hw_addr):
 def get_linux_hw_addresses():
     """ Get the list of PCI-s of all network interfaces available in Linux.
     """
-    hw_addr_list = fwglobals.g.get_cache_data('HW_ADDR')
+    hw_addr_list = fwglobals.g.get_cache_data('DEV')
     if not hw_addr_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
-            hw_if_addr = linux_to_hw_addr(nicname)
-            if hw_if_addr == "":
+            hw_addr = linux_to_hw_addr(nicname)
+            if hw_addr == "":
                 continue
-            hw_addr_list.append(hw_if_addr)
+            hw_addr_list.append(hw_addr)
     return hw_addr_list
 
 def get_interface_driver(interface_name):
-    """Get Linux interface driver.                            
+    """Get Linux interface driver.
 
     :param interface_name: Interface name to check.
 
     :returns: driver name.
     """
     try:
-        cmd = 'ethtool -i %s' % interface_name        
+        cmd = 'ethtool -i %s' % interface_name
         out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
         vals = out[0].decode().split("driver: ", 1)
         return str(vals[-1])
     except subprocess.CalledProcessError:
-        return ''  
+        return ''
 
 
-def hw_if_addr_to_type_and_addr(hw_if_addr):
+def hw_addr_parse(hw_addr):
     """Convert an hardware address into a tuple contained address type (pci, usb) and address.
 
-    :param linuxif:      Linux interface name.
+    :param hw_addr:      Hardware address.
 
     :returns: Tuple (type, address)
     """
-    type_and_addr = hw_if_addr.split(':', 1)
+    type_and_addr = hw_addr.split(':', 1)
     if type_and_addr:
         return (type_and_addr[0], type_and_addr[1])
-    
+
     return ("", "")
 
 def add_type_to_hw_addr(hw_addr):
@@ -369,7 +369,7 @@ def add_type_to_hw_addr(hw_addr):
 
     if re.search('usb', hw_addr):
         return 'usb:%s' % hw_addr
-    
+
     return 'pci:%s' % hw_addr
 
 def linux_to_hw_addr(linuxif):
@@ -410,8 +410,8 @@ def hw_addr_to_linux_if(hw_addr):
     # lrwxrwxrwx 1 root root 0 Jul  4 16:21 lo -> ../../devices/virtual/net/lo
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    hw_addr = hw_addr_full_to_short(hw_addr)
-    _, addr = hw_if_addr_to_type_and_addr(hw_addr)
+    hw_addr = hw_addr_to_short(hw_addr)
+    _, addr = hw_addr_parse(hw_addr)
 
     try:
         output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + addr, shell=True)
@@ -421,10 +421,10 @@ def hw_addr_to_linux_if(hw_addr):
         return None
     return output.rstrip().split('/')[-1]
 
-def hw_addr_is_vmxnet3(hw_if_addr):
+def hw_addr_is_vmxnet3(hw_addr):
     """Check if hardware address is vmxnet3.
 
-    :param hw_if_addr:     hardware address.
+    :param hw_addr:     hardware address.
 
     :returns: 'True' if it is vmxnet3, 'False' otherwise.
     """
@@ -433,12 +433,11 @@ def hw_addr_is_vmxnet3(hw_if_addr):
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:0b:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:13:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
 
-    # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    addr_type, _ = hw_if_addr_to_type_and_addr(hw_if_addr)
+    # We get pci:0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
+    hw_addr = hw_addr_to_short(hw_addr)
+    addr_type, addr = hw_addr_parse(hw_addr)
     if addr_type == 'usb':
         return False
-
-    pci = hw_addr_full_to_short(hw_if_addr)
 
     try:
         # The 'ls -l /sys/bus/pci/devices/*/driver' approach doesn't work well.
@@ -451,7 +450,7 @@ def hw_addr_is_vmxnet3(hw_if_addr):
         #   0000:03:00.0 'VMXNET3 Ethernet Controller' if=ens160 drv=vfio-pci unused=vmxnet3,uio_pci_generic
         #
         #output = subprocess.check_output("sudo ls -l /sys/bus/pci/devices/%s/driver | grep vmxnet3" % pci, shell=True)
-        output = subprocess.check_output("sudo dpdk-devbind -s | grep -E '%s .*vmxnet3'" % pci, shell=True)
+        output = subprocess.check_output("sudo dpdk-devbind -s | grep -E '%s .*vmxnet3'" % addr, shell=True)
     except:
         return False
     if output is None:
@@ -468,10 +467,10 @@ def hw_addr_to_vpp_if_name(hw_addr):
 
     :returns: VPP interface name.
     """
-    addr_type, _ = hw_if_addr_to_type_and_addr(hw_addr)
+    addr_type, _ = hw_addr_parse(hw_addr)
     if addr_type == "pci":
         hw_addr = hw_addr_to_full(hw_addr)
-        vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
+        vpp_if_name = fwglobals.g.get_cache_data('DEV_TO_VPP_IF_NAME_MAP').get(hw_addr)
         if vpp_if_name: return vpp_if_name
         else: return _build_hw_addr_to_vpp_if_name_maps(hw_addr, None)
 
@@ -487,7 +486,7 @@ def vpp_if_name_to_hw_addr(vpp_if_name):
 
     :returns: PCI address.
     """
-    hw_addr = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP').get(vpp_if_name)
+    hw_addr = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_MAP').get(vpp_if_name)
     if hw_addr: return hw_addr
     else: return _build_hw_addr_to_vpp_if_name_maps(None, vpp_if_name)
 
@@ -519,21 +518,21 @@ def _build_hw_addr_to_vpp_if_name_maps(hw_addr, vpp_if_name):
         if k and v:
             k = add_type_to_hw_addr(k)
             full_addr = hw_addr_to_full(k)
-            fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[full_addr] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[v] = full_addr
+            fwglobals.g.get_cache_data('DEV_TO_VPP_IF_NAME_MAP')[full_addr] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_MAP')[v] = full_addr
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
         pci_addr = pci_bytes_to_str(hw_if.pci_addr)
-        fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
-        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP')[vpp_if_name] = pci_addr
+        fwglobals.g.get_cache_data('DEV_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_MAP')[vpp_if_name] = pci_addr
 
     if hw_addr:
-        vpp_if_name = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_IF_NAME_MAP').get(hw_addr)
+        vpp_if_name = fwglobals.g.get_cache_data('DEV_TO_VPP_IF_NAME_MAP').get(hw_addr)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        hw_addr = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_HW_ADDR_MAP').get(vpp_if_name)
+        hw_addr = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_MAP').get(vpp_if_name)
         if hw_addr: return hw_addr
 
     fwglobals.log.debug("_build_hw_addr_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (hw_addr, vpp_if_name, shif))
@@ -603,7 +602,7 @@ def hw_addr_to_vpp_sw_if_index(hw_addr):
         if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
             return sw_if.sw_if_index
     fwglobals.log.debug("hw_addr_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (hw_addr, yaml.dump(sw_ifs, canonical=True)))
-    
+
     return None
 
 # 'hw_addr_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
@@ -614,24 +613,24 @@ def hw_addr_to_vpp_sw_if_index(hw_addr):
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def hw_addr_to_tap(hw_if_addr):
+def hw_addr_to_tap(hw_addr):
     """Convert PCI address into TAP name.
 
     :param pci:      PCI address.
 
     :returns: Linux TAP interface name.
     """
-    addr_type, _ = hw_if_addr_to_type_and_addr(hw_if_addr)
+    addr_type, _ = hw_addr_parse(hw_addr)
     if addr_type == 'usb':
         return None
 
-    pci_full = hw_addr_to_full(hw_if_addr)
-    cache    = fwglobals.g.get_cache_data('HW_ADDR_TO_VPP_TAP_NAME_MAP')
+    pci_full = hw_addr_to_full(hw_addr)
+    cache    = fwglobals.g.get_cache_data('DEV_TO_VPP_TAP_NAME_MAP')
     tap = cache.get(pci_full)
     if tap:
         return tap
 
-    vpp_if_name = hw_addr_to_vpp_if_name(hw_if_addr)
+    vpp_if_name = hw_addr_to_vpp_if_name(hw_addr)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1069,8 +1068,8 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev = hw_addr_full_to_short(dev)
-        addr_type, addr = hw_if_addr_to_type_and_addr(dev)
+        dev = hw_addr_to_short(dev)
+        addr_type, addr = hw_addr_parse(dev)
         if addr_type == "pci":
             config_param = 'dev %s' % addr
             if p.get_element(config['dpdk'],config_param) == None:
@@ -1087,8 +1086,8 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     if config['dpdk'] == None:
         return
     for dev in devices:
-        dev = hw_addr_full_to_short(dev)
-        addr_type, addr = hw_if_addr_to_type_and_addr(dev)
+        dev = hw_addr_to_short(dev)
+        addr_type, addr = hw_addr_parse(dev)
         config_param = 'dev %s' % addr
         key = p.get_element(config['dpdk'],config_param)
         if key:
@@ -1236,9 +1235,9 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
         vpp_if_name = vpp_sw_if_index_to_name(sw_if_index)
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
-    
+
     if not vpp_if_name:
-        return (False, "'vpp_if_name' was not found")
+        return (False, "'vpp_if_name' was not found for %s" % dev)
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1450,11 +1449,11 @@ def vpp_set_dhcp_detect(hw_addr, remove):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    addr_type, _ = hw_if_addr_to_type_and_addr(hw_addr)
+    addr_type, _ = hw_addr_parse(hw_addr)
 
     if addr_type != "pci":
         return (False, "addr type needs to be a pci address")
-    
+
     op = 'del' if remove else ''
 
     sw_if_index = hw_addr_to_vpp_sw_if_index(hw_addr)
@@ -1492,8 +1491,8 @@ def tunnel_change_postprocess(add, addr):
 def fix_params(params, message=None):
     if 'pci' in params:
         if type(params['pci']) == list:
-            for pci in params['pci']:
-                pci = add_type_to_hw_addr(pci)
+            params['hw_addr'] = [add_type_to_hw_addr(pci) for pci in params['pci']]
+            del params['pci']
         else:
             params['hw_addr'] = add_type_to_hw_addr(params.pop('pci'))
 
@@ -1505,30 +1504,35 @@ def fix_params(params, message=None):
 
 # The purpose of this function is to fix 'params' that contains the pci as interface identification.
 # The function changes the pci address into an hardware address which is the new interface identifier.
-# Since we have different types of `params` object, 
-# we need to use several if/else statements in order to handle all of them. 
-def fix_request_params(params, message=None):    
+# Since we have different types of `params` object,
+# we need to use several if/else statements in order to handle all of them.
+def fix_request_params(params, message=None):
     fwglobals.log.debug("fix_request_params: incoming: %s" %(params))
-    if 'requests' in params:        
-        requests = params['requests']     
+    if 'requests' in params:
+        requests = params['requests']
         for request in requests:
             if 'params' in request:
                 request['params'] = fix_params(request['params'], request['message'])
 
     if 'pci' in params:
         params = fix_params(params)
-        
+
     if 'args' in params and 'params' in params['args']:
         nested_params = params['args']['params']
         if 'interface' in nested_params:
             nested_params['interface'] = add_type_to_hw_addr(nested_params['interface'])
 
-    if re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
+    if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
         params['interface'] = add_type_to_hw_addr(params['interface'])
-   
+
     fwglobals.log.debug("fix_request_params: output: %s" %(params))
 
     return params
+
+def fix_message(msg):
+    msg = fix_aggregated_message_format(msg)
+    msg['params'] = fix_request_params(msg['params'])
+    return msg
 
 # Today (May-2019) message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:

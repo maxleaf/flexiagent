@@ -224,10 +224,10 @@ class Fwglobals:
         # Cache to save various global data
         self.AGENT_CACHE = {}
         # PCI to VPP names, assuming names and PCI are unique and not changed during operation
-        self.AGENT_CACHE['HW_ADDR_TO_VPP_IF_NAME_MAP'] = {}
-        self.AGENT_CACHE['VPP_IF_NAME_TO_HW_ADDR_MAP'] = {}
-        self.AGENT_CACHE['HW_ADDR_TO_VPP_TAP_NAME_MAP'] = {}
-        self.AGENT_CACHE['HW_ADDR'] = []
+        self.AGENT_CACHE['DEV_TO_VPP_IF_NAME_MAP'] = {}
+        self.AGENT_CACHE['VPP_IF_NAME_TO_DEV_MAP'] = {}
+        self.AGENT_CACHE['DEV_TO_VPP_TAP_NAME_MAP'] = {}
+        self.AGENT_CACHE['DEV'] = []
         self.fwagent = None
 
         # Load configuration from file
@@ -445,7 +445,7 @@ class Fwglobals:
                 received_msg = copy.deepcopy(request)
 
             handler_func = getattr(self, handler.get('name'))
-            
+
             if result is None:
                 reply = handler_func(request)
             else:
