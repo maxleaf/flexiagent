@@ -77,7 +77,7 @@ class OS_DECODERS:
 
             daddr['driver'] = fwutils.get_interface_driver(nicname)
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
-            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
+            daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
                 daddr[addr_af_name] = addr.address.split('%')[0]

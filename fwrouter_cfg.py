@@ -406,7 +406,7 @@ class FwRouterCfg:
         # This is needed when upgrading from version 1.1.52 to 1.2.X
         if not gw:
             tap = fwutils.hw_addr_to_tap(hw_addr)
-            rip, _ = fwutils.get_linux_interface_gateway(tap)
+            rip, _ = fwutils.get_interface_gateway(tap)
             return hw_addr, rip
         else:
             return hw_addr, gw
