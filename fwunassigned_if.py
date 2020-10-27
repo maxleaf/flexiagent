@@ -98,7 +98,7 @@ class FwUnassignedIfs:
 
         addr       = self._get_if_address(name)
         addr       = addr.split('/')[0] if addr else ''
-        gw, metric = fwutils.get_interface_gateway(name)
+        gw, metric = fwutils.get_linux_interface_gateway(name)
 
         if pci in self.cached_interfaces:
             entry = self.cached_interfaces[pci]
@@ -174,7 +174,7 @@ class FwUnassignedIfs:
             addr = fwutils.get_interface_address(name)
             res += self._reconfig_section(interface, 'addr', addr, only_if_different=True, update=False)
 
-            gw, metric = fwutils.get_interface_gateway(name)
+            gw, metric = fwutils.get_linux_interface_gateway(name)
             res += self._reconfig_section(interface, 'gateway', gw, only_if_different=True, update=False)
             res += self._reconfig_section(interface, 'metric', metric, only_if_different=True, update=False)
 
