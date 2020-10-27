@@ -244,7 +244,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         # interface name.
         #
         cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
-        pci_full = fwutils.pci_addr_full(pci)
+        pci_full = fwutils.pci_to_full(pci)
         if pci_full in cache:
             del cache[pci_full]
 
