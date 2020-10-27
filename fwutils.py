@@ -203,7 +203,7 @@ def get_default_route():
         return ("", "")
     return ("", "")
 
-def get_linux_interface_gateway(if_name):
+def get_interface_gateway(if_name):
     """Get gateway.
 
     :returns: Gateway ip address.
@@ -220,7 +220,7 @@ def get_linux_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
-def get_interfaces_ip_addr(filtr=None):
+def get_interface_address_all(filtr=None):
     """ Get all interfaces from linux, and add only the ones that have address family of
     AF_INET. if filter=='gw', add only interfaces with GW.
     : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
@@ -237,7 +237,7 @@ def get_interfaces_ip_addr(filtr=None):
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
                 if filtr == 'gw':
-                    gateway, _ = get_linux_interface_gateway(nicname)
+                    gateway, _ = get_interface_gateway(nicname)
                     if gateway != '':
                         ip_list.append(ip)
                         break
@@ -266,6 +266,20 @@ def get_interface_address(if_name):
             return '%s/%s' % (ip, mask)
 
     fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
+    return None
+
+def get_interface_name(ip_no_mask):
+    """ Get interface name based on IP address
+
+    : param ip_no_mask: ip address with no mask
+    : returns : if_name - interface name
+    """
+    interfaces = psutil.net_if_addrs()
+    for if_name in interfaces:
+        addresses = interfaces[if_name]
+        for address in addresses:
+            if address.family == socket.AF_INET and address.address == ip_no_mask:
+                return if_name
     return None
 
 def is_ip_in_subnet(ip, subnet):
@@ -1168,7 +1182,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop, _ = get_linux_interface_gateway(tap)
+        next_hop, _ = get_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not provided and there is no default gateway")
 
@@ -1626,3 +1640,22 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
+def set_linux_reverse_path_filter(dev_name, on):
+    """ set rp_filter value of Linux property
+
+    : param dev_name : device name to set the property for
+    : param on       : if on is False, disable rp_filter. Else, enable it
+    """
+    if dev_name == None:
+        return
+
+    _, metric = get_interface_gateway(dev_name)
+    # for default interface, skip the setting as it is redundant
+    if metric == '' or int(metric) == 0:
+        return
+
+    val = 1 if on else 0
+
+    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
+    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
+    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
