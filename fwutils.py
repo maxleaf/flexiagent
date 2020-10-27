@@ -203,7 +203,7 @@ def get_default_route():
         return ("", "")
     return ("", "")
 
-def get_linux_interface_gateway(if_name):
+def get_interface_gateway(if_name):
     """Get gateway.
 
     :returns: Gateway ip address.
@@ -237,7 +237,7 @@ def get_interface_address_all(filtr=None):
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
                 if filtr == 'gw':
-                    gateway, _ = get_linux_interface_gateway(nicname)
+                    gateway, _ = get_interface_gateway(nicname)
                     if gateway != '':
                         ip_list.append(ip)
                         break
@@ -1185,7 +1185,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop, _ = get_linux_interface_gateway(tap)
+        next_hop, _ = get_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not provided and there is no default gateway")
 
@@ -1317,7 +1317,7 @@ def get_tunnel_interface_vpp_names():
         res.append(if_vpp_name)
     return res
 
-def get_interface_gateway(ip):
+def get_interface_gateway_from_router_db(ip):
     """Convert interface src IP address into gateway IP address.
 
     :param ip: IP address.
@@ -1652,7 +1652,7 @@ def set_linux_reverse_path_filter(dev_name, on):
     if dev_name == None:
         return
 
-    _, metric = get_linux_interface_gateway(dev_name)
+    _, metric = get_interface_gateway(dev_name)
     # for default interface, skip the setting as it is redundant
     if metric == '' or int(metric) == 0:
         return
