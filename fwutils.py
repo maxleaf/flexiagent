@@ -359,7 +359,7 @@ def get_interface_driver(interface_name):
 
 
 def dev_id_parse(dev_id):
-    """Convert an hardware address into a tuple contained address type (pci, usb) and address.
+    """Convert a dev id into a tuple contained address type (pci, usb) and address.
 
     :param dev_id:      Hardware address.
 
