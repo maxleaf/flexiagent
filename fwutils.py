@@ -203,7 +203,7 @@ def get_default_route():
         return ("", "")
     return ("", "")
 
-def get_linux_interface_gateway(if_name):
+def get_interface_gateway(if_name):
     """Get gateway.
 
     :returns: Gateway ip address.
@@ -220,7 +220,7 @@ def get_linux_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
-def get_interfaces_ip_addr(filtr=None):
+def get_interface_address_all(filtr=None):
     """ Get all interfaces from linux, and add only the ones that have address family of
     AF_INET. if filter=='gw', add only interfaces with GW.
     : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
@@ -237,7 +237,7 @@ def get_interfaces_ip_addr(filtr=None):
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
                 if filtr == 'gw':
-                    gateway, _ = get_linux_interface_gateway(nicname)
+                    gateway, _ = get_interface_gateway(nicname)
                     if gateway != '':
                         ip_list.append(ip)
                         break
@@ -268,6 +268,20 @@ def get_interface_address(if_name):
     fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
+def get_interface_name(ip_no_mask):
+    """ Get interface name based on IP address
+
+    : param ip_no_mask: ip address with no mask
+    : returns : if_name - interface name
+    """
+    interfaces = psutil.net_if_addrs()
+    for if_name in interfaces:
+        addresses = interfaces[if_name]
+        for address in addresses:
+            if address.family == socket.AF_INET and address.address == ip_no_mask:
+                return if_name
+    return None
+
 def is_ip_in_subnet(ip, subnet):
     """Check if IP address is in subnet.
 
@@ -278,7 +292,7 @@ def is_ip_in_subnet(ip, subnet):
     """
     return True if IPAddress(ip) in IPNetwork(subnet) else False
 
-def pci_addr_full(pci_addr):
+def pci_to_full(pci_addr):
     """Convert short PCI into full representation.
 
     :param pci_addr:      Short PCI address.
@@ -291,7 +305,7 @@ def pci_addr_full(pci_addr):
     return pci_addr
 
 # Convert 0000:00:08.01 provided by management to 0000:00:08.1 used by Linux
-def pci_full_to_short(pci):
+def pci_to_short(pci):
     """Convert full PCI into short representation.
 
     :param pci_addr:      Full PCI address.
@@ -341,7 +355,7 @@ def linux_to_pci_addr(linuxif):
                         continue
                     if interface == linuxif:
                         driver = os.path.realpath('/sys/bus/pci/devices/%s/driver' % slot).split('/')[-1]
-                        return (pci_addr_full(slot), "" if driver=='driver' else driver)
+                        return (pci_to_full(slot), "" if driver=='driver' else driver)
     return ("","")
 
 def pci_to_linux_iface(pci):
@@ -359,7 +373,7 @@ def pci_to_linux_iface(pci):
     # lrwxrwxrwx 1 root root 0 Jul  4 16:21 lo -> ../../devices/virtual/net/lo
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_full_to_short(pci)
+    pci = pci_to_short(pci)
 
     try:
         output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True)
@@ -382,7 +396,7 @@ def pci_is_vmxnet3(pci):
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:13:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_full_to_short(pci)
+    pci = pci_to_short(pci)
 
     try:
         # The 'ls -l /sys/bus/pci/devices/*/driver' approach doesn't work well.
@@ -412,7 +426,7 @@ def pci_to_vpp_if_name(pci):
 
     :returns: VPP interface name.
     """
-    pci = pci_addr_full(pci)
+    pci = pci_to_full(pci)
     vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
     if vpp_if_name: return vpp_if_name
     else: return _build_pci_to_vpp_if_name_maps(pci, None)
@@ -457,8 +471,8 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
-            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr_full(k)] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_addr_full(k)
+            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_to_full(k)] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_to_full(k)
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
@@ -558,7 +572,7 @@ def pci_to_tap(pci):
 
     :returns: Linux TAP interface name.
     """
-    pci_full = pci_addr_full(pci)
+    pci_full = pci_to_full(pci)
     cache    = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
     tap = cache.get(pci_full)
     if tap:
@@ -993,7 +1007,6 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
-
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
@@ -1002,10 +1015,14 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev = pci_full_to_short(dev)
-        config_param = 'dev %s' % dev
-        if p.get_element(config['dpdk'],config_param) == None:
-            tup = p.create_element(config_param)
+        dev_short = pci_to_short(dev)
+        dev_full = pci_to_full(dev)
+        old_config_param = 'dev %s' % dev_full
+        new_config_param = 'dev %s' % dev_short
+        if p.get_element(config['dpdk'],old_config_param) != None:
+            p.remove_element(config['dpdk'], old_config_param)
+        if p.get_element(config['dpdk'],new_config_param) == None:
+            tup = p.create_element(new_config_param)
             config['dpdk'].append(tup)
 
     p.dump(config, vpp_config_filename)
@@ -1018,7 +1035,8 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     if config['dpdk'] == None:
         return
     for dev in devices:
-        config_param = 'dev %s' % dev
+        dev_short = pci_to_short(dev)
+        config_param = 'dev %s' % dev_short
         key = p.get_element(config['dpdk'],config_param)
         if key:
             p.remove_element(config['dpdk'], key)
@@ -1168,7 +1186,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
-        next_hop, _ = get_linux_interface_gateway(tap)
+        next_hop, _ = get_interface_gateway(tap)
     if not next_hop:
         return (False, "'next_hop' was not provided and there is no default gateway")
 
@@ -1300,7 +1318,7 @@ def get_tunnel_interface_vpp_names():
         res.append(if_vpp_name)
     return res
 
-def get_interface_gateway(ip):
+def get_interface_gateway_from_router_db(ip):
     """Convert interface src IP address into gateway IP address.
 
     :param ip: IP address.
@@ -1626,3 +1644,22 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
+def set_linux_reverse_path_filter(dev_name, on):
+    """ set rp_filter value of Linux property
+
+    : param dev_name : device name to set the property for
+    : param on       : if on is False, disable rp_filter. Else, enable it
+    """
+    if dev_name == None:
+        return
+
+    _, metric = get_interface_gateway(dev_name)
+    # for default interface, skip the setting as it is redundant
+    if metric == '' or int(metric) == 0:
+        return
+
+    val = 1 if on else 0
+
+    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
+    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
+    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))

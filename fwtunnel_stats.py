@@ -162,7 +162,7 @@ def add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels):
     # Get list if IP addresses used by tunnels
     ip_up_set = get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
     # Get list of all IP addresses in the system
-    ip_addr_list = fwutils.get_interfaces_ip_addr(filtr = 'gw')
+    ip_addr_list = fwutils.get_interface_address_all(filtr = 'gw')
     for tunnel in tunnels:
         key = tunnel['tunnel-id']
         stats = tunnel_stats.get(key)
