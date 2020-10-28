@@ -34,7 +34,7 @@ import fwutils
 #       "params": {
 #           "addr":"10.0.0.4/24" (OR "10.0.0.4" OR "default")
 #           "via":"192.168.1.1",
-#           "hw_addr":"0000:00:08.00"   (device, optional)
+#           "dev_id":"0000:00:08.00"   (device, optional)
 #       }
 #    }
 #
@@ -59,7 +59,7 @@ def add_route(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('hw_addr')))
+    cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
                                 'func':   'add_static_route',
@@ -68,12 +68,12 @@ def add_route(params):
                                     'via':    params['via'],
                                     'metric': params.get('metric'),
                                     'remove': False,
-                                    'hw_addr':    params.get('hw_addr')
+                                    'dev_id':    params.get('dev_id')
                                 }
                               }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('hw_addr')))
+    cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['revert']['params'] = {
                                 'module': 'fwutils',
                                 'func':   'add_static_route',
@@ -82,7 +82,7 @@ def add_route(params):
                                     'via':    params['via'],
                                     'metric': params.get('metric'),
                                     'remove': True,
-                                    'hw_addr':    params.get('hw_addr')
+                                    'dev_id':    params.get('dev_id')
                                 }
                               }
     cmd_list.append(cmd)
@@ -95,8 +95,8 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    if 'hw_addr' in params:
-        key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['hw_addr'])
+    if 'dev_id' in params:
+        key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['dev_id'])
     else:
         key = 'add-route:%s:%s' % (params['addr'], params['via'])
 

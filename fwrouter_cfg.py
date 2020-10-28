@@ -367,15 +367,15 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None, hw_addr=None, ip=None):
+    def get_interfaces(self, type=None, dev_id=None, ip=None):
         interfaces = self._get_requests('add-interface')
-        if not type and not hw_addr and not ip:
+        if not type and not dev_id and not ip:
             return interfaces
         result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
                 continue
-            elif hw_addr and hw_addr != params['hw_addr']:
+            elif dev_id and dev_id != params['dev_id']:
                 continue
             elif ip and not re.match(ip, params['addr']):
                 continue
@@ -400,28 +400,28 @@ class FwRouterCfg:
         interfaces = self.get_interfaces(type='wan', ip=ip)
         if not interfaces:
             return (None, None)
-        hw_addr = interfaces[0]['hw_addr']
+        dev_id = interfaces[0]['dev_id']
         gw  = interfaces[0].get('gateway')
         # If gateway not exist in interface configuration, use default
         # This is needed when upgrading from version 1.1.52 to 1.2.X
         if not gw:
-            tap = fwutils.hw_addr_to_tap(hw_addr)
+            tap = fwutils.dev_id_to_tap(dev_id)
             rip, _ = fwutils.get_interface_gateway(tap)
-            return hw_addr, rip
+            return dev_id, rip
         else:
-            return hw_addr, gw
+            return dev_id, gw
 
-    def get_interface_ips(self, hw_addr_list=None):
+    def get_interface_ips(self, dev_id_list=None):
         """Fetches IP-s of interfaces stored in the configuration database.
 
-        :param hw_addr_list: filter interfaces to be handled by hw_addr.
+        :param dev_id_list: filter interfaces to be handled by dev_id.
 
         :returns: list of IP addresses. The addresses are without length.
         """
         if_ips = []
         interfaces = self.get_interfaces()
         for params in interfaces:
-            if not hw_addr_list or params['hw_addr'] in hw_addr_list:
+            if not dev_id_list or params['dev_id'] in dev_id_list:
                 if_ips.append(params['addr'].split('/')[0])
         return if_ips
 

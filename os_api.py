@@ -57,13 +57,13 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-            hw_addr = fwutils.linux_to_hw_addr(nicname)
-            if hw_addr == '':
+            dev_id = fwutils.linux_to_dev_id(nicname)
+            if dev_id == '':
                 continue
 
             daddr = {
                 'name':nicname,
-                'hw_addr':hw_addr,
+                'dev_id':dev_id,
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',

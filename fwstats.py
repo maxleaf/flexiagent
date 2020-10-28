@@ -93,10 +93,10 @@ def update_stats():
                         if t_stats:
                             t_stats.update(calc_stats)
                     else:
-                        # For other interfaces try to get hw addr
-                        hw_addr = fwutils.vpp_if_name_to_hw_addr(intf)
-                        if hw_addr:
-                            if_bytes[hw_addr] = calc_stats
+                        # For other interfaces try to get interface id
+                        dev_id = fwutils.vpp_if_name_to_dev_id(intf)
+                        if dev_id:
+                            if_bytes[dev_id] = calc_stats
 
 
             stats['bytes'] = if_bytes

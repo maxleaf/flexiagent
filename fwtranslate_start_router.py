@@ -35,7 +35,7 @@ import fwutils
 #      "entity": "agent",
 #      "message": "start-router",
 #      "params": {
-#        "hw_addr": [
+#        "dev_id": [
 #           "0000:00:08.00",
 #           "0000:00:09.00"
 #        ]
@@ -94,11 +94,11 @@ def start_router(params=None):
     #   sudo ip addr flush dev enp0s8
     # The interfaces to be removed are stored within 'add-interface' requests
     # in the configuration database.
-    hw_addr_list         = []
+    dev_id_list         = []
     pci_list_vmxnet3 = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
     for params in interfaces:
-        linux_if  = fwutils.hw_addr_to_linux_if(params['hw_addr'])
+        linux_if  = fwutils.dev_id_to_linux_if(params['dev_id'])
         if linux_if:
             # Firstly mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
@@ -107,10 +107,10 @@ def start_router(params=None):
             #      command will fail with 'device in use'.
             #   2. They require additional VPP call vmxnet3_create on start
             #      and complement vmxnet3_delete on stop
-            if fwutils.hw_addr_is_vmxnet3(params['hw_addr']):
-                pci_list_vmxnet3.append(params['hw_addr'])
+            if fwutils.dev_id_is_vmxnet3(params['dev_id']):
+                pci_list_vmxnet3.append(params['dev_id'])
             else:
-                hw_addr_list.append(params['hw_addr'])
+                dev_id_list.append(params['dev_id'])
 
             cmd = {}
             cmd['cmd'] = {}
@@ -127,7 +127,7 @@ def start_router(params=None):
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
     # Other interfaces will be not captured by vpp even if they are DOWN.
-    if len(hw_addr_list) > 0:
+    if len(dev_id_list) > 0:
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "python"
@@ -135,7 +135,7 @@ def start_router(params=None):
         cmd['cmd']['params']  = {
             'module': 'fwutils',
             'func'  : 'vpp_startup_conf_add_devices',
-            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': hw_addr_list }
+            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd['revert'] = {}
         cmd['revert']['name']   = "python"
@@ -143,7 +143,7 @@ def start_router(params=None):
         cmd['revert']['params'] = {
             'module': 'fwutils',
             'func'  : 'vpp_startup_conf_remove_devices',
-            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': hw_addr_list }
+            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd_list.append(cmd)
 
@@ -248,7 +248,7 @@ def start_router(params=None):
         cmd['revert'] = {}
         cmd['revert']['name']   = "vmxnet3_delete"
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':pci } ] }
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':pci } ] }
         cmd_list.append(cmd)
 
     # Once VPP started, apply configuration to it.

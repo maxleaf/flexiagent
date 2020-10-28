@@ -11,7 +11,7 @@
       "Params": {
         "addr": "1.0.0.4/24", 
         "gateway": "1.0.0.1", 
-        "hw_addr": "pci:0000:00:03.00", 
+        "dev_id": "pci:0000:00:03.00", 
         "multilink": {
           "labels": [
             "yellow", 
@@ -26,7 +26,7 @@
       "Params": {
         "addr": "10.0.0.4/24", 
         "gateway": "10.0.0.10", 
-        "hw_addr": "pci:0000:00:08.00", 
+        "dev_id": "pci:0000:00:08.00", 
         "multilink": {
           "labels": [
             "green", 
@@ -41,7 +41,7 @@
       "Key": "add-interface:pci:0000:00:09.00", 
       "Params": {
         "addr": "192.168.56.102/24", 
-        "hw_addr": "pci:0000:00:09.00", 
+        "dev_id": "pci:0000:00:09.00", 
         "routing": "ospf", 
         "type": "lan"
       }
