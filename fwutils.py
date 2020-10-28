@@ -1551,7 +1551,7 @@ def fix_message(msg):
     msg = fix_aggregated_message_format(msg)
 
     if 'params' in msg:
-        msg['params'] = fix_request_params(msg['params'])
+        msg['params'] = fix_request_params(msg['params'], msg['message'])
 
     return msg
 
