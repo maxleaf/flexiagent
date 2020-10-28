@@ -171,25 +171,25 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "python"
-            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, iface_hw_addr, labels)
+            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, hw_addr, labels)
             cmd['cmd']['params']  = {
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
                                         'next_hop': gw,
-                                        'dev':      iface_hw_addr,
+                                        'dev':      hw_addr,
                                         'remove':   False
                                       }
             }
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
-            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, iface_hw_addr, labels)
+            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, hw_addr, labels)
             cmd['revert']['params'] = {
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
                                         'next_hop': gw,
-                                        'dev':      iface_hw_addr,
+                                        'dev':      hw_addr,
                                         'remove':   True
                                       }
             }
@@ -204,26 +204,26 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-        cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (iface_hw_addr, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+        cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (hw_addr, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                     'is_add':1, 'twice_nat':0 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_add_del_interface_addr"
-        cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (iface_hw_addr, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+        cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (hw_addr, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                     'is_add':0, 'twice_nat':0 }
         cmd_list.append(cmd)
 
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_hw_addr, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (hw_addr, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                     'is_add':1, 'is_inside':0 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_hw_addr, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (hw_addr, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                     'is_add':0, 'is_inside':0 }
         cmd_list.append(cmd)
 
@@ -235,12 +235,12 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                             'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
             cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
             cmd['revert'] = {}
             cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                             'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
             cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
 
@@ -253,13 +253,13 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_hw_addr, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (hw_addr, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                     'is_add':1, 'is_inside':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_hw_addr, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':iface_hw_addr } ],
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (hw_addr, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
                                     'is_add':0, 'is_inside':1 }
         cmd_list.append(cmd)
 
