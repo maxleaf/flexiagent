@@ -1073,7 +1073,6 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
-
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
@@ -1082,12 +1081,17 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev = hw_addr_to_short(dev)
-        addr_type, addr = hw_addr_parse(dev)
+        dev_short = hw_addr_to_short(dev)
+        dev_full = hw_addr_to_full(dev)
+        addr_type, addr_short = hw_addr_parse(dev_short)
+        addr_type, addr_full = hw_addr_parse(dev_full)
         if addr_type == "pci":
-            config_param = 'dev %s' % addr
-            if p.get_element(config['dpdk'],config_param) == None:
-                tup = p.create_element(config_param)
+            old_config_param = 'dev %s' % addr_full
+            new_config_param = 'dev %s' % addr_short
+            if p.get_element(config['dpdk'],old_config_param) != None:
+                p.remove_element(config['dpdk'], old_config_param)
+            if p.get_element(config['dpdk'],new_config_param) == None:
+                tup = p.create_element(new_config_param)
                 config['dpdk'].append(tup)
 
     p.dump(config, vpp_config_filename)
@@ -1387,7 +1391,7 @@ def get_tunnel_interface_vpp_names():
         res.append(if_vpp_name)
     return res
 
-def get_interface_gateway(ip):
+def get_interface_gateway_from_router_db(ip):
     """Convert interface src IP address into gateway IP address.
 
     :param ip: IP address.

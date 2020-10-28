@@ -243,7 +243,6 @@ def add_remove_netplan_interface(is_add, hw_addr, ip, gw, metric, dhcp):
 
         # If needed, remove hw-addr-to-tap cached value for this hardware address, as netplan might change
         # interface name.
-        #
         cache = fwglobals.g.get_cache_data('DEV_TO_VPP_TAP_NAME_MAP')
         hw_addr = fwutils.hw_addr_to_full(hw_addr)
         if hw_addr in cache:
