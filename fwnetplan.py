@@ -115,25 +115,25 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            hw_addr = fwutils.linux_to_hw_addr(name)
+                            dev_id = fwutils.linux_to_dev_id(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            hw_addr = fwutils.linux_to_hw_addr(dev)
+                            dev_id = fwutils.linux_to_dev_id(dev)
                         if fname in our_files:
-                            our_files[fname].append({'ifname': dev, 'gateway': gateway, 'hw_addr': hw_addr, 'set-name': name})
+                            our_files[fname].append({'ifname': dev, 'gateway': gateway, 'dev_id': dev_id, 'set-name': name})
                         else:
-                            our_files[fname] = [{'ifname': dev, 'gateway': gateway, 'hw_addr': hw_addr, 'set-name': name}]
+                            our_files[fname] = [{'ifname': dev, 'gateway': gateway, 'dev_id': dev_id, 'set-name': name}]
     return our_files
 
 def _set_netplan_filename(files):
     for fname, devices in files.items():
         for dev in devices:
-            hw_addr = dev.get('hw_addr')
+            dev_id = dev.get('dev_id')
             ifname = dev.get('ifname')
             set_name = dev.get('set-name')
-            if hw_addr:
-                fwglobals.g.NETPLAN_FILES[hw_addr] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
-                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, hw_addr, fname))
+            if dev_id:
+                fwglobals.g.NETPLAN_FILES[dev_id] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
+                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, dev_id, fname))
 
 def _add_netplan_file(fname):
     if os.path.exists(fname):
@@ -146,31 +146,40 @@ def _add_netplan_file(fname):
         stream.flush()
         os.fsync(stream.fileno())
 
+def _dump_netplan_file(fname):
+    if fname:
+        try:
+            with open(fname, 'r') as f:
+                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        except Exception as e:
+            err_str = "_dump_netplan_file failed: file: %s, error: %s"\
+              % (fname, str(e))
+            fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, hw_addr, ip, gw, metric, dhcp):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
     config_section = {}
     old_ethernets = {}
 
     set_name = ''
     old_ifname = ''
 
-    ifname = fwutils.hw_addr_to_tap(hw_addr)
+    ifname = fwutils.dev_id_to_tap(dev_id)
     if not ifname:
-        err_str = "add_remove_netplan_interface: %s was not found" % hw_addr
+        err_str = "add_remove_netplan_interface: %s was not found" % dev_id
         fwglobals.log.error(err_str)
         return (False, err_str)
 
-    if hw_addr in fwglobals.g.NETPLAN_FILES:
-        fname = fwglobals.g.NETPLAN_FILES[hw_addr].get('fname')
+    if dev_id in fwglobals.g.NETPLAN_FILES:
+        fname = fwglobals.g.NETPLAN_FILES[dev_id].get('fname')
         fname_run = fname.replace('yaml', 'fwrun.yaml')
         if (not os.path.exists(fname_run)):
             _add_netplan_file(fname_run)
 
         fname_backup = fname + '.fw_run_orig'
 
-        old_ifname = fwglobals.g.NETPLAN_FILES[hw_addr].get('ifname')
-        if fwglobals.g.NETPLAN_FILES[hw_addr].get('set-name'):
-            set_name = fwglobals.g.NETPLAN_FILES[hw_addr].get('set-name')
+        old_ifname = fwglobals.g.NETPLAN_FILES[dev_id].get('ifname')
+        if fwglobals.g.NETPLAN_FILES[dev_id].get('set-name'):
+            set_name = fwglobals.g.NETPLAN_FILES[dev_id].get('set-name')
 
         with open(fname_backup, 'r') as stream:
             old_config = yaml.safe_load(stream)
@@ -241,18 +250,18 @@ def add_remove_netplan_interface(is_add, hw_addr, ip, gw, metric, dhcp):
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # If needed, remove hw-addr-to-tap cached value for this hardware address, as netplan might change
+        # If needed, remove dev-id-to-tap cached value for this hardware address, as netplan might change
         # interface name.
-        cache = fwglobals.g.get_cache_data('DEV_TO_VPP_TAP_NAME_MAP')
-        hw_addr = fwutils.hw_addr_to_full(hw_addr)
-        if hw_addr in cache:
-            del cache[hw_addr]
+        cache = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+        dev_id = fwutils.dev_id_to_full(dev_id)
+        if dev_id in cache:
+            del cache[dev_id]
 
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
             for _ in range(50):
-                ifname = fwutils.hw_addr_to_tap(hw_addr)
+                ifname = fwutils.dev_id_to_tap(dev_id)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
@@ -260,15 +269,14 @@ def add_remove_netplan_interface(is_add, hw_addr, ip, gw, metric, dhcp):
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
                 fwglobals.log.error(err_str)
+                _dump_netplan_file(fname_run)
                 return (False, err_str)
 
     except Exception as e:
-        err_str = "add_remove_netplan_interface failed: hw_addr: %s, file: %s, error: %s"\
-              % (hw_addr, fname_run, str(e))
+        err_str = "add_remove_netplan_interface failed: dev_id: %s, file: %s, error: %s"\
+              % (dev_id, fname_run, str(e))
         fwglobals.log.error(err_str)
-        if fname_run:
-            with open(fname_run, 'r') as f:
-                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        _dump_netplan_file(fname_run)
         return (False, err_str)
 
     return (True, None)

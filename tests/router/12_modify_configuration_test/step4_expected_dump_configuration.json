@@ -11,7 +11,7 @@
       "Params": {
         "addr": "10.0.0.4/24", 
         "gateway": "10.0.0.10", 
-        "hw_addr": "pci:0000:00:08.00", 
+        "dev_id": "pci:0000:00:08.00", 
         "multilink": {
           "labels": [
             "green", 

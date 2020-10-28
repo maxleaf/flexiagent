@@ -36,7 +36,7 @@ import fwutils
 #    {
 #      "message": "add-interface",
 #      "params": {
-#           "hw_addr":"0000:00:08.00",
+#           "dev_id":"0000:00:08.00",
 #           "addr":"10.0.0.4/24",
 #           "routing":"ospf"
 #      }
@@ -77,7 +77,7 @@ def add_interface(params):
      """
     cmd_list = []
 
-    hw_addr  = params['hw_addr']
+    dev_id  = params['dev_id']
     iface_addr = params.get('addr', '')
     iface_addr_bytes = ''
     if iface_addr:
@@ -106,7 +106,7 @@ def add_interface(params):
         cmd['cmd']['params'] = {
                         'module': 'fwutils',
                         'func': 'vpp_set_dhcp_detect',
-                        'args': {'hw_addr': hw_addr, 'remove': False}
+                        'args': {'dev_id': dev_id, 'remove': False}
         }
         cmd['revert'] = {}
         cmd['revert']['name']   = "python"
@@ -114,7 +114,7 @@ def add_interface(params):
         cmd['revert']['params'] = {
                         'module': 'fwutils',
                         'func': 'vpp_set_dhcp_detect',
-                        'args': {'hw_addr': hw_addr, 'remove': True}
+                        'args': {'dev_id': dev_id, 'remove': True}
         }
         cmd_list.append(cmd)
 
@@ -126,7 +126,7 @@ def add_interface(params):
                 'module': 'fwnetplan',
                 'func': 'add_remove_netplan_interface',
                 'args': { 'is_add'   : 1,
-                          'hw_addr'  : hw_addr,
+                          'dev_id'  : dev_id,
                           'ip'       : iface_addr,
                           'gw'       : gw,
                           'metric'   : metric,
@@ -141,7 +141,7 @@ def add_interface(params):
                 'func': 'add_remove_netplan_interface',
                 'args': {
                           'is_add'  : 0,
-                          'hw_addr' : hw_addr,
+                          'dev_id' : dev_id,
                           'ip'      : iface_addr,
                           'gw'      : gw,
                           'metric'  : metric,
@@ -154,13 +154,13 @@ def add_interface(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, hw_addr)
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'hw_addr_to_tap', 'arg':hw_addr } ]},
+    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, dev_id)
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
                                 "sudo ip link set dev DEV-STUB up" ]
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, hw_addr)
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'hw_addr_to_tap', 'arg':hw_addr } ]},
+    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, dev_id)
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
                                 "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)
 
@@ -171,25 +171,25 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "python"
-            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, hw_addr, labels)
+            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
             cmd['cmd']['params']  = {
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
                                         'next_hop': gw,
-                                        'dev':      hw_addr,
+                                        'dev':      dev_id,
                                         'remove':   False
                                       }
             }
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
-            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, hw_addr, labels)
+            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
             cmd['revert']['params'] = {
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
                                         'next_hop': gw,
-                                        'dev':      hw_addr,
+                                        'dev':      dev_id,
                                         'remove':   True
                                       }
             }
@@ -204,26 +204,26 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-        cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (hw_addr, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+        cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (dev_id, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                     'is_add':1, 'twice_nat':0 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_add_del_interface_addr"
-        cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (hw_addr, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+        cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (dev_id, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                     'is_add':0, 'twice_nat':0 }
         cmd_list.append(cmd)
 
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (hw_addr, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                     'is_add':1, 'is_inside':0 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (hw_addr, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                     'is_add':0, 'is_inside':0 }
         cmd_list.append(cmd)
 
@@ -235,12 +235,12 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                             'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
             cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
             cmd['revert'] = {}
             cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                             'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
             cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
 
@@ -253,13 +253,13 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (hw_addr, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                     'is_add':1, 'is_inside':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (hw_addr, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'hw_addr_to_vpp_sw_if_index', 'arg':hw_addr } ],
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                     'is_add':0, 'is_inside':1 }
         cmd_list.append(cmd)
 
@@ -358,4 +358,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-interface:%s' % params['hw_addr']
+    return 'add-interface:%s' % params['dev_id']
