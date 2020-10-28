@@ -10,8 +10,8 @@
       "Key": "add-interface:pci:0000:00:03.00", 
       "Params": {
         "addr": "1.0.0.4/24", 
-        "gateway": "1.0.0.1", 
         "dev_id": "pci:0000:00:03.00", 
+        "gateway": "1.0.0.1", 
         "multilink": {
           "labels": [
             "yellow", 
@@ -25,8 +25,8 @@
       "Key": "add-interface:pci:0000:00:08.00", 
       "Params": {
         "addr": "10.0.0.4/24", 
-        "gateway": "10.0.0.10", 
         "dev_id": "pci:0000:00:08.00", 
+        "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
             "green"
