@@ -250,7 +250,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # If needed, remove dev-id-to-tap cached value for this hardware address, as netplan might change
+        # If needed, remove dev-id-to-tap cached value for this dev id, as netplan might change
         # interface name.
         cache = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
         dev_id = fwutils.dev_id_to_full(dev_id)
