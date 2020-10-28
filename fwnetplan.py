@@ -146,6 +146,15 @@ def _add_netplan_file(fname):
         stream.flush()
         os.fsync(stream.fileno())
 
+def _dump_netplan_file(fname):
+    if fname:
+        try:
+            with open(fname, 'r') as f:
+                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        except Exception as e:
+            err_str = "_dump_netplan_file failed: file: %s, error: %s"\
+              % (fname, str(e))
+            fwglobals.log.error(err_str)
 
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
     config_section = {}
@@ -260,15 +269,14 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
                 fwglobals.log.error(err_str)
+                _dump_netplan_file(fname_run)
                 return (False, err_str)
 
     except Exception as e:
         err_str = "add_remove_netplan_interface failed: dev_id: %s, file: %s, error: %s"\
               % (dev_id, fname_run, str(e))
         fwglobals.log.error(err_str)
-        if fname_run:
-            with open(fname_run, 'r') as f:
-                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        _dump_netplan_file(fname_run)
         return (False, err_str)
 
     return (True, None)
