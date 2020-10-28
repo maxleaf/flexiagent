@@ -63,7 +63,7 @@ class OS_DECODERS:
 
             daddr = {
                 'name':nicname,
-                'pciaddr':hw_addr,
+                'hw_addr':hw_addr,
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',
