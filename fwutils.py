@@ -1549,7 +1549,10 @@ def fix_request_params(params, message=None):
 
 def fix_message(msg):
     msg = fix_aggregated_message_format(msg)
-    msg['params'] = fix_request_params(msg['params'])
+
+    if 'params' in msg:
+        msg['params'] = fix_request_params(msg['params'])
+
     return msg
 
 # Today (May-2019) message aggregation is not well defined in protocol between
