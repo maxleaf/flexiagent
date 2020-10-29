@@ -387,19 +387,26 @@ class FwStunWrap:
         reset_all_timeout = 10 * 60
 
         while self.is_running == True:
-            # send STUN retquests for addresses that a request was not sent for
-            # them, or for ones that did not get reply previously
-            self._send_stun_request()
-            self._increase_sec()
 
-            if slept % (reset_all_timeout) == 0 and slept > 0:
-                # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
-                self.reset_all()
+            # Don't STUN if vpp is being initializing / shutting down,
+            # as quering vpp for interface names/ip-s might generate exception.
+            #
+            if not fwglobals.g.router_api.is_starting_stopping():
 
-            # dump STUN and unassigned interfaces information every 'timeout' seconds.
-            # Wait 1 cycle so that the caches will be populated.
-            if (slept % timeout) == 0 and slept > timeout:
-                fwglobals.g.unassigned_interfaces.log_interfaces_cache()
-                self.log_address_cache()
+                # send STUN retquests for addresses that a request was not sent for
+                # them, or for ones that did not get reply previously
+                self._send_stun_request()
+                self._increase_sec()
+
+                if slept % (reset_all_timeout) == 0 and slept > 0:
+                    # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
+                    self.reset_all()
+
+                # dump STUN and unassigned interfaces information every 'timeout' seconds.
+                # Wait 1 cycle so that the caches will be populated.
+                if (slept % timeout) == 0 and slept > timeout:
+                    fwglobals.g.unassigned_interfaces.log_interfaces_cache()
+                    self.log_address_cache()
+
             time.sleep(1)
             slept += 1
