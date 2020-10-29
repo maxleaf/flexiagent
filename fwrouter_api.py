@@ -108,7 +108,7 @@ class FWROUTER_API:
         """
         while self.router_started:
             time.sleep(1)  # 1 sec
-            try:           # Ensure watchdog thread doesn't exit on exception
+            try:           # Ensure thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
                     fwglobals.log.debug("watchdog: initiate restore")
 
@@ -118,7 +118,8 @@ class FWROUTER_API:
 
                     fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
-                fwglobals.log.error("watchdog: exception: %s" % str(e))
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
     def tunnel_stats_thread(self):
@@ -129,7 +130,12 @@ class FWROUTER_API:
         self._fill_tunnel_stats_dict()
         while self.router_started:
             time.sleep(1)  # 1 sec
-            fwtunnel_stats.tunnel_stats_test()
+            try:           # Ensure thread doesn't exit on exception
+                fwtunnel_stats.tunnel_stats_test()
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
 
     def dhcpc_thread(self):
         """DHCP client thread.
@@ -137,27 +143,34 @@ class FWROUTER_API:
         """
         while self.router_started:
             time.sleep(1)  # 1 sec
-            apply_netplan = False
-            wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
-            for wan in wan_list:
-                dhcp = wan.get('dhcp', 'no')
-                if dhcp == 'no':
-                    continue
+            try:  # Ensure thread doesn't exit on exception
+                apply_netplan = False
+                wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
-                name = fwutils.pci_to_tap(wan['pci'])
-                addr = fwutils.get_interface_address(name)
-                if not addr:
-                    fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
-                    apply_netplan = True
+                for wan in wan_list:
+                    dhcp = wan.get('dhcp', 'no')
+                    if dhcp == 'no':
+                        continue
 
-            if apply_netplan:
-                try:
-                    fwutils.netplan_apply('dhcpc_thread')
-                    fwglobals.g.fwagent.disconnect()
-                    time.sleep(10)  # 10 sec
-                except Exception as e:
-                    fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
+                    name = fwutils.pci_to_tap(wan['pci'])
+                    addr = fwutils.get_interface_address(name)
+                    if not addr:
+                        fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
+                        apply_netplan = True
+
+                if apply_netplan:
+                    try:
+                        fwutils.netplan_apply('dhcpc_thread')
+                        fwglobals.g.fwagent.disconnect()
+                        time.sleep(10)  # 10 sec
+                    except Exception as e:
+                        fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
+
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
