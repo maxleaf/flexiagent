@@ -411,21 +411,6 @@ class FwRouterCfg:
         else:
             return pci, gw
 
-    def get_interface_ips(self, pci_list=None):
-        """Fetches IP-s of interfaces stored in the configuration database.
-
-        :param pci_list: filter interfaces to be handled by pci.
-
-        :returns: list of IP addresses. The addresses are without length.
-        """
-        if_ips = []
-        interfaces = self.get_interfaces()
-        for params in interfaces:
-            if not pci_list or params['pci'] in pci_list:
-                if_ips.append(params['addr'].split('/')[0])
-        return if_ips
-
-
     def update_signature(self, request):
         """Updates the database signature.
         This function assists the database synchronization feature that keeps
@@ -559,7 +544,7 @@ class FwRouterCfg:
         """
         builds a list of WAN interfaces from router DB. if 'useStun' does not exist or False,
         do not add this interface to the list.
-        : return : list if WAN interfaces from router DB
+        : return : list of WAN interfaces from router DB
         """
         addr_list = []
         wan_list = self.get_interfaces(type='wan')
@@ -571,6 +556,8 @@ class FwRouterCfg:
             else:
                 entry = {}
                 entry['address']     = wan.get('addr').split('/')[0]
+                if entry['address'] == '':
+                    continue
                 entry['public_ip']   = wan.get('PublicIP','')
                 entry['public_port'] = wan.get('PublicPort','')
                 addr_list.append(entry)

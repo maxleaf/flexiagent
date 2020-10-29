@@ -241,22 +241,6 @@ class FwUnassignedIfs:
                 return True
         return False
 
-    def update_public(self, addr_no_mask, p_ip, p_port):
-        """ Adds public information to entry in the unassigned hash.
-
-        : param addr_no_mask : IP address without mask, to which to add the public info
-        : param p_ip   : public IP to add to the entry
-        : param p_port : public port to add to the entry
-        """
-        for pci in self.cached_interfaces.keys():
-            entry = self.cached_interfaces[pci]
-            if entry.get('addr'):
-                if addr_no_mask == entry['addr'].split('/')[0]:
-                    if entry.get('gateway'):
-                        entry['public_ip'] = p_ip
-                        entry['public_port'] = p_port
-                        return
-
     def log_interfaces_cache(self):
         """ log cache into log
         """
