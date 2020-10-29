@@ -90,6 +90,8 @@ class FWROUTER_API:
         self.vpp_api         = VPP_API()
         self.multilink       = FwMultilink(multilink_db_file)
         self.router_started  = False
+        self.router_starting = False
+        self.router_stopping = False
         self.router_failure  = False
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
@@ -108,7 +110,7 @@ class FWROUTER_API:
         """
         while self.router_started:
             time.sleep(1)  # 1 sec
-            try:           # Ensure watchdog thread doesn't exit on exception
+            try:           # Ensure thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
                     fwglobals.log.debug("watchdog: initiate restore")
 
@@ -118,7 +120,8 @@ class FWROUTER_API:
 
                     fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
-                fwglobals.log.error("watchdog: exception: %s" % str(e))
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
     def tunnel_stats_thread(self):
@@ -129,7 +132,12 @@ class FWROUTER_API:
         self._fill_tunnel_stats_dict()
         while self.router_started:
             time.sleep(1)  # 1 sec
-            fwtunnel_stats.tunnel_stats_test()
+            try:           # Ensure thread doesn't exit on exception
+                fwtunnel_stats.tunnel_stats_test()
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
 
     def dhcpc_thread(self):
         """DHCP client thread.
@@ -137,27 +145,34 @@ class FWROUTER_API:
         """
         while self.router_started:
             time.sleep(1)  # 1 sec
-            apply_netplan = False
-            wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
-            for wan in wan_list:
-                dhcp = wan.get('dhcp', 'no')
-                if dhcp == 'no':
-                    continue
+            try:  # Ensure thread doesn't exit on exception
+                apply_netplan = False
+                wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
-                name = fwutils.pci_to_tap(wan['pci'])
-                addr = fwutils.get_interface_address(name)
-                if not addr:
-                    fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
-                    apply_netplan = True
+                for wan in wan_list:
+                    dhcp = wan.get('dhcp', 'no')
+                    if dhcp == 'no':
+                        continue
 
-            if apply_netplan:
-                try:
-                    fwutils.netplan_apply('dhcpc_thread')
-                    fwglobals.g.fwagent.disconnect()
-                    time.sleep(10)  # 10 sec
-                except Exception as e:
-                    fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
+                    name = fwutils.pci_to_tap(wan['pci'])
+                    addr = fwutils.get_interface_address(name)
+                    if not addr:
+                        fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
+                        apply_netplan = True
+
+                if apply_netplan:
+                    try:
+                        fwutils.netplan_apply('dhcpc_thread')
+                        fwglobals.g.fwagent.disconnect()
+                        time.sleep(10)  # 10 sec
+                    except Exception as e:
+                        fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
+
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
@@ -219,6 +234,9 @@ class FWROUTER_API:
         if self.router_started == True:
             self.call({'message':'stop-router'})
         fwglobals.log.info("FWROUTER_API: stop_router: stopped")
+
+    def is_starting_stopping(self):
+        return (self.router_starting or self.router_stopping)
 
     def call(self, request):
         """Executes router configuration request: 'add-X','remove-X' or 'modify-X'.
@@ -1085,6 +1103,8 @@ class FWROUTER_API:
         """Handles pre start VPP activities.
         :returns: None.
         """
+        self.router_starting = True
+
         # Reset failure state - hopefully we will succeed.
         # On no luck the failure will be recorded again.
         #
@@ -1092,11 +1112,11 @@ class FWROUTER_API:
 
         fwtranslate_add_tunnel.init_tunnels()
 
-
     def _on_start_router_after(self):
         """Handles post start VPP activities.
         :returns: None.
         """
+        self.router_starting = False
         self.router_started = True
         self._start_threads()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
@@ -1105,11 +1125,18 @@ class FWROUTER_API:
         """Handles pre-VPP stop activities.
         :returns: None.
         """
+        self.router_stopping = True
         self.router_started = False
         self._stop_threads()
         fwutils.reset_dhcpd()
         fwglobals.g.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
+
+    def _on_stop_router_after(self):
+        """Handles post-VPP stop activities.
+        :returns: None.
+        """
+        self.router_stopping = False
 
     def _set_router_failure(self, err_str):
         """Set router failure state.

@@ -9,6 +9,7 @@ import fwglobals
 import fwtunnel_stats
 import fwutils
 import time
+import traceback
 import copy
 
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
@@ -415,25 +416,38 @@ class FwStunWrap:
         update_cache_timeout = 60
 
         while self.is_running == True:
-            # send STUN retquests for addresses that a request was not sent for
-            # them, or for ones that did not get reply previously
-            self._send_stun_request()
-            self._increase_sec()
 
-            if slept % reset_all_timeout == 0 and slept > 0:
-                # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
-                self.reset_all()
+            try:  # Ensure thread doesn't exit on exception
 
-            """
-            if slept % update_cache_timeout == 0 and slept > 0:
-                # every update_cache_timeout, refresh cache with updated IP addresses from OS
-                self.update_cache_from_OS()
-            """
+                # Don't STUN if vpp is being initializing / shutting down,
+                # as quering vpp for interface names/ip-s might generate exception.
+                if not fwglobals.g.router_api.is_starting_stopping():
 
-            # dump STUN and unassigned interfaces information every 'timeout' seconds.
-            # Wait 1 cycle so that the caches will be populated.
-            if (slept % timeout) == 0 and slept > timeout:
-                fwglobals.g.unassigned_interfaces.log_interfaces_cache()
-                self.log_address_cache()
+                    # send STUN retquests for addresses that a request was not sent for
+                    # them, or for ones that did not get reply previously
+                    self._send_stun_request()
+                    self._increase_sec()
+
+                    if slept % (reset_all_timeout) == 0 and slept > 0:
+                        # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
+                        self.reset_all()
+
+            		"""
+            		if slept % update_cache_timeout == 0 and slept > 0:
+                	# every update_cache_timeout, refresh cache with updated IP addresses from OS
+                	self.update_cache_from_OS()
+            		"""
+						
+                    # dump STUN and unassigned interfaces information every 'timeout' seconds.
+                    # Wait 1 cycle so that the caches will be populated.
+                    if (slept % timeout) == 0 and slept > timeout:
+                        fwglobals.g.unassigned_interfaces.log_interfaces_cache()
+                        self.log_address_cache()
+
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
+
             time.sleep(1)
             slept += 1
