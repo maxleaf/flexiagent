@@ -322,12 +322,12 @@ def dev_id_to_short(dev_id):
     """
     addr_type, addr = dev_id_parse(dev_id)
     if addr_type == 'usb':
-        return addr_type
+        return dev_id
 
     l = addr.split('.')
     if len(l[1]) == 2 and l[1][0] == '0':
         return dev_id_add_type(l[0] + '.' + l[1][1])
-    return addr_type
+    return dev_id
 
 def get_linux_dev_ids():
     """ Get the list of PCI-s of all network interfaces available in Linux.
