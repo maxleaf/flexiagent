@@ -49,7 +49,7 @@ class OS_DECODERS:
     """OS DECODERS class representation.
     """
     def interfaces(self, inp):
-        """Get hardware address from Linux interface name for a list of interfaces.
+        """Get device bus address from Linux interface name for a list of interfaces.
 
         :param inp:         Interfaces.
 

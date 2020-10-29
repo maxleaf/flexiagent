@@ -71,10 +71,10 @@ class FwUnassignedIfs:
 
     def _get_assigned_interfaces(self):
         """ Get the list of assigned interfaces from the router-db. Those interfaces
-        are already listed according to their hardware address, so we just add them to a
+        are already listed according to their device bus address, so we just add them to a
         list.
 
-        : return : dev_id_list - list of hardware addresses for assigned interfaces
+        : return : dev_id_list - list of device bus addresses for assigned interfaces
         """
         assigned_if = fwglobals.g.router_cfg.get_interfaces()
         if len(assigned_if) == 0:
@@ -85,7 +85,7 @@ class FwUnassignedIfs:
     def _get_entry_fingerprint(self, dev_id):
         """ Computes a hash for an entry in the cache.
 
-        : param dev_id : the hardware address which is the key in the cache dictionary
+        : param dev_id : the device bus address which is the key in the cache dictionary
         : return : string of changes to calculate hash on.
         """
         res = ''
