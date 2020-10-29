@@ -156,7 +156,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
@@ -214,7 +214,8 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
             if 'dhcp4-overrides' in config_section:
                 del config_section['dhcp4-overrides']
             config_section['addresses'] = [ip]
-            if gw:
+
+            if gw and type == 'WAN':
                 if 'routes' in config_section:
                     def_route_existed = False
                     routes = config_section['routes']
@@ -236,6 +237,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
+
             ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
