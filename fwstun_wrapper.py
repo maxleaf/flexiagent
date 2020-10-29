@@ -424,9 +424,11 @@ class FwStunWrap:
                 # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
                 self.reset_all()
 
+            """
             if slept % update_cache_timeout == 0 and slept > 0:
                 # every update_cache_timeout, refresh cache with updated IP addresses from OS
                 self.update_cache_from_OS()
+            """
 
             # dump STUN and unassigned interfaces information every 'timeout' seconds.
             # Wait 1 cycle so that the caches will be populated.
