@@ -57,13 +57,13 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr and pciaddr[0] == "":
+            pci, driver = fwutils.get_interface_pci(nicname)
+            if not pci:
                 continue
             daddr = {
                         'name':nicname,
-                        'pciaddr':pciaddr[0],
-                        'driver':pciaddr[1],
+                        'pciaddr':pci,
+                        'driver':driver,
                         'MAC':'',
                         'IPv4':'',
                         'IPv4Mask':'',
