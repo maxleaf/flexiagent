@@ -212,6 +212,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
             config_section['dhcp4-overrides'] = {'route-metric': metric}
         else:
             config_section['dhcp4'] = False
+            if 'dhcp4-overrides' in config_section:
+                del config_section['dhcp4-overrides']
             config_section['addresses'] = [ip]
             if gw:
                 if 'routes' in config_section:
