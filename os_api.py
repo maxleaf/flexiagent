@@ -61,9 +61,14 @@ class OS_DECODERS:
             if dev_id == '':
                 continue
 
+            addr_type, addr = fwutils.dev_id_parse(dev_id)
+
+            if addr_type != 'pci':
+                continue
+
             daddr = {
                 'name':nicname,
-                'pciaddr':fwutils.dev_id_parse(dev_id)[1],
+                'pciaddr':addr,
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',
