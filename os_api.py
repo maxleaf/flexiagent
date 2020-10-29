@@ -63,7 +63,7 @@ class OS_DECODERS:
 
             daddr = {
                 'name':nicname,
-                'dev_id':dev_id,
+                'pciaddr':fwutils.dev_id_parse(dev_id)[1],
                 'driver':'',
                 'MAC':'',
                 'IPv4':'',
