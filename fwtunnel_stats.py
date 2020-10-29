@@ -182,7 +182,7 @@ def add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels):
                 # with that IP to disconnect. If it is not part of any connected tunnel,
                 # add its source IP address to the cache of addresses for which
                 # we will send STUN requests.
-                if tunnel['src'] not in ip_up_set:
+                if fwglobals.g.stun_wrapper and tunnel['src'] not in ip_up_set:
                     fwglobals.log.debug("Tunnel-id %d is down, adding address %s to STUN interfaces cache"\
                         %(key, tunnel['src']))
                     fwglobals.g.stun_wrapper.add_addr(tunnel['src'], True)

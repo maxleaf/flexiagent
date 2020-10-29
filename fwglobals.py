@@ -289,13 +289,12 @@ class Fwglobals:
         self.os_api        = OS_API()
         self.apps          = FwApps(self.APP_REC_DB_FILE)
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.unassigned_interfaces  = FwUnassignedIfs()
 
         if standalone:
-            self.stun_wrapper           = None
-            self.unassigned_interfaces  = None
+            self.stun_wrapper = None
         else:
-            self.stun_wrapper           = FwStunWrap()
-            self.unassigned_interfaces  = FwUnassignedIfs()
+            self.stun_wrapper = FwStunWrap()
             self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
@@ -317,8 +316,8 @@ class Fwglobals:
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
 
         if self.stun_wrapper:
-            del self.unassigned_interfaces
             del self.stun_wrapper
+        del self.unassigned_interfaces
         del self.apps
         del self.policies
         del self.os_api
