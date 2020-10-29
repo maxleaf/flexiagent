@@ -904,7 +904,7 @@ class Checker:
         buffers = 16384  # Set default
         conf    = self.vpp_configuration
         conf_param = None
-        if conf and conf['dpdk']:
+        if conf and conf['dpdk'] != None:
             key = self.fw_ac_db.get_element(conf['dpdk'], 'num-mbufs')
             if key:
                 tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'], key)
@@ -936,7 +936,7 @@ class Checker:
 
         if not conf:
             conf = self.fw_ac_db.get_main_list()
-        if conf['dpdk'] is None:
+        if conf['dpdk'] == None:
             tup = self.fw_ac_db.create_element('dpdk')
             conf.append(tup)
 
@@ -944,8 +944,8 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_vpp_workers_core(self, fix=False, silently=False, prompt=''):
-        """Check and set number of worker cores to process incoming packets.
+    def soft_check_multi_core_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+        """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
         :param silently:        Do not prompt user.
@@ -954,16 +954,16 @@ class Checker:
         :returns: 'True' if check is successful and 'False' otherwise.
         """
         # This function does the following:
-        # 1. sets "main-core", "corelist-worrkers" and "workers" in "cpu" section in /etc/vpp/startup.conf
+        # 1. sets "main-core", "corelist-workers" and "workers" in "cpu" section in /etc/vpp/startup.conf
         # 2. sets "num-rx-queues" in "dpdk" section in /etc/vpp/startup.conf
-        # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/defualt/grub
+        # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/default/grub
         # 4. sudo update-grub
 
         if not fix or silently:
             return True
         # 'Fix' and 'silently' has no meaning for vpp configuration parameters,
         # as any value is good for it, and if no value was configured,
-        # the exisiting values will be used, or zero if none.
+        # the existing values will be used, or zero if none.
 
         num_worker_cores = psutil.cpu_count() - 1
         input_cores = 0
@@ -971,6 +971,7 @@ class Checker:
             str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
             try:
                 if len(str_cores) == 0:
+                    input_cores = num_worker_cores
                     break
                 input_cores = int(str_cores)
                 if input_cores > num_worker_cores:
@@ -1000,7 +1001,7 @@ class Checker:
             conf = self.fw_ac_db.get_main_list()
             tup = self.fw_ac_db.create_element('cpu')
             conf.append(tup)
-            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0')) 
+            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0'))
             if input_cores == 0:
                 conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 0'))
             elif input_cores == 1:
@@ -1046,9 +1047,9 @@ class Checker:
                 tmp = re.split('\s+', workers_param.strip())
                 workers_param_val = int(tmp[1])
 
-        if conf and not conf['dpdk']:
+        if conf and conf['dpdk'] == None:
             conf.append(self.fw_ac_db.create_element('dpdk'))
-        if conf['dpdk'][dev_default_key]:
+        if conf['dpdk'][dev_default_key] != None:
             string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key],'num-rx-queues')
             if string:
                 tup_num_rx = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
@@ -1067,27 +1068,21 @@ class Checker:
         if input_cores == 0:
             if main_core_param:
                 self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
-            main_core_param = 'main-core 0'
-            conf['cpu'].append(self.fw_ac_db.create_element(main_core_param))
 
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-            corelist_worker_param = 'corelist-workers 0' 
-            conf['cpu'].append(self.fw_ac_db.create_element(corelist_worker_param))
 
             if workers_param:
                 self.fw_ac_db.remove_element(conf['cpu'], workers_param)
-            workers_param = 'workers 0'
-            conf['cpu'].append(self.fw_ac_db.create_element(workers_param))
 
             if num_of_rx_queues_param:
-                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
-            num_of_rx_queues_param = 'num-rx-queues 0'
-            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(num_of_rx_queues_param))
-
+                if conf['dpdk'][dev_default_key] != None:
+                    self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
+                    if len(conf['dpdk'][dev_default_key]) == 0:
+                        self.fw_ac_db.remove_element(conf['dpdk'],dev_default_key)
             self.vpp_config_modified = True
             self.update_grub = True
-            return True 
+            return True
 
         # in case multi core configured
         if input_cores != 0:
@@ -1126,24 +1121,24 @@ class Checker:
 
             if num_of_rx_queues_param_val != input_cores:
                 if conf['dpdk'] != None:
-                    if conf['dpdk'][dev_default_key]:
+                    if conf['dpdk'][dev_default_key] != None:
                         new_num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
                         string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key], 'num-rx-queues')
                         if string:
                             tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
                             if tup:
                                 self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], string)
-                            conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
+                        conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
                     else:
                         self._add_tup_to_dpdk(input_cores)
-                        self.vpp_config_modified = True 
+                        self.vpp_config_modified = True
 
             if self.vpp_config_modified == True:
                 self.update_grub = True
             return True
 
     def _add_tup_to_dpdk(self, num_of_cores):
-        """ 
+        """
         adds 'def default' tuple to 'dpdk' and sets 'num-rx-queue' value
 
         :param num_of_cores:  num of cores to handle incoming traffic
@@ -1172,7 +1167,7 @@ class Checker:
         """
         # This function does the following:
         # 1. Ask the user if to emable power saving mode
-        # 2. If so, set poll-sleep-usec parameter in startup.conf's unix 
+        # 2. If so, set poll-sleep-usec parameter in startup.conf's unix
         #    section to some TBD value.
 
         if not fix or silently:
@@ -1193,7 +1188,7 @@ class Checker:
                     conf_param = tup[0]
 
         while True:
-            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")        
+            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")
             if str_ps_mode == 'Y' or str_ps_mode == 'y':
                 enable_ps_mode = True
                 break
@@ -1254,12 +1249,16 @@ class Checker:
                         tmp = re.split('\s+', workers_param.strip())
                         num_of_workers_cores = int(tmp[1])
 
+        update_line = ''
         if num_of_workers_cores == 0:
             update_line = ''
-        elif num_of_workers_cores == 1:
-            update_line = 'iommu=pt intel_iommu=on isolcpus=1 nohz_full=1 rcu_nocbs=1'
         else:
-            update_line = 'iommu=pt intel_iommu=on isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
+            if fwutils.check_if_virtual_environment() == True:
+                update_line += 'iommu=pt intel_iommu=on '
+            if num_of_workers_cores == 1:
+                update_line += 'isolcpus=1 nohz_full=1 rcu_nocbs=1'
+            else:
+                update_line += 'isolcpus=1-%d nohz_full=1-%d rcu_nocbs=1-%d' % (num_of_workers_cores, num_of_workers_cores, num_of_workers_cores)
         grub_read_file  = '/etc/default/grub'
         grub_write_file = '/etc/default/grub.tmp'
 
@@ -1270,7 +1269,7 @@ class Checker:
         read_file  = open(grub_read_file, "r")
         write_file = open(grub_write_file, "w")
         for line in read_file:
-            if "GRUB_CMDLINE_LINUX_DEFAULT" in line:
+            if prefix_val in line:
                 # no need to handle lines which are remarked
                 if line.startswith("#"):
                     write_file.write(line)
@@ -1287,14 +1286,15 @@ class Checker:
     # zero cores means reset to old line, without our additions
         if grub_line_found == True:
             add_grub_line = True
-            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part
-            val_line = grub_line.split('=\"')[1].strip()
-            # take the GRUB_CMDLINE_LINUX_DEFAULT part
-            prefix_val = grub_line.split('=\"')[0]
-            val_line = val_line.strip('\" ')
+            # take the list of values after the 'GRUB_CMDLINE_LINUX_DEFAULT=' part, if exist
+            splt = grub_line.split('=\"')
+            if len(splt) > 1:
+                val_line = splt[1].strip().strip('\" ')
+            else:
+                val_line = ''
             #create a list of tokens from the val_line
             val_line_list = re.split('\s+', val_line.strip())
-            #remove old values, if exist, so we can replace them with ourts
+            #remove old values, if exist, so we can replace them with ours
             results = []
             for elem in val_line_list:
                 if elem.startswith('iommu'):
@@ -1318,7 +1318,7 @@ class Checker:
                 grub_line = prefix_val+ '=\"' + val_line +'\"'
             write_file.write(grub_line+'\n')
         else:
-            grub_line = prefix_val+'\"' + update_line + '\"'
+            grub_line = prefix_val+ '=\"' + update_line + '\"'
             write_file.write(grub_line+'\n')
 
         write_file.close()
@@ -1328,4 +1328,3 @@ class Checker:
         if add_grub_line == True:
             os.system ("sudo update-grub")
         return
-

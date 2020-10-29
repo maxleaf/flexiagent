@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
 import re
 
@@ -190,73 +191,6 @@ def add_interface(params):
                     }
         }
         cmd_list.append(cmd)
-
-        # add interface into netplan configuration
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_netplan_interface',
-                    'args': { 'is_add'       : 1,
-                            'pci'            : None,
-                            'ip'             : iface_addr,
-                            'gw'             : gw,
-                            'metric'         : metric,
-                            'dhcp'           : dhcp,
-                            'linux_interface': iface_name
-                    }
-        }
-        cmd['cmd']['descr'] = "add interface into netplan config file"
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_netplan_interface',
-                    'args': {
-                            'is_add'         : 0,
-                            'pci'            : None,
-                            'ip'             : iface_addr,
-                            'gw'             : gw,
-                            'metric'         : metric,
-                            'dhcp'           : dhcp,
-                            'linux_interface': iface_name
-                    }
-        }
-        cmd['revert']['descr'] = "remove interface from netplan config file"
-        cmd_list.append(cmd)
-
-        # Enable NAT.
-        # On WAN interfaces run
-        #   'nat44 add interface address GigabitEthernet0/9/0'
-        #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
-        # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-        if 'type' not in params or params['type'].lower() == 'wan':
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-            cmd['cmd']['descr']   = "enable NAT for tapcli interface"
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':1, 'twice_nat':0 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_add_del_interface_addr"
-            cmd['revert']['descr']  = "disable NAT for tapcli interface"
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':0, 'twice_nat':0 }
-            cmd_list.append(cmd)
-
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-            cmd['cmd']['descr']   = "add interface tapcli to output path" 
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':1, 'is_inside':0 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-            cmd['revert']['descr']  = "remove interface tapcli from output path"
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':0, 'is_inside':0 }
-            cmd_list.append(cmd)
     else:
         # add interface into netplan configuration
         cmd = {}
@@ -407,43 +341,22 @@ def add_interface(params):
         ospfd_file = fwglobals.g.FRR_OSPFD_FILE
         if 'routing' in params and params['routing'].lower() == 'ospf':
 
-            router_id = iface_addr.split('/')[0]    # Get rid of address length
+            # Create /etc/frr/ospfd.conf file if it does not exist yet
             cmd = {}
             cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['descr']   = "initialize %s with router id %s" % (ospfd_file, router_id)
-            cmd['cmd']['params']  = [
-                'sudo printf "' + \
-                'hostname ospfd\n' + \
-                'password zebra\n' + \
-                'log file /var/log/frr/ospfd.log informational\n' + \
-                'log stdout\n' + \
-                '!\n' + \
-                'router ospf\n' + \
-                '    ospf router-id ' + router_id + '\n' + \
-                '!\n' + \
-                '" > ' + ospfd_file ]
-            cmd['precondition'] = {}
-            cmd['precondition']['usage']   = "precondition"
-            cmd['precondition']['name']    = "exec"
-            cmd['precondition']['descr']   = "%s doesn't exists" % ospfd_file
-            cmd['precondition']['params']  = [ "! test -f %s" % ospfd_file ]
+            cmd['cmd']['name']      = "python"
+            cmd['cmd']['descr']     = "create ospfd file if needed"
+            cmd['cmd']['params']    = {
+                                        'module': 'fwutils',
+                                        'func':   'frr_create_ospfd',
+                                        'args': {
+                                            'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
+                                            'ospfd_cfg_file':   ospfd_file,
+                                            'router_id':        iface_addr.split('/')[0]   # Get rid of address length
+                                        }
+                                    }
             # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
             cmd_list.append(cmd)
-
-            # Ensure that ospfd is switched on in /etc/frr/daemons.
-            frr_filename = fwglobals.g.FRR_CONFIG_FILE
-            ospfd_status = os.popen('grep ospfd=no %s' % frr_filename).read()
-            if re.match('ospfd=no', ospfd_status):
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "exec"
-                cmd['cmd']['params']  = [ 'sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_filename ]
-                cmd['cmd']['descr']   = "enable ospf daemon"
-                # There is no revert on purpose: we leave it always ON to simplify code.
-                # If there is no OSPF interfaces, frr will not send OSPF messages.
-                # Implement revert on demand :)
-                cmd_list.append(cmd)
 
             # Escape slash in address with length to prevent sed confusing
             addr = iface_addr.split('/')[0] + r"\/" + iface_addr.split('/')[1]
@@ -474,6 +387,42 @@ def add_interface(params):
             cmd['cmd']['descr']   = "restart frr"
             cmd_list.append(cmd)
 
+    return cmd_list
+
+def modify_interface(new_params, old_params):
+    """Generate commands to modify interface configuration in Linux and VPP
+
+    :param new_params:  The new configuration received from flexiManage.
+    :param old_params:  The current configuration of interface.
+
+    :returns: List of commands.
+    """
+    cmd_list = []
+
+    # For now we don't support real translation to command list.
+    # We just return empty list if new parameters have no impact on Linux or
+    # VPP, like PublicPort, and non-empty dummy list if parameters do have impact
+    # and translation is needed. In last case the modification will be performed
+    # by replacing modify-interface with pair of remove-interface & add-interface.
+    # I am an optimistic person, so I believe that hack will be removed at some
+    # point and real translation will be implemented.
+
+    # Remove all not impacting parameters from both new and old parameters and
+    # compare them. If they are same, no translation is needed.
+    #
+    not_impacting_params = [ 'PublicIP', 'PublicPort', 'useStun']
+    copy_old_params = copy.deepcopy(old_params)
+    copy_new_params = copy.deepcopy(new_params)
+
+    for param in not_impacting_params:
+        if param in copy_old_params:
+            del copy_old_params[param]
+        if param in copy_new_params:
+            del copy_new_params[param]
+
+    same = fwutils.compare_request_params(copy_new_params, copy_old_params)
+    if not same:    # There are different impacting parameters
+        cmd_list = [ 'stub' ]
     return cmd_list
 
 def get_request_key(params):

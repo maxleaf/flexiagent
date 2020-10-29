@@ -42,13 +42,7 @@ os_api_defs = {
     'interfaces':{'module':'psutil', 'api':'net_if_addrs', 'decode':'interfaces'},
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
-    'savefile':{'module':'fwutils', 'api':'save_file', 'decode':'default'},
-    'pcisub':{'module':'fwutils', 'api':'pci_sub_file', 'decode':'default'},
-    'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
-    'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
-    'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
 }
 
 class OS_DECODERS:
@@ -90,32 +84,25 @@ class OS_DECODERS:
             usbaddr = fwutils.linux_to_usb_addr(nicname)
             if pciaddr == "" and usbaddr == "":
                 continue
-            
+
             daddr['pciaddr'] = pciaddr
-            daddr['usbaddr'] = usbaddr 
+            daddr['usbaddr'] = usbaddr
 
             daddr['driver'] = fwutils.get_interface_driver(nicname)
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
-            
-            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
-
+            daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
                 daddr[addr_af_name] = addr.address.split('%')[0]
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
             if daddr['gateway'] is not '':
-                # Send STUN request only for interfaces with Gateway
-                (public_ip, public_port, nat_type) = fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
-                if public_ip == None or public_port == None:
-                    daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
-                        fwglobals.g.stun_wrapper.find_srcip_public_addr(daddr['IPv4'],4789, None, None, True)
-                else:
-                    daddr['public_ip']   = public_ip
-                    daddr['public_port'] = public_port
-                    daddr['nat_type']    = nat_type
-            else:
-                daddr['public_ip'] = daddr['public_port'] = daddr['nat_type'] = None
+                # Find Public port and IP for the address. At that point
+                # the STUN interfaces cache should be already initialized.
+                daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
+                    fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
+
             out.append(daddr)
         print('out=%s' % out)
         return (out,1)

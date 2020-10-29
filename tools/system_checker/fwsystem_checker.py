@@ -79,7 +79,7 @@ soft_checkers = [
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_vpp_workers_core'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+	{ 'soft_check_multi_core_support_requires_RSS'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
 
 ]
@@ -227,7 +227,7 @@ def reset_system_to_defaults(checker):
 
     reboot_needed = False
     while True:
-        choice = raw_input("Resetting to Factory Defauls. Resetting will reboot the system. Are you sure? [y/N]: ")
+        choice = raw_input("Resetting to Factory Defaults. Are you sure? [y/N]: ")
         if choice == 'n' or choice == 'N' or choice == '':
             return True
         elif choice == 'y' or choice == 'Y':
@@ -305,8 +305,8 @@ def main(args):
                             "\t 1  - check system configuration\n" +
                             "\t 2  - configure system silently\n" +
                             "\t 3  - configure system interactively\n" +
-                            "\t 4  - restore system to factory defaults\n" +
-                            "\t-----------------------------------------\n" +
+                            "\t 4  - restore system checker settings to default\n" +
+                            "\t------------------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
             	print('')
@@ -330,7 +330,7 @@ def main(args):
                     checker.save_config()
                     if checker.update_grub == True:
 		                rebootSys = 'x'
-                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'): 
+                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
                                     rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
                                                     "Would you like to reboot now (Y/n)?")
                                     if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
@@ -341,13 +341,16 @@ def main(args):
 
                 os.system("sudo systemctl start flexiwan-router")
                 print ("Done.")
-		
+
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
         return (soft_status_code | hard_status_code)
 
 if __name__ == '__main__':
     import argparse
     global arg
+
+    if not fwutils.check_root_access():
+        sys.exit(1)
 
     # Ensure that VPP does not run.
     # Otherwise driver interface checks might fail and user will be scared for

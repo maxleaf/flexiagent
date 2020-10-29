@@ -30,16 +30,27 @@ import fwutils
 import shutil
 import yaml
 
+def _copyfile(source_name, dest_name, buffer_size=1024*1024):
+    with open(source_name, 'r') as source, open(dest_name, 'w') as dest:
+        while True:
+            copy_buffer = source.read(buffer_size)
+            if not copy_buffer:
+                break
+            fwutils.file_write_and_flush(dest, copy_buffer)
+
 def backup_linux_netplan_files():
     for values in fwglobals.g.NETPLAN_FILES.values():
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
         fname_run = fname.replace('yaml', 'fwrun.yaml')
 
+        fwglobals.log.debug('_backup_netplan_files: doing backup of %s' % fname)
         if not os.path.exists(fname_backup):
-            fwglobals.log.debug('_backup_netplan_files: doing backup of %s' % fname)
-            shutil.copyfile(fname, fname_backup)
-            shutil.move(fname, fname_run)
+            _copyfile(fname, fname_backup)
+        if not os.path.exists(fname_run):
+            _copyfile(fname, fname_run)
+        if os.path.exists(fname):
+            os.remove(fname)
 
 def restore_linux_netplan_files():
     files = glob.glob("/etc/netplan/*.fwrun.yaml") + \
@@ -51,14 +62,15 @@ def restore_linux_netplan_files():
         fname = fname_run.replace('fwrun.yaml', 'yaml')
         fname_backup = fname + '.fw_run_orig'
 
-        os.remove(fname_run)
+        if os.path.exists(fname_run):
+            os.remove(fname_run)
+
         if os.path.exists(fname_backup):
-            shutil.move(fname_backup, fname)
+            _copyfile(fname_backup, fname)
+            os.remove(fname_backup)
 
     if files:
-        cmd = 'netplan apply'
-        fwglobals.log.debug(cmd)
-        subprocess.check_output(cmd, shell=True)
+        fwutils.netplan_apply('restore_linux_netplan_files')
 
 def _get_netplan_interface_name(name, section):
     if 'set-name' in section:
@@ -93,6 +105,8 @@ def get_netplan_filenames():
             if re.search('fw_run_orig', fname):
                 fname = fname.replace('yaml.fw_run_orig', 'yaml')
             config = yaml.safe_load(stream)
+            if config is None:
+                continue
             if 'network' in config:
                 network = config['network']
                 if 'ethernets' in network:
@@ -129,6 +143,18 @@ def _add_netplan_file(fname):
     config['network'] = {'version': 2, 'renderer': 'networkd'}
     with open(fname, 'w+') as stream:
         yaml.safe_dump(config, stream, default_flow_style=False)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+def _dump_netplan_file(fname):
+    if fname:
+        try:
+            with open(fname, 'r') as f:
+                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        except Exception as e:
+            err_str = "_dump_netplan_file failed: file: %s, error: %s"\
+              % (fname, str(e))
+            fwglobals.log.error(err_str)
 
 # need to change after i will change  the add_remove_netplan_interface function
 def add_remove_inf_from_netplan(is_add, linux_interface):
@@ -143,7 +169,7 @@ def add_remove_inf_from_netplan(is_add, linux_interface):
 
         if linux_interface in ethernets:
             del ethernets[linux_interface]
-            
+
             with open(fname_run, 'w') as stream:
                 yaml.safe_dump(config, stream)
 
@@ -162,6 +188,9 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
     if pci in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[pci].get('fname')
         fname_run = fname.replace('yaml', 'fwrun.yaml')
+        if (not os.path.exists(fname_run)):
+            _add_netplan_file(fname_run)
+
         fname_backup = fname + '.fw_run_orig'
 
         old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
@@ -199,6 +228,8 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
             config_section['dhcp4-overrides'] = {'route-metric': metric}
         else:
             config_section['dhcp4'] = False
+            if 'dhcp4-overrides' in config_section:
+                del config_section['dhcp4-overrides']
             config_section['addresses'] = [ip]
             if gw:
                 if 'routes' in config_section:
@@ -232,10 +263,18 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
 
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
 
-        cmd = 'netplan apply'
-        fwglobals.log.debug(cmd)
-        subprocess.check_output(cmd, shell=True)
+        fwutils.netplan_apply('add_remove_netplan_interface')
+
+        # Remove pci-to-tap cached value for this pci, as netplan might change
+        # interface name.
+        #
+        cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
+        pci_full = fwutils.pci_to_full(pci)
+        if pci_full in cache:
+            del cache[pci_full]
 
         # make sure IP address is applied in Linux
         if is_add == 1:
@@ -249,15 +288,14 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
                 fwglobals.log.error(err_str)
+                _dump_netplan_file(fname_run)
                 return (False, err_str)
 
     except Exception as e:
         err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname_run, str(e))
         fwglobals.log.error(err_str)
-        if fname_run:
-            with open(fname_run, 'r') as f:
-                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        _dump_netplan_file(fname_run)
         return (False, err_str)
 
     return (True, None)
@@ -270,6 +308,9 @@ def get_dhcp_netplan_interface(if_name):
     for fname in files:
         with open(fname, 'r') as stream:
             config = yaml.safe_load(stream)
+
+        if config is None:
+            continue
 
         if 'network' in config:
             network = config['network']

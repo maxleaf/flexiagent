@@ -449,7 +449,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, dest_port):
             'vni'                  : bridge_id,
             'dest_port'            : dest_port,
             'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
-                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway', 'arg': src}],
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway_from_router_db', 'arg': src}],
             'instance'             : bridge_id,
             'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }
@@ -696,6 +696,25 @@ def add_tunnel(params):
     # --------------------------------------------------------------------------
     if 'routing' in params['loopback-iface'] and params['loopback-iface']['routing'] == 'ospf':
         ospfd_file = fwglobals.g.FRR_OSPFD_FILE
+
+        # Create /etc/frr/ospfd.conf file if it does not exist yet
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "create ospfd file if needed"
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'frr_create_ospfd',
+                                    'args': {
+                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
+                                        'ospfd_cfg_file':   ospfd_file,
+                                        'router_id':        params['loopback-iface']['addr'].split('/')[0]   # Get rid of address length
+                                    }
+                                  }
+        # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
+        cmd_list.append(cmd)
+
+        # Add point-to-point type of interface for the tunnel address
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
@@ -714,8 +733,8 @@ def add_tunnel(params):
         cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
         cmd_list.append(cmd)
 
-        # Escape slash in address with length to prevent sed confusing
-        addr = params['loopback-iface']['addr']
+        # Add network for the tunnel interface.
+        addr = params['loopback-iface']['addr']  # Escape slash in address with length to prevent sed confusing
         addr = addr.split('/')[0] + r"\/" + addr.split('/')[1]
 
         cmd = {}

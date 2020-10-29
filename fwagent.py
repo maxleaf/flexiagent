@@ -21,6 +21,7 @@
 ################################################################################
 
 import json
+import loadsimulator
 import os
 
 
@@ -91,6 +92,7 @@ class FwAgent:
         self.versions             = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.ws                   = None
         self.thread_statistics    = None
+        self.thread_stun          = None
         self.should_reconnect     = False
         self.pending_msg_replies  = []
         self.handling_request     = False
@@ -128,11 +130,12 @@ class FwAgent:
         # Stop threads
         if self.thread_statistics:
             self.thread_statistics.join()
+            self.thread_statistics = None
 
     def _mark_connection_failure(self, err):
         try:
-            with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as stream:
-                stream.write('Failed to connect to MGMT: %s' % err)
+            with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as f:
+                fwutils.file_write_and_flush(f, 'Failed to connect to MGMT: %s' % err)
                 fwglobals.log.debug("_mark_connection_failure: %s" % str(err))
         except Exception as e:
             fwglobals.log.excep("Failed to create connection failure file: %s" % str(e))
@@ -217,8 +220,8 @@ class FwAgent:
             if loadsimulator.g.enabled():
                 loadsimulator.g.simulate_device_tokens.append(data)
             else:
-                with open(fwglobals.g.DEVICE_TOKEN_FILE, 'w') as fout:
-                    fout.write(data)
+                with open(fwglobals.g.DEVICE_TOKEN_FILE, 'w') as f:
+                    fwutils.file_write_and_flush(f, data)
             fwglobals.log.info("Registation successful with parameters:")
             fwglobals.log.info("  Hostname:  " + machine_name)
             fwglobals.log.info("  IP List:   " + ip_list)
@@ -346,7 +349,11 @@ class FwAgent:
         #self.ws.run_forever(sslopt={"cert_reqs": cert_required},
         #                    ping_interval=0, ping_timeout=0)
         if self.connection_error_code:
-            fwglobals.log.error("connection to flexiWAN orchestrator was closed due to error: %s" % self.connection_error_msg)
+            error_str = "connection to flexiWAN orchestrator was closed due to: %s" % self.connection_error_msg
+            if self.connection_error_code < fwglobals.g.WS_STATUS_OK:
+                fwglobals.log.error(error_str)
+            else:
+                fwglobals.log.info(error_str)
             return False
         fwglobals.log.info("connection to flexiWAN orchestrator was closed")
         return True
@@ -364,10 +371,10 @@ class FwAgent:
         if 'status_code' in dir(error):
             self.connection_error_code = error.status_code
             self.connection_error_msg  = "not approved" \
-                if error.status_code == fwglobals.g.WS_STATUS_CODE_NOT_APPROVED \
+                if error.status_code == fwglobals.g.WS_STATUS_ERROR_NOT_APPROVED \
                 else str(error)
         else:
-            self.connection_error_code = fwglobals.g.WS_STATUS_LOCAL_ERROR
+            self.connection_error_code = fwglobals.g.WS_STATUS_ERROR_LOCAL_ERROR
             self.connection_error_msg  = str(error)
         fwglobals.log.error("connection got error: " + self.connection_error_msg)
 
@@ -450,7 +457,6 @@ class FwAgent:
                 time.sleep(1)
                 slept += 1
 
-
         self.received_request = True
         self.thread_statistics = threading.Thread(target=run, name='Statistics Thread')
         self.thread_statistics.start()
@@ -479,10 +485,19 @@ class FwAgent:
 
         fwglobals.log.debug(seq + " job_id=" + job_id + " request=" + json.dumps(request))
 
-        reply = self.handle_received_request(request)
+        # In load simulator mode always reply ok on sync message
+        if loadsimulator.g.enabled() and request["message"] == "sync-device":
+            reply = {"ok":1}
+        else:
+            reply = self.handle_received_request(request)
 
-        reply_str = reply if not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
+        reply_str = reply if 'message' in request and not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
         fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
+
+        # In load simulator mode self.ws is not initialized as far as connections are created
+        # outside the agent.
+        if not loadsimulator.g.enabled():
+            ws = self.ws
 
         # Messages that change the interfaces might cause the existing connection to break
         # (for example, if the IP/mask has changed). Since sending the reply on a broken
@@ -491,16 +506,16 @@ class FwAgent:
         # We close the connection even if the request failed, as the change might have
         # taken place regardless of the request status, hence socket might not be operational.
         #
-        if self.should_reconnect == True or self.ws == None:
+        if self.should_reconnect == True or ws == None:
             fwglobals.log.info("_on_message: re-establish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
-            self.connection_error_code = fwglobals.g.WS_STATUS_DEVICE_CHANGE
+            self.connection_error_code = fwglobals.g.WS_STATUS_OK_DEVICE_CHANGE
             self.connection_error_msg = 'device change'
-            if self.ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
+            if ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
                 fwglobals.log.info("_on_message: closing connection to orchestrator")
-                self.ws.close()
+                ws.close()
         else:
-            self.ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
+            ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
 
     def disconnect(self):
         """Shutdowns the WebSocket connection.
@@ -517,13 +532,11 @@ class FwAgent:
         in the fwglobals.py module. It dispatches requests to the appropriate
         request handlers.
 
-        :param msg:  Message instance.
+        :param received_msg:  the receive instance.
 
         :returns: (reply, msg), where reply is reply to be sent back to server,
                   msg is normalized received message.
         """
-        print_message = fwglobals.g.cfg.DEBUG
-
         self.received_request = True
         self.handling_request = True
 
@@ -532,7 +545,10 @@ class FwAgent:
         # expected by the agent framework.
         msg = fwutils.fix_aggregated_message_format(received_msg)
 
-        print_message = False if re.match('get-device-', msg['message']) else print_message
+        print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
+        print_message = False if msg['message'] == 'add-application' else print_message
+        if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
+            print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
@@ -623,7 +639,7 @@ def reset(soft=False):
     CEND = "\x1b[0m"
     choice = raw_input(CSTART + "Device must be deleted from the orchestrator before resetting the agent. " +
                       "Already deleted from orchestrator y/n [n]" + CEND)
-    if choice == 'y':
+    if choice == 'y' or choice == 'Y':
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)
         fwglobals.log.info("Done")
@@ -667,7 +683,7 @@ def start(start_router):
     daemon_rpc('start', start_vpp=start_router) # if daemon runs, start connection loop and router if required
     fwglobals.log.info("done")
 
-def show(agent_info, router_info):
+def show(agent_info, router_info, daemon_info):
     """Handles 'fwagent show' command.
     This commands prints various information about device and it's components,
     like router configuration, software version, etc.
@@ -675,6 +691,7 @@ def show(agent_info, router_info):
 
     :param agent_info:   Agent information.
     :param router_info:  Router information.
+    :param daemon_info:  Daemon information.
 
     :returns: None.
     """
@@ -705,6 +722,15 @@ def show(agent_info, router_info):
             fwutils.print_router_config(basic=False, signature=True)
         elif router_info == 'multilink-policy':
             fwutils.print_router_config(basic=False, multilink=True)
+
+    if daemon_info:
+        if daemon_info == 'status':
+            try:
+                daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
+                daemon.ping()   # Check if daemon runs
+                fwglobals.log.info("running")
+            except Pyro4.errors.CommunicationError:
+                fwglobals.log.info("not running")
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -739,8 +765,7 @@ class FwagentDaemon(object):
         exit(1)
 
     def __enter__(self):
-        fwglobals.g.initialize_agent()
-        self.agent = fwglobals.g.fwagent
+        self.agent = fwglobals.g.initialize_agent()
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -750,7 +775,7 @@ class FwagentDaemon(object):
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
         self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
-        fwglobals.g.finalize_agent()
+        self.agent = fwglobals.g.finalize_agent()
         fwglobals.log.debug("FwagentDaemon: exited")
 
     def _check_system(self):
@@ -1069,7 +1094,7 @@ if __name__ == '__main__':
     fwglobals.initialize()
     loadsimulator.initialize()
 
-    command_funcs = {
+    command_functions = {
                     'version':lambda args: version(),
                     'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
@@ -1078,7 +1103,8 @@ if __name__ == '__main__':
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
                     'show': lambda args: show(
                         agent_info=args.agent,
-                        router_info=args.router),
+                        router_info=args.router,
+                        daemon_info=args.daemon),
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
@@ -1120,6 +1146,8 @@ if __name__ == '__main__':
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
+    parser_show.add_argument('--daemon', choices=['status'],
+                        help="show various daemon parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
@@ -1136,5 +1164,9 @@ if __name__ == '__main__':
     if hasattr(args, 'quiet') and args.quiet:
         fwglobals.log.set_target(to_syslog=True, to_terminal=False)
 
+    if not args.command in [ 'show', 'version' ]:
+        if not fwutils.check_root_access():
+            sys.exit(1)
+
     fwglobals.log.debug("---> exec " + str(args), to_terminal=False)
-    command_funcs[args.command](args)
+    command_functions[args.command](args)

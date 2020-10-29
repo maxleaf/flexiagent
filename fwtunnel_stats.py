@@ -1,6 +1,4 @@
-#! /usr/bin/python
-
-################################################################################
+#################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #
@@ -27,6 +25,7 @@ from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
 import fwglobals
+import fwutils
 
 tunnel_stats_global = {}
 
@@ -114,7 +113,7 @@ def tunnel_stats_get():
     """Return a new tunnel status dictionary.
     Update tunnel status based on timeout.
 
-    :returns: None.
+    :returns: dictionary of tunnel statistics.
     """
     tunnel_stats = {}
     cur_time = time.time()
@@ -129,16 +128,62 @@ def tunnel_stats_get():
         else:
             tunnel_stats[key]['status'] = 'up'
 
-        if tunnel_stats[key]['status'] == 'down':
-            # if tunnel status is down, we add the source IP of that tunnel to the list
-            # of addresses that we will send STUN requests on their behalf.
-            # go to router configuration db, and find this tunnel
-            tunnels = fwglobals.g.router_cfg.get_tunnels()
-            for params in tunnels:
-                if params['tunnel-id'] == key:
-                    # found tunnel, add its source IP address to the cache of addresses for which
-                    # we will send STUN requests.
-                    fwglobals.g.stun_wrapper.add_addr(params['src'])
-                    break
-
     return tunnel_stats
+
+def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):
+    """ get set of addresses that are part of any connected tunnels
+    : param tunnel_stat : statistics of tunnels.
+    : param tunnels     : list of tunnels and their properties
+    : return : set of IP addresses part of connected tunnels
+    """
+    ip_up_set = set()
+    if tunnels and tunnel_stats:
+        for tunnel in tunnels:
+            tunnel_id = tunnel.get('tunnel-id')
+            if tunnel_id and tunnel_stats.get(tunnel_id):
+                if tunnel_stats[tunnel_id].get('status') == 'up':
+                    ip_up_set.add(tunnel['src'])
+    return ip_up_set
+
+def add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels):
+    """ Run over all tunnels and get the source IP address of the tunnels that are not connected.
+    If it was disconnected due to changes in its source IP address, check if this IP address is still
+    valid. If it is, check that it is not used in other connected tunnels. If it is not used but still
+    valid, add it to the STUN cache. It it is in use, do not add it to the STUN cache, because we don't
+    want to start sending STUN requests on its behalf as it will lead to disconnection of the other
+    tunnels with that IP address.
+
+    : param tunnel_stats : dictionary of tunnel statistics. One of its properties is the tunnel status
+                           ("up" or "down")
+    : param tunnels      : list of tunnels and their properties
+    """
+    if not tunnel_stats or not tunnels:
+        return
+    # Get list if IP addresses used by tunnels
+    ip_up_set = get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
+    # Get list of all IP addresses in the system
+    ip_addr_list = fwutils.get_interface_address_all(filtr = 'gw')
+    for tunnel in tunnels:
+        key = tunnel['tunnel-id']
+        stats = tunnel_stats.get(key)
+        if stats:
+            status = stats.get('status')
+            if status == 'down':
+                # Down tunnel found. However, the tunnel might be disconnected due to changes in
+                # source IP address. In that case, the current source address of the tunnel
+                # is no longer valid. To make things safe, we check if the IP address exists
+                # in the system. If it is not, no point on adding it to the STUN cache.
+                if tunnel['src'] not in ip_addr_list:
+                    fwglobals.log.debug("Tunnel-id %d is down, but its source address %s no longer valid"\
+                        %(key, tunnel['src']))
+                    continue
+                # If valid IP, check if the IP is part of other connected tunnels. If so,
+                # do not add it to the STUN hash, as it might cause other connected tunnels
+                # with that IP to disconnect. If it is not part of any connected tunnel,
+                # add its source IP address to the cache of addresses for which
+                # we will send STUN requests.
+                if tunnel['src'] not in ip_up_set:
+                    fwglobals.log.debug("Tunnel-id %d is down, adding address %s to STUN interfaces cache"\
+                        %(key, tunnel['src']))
+                    fwglobals.g.stun_wrapper.add_addr(tunnel['src'], True)
+                continue

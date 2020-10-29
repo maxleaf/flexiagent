@@ -34,6 +34,7 @@
 import getopt
 import os
 import sys
+import shutil
 
 agent_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(agent_root_dir)
@@ -69,10 +70,17 @@ def main():
     os.system('systemctl stop flexiwan-router')
     fwutils.stop_vpp()
     fwnetplan.restore_linux_netplan_files()
+    # reset startup.conf file
+    if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
+        shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
     if arg_clean_cfg:
         fwutils.reset_router_config()
     if not arg_quiet:
         print ("Done")
 
 if __name__ == '__main__':
+
+    if not fwutils.check_root_access():
+        sys.exit(1)
+
     main()

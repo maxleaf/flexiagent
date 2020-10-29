@@ -28,6 +28,7 @@ import psutil
 
 from fwtunnel_stats import tunnel_stats_get
 import fwglobals
+import fwtunnel_stats
 
 # Globals
 # Keep updates up to 1 hour ago
@@ -68,6 +69,8 @@ def update_stats():
             if_bytes = {}
             tunnel_bytes = {}
             tunnel_stats = tunnel_stats_get()
+            tunnels = fwglobals.g.router_cfg.get_tunnels()
+            fwtunnel_stats.add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels)
             for intf, counts in stats['last'].items():
                 if (intf.startswith('ipsec-gre') or
                     intf.startswith('loop')): continue
@@ -158,7 +161,7 @@ def get_stats():
     res_update_list = list(updates_list)
     del updates_list[:]
 
-    reconfig = fwutils.get_reconfig_hash()
+    reconfig = fwglobals.g.unassigned_interfaces.get_reconfig_hash()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
@@ -167,6 +170,7 @@ def get_stats():
         status = True
         state = 'running'
         reason = ''
+        reconfig = ''
     else:
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()

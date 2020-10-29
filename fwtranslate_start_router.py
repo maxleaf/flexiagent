@@ -82,11 +82,12 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "fwtranslate_add_tunnel.init_tunnels()"
+    cmd['cmd']['descr']   = "fwrouter_api._on_start_router_before()"
     cmd['cmd']['params']  = {
-                    'module': 'fwtranslate_add_tunnel',
-                    'func'  : 'init_tunnels'
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_start_router_before'
     }
+    cmd_list.append(cmd)
 
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
@@ -225,11 +226,13 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "connect_to_router"
-    cmd['cmd']['descr']   = "connect to vpp papi"
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "connect to vpp papi"
+    cmd['cmd']['params']    = { 'object': 'fwglobals.g.router_api.vpp_api', 'func': 'connect_to_vpp' }
     cmd['revert'] = {}
-    cmd['revert']['name']   = "disconnect_from_router"
+    cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "disconnect from vpp papi"
+    cmd['revert']['params'] = { 'object': 'fwglobals.g.router_api.vpp_api', 'func': 'disconnect_from_vpp' }
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
@@ -300,17 +303,17 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "fwrouter_api._on_start_router()"
+    cmd['cmd']['descr']   = "fwrouter_api._on_start_router_after()"
     cmd['cmd']['params']  = {
                     'object': 'fwglobals.g.router_api',
-                    'func'  : '_on_start_router'
+                    'func'  : '_on_start_router_after'
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "fwrouter_api._on_stop_router()"
+    cmd['revert']['descr']  = "fwrouter_api._on_stop_router_before()"
     cmd['revert']['params'] = {
                     'object': 'fwglobals.g.router_api',
-                    'func'  : '_on_stop_router'
+                    'func'  : '_on_stop_router_before'
     }
     cmd_list.append(cmd)
 
