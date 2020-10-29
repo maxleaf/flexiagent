@@ -1518,13 +1518,13 @@ def fix_request_params(params, message=None):
 
     """
 
-    def _fix_pci_params(params, message=None):
-        if 'pci' in params:
-            if type(params['pci']) == list:
-                params['dev_id'] = [dev_id_add_type(pci) for pci in params['pci']]
-                del params['pci']
+    def _fix_params_key(params, key, message=None):
+        if key in params:
+            if type(params[key]) == list:
+                params['dev_id'] = [dev_id_add_type(pci) for pci in params[key]]
+                del params[key]
             else:
-                params['dev_id'] = dev_id_add_type(params.pop('pci'))
+                params['dev_id'] = dev_id_add_type(params.pop(key))
 
         if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
             params['interface'] = dev_id_add_type(params['interface'])
@@ -1536,10 +1536,14 @@ def fix_request_params(params, message=None):
         requests = params['requests']
         for request in requests:
             if 'params' in request:
-                request['params'] = _fix_pci_params(request['params'], request['message'])
+                request['params'] = _fix_params_key(request['params'], 'pci', request['message'])
+                request['params'] = _fix_params_key(request['params'], 'devId', request['message'])
 
     if 'pci' in params:
-        params = _fix_pci_params(params)
+        params = _fix_params_key(params, 'pci')
+
+    if 'devId' in params:
+        params = _fix_params_key(params, 'devId')
 
     if 'args' in params and 'params' in params['args']:
         nested_params = params['args']['params']
