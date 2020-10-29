@@ -209,6 +209,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         if re.match('yes', dhcp):
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
+            config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
         else:
             config_section['dhcp4'] = False
             if 'dhcp4-overrides' in config_section:
@@ -262,11 +263,15 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
-            for _ in range(50):
+            for i in range(50):
                 ifname = fwutils.pci_to_tap(pci)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
+                if i % 10 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+                    cmd = "systemctl restart systemd-networkd"
+                    fwglobals.log.debug("add_remove_netplan_interface: " + cmd)
+                    os.system(cmd)
                 time.sleep(1)
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
