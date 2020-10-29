@@ -87,6 +87,13 @@ def start_router(params=None):
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_start_router_before'
     }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "fwrouter_api._on_stop_router_after()"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_stop_router_after'
+    }
     cmd_list.append(cmd)
 
     # Remove interfaces from Linux.
