@@ -226,7 +226,7 @@ class FwStunWrap:
         We initialize 'next_time' to 30, if we detect that tunnel is disconnected. The avarage time
         for tunnel to get connected from the time it was created is 30 seconds, so no point in sending
         STUN requests before, if the reason is public IP or Port were change. For the rest of the cases,
-        we initialize 'next_time' to 1. See parameter 'wait' below.
+        we initialize 'next_time' to 0. See parameter 'wait' below.
 
         : param address :  address to reset in the cache.
         : param wait    :  If True, start 'next_time' counter from 30 (waiting for tunnel creation,
@@ -368,8 +368,10 @@ class FwStunWrap:
 
         fwglobals.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
         fwutils.set_linux_reverse_path_filter(dev_name, False)
+
         nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
             fwstun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port, dev_name)
+
         fwutils.set_linux_reverse_path_filter(dev_name, True)
         return nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port
 
