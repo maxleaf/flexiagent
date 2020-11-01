@@ -242,8 +242,8 @@ def get_interface_address_all(filtr=None):
     ip_list = []
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
-        pci, _ = get_interface_pci(nicname)
-        if not pci:
+        dev_id = get_interface_dev_id(nicname)
+        if dev_id == '':
             continue
         for addr in addrs:
             if addr.family == socket.AF_INET:
@@ -304,90 +304,127 @@ def is_ip_in_subnet(ip, subnet):
     """
     return True if IPAddress(ip) in IPNetwork(subnet) else False
 
-def pci_to_full(pci_addr):
+def dev_id_to_full(dev_id):
     """Convert short PCI into full representation.
+    the 'dev_id' param could be either a pci or a usb address.
+    in case of pci address - the function will convert into a full address
 
-    :param pci_addr:      Short PCI address.
+    :param dev_id:      device bus address.
 
-    :returns: Full PCI address.
+    :returns: full device bus address.
     """
-    pc = pci_addr.split('.')
+    (addr_type, addr) = dev_id_parse(dev_id)
+    if addr_type == 'usb':
+        return dev_id
+
+    pc = addr.split('.')
     if len(pc) == 2:
-        return pc[0]+'.'+"%02x"%(int(pc[1],16))
-    return pci_addr
+        return dev_id_add_type(pc[0]+'.'+"%02x"%(int(pc[1],16)))
+    return dev_id
 
 # Convert 0000:00:08.01 provided by management to 0000:00:08.1 used by Linux
-def pci_to_short(pci):
+def dev_id_to_short(dev_id):
     """Convert full PCI into short representation.
+    the 'dev_id' param could be either a pci or a usb address.
+    in case of pci address - convert pci provided by management into a short address used by Linux
 
-    :param pci_addr:      Full PCI address.
+    :param dev_id:      Full PCI address.
 
     :returns: Short PCI address.
     """
-    l = pci.split('.')
-    if len(l[1]) == 2 and l[1][0] == '0':
-        pci = l[0] + '.' + l[1][1]
-    return pci
+    addr_type, addr = dev_id_parse(dev_id)
+    if addr_type == 'usb':
+        return dev_id
 
-def get_linux_pcis():
+    l = addr.split('.')
+    if len(l[1]) == 2 and l[1][0] == '0':
+        return dev_id_add_type(l[0] + '.' + l[1][1])
+    return dev_id
+
+def get_linux_dev_ids():
     """ Get the list of PCI-s of all network interfaces available in Linux.
     """
-    pci_list = fwglobals.g.get_cache_data('PCIS')
-    if not pci_list:
+    dev_id_list = fwglobals.g.get_cache_data('DEV_ID')
+    if not dev_id_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
-            pci, _ = get_interface_pci(nicname)
-            if not pci:
+            dev_id = get_interface_dev_id(nicname)
+            if dev_id == "":
                 continue
-            pci_list.append(pci)
-    return pci_list
+            dev_id_list.append(dev_id)
+    return dev_id_list
 
-def get_interface_pci(linuxif):
-    """Convert Linux interface name into PCI address.
+def get_interface_driver(interface_name):
+    """Get Linux interface driver.
+
+    :param interface_name: Interface name to check.
+
+    :returns: driver name.
+    """
+    try:
+        cmd = 'ethtool -i %s' % interface_name
+        out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
+        vals = out[0].decode().split("driver: ", 1)
+        return str(vals[-1])
+    except subprocess.CalledProcessError:
+        return ''
+
+
+def dev_id_parse(dev_id):
+    """Convert a dev id into a tuple contained address type (pci, usb) and address.
+
+    :param dev_id:     device bus address.
+
+    :returns: Tuple (type, address)
+    """
+    type_and_addr = dev_id.split(':', 1)
+    if type_and_addr:
+        return (type_and_addr[0], type_and_addr[1])
+
+    return ("", "")
+
+def dev_id_add_type(dev_id):
+    """Add address type at the begining of the address.
+
+    :param dev_id:      device bus address.
+
+    :returns: device bus address with type.
+    """
+    if dev_id.startswith('pci:') or dev_id.startswith('usb:'):
+        return dev_id
+
+    if re.search('usb', dev_id):
+        return 'usb:%s' % dev_id
+
+    return 'pci:%s' % dev_id
+
+def get_interface_dev_id(linuxif):
+    """Convert Linux interface name into bus address.
 
     :param linuxif:      Linux interface name.
 
-    :returns: tuple (PCI address , driver name).
+    :returns: dev_id.
     """
-    NETWORK_BASE_CLASS = "02"
-    vpp_run = vpp_does_run()
-    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-    for line in lines:
-        vals = line.decode().split("\t", 1)
-        if len(vals) == 2:
-            # keep slot number
-            if vals[0] == 'Slot:':
-                slot = vals[1]
-            if vals[0] == 'Class:':
-                if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    interface = pci_to_linux_iface(slot)
-                    if not interface and vpp_run:
-                        interface = pci_to_tap(slot)
-                    if not interface:
-                        continue
-                    if interface == linuxif:
-                        return pci_addr_full(slot)
-    return ""
+    try:
+        if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-def linux_to_usb_addr(linuxif):
-    """Convert Linux interface name into PCI address or into BUS address
-
-    :param linuxif:      Linux interface name.
-
-    :returns: PCI address.
-    """
-    test = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
-
-    if re.search('usb', test):
-        address = 'usb%s' % re.search('usb(.+?)/net', test).group(1)
-        return address
+        if re.search('pci', if_addr):
+            if re.search('usb', if_addr):
+                address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
+                return dev_id_add_type(address)
+            else:
+                address = if_addr.split('/net')[0].split('/')[-1]
+                address = dev_id_add_type(address)
+                return dev_id_to_full(address)
+    except:
+        return ""
 
     return ""
 
-def pci_to_linux_iface(pci):
-    """Convert PCI address into Linux interface name.
+def dev_id_to_linux_if(dev_id):
+    """Convert device bus address into Linux interface name.
 
-    :param pci:      PCI address.
+    :param dev_id:      device bus address.
 
     :returns: Linux interface name.
     """
@@ -399,21 +436,21 @@ def pci_to_linux_iface(pci):
     # lrwxrwxrwx 1 root root 0 Jul  4 16:21 lo -> ../../devices/virtual/net/lo
 
     # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_to_short(pci)
+    dev_id = dev_id_to_short(dev_id)
+    _, addr = dev_id_parse(dev_id)
 
     try:
-        pci = pci_full_to_short(pci)
-        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True)
+        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + addr, shell=True)
     except:
         return None
     if output is None:
         return None
     return output.rstrip().split('/')[-1]
 
-def pci_is_vmxnet3(pci):
-    """Check if PCI address is vmxnet3.
+def dev_id_is_vmxnet3(dev_id):
+    """Check if device bus address is vmxnet3.
 
-    :param pci:      PCI address.
+    :param dev_id:    device bus address.
 
     :returns: 'True' if it is vmxnet3, 'False' otherwise.
     """
@@ -422,8 +459,11 @@ def pci_is_vmxnet3(pci):
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:0b:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
     # lrwxrwxrwx 1 root root 0 Jul 17 23:01 /sys/bus/pci/devices/0000:13:00.0/driver -> ../../../../bus/pci/drivers/vfio-pci
 
-    # We get 0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
-    pci = pci_to_short(pci)
+    # We get pci:0000:00:08.01 from management and not 0000:00:08.1, so convert a little bit
+    dev_id = dev_id_to_short(dev_id)
+    addr_type, addr = dev_id_parse(dev_id)
+    if addr_type == 'usb':
+        return False
 
     try:
         # The 'ls -l /sys/bus/pci/devices/*/driver' approach doesn't work well.
@@ -436,49 +476,53 @@ def pci_is_vmxnet3(pci):
         #   0000:03:00.0 'VMXNET3 Ethernet Controller' if=ens160 drv=vfio-pci unused=vmxnet3,uio_pci_generic
         #
         #output = subprocess.check_output("sudo ls -l /sys/bus/pci/devices/%s/driver | grep vmxnet3" % pci, shell=True)
-        output = subprocess.check_output("sudo dpdk-devbind -s | grep -E '%s .*vmxnet3'" % pci, shell=True)
+        output = subprocess.check_output("sudo dpdk-devbind -s | grep -E '%s .*vmxnet3'" % addr, shell=True)
     except:
         return False
     if output is None:
         return False
     return True
 
-# 'pci_to_vpp_if_name' function maps interface referenced by pci, eg. '0000:00:08.00'
+# 'dev_id_to_vpp_if_name' function maps interface referenced by device bus address - pci or usb - eg. '0000:00:08.00'
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
-def pci_to_vpp_if_name(pci):
+def dev_id_to_vpp_if_name(dev_id):
     """Convert PCI address into VPP interface name.
 
-    :param pci:      PCI address.
+    :param dev_id:      device bus address.
 
     :returns: VPP interface name.
     """
-    pci = pci_to_full(pci)
-    vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
-    if vpp_if_name: return vpp_if_name
-    else: return _build_pci_to_vpp_if_name_maps(pci, None)
+    addr_type, _ = dev_id_parse(dev_id)
+    if addr_type == "pci":
+        dev_id = dev_id_to_full(dev_id)
+        vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+        if vpp_if_name: return vpp_if_name
+        else: return _build_dev_id_to_vpp_if_name_maps(dev_id, None)
 
-# 'vpp_if_name_to_pci' function maps interface name, eg. 'GigabitEthernet0/8/0'
+    return None
+
+# 'vpp_if_name_to_dev_id' function maps interface name, eg. 'GigabitEthernet0/8/0'
 # into the pci of that interface, eg. '0000:00:08.00'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
-def vpp_if_name_to_pci(vpp_if_name):
+def vpp_if_name_to_dev_id(vpp_if_name):
     """Convert PCI address into VPP interface name.
 
     :param vpp_if_name:      VPP interface name.
 
     :returns: PCI address.
     """
-    pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
-    if pci: return pci
-    else: return _build_pci_to_vpp_if_name_maps(None, vpp_if_name)
+    dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
+    if dev_id: return dev_id
+    else: return _build_dev_id_to_vpp_if_name_maps(None, vpp_if_name)
 
-# '_build_pci_to_vpp_if_name_maps' function build the local caches of
-# pci to vpp_if_name and vise vera
-# if pci provided, return the name found for this pci,
-# else, if name provided, return the pci for this name,
+# '_build_dev_id_to_vpp_if_name_maps' function build the local caches of
+# device bus address to vpp_if_name and vise vera
+# if dev_id provided, return the name found for this dev_id,
+# else, if name provided, return the dev_id for this name,
 # else, return None
 # To do that we dump all hardware interfaces, split the dump into list by empty line,
-# and search list for interface that includes the pci name.
+# and search list for interface that includes the dev_id name.
 # The dumps brings following table:
 #              Name                Idx    Link  Hardware
 # GigabitEthernet0/8/0               1    down  GigabitEthernet0/8/0
@@ -486,10 +530,10 @@ def vpp_if_name_to_pci(vpp_if_name):
 #   ...
 #   pci: device 8086:100e subsystem 8086:001e address 0000:00:08.00 numa 0
 #
-def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
+def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
     shif = _vppctl_read('show hardware-interfaces')
     if shif == None:
-        fwglobals.log.debug("_build_pci_to_vpp_if_name_maps: Error reading interface info")
+        fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps: Error reading interface info")
     data = shif.splitlines()
     for intf in _get_group_delimiter(data, r"^\w.*?\d"):
         # Contains data for a given interface
@@ -498,25 +542,27 @@ def _build_pci_to_vpp_if_name_maps(pci, vpp_if_name):
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
-            fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_to_full(k)] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[v] = pci_to_full(k)
+            k = dev_id_add_type(k)
+            full_addr = dev_id_to_full(k)
+            fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[full_addr] = v
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[v] = full_addr
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
         pci_addr = pci_bytes_to_str(hw_if.pci_addr)
-        fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
-        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP')[vpp_if_name] = pci_addr
+        fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
+        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[vpp_if_name] = pci_addr
 
-    if pci:
-        vpp_if_name = fwglobals.g.get_cache_data('PCI_TO_VPP_IF_NAME_MAP').get(pci)
+    if dev_id:
+        vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        pci = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_PCI_MAP').get(vpp_if_name)
-        if pci: return pci
+        dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
+        if dev_id: return dev_id
 
-    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (pci, vpp_if_name, shif))
-    fwglobals.log.debug("_build_pci_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (pci, vpp_if_name, vmxnet3hw))
+    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (dev_id, vpp_if_name, shif))
+    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (dev_id, vpp_if_name, vmxnet3hw))
     fwglobals.log.debug(str(traceback.extract_stack()))
     return None
 
@@ -559,21 +605,21 @@ def pci_bytes_to_str(pci_bytes):
     function = (bytes) & 0x7
     return "%04x:%02x:%02x.%02x" % (domain, bus, slot, function)
 
-# 'pci_to_vpp_sw_if_index' function maps interface referenced by pci, e.g '0000:00:08.00'
+# 'dev_id_to_vpp_sw_if_index' function maps interface referenced by device bus address, e.g pci - '0000:00:08.00'
 # into index of this interface in VPP, eg. 1.
-# To do that we convert firstly the pci into name of interface in VPP,
+# To do that we convert firstly the device bus address into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
-def pci_to_vpp_sw_if_index(pci):
-    """Convert PCI address into VPP sw_if_index.
+def dev_id_to_vpp_sw_if_index(dev_id):
+    """Convert device bus address into VPP sw_if_index.
 
-    :param pci:      PCI address.
+    :param dev_id:      device bus address.
 
     :returns: sw_if_index.
     """
-    vpp_if_name = pci_to_vpp_if_name(pci)
-    fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, str(vpp_if_name)))
+    vpp_if_name = dev_id_to_vpp_if_name(dev_id)
+    fwglobals.log.debug("dev_id_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (dev_id, str(vpp_if_name)))
     if vpp_if_name is None:
         return None
 
@@ -581,31 +627,11 @@ def pci_to_vpp_sw_if_index(pci):
     for sw_if in sw_ifs:
         if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
             return sw_if.sw_if_index
-    fwglobals.log.debug("pci_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (pci, yaml.dump(sw_ifs, canonical=True)))
+    fwglobals.log.debug("dev_id_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (dev_id, yaml.dump(sw_ifs, canonical=True)))
+
     return None
 
-# 'linux_if_name_to_vpp_sw_if_index' function maps linux interface referenced by interface name, e.g 'eth0'
-# into index of this tapcli interface in VPP, eg. tapcli-0
-def linux_if_name_to_vpp_sw_if_index(interface_name):
-    """Convert Linux Interface Name into VPP sw_if_index.
-
-    :param interface_name:      Linux interface name.
-
-    :returns: sw_if_index.
-    """
-    vpp_if_name = vpp_tapcli_by_linux_interface_name(interface_name)
-    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, str(vpp_if_name)))
-    if vpp_if_name is None:
-        return None
-
-    sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
-    for sw_if in sw_ifs:
-        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
-            return sw_if.sw_if_index
-    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, yaml.dump(sw_ifs, canonical=True)))
-    return None
-
-# 'pci_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
+# 'dev_id_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
 # To do that we convert firstly the pci into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0' and than we grep output of 'vppctl sh tap-inject'
@@ -613,25 +639,29 @@ def linux_if_name_to_vpp_sw_if_index(interface_name):
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def pci_to_tap(pci):
+def dev_id_to_tap(dev_id):
     """Convert PCI address into TAP name.
 
     :param pci:      PCI address.
 
     :returns: Linux TAP interface name.
     """
-    pci_full = pci_to_full(pci)
-    cache    = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
-    tap = cache.get(pci_full)
+    addr_type, _ = dev_id_parse(dev_id)
+    if addr_type == 'usb':
+        return None
+
+    dev_id_full = dev_id_to_full(dev_id)
+    cache    = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+    tap = cache.get(dev_id_full)
     if tap:
         return tap
 
-    vpp_if_name = pci_to_vpp_if_name(pci)
+    vpp_if_name = dev_id_to_vpp_if_name(dev_id)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
     if tap:
-        cache[pci_full] = tap
+        cache[dev_id_full] = tap
     return tap
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
@@ -1119,15 +1149,18 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
         tup = p.create_element('dpdk')
         config.append(tup)
     for dev in devices:
-        dev_short = pci_to_short(dev)
-        dev_full = pci_to_full(dev)
-        old_config_param = 'dev %s' % dev_full
-        new_config_param = 'dev %s' % dev_short
-        if p.get_element(config['dpdk'],old_config_param) != None:
-            p.remove_element(config['dpdk'], old_config_param)
-        if p.get_element(config['dpdk'],new_config_param) == None:
-            tup = p.create_element(new_config_param)
-            config['dpdk'].append(tup)
+        dev_short = dev_id_to_short(dev)
+        dev_full = dev_id_to_full(dev)
+        addr_type, addr_short = dev_id_parse(dev_short)
+        addr_type, addr_full = dev_id_parse(dev_full)
+        if addr_type == "pci":
+            old_config_param = 'dev %s' % addr_full
+            new_config_param = 'dev %s' % addr_short
+            if p.get_element(config['dpdk'],old_config_param) != None:
+                p.remove_element(config['dpdk'], old_config_param)
+            if p.get_element(config['dpdk'],new_config_param) == None:
+                tup = p.create_element(new_config_param)
+                config['dpdk'].append(tup)
 
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
@@ -1139,8 +1172,9 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     if config['dpdk'] == None:
         return
     for dev in devices:
-        dev_short = pci_to_short(dev)
-        config_param = 'dev %s' % dev_short
+        dev = dev_id_to_short(dev)
+        addr_type, addr = dev_id_parse(dev)
+        config_param = 'dev %s' % addr
         key = p.get_element(config['dpdk'],config_param)
         if key:
             p.remove_element(config['dpdk'], key)
@@ -1192,15 +1226,15 @@ def modify_dhcpd(is_add, params):
 
     :returns: String with sed commands.
     """
-    pci         = params['interface']
+    dev_id         = params['interface']
     range_start = params.get('range_start', '')
     range_end   = params.get('range_end', '')
     dns         = params.get('dns', {})
     mac_assign  = params.get('mac_assign', {})
 
-    interfaces = fwglobals.g.router_cfg.get_interfaces(pci=pci)
+    interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
     if not interfaces:
-        return (False, "modify_dhcpd: %s was not found" % (pci))
+        return (False, "modify_dhcpd: %s was not found" % (dev_id))
 
     address = IPNetwork(interfaces[0]['addr'])
     router = str(address.ip)
@@ -1272,7 +1306,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     :param params: labels      - python list of labels
                    is_dia      - type of labels (DIA - Direct Internet Access)
                    remove      - True to remove labels, False to add.
-                   dev         - PCI if device to apply labels to.
+                   dev         - Bus address of Device to apply labels to.
                    next_hop_ip - IP address of next hop.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
@@ -1282,11 +1316,14 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     ids = ','.join(map(str, ids_list))
 
     if dev:
-        vpp_if_name = pci_to_vpp_if_name(dev)
+        vpp_if_name = dev_id_to_vpp_if_name(dev)
     elif sw_if_index:
         vpp_if_name = vpp_sw_if_index_to_name(sw_if_index)
     else:
         return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
+
+    if not vpp_if_name:
+        return (False, "'vpp_if_name' was not found for %s" % dev)
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1397,23 +1434,23 @@ def get_interface_sw_if_index(ip):
 
     :returns: sw_if_index.
     """
-    pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    if not pci:
+    dev_id, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not dev_id:
         # If interface was configured with dhcp, router_cfg has no IP-s.
         # In this case try to fetch GW from Linux.
         if_name = get_interface_name(ip)
         if if_name:
-            pci, _ = get_interface_pci(if_name)
-    if not pci:
+            dev_id = get_interface_dev_id(if_name)
+    if not dev_id:
         return None
-    return pci_to_vpp_sw_if_index(pci)
+    return dev_id_to_vpp_sw_if_index(dev_id)
 
 def get_interface_vpp_names(type=None):
     res = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
     for params in interfaces:
         if type == None or re.match(type, params['type'], re.IGNORECASE):
-            sw_if_index = pci_to_vpp_sw_if_index(params['pci'])
+            sw_if_index = dev_id_to_vpp_sw_if_index(params['dev_id'])
             if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
             res.append(if_vpp_name)
     return res
@@ -1445,7 +1482,7 @@ def get_interface_gateway_from_router_db(ip):
         return None
     return ip_str_to_bytes(gw_ip)[0]
 
-def add_static_route(addr, via, metric, remove, pci=None):
+def add_static_route(addr, via, metric, remove, dev_id=None):
     """Add static route.
 
     :param params: params:
@@ -1453,7 +1490,7 @@ def add_static_route(addr, via, metric, remove, pci=None):
                         via     - Gateway address.
                         metric  - Metric.
                         remove  - True to remove route.
-                        pci     - Device to be used for outgoing packets.
+                        dev_id  - Bus address of device to be used for outgoing packets.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1487,10 +1524,10 @@ def add_static_route(addr, via, metric, remove, pci=None):
             op = 'del'
         cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
     else:
-        if not pci:
+        if not dev_id:
             cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
-            tap = pci_to_tap(pci)
+            tap = dev_id_to_tap(dev_id)
             cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
@@ -1501,18 +1538,23 @@ def add_static_route(addr, via, metric, remove, pci=None):
 
     return True
 
-def vpp_set_dhcp_detect(pci, remove):
+def vpp_set_dhcp_detect(dev_id, remove):
     """Enable/disable DHCP detect feature.
 
     :param params: params:
-                        pci     -  Interface PCI.
+                        dev_id -  Interface device bus address.
                         remove  - True to remove rule, False to add.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
+    addr_type, _ = dev_id_parse(dev_id)
+
+    if addr_type != "pci":
+        return (False, "addr type needs to be a pci address")
+
     op = 'del' if remove else ''
 
-    sw_if_index = pci_to_vpp_sw_if_index(pci)
+    sw_if_index = dev_id_to_vpp_sw_if_index(dev_id)
     int_name = vpp_sw_if_index_to_name(sw_if_index)
 
 
@@ -1542,6 +1584,63 @@ def tunnel_change_postprocess(add, addr):
 
     for policy_id, priority in policies.items():
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
+
+def fix_request_params(params, message=None):
+    """ Fix incoming message parameters
+    The purpose of this function is to fix 'params' that contains the pci as interface identification.
+    The function changes the pci address into `dev_id` which is the new interface identifier.
+    Since we have different types of `params` object,
+    we need to use several if/else statements in order to handle all of them.
+
+    :param params - parameters object.
+    :param message - request message.
+
+    """
+
+    def _fix_params_key(params, key, message=None):
+        if key in params:
+            if type(params[key]) == list:
+                params['dev_id'] = [dev_id_add_type(pci) for pci in params[key]]
+                del params[key]
+            else:
+                params['dev_id'] = dev_id_add_type(params.pop(key))
+
+        if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
+            params['interface'] = dev_id_add_type(params['interface'])
+
+        return params
+
+
+    if 'requests' in params:
+        requests = params['requests']
+        for request in requests:
+            if 'params' in request:
+                request['params'] = _fix_params_key(request['params'], 'pci', request['message'])
+                request['params'] = _fix_params_key(request['params'], 'devId', request['message'])
+
+    if 'pci' in params:
+        params = _fix_params_key(params, 'pci')
+
+    if 'devId' in params:
+        params = _fix_params_key(params, 'devId')
+
+    if 'args' in params and 'params' in params['args']:
+        nested_params = params['args']['params']
+        if 'interface' in nested_params:
+            nested_params['interface'] = dev_id_add_type(nested_params['interface'])
+
+    if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
+        params['interface'] = dev_id_add_type(params['interface'])
+
+    return params
+
+def fix_message(msg):
+    msg = fix_aggregated_message_format(msg)
+
+    if 'params' in msg:
+        msg['params'] = fix_request_params(msg['params'], msg['message'])
+
+    return msg
 
 # Today (May-2019) message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:

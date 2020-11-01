@@ -71,28 +71,28 @@ class FwUnassignedIfs:
 
     def _get_assigned_interfaces(self):
         """ Get the list of assigned interfaces from the router-db. Those interfaces
-        are already listed according to their PCI address, so we just add them to a
+        are already listed according to their device bus address, so we just add them to a
         list.
 
-        : return : pci_list - list of PCI addresses for assigned interfaces
+        : return : dev_id_list - list of device bus addresses for assigned interfaces
         """
         assigned_if = fwglobals.g.router_cfg.get_interfaces()
         if len(assigned_if) == 0:
             return []
-        pci_list = [interface['pci'] for interface in assigned_if]
-        return pci_list
+        dev_id_list = [interface['dev_id'] for interface in assigned_if]
+        return dev_id_list
 
-    def _get_entry_fingerprint(self, pci):
+    def _get_entry_fingerprint(self, dev_id):
         """ Computes a hash for an entry in the cache.
 
-        : param pci : the PCI address which is the key in the cache dictionary
+        : param dev_id : the device bus address which is the key in the cache dictionary
         : return : string of changes to calculate hash on.
         """
         res = ''
         vpp_run = fwutils.vpp_does_run()
-        name    = fwutils.pci_to_linux_iface(pci)
+        name    = fwutils.dev_id_to_linux_if(dev_id)
         if name is None and vpp_run:
-            name = fwutils.pci_to_tap(pci)
+            name = fwutils.dev_id_to_tap(dev_id)
         if name is None:
             return res
 
@@ -100,8 +100,8 @@ class FwUnassignedIfs:
         addr       = addr.split('/')[0] if addr else ''
         gw, metric = fwutils.get_interface_gateway(name)
 
-        if pci in self.cached_interfaces:
-            entry = self.cached_interfaces[pci]
+        if dev_id in self.cached_interfaces:
+            entry = self.cached_interfaces[dev_id]
             # entry is in cache, check for differences between real-time info and cached info.
             # if the is a difference, add it to the computation, and update the cache.
             res += self._reconfig_section(entry,'addr',addr,only_if_different=True, update=True)
@@ -115,8 +115,8 @@ class FwUnassignedIfs:
                 res += self._reconfig_section(entry,'public_port',str(public_port),only_if_different=True, update=True)
         else:
             #entry is not in cache, create entry and update res
-            self.cached_interfaces[pci] = {}
-            entry = self.cached_interfaces[pci]
+            self.cached_interfaces[dev_id] = {}
+            entry = self.cached_interfaces[dev_id]
             entry['name'] = name
 
             res += self._reconfig_section(entry, 'addr', addr, only_if_different=False, update=True)
@@ -163,10 +163,10 @@ class FwUnassignedIfs:
 
         vpp_run = fwutils.vpp_does_run()
         for interface in if_list:
-            name = fwutils.pci_to_linux_iface(interface.get('pci'))
+            name = fwutils.dev_id_to_linux_if(interface.get('dev_id'))
 
             if name is None and vpp_run:
-                name = fwutils.pci_to_tap(interface.get('pci'))
+                name = fwutils.dev_id_to_tap(interface.get('dev_id'))
 
             if name is None:
                 return ''
@@ -203,21 +203,21 @@ class FwUnassignedIfs:
         """
         res = ''
 
-        linux_pci_list    = fwutils.get_linux_pcis()
-        assigned_pci_list = self._get_assigned_interfaces()
+        linux_dev_id_list    = fwutils.get_linux_dev_ids()
+        assigned_dev_id_list = self._get_assigned_interfaces()
 
-        for pci in linux_pci_list:
-            if pci in assigned_pci_list:
+        for dev_id in linux_dev_id_list:
+            if dev_id in assigned_dev_id_list:
             # for assigned interfaces, reconfig is computed in fwutils.get_reconfig_hash()
-                if pci in self.cached_interfaces:
+                if dev_id in self.cached_interfaces:
                     # a case when unassigned interface became assigned. It will be
                     # computed in fwutils.get_reconfig_hash()
-                    del self.cached_interfaces[pci]
+                    del self.cached_interfaces[dev_id]
             else:
                 # the interface is unassigned, calculate hash. If this is a new interface
                 # (or an interface that was assigned and became unassigned), it will be
                 # added to the cache.
-                res += self._get_entry_fingerprint(pci)
+                res += self._get_entry_fingerprint(dev_id)
 
         # add the assigned-interfaces reconfig hash
         res += self._get_assigned_reconfig_hash()
@@ -235,8 +235,8 @@ class FwUnassignedIfs:
         : param address_no_mask : address to look for, without mask
         : return: True if part of cache, False if not
         """
-        for pci in self.cached_interfaces.keys():
-            entry = self.cached_interfaces[pci]
+        for dev_id in self.cached_interfaces.keys():
+            entry = self.cached_interfaces[dev_id]
             if entry['addr'] != None and address_no_mask==entry['addr'].split('/')[0]:
                 return True
         return False
@@ -248,7 +248,7 @@ class FwUnassignedIfs:
             for key in self.cached_interfaces.keys():
                 entry = self.cached_interfaces[key]
                 string = "FwUnassignedIfs: "
-                string += entry.get('name','NoName') + ': {' + 'pci_address: ' + key + ', Address: '
+                string += entry.get('name','NoName') + ': {' + 'dev_id: ' + key + ', Address: '
                 string += 'None' if entry.get('addr') == None else entry.get('addr')
                 string += ', gateway: '
                 string += 'None' if entry.get('gateway') == '' else entry.get('gateway','None')

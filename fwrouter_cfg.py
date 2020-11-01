@@ -367,15 +367,15 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None, pci=None, ip=None):
+    def get_interfaces(self, type=None, dev_id=None, ip=None):
         interfaces = self._get_requests('add-interface')
-        if not type and not pci and not ip:
+        if not type and not dev_id and not ip:
             return interfaces
         result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
                 continue
-            elif pci and pci != params['pci']:
+            elif dev_id and dev_id != params['dev_id']:
                 continue
             elif ip and not re.match(ip, params['addr']):
                 continue
@@ -400,16 +400,16 @@ class FwRouterCfg:
         interfaces = self.get_interfaces(type='wan', ip=ip)
         if not interfaces:
             return (None, None)
-        pci = interfaces[0]['pci']
+        dev_id = interfaces[0]['dev_id']
         gw  = interfaces[0].get('gateway')
         # If gateway not exist in interface configuration, use default
         # This is needed when upgrading from version 1.1.52 to 1.2.X
         if not gw:
-            tap = fwutils.pci_to_tap(pci)
+            tap = fwutils.dev_id_to_tap(dev_id)
             rip, _ = fwutils.get_interface_gateway(tap)
-            return pci, rip
+            return dev_id, rip
         else:
-            return pci, gw
+            return dev_id, gw
 
     def update_signature(self, request):
         """Updates the database signature.

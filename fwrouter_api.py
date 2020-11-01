@@ -155,7 +155,7 @@ class FWROUTER_API:
                     if dhcp == 'no':
                         continue
 
-                    name = fwutils.pci_to_tap(wan['pci'])
+                    name = fwutils.dev_id_to_tap(wan['dev_id'])
                     addr = fwutils.get_interface_address(name)
                     if not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
@@ -212,7 +212,7 @@ class FWROUTER_API:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
-            fwglobals.g.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
+            fwglobals.g.AGENT_CACHE['DEV_ID_TO_VPP_TAP_NAME_MAP'] = {}
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -739,7 +739,7 @@ class FWROUTER_API:
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
-            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
+            old_params = fwglobals.g.router_cfg.get_interfaces(dev_id=new_params['dev_id'])[0]
             if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
                 return True
             if new_params.get('gateway') and new_params.get('gateway') != old_params.get('gateway'):
@@ -845,7 +845,7 @@ class FWROUTER_API:
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
         # The remove-* request might have partial set of parameters only.
-        # For example, 'remove-interface' has 'pci' parameter only and
+        # For example, 'remove-interface' has 'dev_id' parameter only and
         # has no IP, LAN/WAN type, etc.
         # That makes it impossible to revert these partial remove-X requests
         # on aggregated message rollback that might happen due to failure in
@@ -1129,7 +1129,7 @@ class FWROUTER_API:
         self.router_started = False
         self._stop_threads()
         fwutils.reset_dhcpd()
-        fwglobals.g.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
+        fwglobals.g.AGENT_CACHE['DEV_ID_TO_VPP_TAP_NAME_MAP'] = {}
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_after(self):

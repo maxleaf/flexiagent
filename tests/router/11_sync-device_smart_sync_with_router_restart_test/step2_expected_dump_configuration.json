@@ -7,9 +7,10 @@
   ], 
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:0000:00:03.00", 
+      "Key": "add-interface:pci:0000:00:03.00", 
       "Params": {
         "addr": "1.0.0.4/24", 
+        "dev_id": "pci:0000:00:03.00", 
         "gateway": "1.0.0.1", 
         "multilink": {
           "labels": [
@@ -17,29 +18,28 @@
             "blue"
           ]
         }, 
-        "pci": "0000:00:03.00", 
         "type": "wan"
       }
     }, 
     {
-      "Key": "add-interface:0000:00:08.00", 
+      "Key": "add-interface:pci:0000:00:08.00", 
       "Params": {
         "addr": "10.0.0.4/24", 
+        "dev_id": "pci:0000:00:08.00", 
         "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
             "green"
           ]
         }, 
-        "pci": "0000:00:08.00", 
         "type": "wan"
       }
     }, 
     {
-      "Key": "add-interface:0000:00:09.00", 
+      "Key": "add-interface:pci:0000:00:09.00", 
       "Params": {
         "addr": "192.168.56.100/24", 
-        "pci": "0000:00:09.00", 
+        "dev_id": "pci:0000:00:09.00", 
         "routing": "ospf", 
         "type": "lan"
       }
@@ -155,12 +155,12 @@
   ], 
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config 0000:00:09.00", 
+      "Key": "add-dhcp-config pci:0000:00:09.00", 
       "Params": {
         "dns": [
           "8.8.4.4"
         ], 
-        "interface": "0000:00:09.00", 
+        "interface": "pci:0000:00:09.00", 
         "mac_assign": [], 
         "range_end": "20.20.20.200", 
         "range_start": "20.20.20.150"

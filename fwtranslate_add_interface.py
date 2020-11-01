@@ -36,7 +36,7 @@ import fwutils
 #    {
 #      "message": "add-interface",
 #      "params": {
-#           "pci":"0000:00:08.00",
+#           "dev_id":"0000:00:08.00",
 #           "addr":"10.0.0.4/24",
 #           "routing":"ospf"
 #      }
@@ -77,7 +77,7 @@ def add_interface(params):
      """
     cmd_list = []
 
-    iface_pci  = params['pci']
+    dev_id  = params['dev_id']
     iface_addr = params.get('addr', '')
     iface_name = fwutils.pci_to_linux_iface(iface_pci)
     iface_addr_bytes = ''
@@ -108,7 +108,7 @@ def add_interface(params):
         cmd['cmd']['params'] = {
                         'module': 'fwutils',
                         'func': 'vpp_set_dhcp_detect',
-                        'args': {'pci': iface_pci, 'remove': False}
+                        'args': {'dev_id': dev_id, 'remove': False}
         }
         cmd['revert'] = {}
         cmd['revert']['name']   = "python"
@@ -116,7 +116,7 @@ def add_interface(params):
         cmd['revert']['params'] = {
                         'module': 'fwutils',
                         'func': 'vpp_set_dhcp_detect',
-                        'args': {'pci': iface_pci, 'remove': True}
+                        'args': {'dev_id': dev_id, 'remove': True}
         }
         cmd_list.append(cmd)
 
@@ -200,13 +200,13 @@ def add_interface(params):
         cmd['cmd']['params'] = {
                     'module': 'fwnetplan',
                     'func': 'add_remove_netplan_interface',
-                    'args': { 'is_add': 1,
-                            'pci'   : iface_pci,
-                            'ip'    : iface_addr,
-                            'gw'    : gw,
-                            'metric': metric,
-                            'dhcp'  : dhcp,
-                            'type'  : int_type
+                    'args': { 'is_add'  : 1,
+                            'dev_id'    : dev_id,
+                            'ip'        : iface_addr,
+                            'gw'        : gw,
+                            'metric'    : metric,
+                            'dhcp'      : dhcp,
+                            'type'      : int_type
                             }
         }
         cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -216,13 +216,13 @@ def add_interface(params):
                     'module': 'fwnetplan',
                     'func': 'add_remove_netplan_interface',
                     'args': {
-                            'is_add': 0,
-                            'pci'   : iface_pci,
-                            'ip'    : iface_addr,
-                            'gw'    : gw,
-                            'metric': metric,
-                            'dhcp'  : dhcp,
-                            'type'  : int_type
+                            'is_add'  : 0,
+                            'dev_id'  : dev_id,
+                            'ip'      : iface_addr,
+                            'gw'      : gw,
+                            'metric'  : metric,
+                            'dhcp'    : dhcp,
+                            'type'    : int_type
                     }
         }
         cmd['revert']['descr'] = "remove interface from netplan config file"
@@ -231,13 +231,13 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, iface_pci)
-        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+        cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, dev_id)
+        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
                                     "sudo ip link set dev DEV-STUB up" ]
         cmd['revert'] = {}
         cmd['revert']['name']   = "exec"
-        cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, iface_pci)
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'pci_to_tap', 'arg':iface_pci } ]},
+        cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, dev_id)
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
                                     "sudo ip link set dev DEV-STUB down" ]
         cmd_list.append(cmd)
 
@@ -248,25 +248,25 @@ def add_interface(params):
                 cmd = {}
                 cmd['cmd'] = {}
                 cmd['cmd']['name']    = "python"
-                cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, iface_pci, labels)
+                cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
                 cmd['cmd']['params']  = {
                                 'module': 'fwutils',
                                 'func'  : 'vpp_multilink_update_labels',
                                 'args'  : { 'labels':   labels,
                                             'next_hop': gw,
-                                            'dev':      iface_pci,
+                                            'dev':      dev_id,
                                             'remove':   False
                                         }
                 }
                 cmd['revert'] = {}
                 cmd['revert']['name']   = "python"
-                cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, iface_pci, labels)
+                cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
                 cmd['revert']['params'] = {
                                 'module': 'fwutils',
                                 'func'  : 'vpp_multilink_update_labels',
                                 'args'  : { 'labels':   labels,
                                             'next_hop': gw,
-                                            'dev':      iface_pci,
+                                            'dev':      dev_id,
                                             'remove':   True
                                         }
                 }
@@ -281,13 +281,13 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-            cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (iface_pci, iface_addr)
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+            cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (dev_id, iface_addr)
+            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                         'is_add':1, 'twice_nat':0 }
             cmd['revert'] = {}
             cmd['revert']['name']   = "nat44_add_del_interface_addr"
-            cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (iface_pci, iface_addr)
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+            cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (dev_id, iface_addr)
+            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                         'is_add':0, 'twice_nat':0 }
             cmd_list.append(cmd)
 
@@ -435,4 +435,4 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    return 'add-interface:%s' % params['pci']
+    return 'add-interface:%s' % params['dev_id']

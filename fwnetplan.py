@@ -115,25 +115,25 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            pci, _ = fwutils.get_interface_pci(name)
+                            dev_id = fwutils.get_interface_dev_id(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            pci, _ = fwutils.get_interface_pci(dev)
+                            dev_id = fwutils.get_interface_dev_id(dev)
                         if fname in our_files:
-                            our_files[fname].append({'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name})
+                            our_files[fname].append({'ifname': dev, 'gateway': gateway, 'dev_id': dev_id, 'set-name': name})
                         else:
-                            our_files[fname] = [{'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name}]
+                            our_files[fname] = [{'ifname': dev, 'gateway': gateway, 'dev_id': dev_id, 'set-name': name}]
     return our_files
 
 def _set_netplan_filename(files):
     for fname, devices in files.items():
         for dev in devices:
-            pci = dev.get('pci')
+            dev_id = dev.get('dev_id')
             ifname = dev.get('ifname')
             set_name = dev.get('set-name')
-            if pci:
-                fwglobals.g.NETPLAN_FILES[pci] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
-                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, pci, fname))
+            if dev_id:
+                fwglobals.g.NETPLAN_FILES[dev_id] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
+                fwglobals.log.debug('_set_netplan_filename: %s(%s) uses %s' % (ifname, dev_id, fname))
 
 def _add_netplan_file(fname):
     if os.path.exists(fname):
@@ -173,29 +173,30 @@ def add_remove_inf_from_netplan(is_add, linux_interface):
             with open(fname_run, 'w') as stream:
                 yaml.safe_dump(config, stream)
 
-def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, linux_interface=None):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
     set_name = ''
     old_ifname = ''
-    ifname = fwutils.pci_to_tap(pci) if not linux_interface else fwutils.vpp_tap_by_linux_interface_name(linux_interface)
+
+    ifname = fwutils.dev_id_to_tap(dev_id)
     if not ifname:
-        err_str = "add_remove_netplan_interface: %s was not found" % pci
+        err_str = "add_remove_netplan_interface: %s was not found" % dev_id
         fwglobals.log.error(err_str)
         return (False, err_str)
 
-    if pci in fwglobals.g.NETPLAN_FILES:
-        fname = fwglobals.g.NETPLAN_FILES[pci].get('fname')
+    if dev_id in fwglobals.g.NETPLAN_FILES:
+        fname = fwglobals.g.NETPLAN_FILES[dev_id].get('fname')
         fname_run = fname.replace('yaml', 'fwrun.yaml')
         if (not os.path.exists(fname_run)):
             _add_netplan_file(fname_run)
 
         fname_backup = fname + '.fw_run_orig'
 
-        old_ifname = fwglobals.g.NETPLAN_FILES[pci].get('ifname')
-        if fwglobals.g.NETPLAN_FILES[pci].get('set-name'):
-            set_name = fwglobals.g.NETPLAN_FILES[pci].get('set-name')
+        old_ifname = fwglobals.g.NETPLAN_FILES[dev_id].get('ifname')
+        if fwglobals.g.NETPLAN_FILES[dev_id].get('set-name'):
+            set_name = fwglobals.g.NETPLAN_FILES[dev_id].get('set-name')
 
         with open(fname_backup, 'r') as stream:
             old_config = yaml.safe_load(stream)
@@ -271,19 +272,18 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, linux_
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # Remove pci-to-tap cached value for this pci, as netplan might change
+        # If needed, remove dev-id-to-tap cached value for this dev id, as netplan might change
         # interface name.
-        #
-        cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
-        pci_full = fwutils.pci_to_full(pci)
-        if pci_full in cache:
-            del cache[pci_full]
+        cache = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+        dev_id = fwutils.dev_id_to_full(dev_id)
+        if dev_id in cache:
+            del cache[dev_id]
 
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
             for i in range(50):
-                ifname = fwutils.pci_to_tap(pci) if not linux_interface else fwutils.vpp_tap_by_linux_interface_name(linux_interface)
+                ifname = fwutils.dev_id_to_tap(dev_id)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
@@ -299,8 +299,8 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, linux_
                 return (False, err_str)
 
     except Exception as e:
-        err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
-              % (pci, fname_run, str(e))
+        err_str = "add_remove_netplan_interface failed: dev_id: %s, file: %s, error: %s"\
+              % (dev_id, fname_run, str(e))
         fwglobals.log.error(err_str)
         _dump_netplan_file(fname_run)
         return (False, err_str)

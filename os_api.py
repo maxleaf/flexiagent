@@ -49,7 +49,7 @@ class OS_DECODERS:
     """OS DECODERS class representation.
     """
     def interfaces(self, inp):
-        """Get PCI address from Linux interface name for a list of interfaces.
+        """Get device bus address from Linux interface name for a list of interfaces.
 
         :param inp:         Interfaces.
 
@@ -57,38 +57,34 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-            daddr = {
-                        'name':nicname,
-                        'pciaddr':'',
-                        'usbaddr':'',
-                        'driver':'',
-                        'MAC':'',
-                        'IPv4':'',
-                        'IPv4Mask':'',
-                        'IPv6':'',
-                        'IPv6Mask':'',
-                        'dhcp':'',
-                        'gateway':'',
-                        'metric': '',
-                        'connectivity_type': ''
-                    }
-
-            if fwutils.is_wifi_interface(nicname):
-                daddr['connectivity_type'] = 'wifi'
-
-            if fwutils.is_lte_interface(nicname):
-                daddr['connectivity_type'] = 'lte'
-
-            pciaddr = fwutils.get_interface_pci(nicname)
-            usbaddr = fwutils.linux_to_usb_addr(nicname)
-            if pciaddr == "" and usbaddr == "":
+            dev_id = fwutils.get_interface_dev_id(nicname)
+            if dev_id == '':
                 continue
 
-            daddr['pciaddr'] = pciaddr
-            daddr['usbaddr'] = usbaddr
+            daddr = {
+                'name':nicname,
+                'devId':dev_id,
+                'driver':'',
+                'MAC':'',
+                'IPv4':'',
+                'IPv4Mask':'',
+                'IPv6':'',
+                'IPv6Mask':'',
+                'dhcp':'',
+                'gateway':'',
+                'metric': '',
+                'deviceType': ''
+            }
+
+            if fwutils.is_wifi_interface(nicname):
+                daddr['deviceType'] = 'wifi'
+
+            if fwutils.is_lte_interface(nicname):
+                daddr['deviceType'] = 'lte'
 
             daddr['driver'] = fwutils.get_interface_driver(nicname)
 
+            daddr['driver'] = fwutils.get_interface_driver(nicname)
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
             for addr in addrs:
