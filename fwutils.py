@@ -230,8 +230,8 @@ def get_interface_address_all(filtr=None):
     ip_list = []
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
-        pciaddr = linux_to_pci_addr(nicname)
-        if pciaddr and pciaddr[0] == "":
+        pci, _ = get_interface_pci(nicname)
+        if not pci:
             continue
         for addr in addrs:
             if addr.family == socket.AF_INET:
@@ -324,18 +324,18 @@ def get_linux_pcis():
     if not pci_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
-            pciaddr = linux_to_pci_addr(nicname)
-            if pciaddr and pciaddr[0] == "":
+            pci, _ = get_interface_pci(nicname)
+            if not pci:
                 continue
-            pci_list.append(pciaddr[0])
+            pci_list.append(pci)
     return pci_list
 
-def linux_to_pci_addr(linuxif):
+def get_interface_pci(linuxif):
     """Convert Linux interface name into PCI address.
 
     :param linuxif:      Linux interface name.
 
-    :returns: PCI address.
+    :returns: tuple (PCI address , driver name).
     """
     NETWORK_BASE_CLASS = "02"
     vpp_run = vpp_does_run()
@@ -1293,8 +1293,13 @@ def get_interface_sw_if_index(ip):
 
     :returns: sw_if_index.
     """
-
     pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not pci:
+        # If interface was configured with dhcp, router_cfg has no IP-s.
+        # In this case try to fetch GW from Linux.
+        if_name = get_interface_name(ip)
+        if if_name:
+            pci, _ = get_interface_pci(if_name)
     if not pci:
         return None
     return pci_to_vpp_sw_if_index(pci)
@@ -1325,8 +1330,15 @@ def get_interface_gateway_from_router_db(ip):
 
     :returns: IP address.
     """
-
-    pci, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    _, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not gw_ip:
+        # If interface was configured with dhcp, router_cfg has no IP-s.
+        # In this case try to fetch GW from Linux.
+        if_name = get_interface_name(ip)
+        if if_name:
+            gw_ip, _ = get_interface_gateway(if_name)
+    if not gw_ip:
+        return None
     return ip_str_to_bytes(gw_ip)[0]
 
 def add_static_route(addr, via, metric, remove, pci=None):

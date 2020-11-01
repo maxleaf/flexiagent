@@ -57,13 +57,13 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr and pciaddr[0] == "":
+            pci, driver = fwutils.get_interface_pci(nicname)
+            if not pci:
                 continue
             daddr = {
                         'name':nicname,
-                        'pciaddr':pciaddr[0],
-                        'driver':pciaddr[1],
+                        'pciaddr':pci,
+                        'driver':driver,
                         'MAC':'',
                         'IPv4':'',
                         'IPv4Mask':'',
@@ -81,7 +81,7 @@ class OS_DECODERS:
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            if daddr['gateway'] is not '':
+            if fwglobals.g.stun_wrapper and daddr['gateway']:
                 # Find Public port and IP for the address. At that point
                 # the STUN interfaces cache should be already initialized.
                 daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
