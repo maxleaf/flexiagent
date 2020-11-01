@@ -11,6 +11,7 @@ import fwutils
 import time
 import traceback
 import copy
+from random import seed, randint
 
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
 sys.path.append(tools)
@@ -51,6 +52,26 @@ class FwStunWrap:
     More info can be found in unassigned_if.py
     """
 
+    def __init__(self, standalone):
+        """ Init function. This function inits the cache, gets the router-db handle
+            and register callback and request names to listen too.
+
+            : param standalone : if set to TRUE, no traffic will be sent from the
+                                 STUN module. We use this mode in pytest, for example.
+                                 In pytests, we define bogus IP addresses, which we
+                                 do not want to sent STUN requests on their behalf as
+                                 they will produce nothing.
+        """
+        self.local_cache = fwglobals.g.AGENT_CACHE
+        self.local_cache['stun_interfaces'] = {}
+        self.thread_stun = None
+        self.is_running = False
+        self.standalone = standalone
+        if standalone:
+            seed(1)
+        fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
+            ['add-interface', 'remove-interface'])
+
     def _log_address_cache(self):
         """ prints the content on the local cache
         """
@@ -58,17 +79,6 @@ class FwStunWrap:
             for addr in self.local_cache['stun_interfaces'].keys():
                 if addr:
                     fwglobals.log.debug("FwStunWrap: " + addr+':'+str(self.local_cache['stun_interfaces'][addr]))
-
-    def __init__(self):
-        """ Init function. This function inits the cache, gets the router-db handle
-            and register callback and request names to listen too.
-        """
-        self.local_cache = fwglobals.g.AGENT_CACHE
-        self.local_cache['stun_interfaces'] = {}
-        self.thread_stun = None
-        self.is_running = False
-        fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
-            ['add-interface', 'remove-interface'])
 
     def initialize(self):
         """ Initialize STUN cache by sending STUN requests on all WAN interfaces before the first
@@ -82,7 +92,8 @@ class FwStunWrap:
             fwglobals.log.debug("stun_thread initialize: collected IPs: %s" %(str(ip_list)))
             for ip in ip_list:
                 self.add_addr(ip, False)
-            self._send_stun_request()
+            if not self.standalone:
+                self._send_stun_requests()
             self._log_address_cache()
 
         self.is_running = True
@@ -154,6 +165,13 @@ class FwStunWrap:
         """
         if addr == '':
             return
+
+        if self.standalone:
+            # add bogus info. More info can be found in the __init__ documentation.
+            params = {}
+            params['PublicIP'] = "190.180.170.123"
+            params['PublicPort'] = str(randint(1024,65535))
+            params['useStun'] = True
 
         # 1 add address with public info, as received by add-address from management,
         # over-written the address if exist in cache.
@@ -317,12 +335,15 @@ class FwStunWrap:
         cached_addr['stun_server']      = st_host
         cached_addr['stun_server_port'] = st_port
 
-    def _send_stun_request(self):
+    def _send_stun_requests(self):
         """ Send STUN request for each address that has no public IP and port
         updated in the cache. Sent only if the seconds counter equals to
         the calculated time it should be sent ('next_time').
         """
         if not self.local_cache['stun_interfaces']:
+            return
+
+        if self.standalone:
             return
 
         # now start sending STUN request
@@ -383,7 +404,7 @@ class FwStunWrap:
         slept = 0
         timeout = 30
         reset_all_timeout = 10 * 60
-        #update_cache_timeout = 60
+        update_cache_from_os_timeout = 2 * 60
 
         while self.is_running == True:
 
@@ -395,18 +416,16 @@ class FwStunWrap:
 
                     # send STUN retquests for addresses that a request was not sent for
                     # them, or for ones that did not get reply previously
-                    self._send_stun_request()
+                    self._send_stun_requests()
                     self._increase_sec()
 
                     if slept % (reset_all_timeout) == 0 and slept > 0:
                         # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
                         self.reset_all()
 
-            		"""
-            		if slept % update_cache_timeout == 0 and slept > 0:
-                	# every update_cache_timeout, refresh cache with updated IP addresses from OS
-                	self.update_cache_from_OS()
-            		"""
+                    if slept % update_cache_from_os_timeout == 0 and slept > 0:
+                        # every update_cache_timeout, refresh cache with updated IP addresses from OS
+                        self.update_cache_from_OS()
 
                     # dump STUN and unassigned interfaces information every 'timeout' seconds.
                     # Wait 1 cycle so that the caches will be populated.
@@ -459,8 +478,8 @@ class FwStunWrap:
                     # with that IP to disconnect. If it is not part of any connected tunnel,
                     # add its source IP address to the cache of addresses for which
                     # we will send STUN requests.
-                    if fwglobals.g.stun_wrapper and tunnel['src'] not in ip_up_set:
+                    if tunnel['src'] not in ip_up_set:
                         fwglobals.log.debug("Tunnel-id %d is down, adding address %s to STUN interfaces cache"\
                             %(key, tunnel['src']))
-                        fwglobals.g.stun_wrapper.add_addr(tunnel['src'], True)
+                        self.add_addr(tunnel['src'], True)
                     continue

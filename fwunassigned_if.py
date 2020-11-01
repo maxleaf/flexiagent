@@ -107,7 +107,7 @@ class FwUnassignedIfs:
             res += self._reconfig_section(entry,'addr',addr,only_if_different=True, update=True)
             res += self._reconfig_section(entry,'gateway',gw,only_if_different=True, update=True)
             res += self._reconfig_section(entry,'metric',metric,only_if_different=True, update=True)
-            if fwglobals.g.stun_wrapper and gw and addr:
+            if gw and addr:
                 # If GW exist, we need to check public info as well: compare local data
                 # against STUN cache
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
@@ -124,7 +124,7 @@ class FwUnassignedIfs:
             res += self._reconfig_section(entry, 'metric', metric, only_if_different=False, update=True)
             res += self._reconfig_section(entry, 'metric', metric, only_if_different=False, update=True)
 
-            if fwglobals.g.stun_wrapper and gw and addr:
+            if gw and addr:
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
                 res += self._reconfig_section(entry, 'public_ip', public_ip, only_if_different=False, update=True)
                 res += self._reconfig_section(entry, 'public_port', str(public_port), only_if_different=False, update=True)
@@ -178,7 +178,7 @@ class FwUnassignedIfs:
             res += self._reconfig_section(interface, 'gateway', gw, only_if_different=True, update=False)
             res += self._reconfig_section(interface, 'metric', metric, only_if_different=True, update=False)
 
-            if fwglobals.g.stun_wrapper and addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
+            if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
                 nomaskaddr = addr.split('/')[0]
                 new_p_ip, new_p_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
                 addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()

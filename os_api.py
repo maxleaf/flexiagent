@@ -81,7 +81,7 @@ class OS_DECODERS:
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            if fwglobals.g.stun_wrapper and daddr['gateway']:
+            if daddr['gateway']:
                 # Find Public port and IP for the address. At that point
                 # the STUN interfaces cache should be already initialized.
                 daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
