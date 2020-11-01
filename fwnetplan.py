@@ -115,10 +115,10 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            dev_id = fwutils.linux_to_dev_id(name)
+                            dev_id = fwutils.get_interface_dev_id(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            dev_id = fwutils.linux_to_dev_id(dev)
+                            dev_id = fwutils.get_interface_dev_id(dev)
                         if fname in our_files:
                             our_files[fname].append({'ifname': dev, 'gateway': gateway, 'dev_id': dev_id, 'set-name': name})
                         else:
@@ -156,7 +156,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
@@ -210,12 +210,14 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
         if re.match('yes', dhcp):
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
+            config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
         else:
             config_section['dhcp4'] = False
             if 'dhcp4-overrides' in config_section:
                 del config_section['dhcp4-overrides']
             config_section['addresses'] = [ip]
-            if gw:
+
+            if gw and type == 'WAN':
                 if 'routes' in config_section:
                     def_route_existed = False
                     routes = config_section['routes']
@@ -237,6 +239,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
+
             ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
@@ -262,11 +265,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp):
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
-            for _ in range(50):
+            for i in range(50):
                 ifname = fwutils.dev_id_to_tap(dev_id)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
+                if i % 10 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+                    cmd = "systemctl restart systemd-networkd"
+                    fwglobals.log.debug("add_remove_netplan_interface: " + cmd)
+                    os.system(cmd)
                 time.sleep(1)
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname

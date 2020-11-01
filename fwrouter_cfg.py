@@ -411,21 +411,6 @@ class FwRouterCfg:
         else:
             return dev_id, gw
 
-    def get_interface_ips(self, dev_id_list=None):
-        """Fetches IP-s of interfaces stored in the configuration database.
-
-        :param dev_id_list: filter interfaces to be handled by dev_id.
-
-        :returns: list of IP addresses. The addresses are without length.
-        """
-        if_ips = []
-        interfaces = self.get_interfaces()
-        for params in interfaces:
-            if not dev_id_list or params['dev_id'] in dev_id_list:
-                if_ips.append(params['addr'].split('/')[0])
-        return if_ips
-
-
     def update_signature(self, request):
         """Updates the database signature.
         This function assists the database synchronization feature that keeps
@@ -559,7 +544,7 @@ class FwRouterCfg:
         """
         builds a list of WAN interfaces from router DB. if 'useStun' does not exist or False,
         do not add this interface to the list.
-        : return : list if WAN interfaces from router DB
+        : return : list of WAN interfaces from router DB
         """
         addr_list = []
         wan_list = self.get_interfaces(type='wan')
@@ -571,6 +556,8 @@ class FwRouterCfg:
             else:
                 entry = {}
                 entry['address']     = wan.get('addr').split('/')[0]
+                if entry['address'] == '':
+                    continue
                 entry['public_ip']   = wan.get('PublicIP','')
                 entry['public_port'] = wan.get('PublicPort','')
                 addr_list.append(entry)

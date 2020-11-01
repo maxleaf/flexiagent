@@ -750,12 +750,17 @@ class FwagentDaemon(object):
 
     The FwagentDaemon object is created by the 'fwagent daemon' command.
     """
-    def __init__(self):
-        """Constructor method
+    def __init__(self, standalone=False):
+        """Constructor method.
+
+        :param standalone: if True, the agent will be not connected to flexiManage,
+                           hence no need in network activity, like STUN.
+                           The standalone mode is used by CLI-based tests.
         """
-        self.agent       = None
-        self.active      = False
-        self.thread_main = None
+        self.agent          = None
+        self.active         = False
+        self.thread_main    = None
+        self.standalone     = standalone
 
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT,  self._signal_handler)
@@ -765,7 +770,7 @@ class FwagentDaemon(object):
         exit(1)
 
     def __enter__(self):
-        self.agent = fwglobals.g.initialize_agent()
+        self.agent = fwglobals.g.initialize_agent(standalone=self.standalone)
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -973,25 +978,25 @@ class FwagentDaemon(object):
                 ret = api_func()
             return ret
 
-def daemon(start_loop=True):
+def daemon(standalone=False):
     """Handles 'fwagent daemon' command.
     This command runs Fwagent in daemon mode. It creates the wrapping
     FwagentDaemon object that manages the instance of the Fwagent class and
     keeps it registered and connected to flexiManage.
     For more info See documentation on FwagentDaemon class.
 
-    :param start_loop: if True the register-and-connect loop will be started.
+    :param standalone: if False the register-and-connect loop will not be started.
 
     :returns: None.
     """
     fwglobals.log.set_target(to_syslog=True, to_terminal=False)
-    fwglobals.log.info("starting in daemon mode (start_loop=%s)" % str(start))
+    fwglobals.log.info("starting in daemon mode (standalone=%s)" % str(standalone))
 
-    with FwagentDaemon() as agent_daemon:
+    with FwagentDaemon(standalone) as agent_daemon:
 
         # Start the FwagentDaemon main function in separate thread as it is infinite,
         # and we need to get to Pyro4.Daemon.serveSimple() call to run rpc loop.
-        if start_loop:
+        if not standalone:
             agent_daemon.start()
 
         # Register FwagentDaemon object with Pyro framework and start Pyro request loop:
@@ -1099,7 +1104,7 @@ if __name__ == '__main__':
                     'reset': lambda args: reset(soft=args.soft),
                     'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
                     'start': lambda args: start(start_router=args.start_router),
-                    'daemon': lambda args: daemon(start_loop=not args.dont_connect),
+                    'daemon': lambda args: daemon(standalone=args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
                     'show': lambda args: show(
                         agent_info=args.agent,

@@ -57,7 +57,7 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-            dev_id = fwutils.linux_to_dev_id(nicname)
+            dev_id = fwutils.get_interface_dev_id(nicname)
             if dev_id == '':
                 continue
 
@@ -89,7 +89,7 @@ class OS_DECODERS:
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            if daddr['gateway'] is not '':
+            if fwglobals.g.stun_wrapper and daddr['gateway']:
                 # Find Public port and IP for the address. At that point
                 # the STUN interfaces cache should be already initialized.
                 daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \

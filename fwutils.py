@@ -230,7 +230,7 @@ def get_interface_address_all(filtr=None):
     ip_list = []
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
-        dev_id = linux_to_dev_id(nicname)
+        dev_id = get_interface_dev_id(nicname)
         if dev_id == '':
             continue
         for addr in addrs:
@@ -336,7 +336,7 @@ def get_linux_dev_ids():
     if not dev_id_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
-            dev_id = linux_to_dev_id(nicname)
+            dev_id = get_interface_dev_id(nicname)
             if dev_id == "":
                 continue
             dev_id_list.append(dev_id)
@@ -386,12 +386,12 @@ def dev_id_add_type(dev_id):
 
     return 'pci:%s' % dev_id
 
-def linux_to_dev_id(linuxif):
-    """Convert Linux interface name into an device bus address which we use as id.
+def get_interface_dev_id(linuxif):
+    """Convert Linux interface name into bus address.
 
     :param linuxif:      Linux interface name.
 
-    :returns: device bus address.
+    :returns: dev_id.
     """
     try:
         if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
@@ -1366,8 +1366,13 @@ def get_interface_sw_if_index(ip):
 
     :returns: sw_if_index.
     """
-
     dev_id, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not dev_id:
+        # If interface was configured with dhcp, router_cfg has no IP-s.
+        # In this case try to fetch GW from Linux.
+        if_name = get_interface_name(ip)
+        if if_name:
+            dev_id = get_interface_dev_id(if_name)
     if not dev_id:
         return None
     return dev_id_to_vpp_sw_if_index(dev_id)
@@ -1398,8 +1403,15 @@ def get_interface_gateway_from_router_db(ip):
 
     :returns: IP address.
     """
-
     _, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
+    if not gw_ip:
+        # If interface was configured with dhcp, router_cfg has no IP-s.
+        # In this case try to fetch GW from Linux.
+        if_name = get_interface_name(ip)
+        if if_name:
+            gw_ip, _ = get_interface_gateway(if_name)
+    if not gw_ip:
+        return None
     return ip_str_to_bytes(gw_ip)[0]
 
 def add_static_route(addr, via, metric, remove, dev_id=None):

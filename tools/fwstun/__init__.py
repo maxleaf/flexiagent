@@ -197,7 +197,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
 
     return retVal
 
-def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one_try):
+def get_nat_type(s, source_ip, source_port, stun_host, stun_port):
     _initialize()
     port = stun_port
     fwglobals.log.debug("Stun: Do Test1")
@@ -220,8 +220,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
             if resp:
                 stun_host = stun_host_
                 break
-            if stop_after_one_try == True:
-                break
+
     if not resp:
         return Blocked, ret, '', ''
     fwglobals.log.debug("Stun: Result: %s" %(ret))
@@ -274,7 +273,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, stop_after_one
 
 
 def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
-                stun_port=3478, stop_after_one_try = False, dev_name = None):
+                stun_port=3478, dev_name = None):
     """
     This function is the outside API to the stun client module.
     It retrieves the STUN type, the public IP as seen from the STUN on the other side of the
@@ -283,8 +282,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     : param source_port : the local source port on behalf NAT request is sent
     : param stun_host   : the stun server host name or IP address
     : param stun_port   : the stun server port
-    : param stop_after_one_try : in case of Register message, we want to sent only one
-              request. In that case, stop_after_one_try will be True
+
     : param dev_name    : device name to bind() to
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -301,7 +299,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         return ('', '', '', '', '')
     else:
         nat_type, nat, stun_h, stun_p = get_nat_type(s, source_ip, source_port,
-                                 stun_host=stun_host, stun_port=stun_port, stop_after_one_try=stop_after_one_try)
+                                 stun_host=stun_host, stun_port=stun_port)
         external_ip = nat['ExternalIP'] if nat['ExternalIP'] != None else ''
         external_port = nat['ExternalPort'] if nat['ExternalPort'] != None else ''
         s.close()
