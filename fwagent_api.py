@@ -43,7 +43,7 @@ fwagent_api = {
     'upgrade-device-sw':                '_upgrade_device_sw',
     'reset-device':                     '_reset_device_soft',
     'sync-device':                      '_sync_device',
-    'get-wifi-available-access-points': '_get_wifi_available_access_points',
+    'get-wifi-available-networks':      '_get_wifi_available_networks',
     'connect-to-wifi':                  '_connect_to_wifi',
     'connect-to-lte':                   '_connect_to_lte',
     'get-interface-status':             '_get_interface_status'
@@ -351,19 +351,19 @@ class FWAGENT_API:
         fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
         return {'ok': 1}
 
-    def _get_wifi_available_access_points(self, params):
-        fwglobals.log.info("FWAGENT_API: _get_wifi_available_access_points STARTED")
-        
+    def _get_wifi_available_networks(self, params):
+        fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks STARTED")
+
         try:
-            access_points = fwutils.get_available_access_points(params['interfaceName'])
-            fwglobals.log.info("FWAGENT_API: _get_wifi_available_access_points FINISHED")
-            return {'message': access_points, 'ok': 1}
+            networks = fwutils.wifi_get_available_networks(params['devId'])
+            fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks FINISHED")
+            return {'message': networks, 'ok': 1}
         except:
             raise Exception("_get_device_logs: failed to get available access points: %s" % format(sys.exc_info()[1]))
 
     def _connect_to_wifi(self, params):
         fwglobals.log.info("FWAGENT_API: _connect_to_wifi STARTED")
-        
+
         try:
             result = fwutils.connect_to_wifi(params)
 
@@ -371,13 +371,13 @@ class FWAGENT_API:
                 fwglobals.log.info("FWAGENT_API: _connect_to_wifi FINISHED")
                 return {'message': result, 'ok': result}
 
-            return {'message': False, 'ok': 0}    
+            return {'message': False, 'ok': 0}
         except:
             raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
 
     def _connect_to_lte(self, params):
         fwglobals.log.info("FWAGENT_API: _connect_to_lte STARTED")
-        
+
         try:
             result = fwutils.connect_to_lte(params)
             fwglobals.log.info("FWAGENT_API: _connect_to_lte FINISHED")

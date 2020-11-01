@@ -354,22 +354,6 @@ def get_linux_dev_ids():
             dev_id_list.append(dev_id)
     return dev_id_list
 
-def get_interface_driver(interface_name):
-    """Get Linux interface driver.
-
-    :param interface_name: Interface name to check.
-
-    :returns: driver name.
-    """
-    try:
-        cmd = 'ethtool -i %s' % interface_name
-        out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
-        vals = out[0].decode().split("driver: ", 1)
-        return str(vals[-1])
-    except subprocess.CalledProcessError:
-        return ''
-
-
 def dev_id_parse(dev_id):
     """Convert a dev id into a tuple contained address type (pci, usb) and address.
 
@@ -629,6 +613,27 @@ def dev_id_to_vpp_sw_if_index(dev_id):
             return sw_if.sw_if_index
     fwglobals.log.debug("dev_id_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (dev_id, yaml.dump(sw_ifs, canonical=True)))
 
+    return None
+
+# 'linux_if_name_to_vpp_sw_if_index' function maps linux interface referenced by interface name, e.g 'eth0'
+# into index of this tapcli interface in VPP, eg. tapcli-0
+def linux_if_name_to_vpp_sw_if_index(interface_name):
+    """Convert Linux Interface Name into VPP sw_if_index.
+
+    :param interface_name:      Linux interface name.
+
+    :returns: sw_if_index.
+    """
+    vpp_if_name = vpp_tapcli_by_linux_interface_name(interface_name)
+    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, str(vpp_if_name)))
+    if vpp_if_name is None:
+        return None
+
+    sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
+    for sw_if in sw_ifs:
+        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
+            return sw_if.sw_if_index
+    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, yaml.dump(sw_ifs, canonical=True)))
     return None
 
 # 'dev_id_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
@@ -1753,33 +1758,37 @@ def fix_aggregated_message_format(msg):
     #
     return copy.deepcopy(msg)
 
-def get_available_access_points(interface_name):
+def wifi_get_available_networks(dev_id):
     """Get WIFI available access points.
 
-    :param interface_name: Interface name to get.
+    :param dev_id: Bus address of interface to get for.
 
     :returns: string array of essids
     """
-    #   -i wlxd0374523abfb
-    access_points = []
+    linux_if = dev_id_to_linux_if(dev_id)
 
-    def clean(n):
-        n = n.replace('"', '')
-        n = n.strip()
-        n = n.split(':')[-1]
-        return n
+    if linux_if and is_wifi_interface(dev_id):
+        networks = []
 
-    # make sure the interface is up
-    cmd = 'ip link set dev %s up' % interface_name
-    subprocess.check_output(cmd, shell=True)
+        def clean(n):
+            n = n.replace('"', '')
+            n = n.strip()
+            n = n.split(':')[-1]
+            return n
 
-    try:
-        cmd = 'iwlist %s scan | grep ESSID' % interface_name
-        access_points = subprocess.check_output(cmd, shell=True).splitlines()
-        access_points = map(clean, access_points)
-        return access_points
-    except subprocess.CalledProcessError:
-        return access_points
+        # make sure the interface is up
+        cmd = 'ip link set dev %s up' % interface_name
+        subprocess.check_output(cmd, shell=True)
+
+        try:
+            cmd = 'iwlist %s scan | grep ESSID' % interface_name
+            networks = subprocess.check_output(cmd, shell=True).splitlines()
+            networks = map(clean, networks)
+            return networks
+        except subprocess.CalledProcessError:
+            return networks
+
+    return networks
 
 def connect_to_wifi(params):
     interface_name = params['interfaceName']
@@ -1808,14 +1817,14 @@ def connect_to_wifi(params):
     except subprocess.CalledProcessError:
         return False
 
-def is_lte_interface(interface_name):
+def is_lte_interface(dev_id):
     """Check if interface is LTE.
 
-    :param interface_name: Interface name to check.
+    :param dev_id: Bus address of interface to check.
 
     :returns: Boolean.
     """
-    driver = get_interface_driver(interface_name)
+    driver = get_interface_driver(dev_id)
     supported_lte_drivers = ['cdc_mbim']
     if driver in supported_lte_drivers:
         return True
@@ -1873,41 +1882,50 @@ def connect_to_lte(params):
     except subprocess.CalledProcessError:
         return False
 
-def is_wifi_interface(interface_name):
+def is_wifi_interface(dev_id):
     """Check if interface is WIFI.
 
     :param interface_name: Interface name to check.
 
     :returns: Boolean.
     """
-    cmd = 'cat /proc/net/wireless | grep %s' % interface_name
-    try:
-        out = subprocess.check_output(cmd, shell=True).strip()
-        return True
-    except subprocess.CalledProcessError:
-        return False
+    linux_if = dev_id_to_linux_if(dev_id)
 
-def get_interface_driver(interface_name):
+    if linux_if:
+        cmd = 'cat /proc/net/wireless | grep %s' % interface_name
+        try:
+            out = subprocess.check_output(cmd, shell=True).strip()
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    return False
+
+def get_interface_driver(dev_id):
     """Get Linux interface driver.
 
-    :param interface_name: Interface name to check.
+    :param dev_id: Bus address of interface to check.
 
     :returns: driver name.
     """
 
-    try:
-        cmd = 'ethtool -i %s' % interface_name
-        out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
-        vals = out[0].decode().split("driver: ", 1)
-        return str(vals[-1])
-    except subprocess.CalledProcessError:
-        return ''
+    linux_if = dev_id_to_linux_if(dev_id)
+    if linux_if:
+        try:
+            cmd = 'ethtool -i %s' % interface_name
+            out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
+            vals = out[0].decode().split("driver: ", 1)
+            return str(vals[-1])
+        except subprocess.CalledProcessError:
+            return ''
+
+    return ''
 
 
-def is_non_dpdk_interface(interface_name, pci):
+def is_non_dpdk_interface(dev_id):
     """Check if interface is not supported by dpdk.
 
-    :param interface_name: Interface name to check.
+    :param dev_id: Bus address of interface to check.
 
     :returns: boolean.
     """
@@ -1916,17 +1934,9 @@ def is_non_dpdk_interface(interface_name, pci):
     # 0000:0a:00.00 'Ethernet Connection X553 1GbE' if=eth4 drv=ixgbe unused= 10.0.0.1
     # 0000:07:00.00 'I210 Gigabit Network Connection' if=eth2 drv=igb unused=vfio-pci,uio_pci_generic =192.168.0.1
 
-    # if pci:
-    #     if str(pci) == "0000:06:00.00":
-    #         return True
-
-
-    # if interface_name == 'eth2'or interface_name == 'eth5':
-    #     return True
-
-    if is_wifi_interface(interface_name):
+    if is_wifi_interface(dev_id):
         return True
-    if is_lte_interface(interface_name):
+    if is_lte_interface(dev_id):
         return True
 
     return False

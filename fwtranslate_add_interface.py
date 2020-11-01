@@ -43,7 +43,7 @@ import fwutils
 #    }
 #
 # into list of commands:
-# 
+#
 #    1.vpp.cfg
 #    ------------------------------------------------------------
 #    01. sudo vppctl set int state 0000:00:08.00 up
@@ -120,7 +120,7 @@ def add_interface(params):
         }
         cmd_list.append(cmd)
 
-    if fwutils.is_non_dpdk_interface(iface_name, iface_pci):
+    if fwutils.is_non_dpdk_interface(iface_name):
         # create tap for this interface in vpp and linux
         cmd = {}
         cmd['cmd'] = {}
@@ -171,7 +171,7 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "UP interface create by tap-inject in Linux" 
+        cmd['cmd']['descr']     = "UP interface create by tap-inject in Linux"
         cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_by_linux_interface_name', 'arg': iface_name } ]},
                                     "sudo ip link set dev DEV-STUB up" ]
         cmd['revert'] = {}
@@ -192,6 +192,74 @@ def add_interface(params):
                     }
         }
         cmd_list.append(cmd)
+
+        # add interface into netplan configuration
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                    'module': 'fwnetplan',
+                    'func': 'add_remove_netplan_interface',
+                    'args': { 'is_add'       : 1,
+                            'dev_id'         : None,
+                            'ip'             : iface_addr,
+                            'gw'             : gw,
+                            'metric'         : metric,
+                            'dhcp'           : dhcp,
+                            'type'           : int_type
+                    }
+        }
+        cmd['cmd']['descr'] = "add interface into netplan config file"
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                    'module': 'fwnetplan',
+                    'func': 'add_remove_netplan_interface',
+                    'args': {
+                            'is_add'         : 0,
+                            'pci'            : None,
+                            'ip'             : iface_addr,
+                            'gw'             : gw,
+                            'metric'         : metric,
+                            'dhcp'           : dhcp,
+                            'type'           : int_type,
+                    }
+        }
+        cmd['revert']['descr'] = "remove interface from netplan config file"
+        cmd_list.append(cmd)
+
+        # Enable NAT.
+        # On WAN interfaces run
+        #   'nat44 add interface address GigabitEthernet0/9/0'
+        #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
+        # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
+        if 'type' not in params or params['type'].lower() == 'wan':
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "nat44_add_del_interface_addr"
+            cmd['cmd']['descr']   = "enable NAT for tapcli interface"
+            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':1, 'twice_nat':0 }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "nat44_add_del_interface_addr"
+            cmd['revert']['descr']  = "disable NAT for tapcli interface"
+            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':0, 'twice_nat':0 }
+            cmd_list.append(cmd)
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
+            cmd['cmd']['descr']   = "add interface tapcli to output path" 
+            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':1, 'is_inside':0 }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
+            cmd['revert']['descr']  = "remove interface tapcli from output path"
+            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
+                                        'is_add':0, 'is_inside':0 }
+            cmd_list.append(cmd)
+
     else:
         # add interface into netplan configuration
         cmd = {}

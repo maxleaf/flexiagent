@@ -111,7 +111,7 @@ def start_router(params=None):
             #   1. They should not appear in /etc/vpp/startup.conf because they don't have pci address.
             #   2. They should not be removed from linux
             # Additional logic for these interfaces is at add_interface translator
-            if fwutils.is_non_dpdk_interface(linux_if, params['pci']):
+            if fwutils.is_non_dpdk_interface(linux_if):
                 # create linux bridge
                 cmd = {}
                 cmd['cmd'] = {}

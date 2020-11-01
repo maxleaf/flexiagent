@@ -69,7 +69,7 @@ request_handlers = {
     'upgrade-device-sw':                 {'name': '_call_agent_api'},
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
-    'get-wifi-available-access-points':  {'name': '_call_agent_api'},
+    'get-wifi-available-networks':       {'name': '_call_agent_api'},
     'connect-to-wifi':                   {'name': '_call_agent_api'},
     'connect-to-lte':                    {'name': '_call_agent_api'},
     'get-interface-status':              {'name': '_call_agent_api'},
