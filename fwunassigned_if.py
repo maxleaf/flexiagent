@@ -107,7 +107,7 @@ class FwUnassignedIfs:
             res += self._reconfig_section(entry,'addr',addr,only_if_different=True, update=True)
             res += self._reconfig_section(entry,'gateway',gw,only_if_different=True, update=True)
             res += self._reconfig_section(entry,'metric',metric,only_if_different=True, update=True)
-            if gw and addr:
+            if fwglobals.g.stun_wrapper and gw and addr:
                 # If GW exist, we need to check public info as well: compare local data
                 # against STUN cache
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
@@ -124,7 +124,7 @@ class FwUnassignedIfs:
             res += self._reconfig_section(entry, 'metric', metric, only_if_different=False, update=True)
             res += self._reconfig_section(entry, 'metric', metric, only_if_different=False, update=True)
 
-            if gw and addr:
+            if fwglobals.g.stun_wrapper and gw and addr:
                 public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(addr)
                 res += self._reconfig_section(entry, 'public_ip', public_ip, only_if_different=False, update=True)
                 res += self._reconfig_section(entry, 'public_port', str(public_port), only_if_different=False, update=True)
@@ -178,7 +178,7 @@ class FwUnassignedIfs:
             res += self._reconfig_section(interface, 'gateway', gw, only_if_different=True, update=False)
             res += self._reconfig_section(interface, 'metric', metric, only_if_different=True, update=False)
 
-            if addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
+            if fwglobals.g.stun_wrapper and addr and gw: # Don't bother sending STUN on LAN interfaces (which does not have gw)
                 nomaskaddr = addr.split('/')[0]
                 new_p_ip, new_p_port, _ = fwglobals.g.stun_wrapper.find_addr(nomaskaddr)
                 addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
@@ -240,22 +240,6 @@ class FwUnassignedIfs:
             if entry['addr'] != None and address_no_mask==entry['addr'].split('/')[0]:
                 return True
         return False
-
-    def update_public(self, addr_no_mask, p_ip, p_port):
-        """ Adds public information to entry in the unassigned hash.
-
-        : param addr_no_mask : IP address without mask, to which to add the public info
-        : param p_ip   : public IP to add to the entry
-        : param p_port : public port to add to the entry
-        """
-        for pci in self.cached_interfaces.keys():
-            entry = self.cached_interfaces[pci]
-            if entry.get('addr'):
-                if addr_no_mask == entry['addr'].split('/')[0]:
-                    if entry.get('gateway'):
-                        entry['public_ip'] = p_ip
-                        entry['public_port'] = p_port
-                        return
 
     def log_interfaces_cache(self):
         """ log cache into log

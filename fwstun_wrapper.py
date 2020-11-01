@@ -51,7 +51,7 @@ class FwStunWrap:
     More info can be found in unassigned_if.py
     """
 
-    def log_address_cache(self):
+    def _log_address_cache(self):
         """ prints the content on the local cache
         """
         if self.local_cache['stun_interfaces']:
@@ -79,11 +79,11 @@ class FwStunWrap:
         fwglobals.log.debug("Start sending STUN requests for all WAN interfaces")
         ip_list = fwutils.get_interface_address_all(filtr = 'gw')
         if ip_list:
-            fwglobals.log.debug("stun_thread initialize: collected IPs: %s" %str(ip_list))
+            fwglobals.log.debug("stun_thread initialize: collected IPs: %s" %(str(ip_list)))
             for ip in ip_list:
-                dev_name = fwutils.get_interface_name(ip)
-                self._send_single_stun_request(ip, 4789, None, None, True, dev_name)
-            self.log_address_cache()
+                self.add_addr(ip, False)
+            self._send_stun_request()
+            self._log_address_cache()
 
         self.is_running = True
         fwglobals.log.debug("Starting STUN thread")
@@ -111,6 +111,39 @@ class FwStunWrap:
             # We know it is "remove" because we only registered for "add" and "remove"
             self.remove_addr(params['addr'].split('/')[0], params)
 
+    def update_cache_from_OS(self):
+        """ Check the OS to find newly added/removed WAN interfaces and add/remove them
+        to/from the cache
+        """
+        tunnel_stats        = fwtunnel_stats.tunnel_stats_get()
+        tunnels             = fwglobals.g.router_cfg.get_tunnels()
+        tunnel_up_addr_list = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
+        os_addr_list        = fwutils.get_interface_address_all(filtr = 'gw')
+        cache_addr_list     = list(self.local_cache['stun_interfaces'].keys())
+
+        os_addr_list.sort()
+        cache_addr_list.sort()
+        fwglobals.log.debug("update_cache_from_OS: WAN IP list from OS %s" %(str(os_addr_list)))
+        fwglobals.log.debug("update_cache_from_OS: WAN IP list from STUN cache %s" %(str(cache_addr_list)))
+
+        # add new IP from OS to Cache
+        for ip in os_addr_list:
+            if ip in cache_addr_list:
+                continue
+            else:
+                fwglobals.log.debug("update_cache_from_OS: adding address %s" %(ip))
+                self.add_addr(ip)
+
+        # remove IPs from Cache if they are not part of OS IPs, unless they are part of connected
+        # tunnels.
+        # Since the IP does not exists, the tunnel will eventually get disconnected, and that
+        # IP will not be added to the cache again. On the next call to this function, there
+        # will be no associated connected tunnels with that IP address, and it will be removed.
+        for ip in cache_addr_list:
+            if ip not in os_addr_list and ip not in tunnel_up_addr_list:
+                fwglobals.log.debug("update_cache_from_OS: removing address %s" %(ip))
+                self.remove_addr(ip)
+
     def add_addr(self, addr, wait=False, params=None):
         """ Add address to cache.
 
@@ -119,6 +152,9 @@ class FwStunWrap:
                        initialize_addr() for more info
         : param params : parameters that can be received by management, or None
         """
+        if addr == '':
+            return
+
         # 1 add address with public info, as received by add-address from management,
         # over-written the address if exist in cache.
         if params and params.get('PublicIP','') != '' and params.get('PublicPort','') != '' \
@@ -153,6 +189,9 @@ class FwStunWrap:
         : param addr   : address to remove from cache.
         : param params : interface parameters
         """
+        if addr == '':
+            return
+
         if addr in self.local_cache['stun_interfaces'].keys():
             if (fwglobals.g.unassigned_interfaces.is_unassigned_addr(addr) == True) or \
                 (params and params.get('gateway','')!= ''):
@@ -183,13 +222,11 @@ class FwStunWrap:
 
         Stun server and port will not be reset, because we want to map an address to the same
         STUN server, meaning an interface will send STUN requests to the same STUN server
-        always, unless the STUN server went down or the request timed-out. In that case,
-        the underlying level will replace the STUN server in _send_single_stun_request().
-
+        always, unless the STUN server went down or the request timed-out.
         We initialize 'next_time' to 30, if we detect that tunnel is disconnected. The avarage time
         for tunnel to get connected from the time it was created is 30 seconds, so no point in sending
         STUN requests before, if the reason is public IP or Port were change. For the rest of the cases,
-        we initialize 'next_time' to 1. See parameter 'wait' below.
+        we initialize 'next_time' to 0. See parameter 'wait' below.
 
         : param address :  address to reset in the cache.
         : param wait    :  If True, start 'next_time' counter from 30 (waiting for tunnel creation,
@@ -216,7 +253,7 @@ class FwStunWrap:
         if wait == True:
             self.local_cache['stun_interfaces'][address]['next_time'] = 30
         else:
-            self.local_cache['stun_interfaces'][address]['next_time'] = 1
+            self.local_cache['stun_interfaces'][address]['next_time'] = 0
 
         return self.local_cache['stun_interfaces'][address]
 
@@ -226,8 +263,8 @@ class FwStunWrap:
         the address back to the STUN cache and reset it.
         """
         tunnel_stats = fwtunnel_stats.tunnel_stats_get()
-        tunnels = fwglobals.g.router_cfg.get_tunnels()
-        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
+        tunnels      = fwglobals.g.router_cfg.get_tunnels()
+        ip_up_set    = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
         for addr in self.local_cache['stun_interfaces']:
             # Do not reset info on interface participating in a connected tunnel
             if addr in ip_up_set:
@@ -249,13 +286,14 @@ class FwStunWrap:
 
         : param address : the address for which we did not receive STUN reply
         """
-        if self.local_cache['stun_interfaces'][address]['next_time'] < 60:
-            self.local_cache['stun_interfaces'][address]['next_time']+=4
-        if self.local_cache['stun_interfaces'][address]['next_time'] > 60:
-            self.local_cache['stun_interfaces'][address]['next_time'] = 60
-        self.local_cache['stun_interfaces'][address]['success'] = False
-        self.local_cache['stun_interfaces'][address]['stun_server'] = ''
-        self.local_cache['stun_interfaces'][address]['stun_server_port'] = ''
+        cached_addr = self.local_cache['stun_interfaces'][address]
+        if cached_addr['next_time'] < 60:
+            cached_addr['next_time'] += 4
+        if cached_addr['next_time'] > 60:
+            cached_addr['next_time'] = 60
+        cached_addr['success'] = False
+        cached_addr['stun_server'] = ''
+        cached_addr['stun_server_port'] = ''
 
     def _handle_stun_response(self, address, p_ip, p_port, nat_type, st_host, st_port):
         """ Handle STUN response for an address. Reset all the counters,
@@ -271,7 +309,7 @@ class FwStunWrap:
         fwglobals.log.debug("found external %s:%s for %s:4789" %(p_ip, p_port, address))
         cached_addr = self.local_cache['stun_interfaces'][address]
         cached_addr['success']     = True
-        cached_addr['next_time']   = 1
+        cached_addr['next_time']   = 0
         cached_addr['sec_counter'] = 0
         cached_addr['nat_type']         = nat_type
         cached_addr['public_ip']        = p_ip
@@ -284,20 +322,19 @@ class FwStunWrap:
         updated in the cache. Sent only if the seconds counter equals to
         the calculated time it should be sent ('next_time').
         """
-        # Check if cache is empty. If it is, fill it with WAN addresses from router DB
-        self.check_if_cache_empty()
+        if not self.local_cache['stun_interfaces']:
+            return
 
-        #now start sending STUN request
+        # now start sending STUN request
         for addr in self.local_cache['stun_interfaces'].keys():
             elem = copy.deepcopy(self.local_cache['stun_interfaces'].get(addr))
             if not elem or elem.get('success',False) == True:
                 continue
             else:
                 if elem['sec_counter'] >= elem['next_time']:
-                    dev_name = fwutils.get_interface_name(addr)
                     nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
                         self._send_single_stun_request(addr, 4789, elem['stun_server'], \
-                        elem['stun_server_port'], False, dev_name)
+                        elem['stun_server_port'])
                     elem['sec_counter'] = 0
                     # address can be removed by another thread while iterating
                     if addr in self.local_cache['stun_interfaces'].keys():
@@ -311,40 +348,13 @@ class FwStunWrap:
                         self._handle_stun_response(addr, nat_ext_ip, nat_ext_port,\
                              nat_type, stun_host, stun_port)
 
-    def check_if_cache_empty(self):
-        """ If the agent and management are disconnected for some time,
-        the cache can become empty (for example, if disconnection came after remove-interface).
-        In that case, we will go to the router configuration, retreive interfaces with gateway,
-        and fill the cache with those addresses.
-        """
-        if self.local_cache['stun_interfaces']:
-            return
-        fwglobals.log.debug("check_if_cache_empty: adding WAN addresses from Router-DB")
-        addr_list = fwglobals.g.router_cfg.get_interface_public_addresses()
-        ip_addr_list = fwutils.get_interface_address_all(filtr = 'gw')
-        for elem in addr_list:
-            # filter out left overs from previous unhandled router shut-down
-            if elem['address'] in ip_addr_list:
-                self.add_addr(elem['address'], False)
-        return
-
-    def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port, try_once, dev_name):
+    def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_addr, stun_port):
         """ sends one STUN request for an address.
-        This function used in 2 cases:
-        1. Send a single request when device is registering, and use the result to fill the cache.
-        2. Send as part of STUN process from _send_stun_request(), that handles response and none-response
-           cases.
 
         : param lcl_src_ip   : local IP address
         : param lcl_srt_port : local port
         : param stun_addr    : The STUN server address to send the request to
         : param stun_port    : The STUN server port to send the request to
-        : param try_once     : if True, send only one request. We need this in case
-                                of Register requests, and reconfig calculations.
-                                If False, we update the cache based on the results
-                                of the STUN reply, if any. This can lead to a new
-                                entry in the cache.
-        : param dev_name     : device name to bind to
 
         : return :  nat_type     - nat type of the NAT
                     net_ext_ip   - the public IP address
@@ -352,31 +362,18 @@ class FwStunWrap:
                     stun_host    - the STUN server the request was answered by
                     stun_port    - the STUN server's port
         """
+        dev_name = fwutils.get_interface_name(lcl_src_ip)
+        if dev_name == None:
+            return '','','','',''
+
         fwglobals.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
         fwutils.set_linux_reverse_path_filter(dev_name, False)
+
         nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port = \
-            fwstun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port, try_once, dev_name)
+            fwstun.get_ip_info(lcl_src_ip, lcl_src_port, stun_addr, stun_port, dev_name)
+
         fwutils.set_linux_reverse_path_filter(dev_name, True)
-        if try_once == False:
-            return nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port
-        else:
-            fwglobals.log.debug("_send_single_stun_request: adding address %s to cache" %(str(lcl_src_ip)))
-            cached_addr = self.initialize_addr(lcl_src_ip, False)
-            if nat_ext_ip != '' and nat_ext_port != '':
-                fwglobals.log.debug("found external %s:%s for %s:%s" %(nat_ext_ip, nat_ext_port, lcl_src_ip,lcl_src_port))
-                cached_addr['success']     = True
-                cached_addr['nat_type']    = nat_type
-                cached_addr['public_ip']   = nat_ext_ip
-                cached_addr['public_port'] = nat_ext_port
-                cached_addr['stun_server'] = stun_host
-                cached_addr['stun_server_port'] = stun_port
-                return None
-            else:
-                fwglobals.log.debug("failed to find external ip:port for %s:%d" %(lcl_src_ip,lcl_src_port))
-                cached_addr['stun_server']      = ''
-                cached_addr['stun_server_port'] = ''
-                cached_addr['nat_type']  = nat_type if nat_type != '' else ''
-                return None
+        return nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port
 
     def _stun_thread(self, *args):
         """STUN thread
@@ -386,6 +383,7 @@ class FwStunWrap:
         slept = 0
         timeout = 30
         reset_all_timeout = 10 * 60
+        #update_cache_timeout = 60
 
         while self.is_running == True:
 
@@ -404,11 +402,17 @@ class FwStunWrap:
                         # reset all STUN information every 10 minutes, skip when slept is just initialized to 0
                         self.reset_all()
 
+            		"""
+            		if slept % update_cache_timeout == 0 and slept > 0:
+                	# every update_cache_timeout, refresh cache with updated IP addresses from OS
+                	self.update_cache_from_OS()
+            		"""
+
                     # dump STUN and unassigned interfaces information every 'timeout' seconds.
                     # Wait 1 cycle so that the caches will be populated.
                     if (slept % timeout) == 0 and slept > timeout:
                         fwglobals.g.unassigned_interfaces.log_interfaces_cache()
-                        self.log_address_cache()
+                        self._log_address_cache()
 
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
@@ -417,3 +421,46 @@ class FwStunWrap:
 
             time.sleep(1)
             slept += 1
+
+    def add_address_of_down_tunnels_to_stun(self, tunnel_stats, tunnels):
+        """ Run over all tunnels and get the source IP address of the tunnels that are not connected.
+        If it was disconnected due to changes in its source IP address, check if this IP address is still
+        valid. If it is, check that it is not used in other connected tunnels. If it is not used but still
+        valid, add it to the STUN cache. It it is in use, do not add it to the STUN cache, because we don't
+        want to start sending STUN requests on its behalf as it will lead to disconnection of the other
+        tunnels with that IP address.
+
+        : param tunnel_stats : dictionary of tunnel statistics. One of its properties is the tunnel status
+                            ("up" or "down")
+        : param tunnels      : list of tunnels and their properties
+        """
+        if not tunnel_stats or not tunnels:
+            return
+        # Get list if IP addresses used by tunnels
+        ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
+        # Get list of all IP addresses in the system
+        ip_addr_list = fwutils.get_interface_address_all(filtr = 'gw')
+        for tunnel in tunnels:
+            key = tunnel['tunnel-id']
+            stats = tunnel_stats.get(key)
+            if stats:
+                status = stats.get('status')
+                if status == 'down':
+                    # Down tunnel found. However, the tunnel might be disconnected due to changes in
+                    # source IP address. In that case, the current source address of the tunnel
+                    # is no longer valid. To make things safe, we check if the IP address exists
+                    # in the system. If it is not, no point on adding it to the STUN cache.
+                    if tunnel['src'] not in ip_addr_list:
+                        fwglobals.log.debug("Tunnel-id %d is down, but its source address %s no longer valid"\
+                            %(key, tunnel['src']))
+                        continue
+                    # If valid IP, check if the IP is part of other connected tunnels. If so,
+                    # do not add it to the STUN hash, as it might cause other connected tunnels
+                    # with that IP to disconnect. If it is not part of any connected tunnel,
+                    # add its source IP address to the cache of addresses for which
+                    # we will send STUN requests.
+                    if fwglobals.g.stun_wrapper and tunnel['src'] not in ip_up_set:
+                        fwglobals.log.debug("Tunnel-id %d is down, adding address %s to STUN interfaces cache"\
+                            %(key, tunnel['src']))
+                        fwglobals.g.stun_wrapper.add_addr(tunnel['src'], True)
+                    continue
