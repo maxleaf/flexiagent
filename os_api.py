@@ -57,22 +57,21 @@ class OS_DECODERS:
         """
         out = []
         for nicname, addrs in inp.items():
-
             daddr = {
-                'name':nicname,
-                'pciaddr':'',
-                'usbaddr':'',
-                'driver':'',
-                'MAC':'',
-                'IPv4':'',
-                'IPv4Mask':'',
-                'IPv6':'',
-                'IPv6Mask':'',
-                'dhcp':'',
-                'gateway':'',
-                'metric': '',
-                'connectivity_type': ''
-            }
+                        'name':nicname,
+                        'pciaddr':'',
+                        'usbaddr':'',
+                        'driver':'',
+                        'MAC':'',
+                        'IPv4':'',
+                        'IPv4Mask':'',
+                        'IPv6':'',
+                        'IPv6Mask':'',
+                        'dhcp':'',
+                        'gateway':'',
+                        'metric': '',
+                        'connectivity_type': ''
+                    }
 
             if fwutils.is_wifi_interface(nicname):
                 daddr['connectivity_type'] = 'wifi'
@@ -80,7 +79,7 @@ class OS_DECODERS:
             if fwutils.is_lte_interface(nicname):
                 daddr['connectivity_type'] = 'lte'
 
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
+            pciaddr = fwutils.get_interface_pci(nicname)
             usbaddr = fwutils.linux_to_usb_addr(nicname)
             if pciaddr == "" and usbaddr == "":
                 continue
@@ -89,6 +88,7 @@ class OS_DECODERS:
             daddr['usbaddr'] = usbaddr
 
             daddr['driver'] = fwutils.get_interface_driver(nicname)
+
             daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
             daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
             for addr in addrs:
@@ -97,7 +97,7 @@ class OS_DECODERS:
                 if addr.netmask != None:
                     daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            if daddr['gateway'] is not '':
+            if fwglobals.g.stun_wrapper and daddr['gateway']:
                 # Find Public port and IP for the address. At that point
                 # the STUN interfaces cache should be already initialized.
                 daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \

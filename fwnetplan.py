@@ -115,10 +115,10 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            pci = fwutils.linux_to_pci_addr(name)
+                            pci, _ = fwutils.get_interface_pci(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            pci = fwutils.linux_to_pci_addr(dev)
+                            pci, _ = fwutils.get_interface_pci(dev)
                         if fname in our_files:
                             our_files[fname].append({'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name})
                         else:
@@ -173,7 +173,7 @@ def add_remove_inf_from_netplan(is_add, linux_interface):
             with open(fname_run, 'w') as stream:
                 yaml.safe_dump(config, stream)
 
-def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interface=None):
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, linux_interface=None):
     config_section = {}
     old_ethernets = {}
 
@@ -226,12 +226,14 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
         if re.match('yes', dhcp):
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
+            config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
         else:
             config_section['dhcp4'] = False
             if 'dhcp4-overrides' in config_section:
                 del config_section['dhcp4-overrides']
             config_section['addresses'] = [ip]
-            if gw:
+
+            if gw and type == 'WAN':
                 if 'routes' in config_section:
                     def_route_existed = False
                     routes = config_section['routes']
@@ -253,6 +255,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
+
             ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
@@ -279,11 +282,15 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, linux_interf
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
-            for _ in range(50):
+            for i in range(50):
                 ifname = fwutils.pci_to_tap(pci) if not linux_interface else fwutils.vpp_tap_by_linux_interface_name(linux_interface)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
+                if i % 10 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+                    cmd = "systemctl restart systemd-networkd"
+                    fwglobals.log.debug("add_remove_netplan_interface: " + cmd)
+                    os.system(cmd)
                 time.sleep(1)
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname

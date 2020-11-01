@@ -94,9 +94,10 @@ def add_interface(params):
     ######################################################################
 
     # Add interface section into Netplan configuration file
-    gw     = params.get('gateway', None)
-    metric = params.get('metric', 0)
-    dhcp   = params.get('dhcp', 'no')
+    gw        = params.get('gateway', None)
+    metric    = params.get('metric', 0)
+    dhcp      = params.get('dhcp', 'no')
+    int_type  = params.get('type', None)
 
     # enable DHCP packets detection in VPP
     if dhcp == 'yes':
@@ -132,7 +133,7 @@ def add_interface(params):
         cmd['cmd']['descr'] = "create tap interface in linux and vpp"
         cmd_list.append(cmd)
 
-        # add tap into a bridge. 
+        # add tap into a bridge.
         # Note: the bridge is created on start_router translator
         cmd = {}
         cmd['cmd'] = {}
@@ -204,7 +205,8 @@ def add_interface(params):
                             'ip'    : iface_addr,
                             'gw'    : gw,
                             'metric': metric,
-                            'dhcp'  : dhcp
+                            'dhcp'  : dhcp,
+                            'type'  : int_type
                             }
         }
         cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -219,7 +221,8 @@ def add_interface(params):
                             'ip'    : iface_addr,
                             'gw'    : gw,
                             'metric': metric,
-                            'dhcp'  : dhcp
+                            'dhcp'  : dhcp,
+                            'type'  : int_type
                     }
         }
         cmd['revert']['descr'] = "remove interface from netplan config file"
