@@ -272,8 +272,12 @@ class Fwglobals:
             #     if isinstance(val, (int, float, str, unicode)):
             #         log.debug("  %s: %s" % (a, str(val)), to_terminal=False)
 
-    def initialize_agent(self):
+    def initialize_agent(self, standalone=False):
         """Initialize singleton object. Restore VPP if needed.
+
+        :param standalone: if True, the agent will be not connected to flexiManage,
+                           hence no need in network activity, like STUN.
+                           The standalone mode is used by CLI-based tests.
         """
         if self.fwagent:
             global log
@@ -287,9 +291,13 @@ class Fwglobals:
         self.os_api        = OS_API()
         self.apps          = FwApps(self.APP_REC_DB_FILE)
         self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
-        self.stun_wrapper  = FwStunWrap()
-        self.unassigned_interfaces = FwUnassignedIfs()
-        self.stun_wrapper.initialize()
+        self.unassigned_interfaces  = FwUnassignedIfs()
+
+        if standalone:
+            self.stun_wrapper = None
+        else:
+            self.stun_wrapper = FwStunWrap()
+            self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -303,12 +311,15 @@ class Fwglobals:
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return None
 
-        self.stun_wrapper.finalize()
+        if self.stun_wrapper:
+            self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
+
+        if self.stun_wrapper:
+            del self.stun_wrapper
         del self.unassigned_interfaces
-        del self.stun_wrapper
         del self.apps
         del self.policies
         del self.os_api

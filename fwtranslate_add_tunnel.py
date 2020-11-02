@@ -482,7 +482,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, dest_port):
             'vni'                  : bridge_id,
             'dest_port'            : dest_port,
             'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
-                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway', 'arg': src}],
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway_from_router_db', 'arg': src}],
             'instance'             : bridge_id,
             'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }

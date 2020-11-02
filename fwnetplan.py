@@ -115,10 +115,10 @@ def get_netplan_filenames():
                         name = _get_netplan_interface_name(dev, ethernets[dev])
                         if name:
                             gateway = devices[name] if name in devices else None
-                            pci = fwutils.linux_to_pci_addr(name)[0]
+                            pci, _ = fwutils.get_interface_pci(name)
                         else:
                             gateway = devices[dev] if dev in devices else None
-                            pci = fwutils.linux_to_pci_addr(dev)[0]
+                            pci, _ = fwutils.get_interface_pci(dev)
                         if fname in our_files:
                             our_files[fname].append({'ifname': dev, 'gateway': gateway, 'pci': pci, 'set-name': name})
                         else:
@@ -146,8 +146,17 @@ def _add_netplan_file(fname):
         stream.flush()
         os.fsync(stream.fileno())
 
+def _dump_netplan_file(fname):
+    if fname:
+        try:
+            with open(fname, 'r') as f:
+                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        except Exception as e:
+            err_str = "_dump_netplan_file failed: file: %s, error: %s"\
+              % (fname, str(e))
+            fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
+def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
@@ -200,10 +209,14 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         if re.match('yes', dhcp):
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
+            config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
         else:
             config_section['dhcp4'] = False
+            if 'dhcp4-overrides' in config_section:
+                del config_section['dhcp4-overrides']
             config_section['addresses'] = [ip]
-            if gw:
+
+            if gw and type == 'WAN':
                 if 'routes' in config_section:
                     def_route_existed = False
                     routes = config_section['routes']
@@ -225,6 +238,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
+
             ethernets[ifname] = config_section
         else:
             if ifname in ethernets:
@@ -244,31 +258,34 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp):
         # interface name.
         #
         cache = fwglobals.g.get_cache_data('PCI_TO_VPP_TAP_NAME_MAP')
-        pci_full = fwutils.pci_addr_full(pci)
+        pci_full = fwutils.pci_to_full(pci)
         if pci_full in cache:
             del cache[pci_full]
 
         # make sure IP address is applied in Linux
         if is_add == 1:
             ip_address_is_found = False
-            for _ in range(50):
+            for i in range(50):
                 ifname = fwutils.pci_to_tap(pci)
                 if fwutils.get_interface_address(ifname):
                     ip_address_is_found = True
                     break
+                if i % 10 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+                    cmd = "systemctl restart systemd-networkd"
+                    fwglobals.log.debug("add_remove_netplan_interface: " + cmd)
+                    os.system(cmd)
                 time.sleep(1)
             if not ip_address_is_found:
                 err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
                 fwglobals.log.error(err_str)
+                _dump_netplan_file(fname_run)
                 return (False, err_str)
 
     except Exception as e:
         err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
               % (pci, fname_run, str(e))
         fwglobals.log.error(err_str)
-        if fname_run:
-            with open(fname_run, 'r') as f:
-                fwglobals.log.error("NETPLAN file contents: " + f.read())
+        _dump_netplan_file(fname_run)
         return (False, err_str)
 
     return (True, None)
