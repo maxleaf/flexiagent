@@ -355,11 +355,11 @@ class FWAGENT_API:
         fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks STARTED")
 
         try:
-            networks = fwutils.wifi_get_available_networks(params['devId'])
+            networks = fwutils.wifi_get_available_networks(params['dev_id'])
             fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks FINISHED")
             return {'message': networks, 'ok': 1}
         except:
-            raise Exception("_get_device_logs: failed to get available access points: %s" % format(sys.exc_info()[1]))
+            raise Exception("_get_wifi_available_networks: failed to get available access points: %s" % format(sys.exc_info()[1]))
 
     def _connect_to_wifi(self, params):
         fwglobals.log.info("FWAGENT_API: _connect_to_wifi STARTED")

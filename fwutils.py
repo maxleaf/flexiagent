@@ -1777,11 +1777,11 @@ def wifi_get_available_networks(dev_id):
             return n
 
         # make sure the interface is up
-        cmd = 'ip link set dev %s up' % interface_name
+        cmd = 'ip link set dev %s up' % linux_if
         subprocess.check_output(cmd, shell=True)
 
         try:
-            cmd = 'iwlist %s scan | grep ESSID' % interface_name
+            cmd = 'iwlist %s scan | grep ESSID' % linux_if
             networks = subprocess.check_output(cmd, shell=True).splitlines()
             networks = map(clean, networks)
             return networks
@@ -1791,31 +1791,35 @@ def wifi_get_available_networks(dev_id):
     return networks
 
 def connect_to_wifi(params):
-    interface_name = params['interfaceName']
-    essid = params['essid']
-    password = params['password']
+    interface_name = dev_id_to_linux_if(params['dev_id'])
 
-    wpaIsRun = True if pid_of('wpa_supplicant') else False
-    if (wpaIsRun):
-        os.system('sudo killall wpa_supplicant')
-        time.sleep(3)
+    if interface_name:
+        essid = params['essid']
+        password = params['password']
 
-    # create config file
-    subprocess.check_output('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
+        wpaIsRun = True if pid_of('wpa_supplicant') else False
+        if (wpaIsRun):
+            os.system('sudo killall wpa_supplicant')
+            time.sleep(3)
 
-    try:
-        output = subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
-        time.sleep(3)
+        # create config file
+        subprocess.check_output('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
 
-        is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
+        try:
+            output = subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
+            time.sleep(3)
 
-        if (is_success.strip() == 'COMPLETED'):
-            # subprocess.check_output('dhclient %s' % interface_name, shell=True)
-            return True
-        else:
+            is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
+
+            if (is_success.strip() == 'COMPLETED'):
+                # subprocess.check_output('dhclient %s' % interface_name, shell=True)
+                return True
+            else:
+                return False
+        except subprocess.CalledProcessError:
             return False
-    except subprocess.CalledProcessError:
-        return False
+
+    return False
 
 def is_lte_interface(dev_id):
     """Check if interface is LTE.
@@ -1892,7 +1896,7 @@ def is_wifi_interface(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
 
     if linux_if:
-        cmd = 'cat /proc/net/wireless | grep %s' % interface_name
+        cmd = 'cat /proc/net/wireless | grep %s' % linux_if
         try:
             out = subprocess.check_output(cmd, shell=True).strip()
             return True
