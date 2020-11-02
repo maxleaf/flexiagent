@@ -1767,7 +1767,7 @@ def wifi_get_available_networks(dev_id):
     """
     linux_if = dev_id_to_linux_if(dev_id)
 
-    if linux_if and is_wifi_interface(dev_id):
+    if linux_if:
         networks = []
 
         def clean(n):
@@ -1849,7 +1849,19 @@ def run_serial_command(ser, command):
 
     return ret
 
-def get_lte_apn_configured():
+def get_lte_configuration():
+    cmd = 'cat /etc/mbim-network.conf'
+    try:
+        out = subprocess.check_output(cmd, shell=True).strip()
+        configs = out.split('=')
+        if configs[0] == "APN":
+            return configs[1]
+        return ''
+    except subprocess.CalledProcessError:
+        return ''
+
+    return ''
+
     #ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
     #ser.write('At+cgdcont?\r\n')
     # ser.write('AT!GSTATUS?\r\n')
@@ -1857,32 +1869,35 @@ def get_lte_apn_configured():
     # s = ser.readline().strip()
 
     #ser.close()
-    return ''
+    # return ''
 
 def connect_to_lte(params):
-    interface_name = params['interfaceName']
+    interface_name = dev_id_to_linux_if(params['dev_id'])
     apn = params['apn']
 
     try:
-        ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
+        os.system('echo "APN=%s" > /etc/mbim-network.conf' % apn)
 
-        response = run_serial_command(ser, 'At!scact?')
+        return True
+        # ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
 
-        if not 'OK' in response or '!SCACT: 1,0' in response:
-            response = run_serial_command(ser, 'At+cgdcont=1,"ip","%s"' % str(apn))
+        # response = run_serial_command(ser, 'At!scact?')
 
-            if 'ERROR' in response:
-                return False
+        # if not 'OK' in response or '!SCACT: 1,0' in response:
+        #     response = run_serial_command(ser, 'At+cgdcont=1,"ip","%s"' % str(apn))
 
-            response = run_serial_command(ser, 'At!scact=1,1')
+        #     if 'ERROR' in response:
+        #         return False
 
-        ser.close()
+        #     response = run_serial_command(ser, 'At!scact=1,1')
 
-        if (True):
-            subprocess.check_output('dhclient %s' % str(interface_name), shell=True)
-            return True
-        else:
-            return False
+        # ser.close()
+
+        # if (True):
+        #     subprocess.check_output('dhclient %s' % str(interface_name), shell=True)
+        #     return True
+        # else:
+        #     return False
     except subprocess.CalledProcessError:
         return False
 
@@ -1916,7 +1931,7 @@ def get_interface_driver(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
     if linux_if:
         try:
-            cmd = 'ethtool -i %s' % interface_name
+            cmd = 'ethtool -i %s' % linux_if
             out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).splitlines()
             vals = out[0].decode().split("driver: ", 1)
             return str(vals[-1])

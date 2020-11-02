@@ -46,7 +46,7 @@ fwagent_api = {
     'get-wifi-available-networks':      '_get_wifi_available_networks',
     'connect-to-wifi':                  '_connect_to_wifi',
     'connect-to-lte':                   '_connect_to_lte',
-    'get-interface-status':             '_get_interface_status'
+    'get-lte-interface-status':         '_get_lte_interface_status'
 }
 
 class FWAGENT_API:
@@ -354,12 +354,15 @@ class FWAGENT_API:
     def _get_wifi_available_networks(self, params):
         fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks STARTED")
 
-        try:
-            networks = fwutils.wifi_get_available_networks(params['dev_id'])
-            fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks FINISHED")
-            return {'message': networks, 'ok': 1}
-        except:
-            raise Exception("_get_wifi_available_networks: failed to get available access points: %s" % format(sys.exc_info()[1]))
+        if fwutils.is_wifi_interface(params['dev_id']):
+            try:
+                networks = fwutils.wifi_get_available_networks(params['dev_id'])
+                fwglobals.log.info("FWAGENT_API: _get_wifi_available_networks FINISHED")
+                return {'message': networks, 'ok': 1}
+            except:
+                raise Exception("_get_wifi_available_networks: failed to get available access points: %s" % format(sys.exc_info()[1]))
+
+        return {'message': 'This interface is not WIFI', 'ok': 0}
 
     def _connect_to_wifi(self, params):
         fwglobals.log.info("FWAGENT_API: _connect_to_wifi STARTED")
@@ -379,19 +382,22 @@ class FWAGENT_API:
         fwglobals.log.info("FWAGENT_API: _connect_to_lte STARTED")
 
         try:
-            result = fwutils.connect_to_lte(params)
-            fwglobals.log.info("FWAGENT_API: _connect_to_lte FINISHED")
-            return {'message': result, 'ok': result}
+            if fwutils.is_lte_interface(params['dev_id']):
+                result = fwutils.connect_to_lte(params)
+                fwglobals.log.info("FWAGENT_API: _connect_to_lte FINISHED")
+                return {'message': result, 'ok': result}
+
+            return {'message': 'This interface is not LTE', 'ok': 0}
         except:
             raise Exception("_connect_to_lte: failed to connect to lte: %s" % format(sys.exc_info()[1]))
 
-    def _get_interface_status(self, params):
-        fwglobals.log.info("FWAGENT_API: _get_interface_status STARTED")
+    def _get_lte_interface_status(self, params):
+        fwglobals.log.info("FWAGENT_API: _get_lte_interface_status STARTED")
         try:
-            interface_name = str(params['interfaceName'])
+            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
             addr = fwutils.get_interface_address(interface_name)
-            apn = fwutils.get_lte_apn_configured()#At+cgdcont?
+            apn = fwutils.get_lte_configuration()
             connectivity = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
             response = {
@@ -400,8 +406,8 @@ class FWAGENT_API:
                 'connectivity': connectivity
             }
 
-            fwglobals.log.info("FWAGENT_API: _get_interface_status FINISHED")
+            fwglobals.log.info("FWAGENT_API: _get_lte_interface_status FINISHED")
             return {'message': response, 'ok': 1}
         except:
-            raise Exception("_get_interface_status: failed to connect to lte: %s" % format(sys.exc_info()[1]))
+            raise Exception("_get_lte_interface_status: failed to connect to lte: %s" % format(sys.exc_info()[1]))
 
