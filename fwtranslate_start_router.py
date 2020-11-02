@@ -96,35 +96,38 @@ def start_router(params=None):
     }
     cmd_list.append(cmd)
 
+    dev_id_list         = []
+    pci_list_vmxnet3 = []
+
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
     #   sudo ip addr flush dev enp0s8
     # The interfaces to be removed are stored within 'add-interface' requests
     # in the configuration database.
-    dev_id_list         = []
-    pci_list_vmxnet3 = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
     for params in interfaces:
         linux_if  = fwutils.dev_id_to_linux_if(params['dev_id'])
         if linux_if:
-            # Firstly mark 'vmxnet3' interfaces as they need special care:
-            #   1. They should not appear in /etc/vpp/startup.conf.
-            #      If they appear in /etc/vpp/startup.conf, vpp will capture
-            #      them with vfio-pci driver, and 'create interface vmxnet3'
-            #      command will fail with 'device in use'.
-            #   2. They require additional VPP call vmxnet3_create on start
-            #      and complement vmxnet3_delete on stop
-            if fwutils.dev_id_is_vmxnet3(params['dev_id']):
-                pci_list_vmxnet3.append(params['dev_id'])
-            else:
-                dev_id_list.append(params['dev_id'])
-
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "exec"
             cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
             cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
             cmd_list.append(cmd)
+
+        # Detect 'vmxnet3' interfaces as they need special care:
+        #   1. They should not appear in /etc/vpp/startup.conf.
+        #      If they appear in /etc/vpp/startup.conf, vpp will capture
+        #      them with vfio-pci driver, and 'create interface vmxnet3'
+        #      command will fail with 'device in use'.
+        #   2. They require additional VPP call vmxnet3_create on start
+        #      and complement vmxnet3_delete on stop
+        #
+        if fwutils.dev_id_is_vmxnet3(params['dev_id']):
+            pci_list_vmxnet3.append(params['dev_id'])
+        else:
+            dev_id_list.append(params['dev_id'])
+
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
