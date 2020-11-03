@@ -114,6 +114,7 @@ request_handlers = {
     'bridge_domain_add_del':        {'name': '_call_vpp_api'},
     'create_loopback_instance':     {'name': '_call_vpp_api'},
     'delete_loopback':              {'name': '_call_vpp_api'},
+    'gre_add_del_tunnel':           {'name': '_call_vpp_api'},
     'ipsec_gre_add_del_tunnel':     {'name': '_call_vpp_api'},
     'ipsec_sad_add_del_entry':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
