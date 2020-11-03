@@ -56,11 +56,9 @@ g_dumpers = {
                                                    'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
                                                    'ps -elf | grep vpp >> <dumper_out_file>' },
     'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
-    'linux_syslog':                 { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && ' +
-                                                   'cp /var/log/syslog <temp_folder>/linux_syslog/ 2>/dev/null ;' +
+    'linux_syslog':                 { 'shell_cmd': 'cp /var/log/syslog <temp_folder>/linux_syslog.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'linux_syslog.1':               { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && ' +
-                                                   'cp /var/log/syslog.156 <temp_folder>/linux_syslog/ 2>/dev/null ;' +
+    'linux_syslog.1':               { 'shell_cmd': 'cp /var/log/syslog.1 <temp_folder>/linux_syslog_1.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
     ############################################################################
@@ -73,11 +71,9 @@ g_dumpers = {
     #
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
                                                    'cp /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
-    'fwagent_log':                  { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
-                                                   'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent/ 2>/dev/null ;' +
+    'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwagent_log.1':                { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
-                                                   'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent/ 2>/dev/null ;' +
+    'fwagent_log.1':                { 'shell_cmd': 'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent_1.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
