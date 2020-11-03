@@ -402,8 +402,7 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
             'src_address'  : src_addr_bytes,
             'dst_address'  : dst_addr_bytes,
             'instance'     : 0xffffffff,
-            'type'         : 1, # VppEnum.vl_api_gre_tunnel_type_t.GRE_API_TUNNEL_TYPE_TEB,
-            'mode'         : 0  # VppEnum.vl_api_tunnel_mode_t.TUNNEL_API_MODE_P2P
+            'tunnel_type'  : 1 # GRE_API_TUNNEL_TYPE_TEB
     }
     cmd = {}
     cmd['cmd'] = {}
