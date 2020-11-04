@@ -105,7 +105,7 @@ def b2a_hexstr(abytes):
     return binascii.b2a_hex(abytes).decode("ascii")
 
 def _initialize():
-    global dictValToAttr, dictValToMsgType
+    global dioctValToAttr, dictValToMsgType
     dictValToAttr= {v: k for k, v in dictAttrToVal.items()}
     dictValToMsgType = {v: k for k, v in dictMsgTypeToVal.items()}
 
@@ -249,7 +249,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port):
             ret = stun_test(s, changedIP, changedPort, source_ip, source_port)
             fwglobals.log.debug("Stun: Result: %s" %(ret))
             if not ret['Resp']:
-                typ = ChangedAddressError
+                typ = SymmetricNAT
             else:
                 if exIP == ret['ExternalIP'] and exPort == ret['ExternalPort']:
                     changePortRequest = ''.join([ChangeRequest, '0004',
