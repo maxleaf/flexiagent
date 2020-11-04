@@ -105,7 +105,7 @@ def b2a_hexstr(abytes):
     return binascii.b2a_hex(abytes).decode("ascii")
 
 def _initialize():
-    global dioctValToAttr, dictValToMsgType
+    global dictValToAttr, dictValToMsgType
     dictValToAttr= {v: k for k, v in dictAttrToVal.items()}
     dictValToMsgType = {v: k for k, v in dictMsgTypeToVal.items()}
 
