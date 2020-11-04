@@ -225,9 +225,9 @@ def get_interface_address_all(filtr=None):
     AF_INET. if filter=='gw', add only interfaces with GW.
     : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
                     if filtr is None, return all IP addresses in the system.
-    : return : list of WAN interfaces
+    : return : Dictionary of PCI->IP
     """
-    ip_list = []
+    pci_ip_dict = {}
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         pci, _ = get_interface_pci(nicname)
@@ -239,12 +239,12 @@ def get_interface_address_all(filtr=None):
                 if filtr == 'gw':
                     gateway, _ = get_interface_gateway(nicname)
                     if gateway != '':
-                        ip_list.append(ip)
+                        pci_ip_dict[pci] = ip
                         break
                 else:
-                    ip_list.append(ip)
+                    pci_ip_dict[pci] = ip
                     break
-    return ip_list
+    return pci_ip_dict
 
 def get_interface_address(if_name):
     """Get interface IP address.
