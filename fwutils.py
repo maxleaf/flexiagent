@@ -1798,7 +1798,7 @@ def connect_to_wifi(params):
         password = params['password']
 
         wpaIsRun = True if pid_of('wpa_supplicant') else False
-        if (wpaIsRun):
+        if wpaIsRun:
             os.system('sudo killall wpa_supplicant')
             time.sleep(3)
 
@@ -1811,8 +1811,11 @@ def connect_to_wifi(params):
 
             is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
 
-            if (is_success.strip() == 'COMPLETED'):
-                # subprocess.check_output('dhclient %s' % interface_name, shell=True)
+            if is_success.strip() == 'COMPLETED':
+
+                if params['useDHCP']:
+                    subprocess.check_output('dhclient %s' % interface_name, shell=True)
+
                 return True
             else:
                 return False
