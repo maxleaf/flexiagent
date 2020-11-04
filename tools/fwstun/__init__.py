@@ -99,7 +99,7 @@ SymmetricUDPFirewall = "Symmetric UDP Firewall"
 RestricNAT = "Restric NAT"
 RestricPortNAT = "Restric Port NAT"
 SymmetricNAT = "Symmetric NAT"
-ChangedAddressError = "Meet an error, when do Test1 on Changed IP and Port"
+ChangedAddressError = "Error"
 
 def b2a_hexstr(abytes):
     return binascii.b2a_hex(abytes).decode("ascii")
@@ -249,7 +249,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port):
             ret = stun_test(s, changedIP, changedPort, source_ip, source_port)
             fwglobals.log.debug("Stun: Result: %s" %(ret))
             if not ret['Resp']:
-                typ = ChangedAddressError
+                typ = SymmetricNAT
             else:
                 if exIP == ret['ExternalIP'] and exPort == ret['ExternalPort']:
                     changePortRequest = ''.join([ChangeRequest, '0004',
