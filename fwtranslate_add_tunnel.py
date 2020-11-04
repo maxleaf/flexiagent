@@ -609,7 +609,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 'loop1_sw_if_index',
                 loop1_cfg,
                 id=bridge_id,
-                internal=True)
+                internal=False)
     _add_bridge(
                 cmd_list, bridge_id)
     _add_vxlan_tunnel(
@@ -669,9 +669,9 @@ def add_tunnel(params):
     loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
 
     loop1_ip         = copy.deepcopy(loop0_ip)
-    loop1_ip.value  += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
+    #loop1_ip.value  += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
     loop1_mac        = copy.deepcopy(loop0_mac)
-    loop1_mac.value += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
+    #loop1_mac.value += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
 
     remote_loop1_ip         = copy.deepcopy(loop1_ip)
     remote_loop1_ip.value  ^= IPAddress('0.0.0.1').value        # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
@@ -679,8 +679,8 @@ def add_tunnel(params):
     remote_loop1_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fe:00:04 -> 02:00:27:fe:00:05 / 02:00:27:fe:00:05 -> 02:00:27:fe:00:04
 
     # Add loop0-bridge-l2gre_ipsec
-    l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
-    _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
+    #l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
+    #_add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
 
     # Add loop1-bridge-vxlan
     vxlan_ips = {'src':params['src'], 'dst':params['dst']}
@@ -723,7 +723,7 @@ def add_tunnel(params):
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % params['loopback-iface']['addr']
-        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
+        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop1_sw_if_index'} ]},
             'if [ -z "$(grep \'interface DEV-STUB\' %s)" ]; then sudo printf "' % ospfd_file + \
             'interface DEV-STUB\n' + \
             '    ip ospf network point-to-point\n' + \
@@ -732,7 +732,7 @@ def add_tunnel(params):
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % params['loopback-iface']['addr']
-        cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
+        cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop1_sw_if_index'} ]},
             'sed -i -E "/interface DEV-STUB/,+2d" %s; sudo systemctl restart frr' % ospfd_file ]
         cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
         cmd_list.append(cmd)
