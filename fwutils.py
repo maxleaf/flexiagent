@@ -1873,15 +1873,53 @@ def get_lte_configuration():
 
     #ser.close()
     # return ''
+def get_lte_provier_info():
+    try:
+        response = {
+            'IP':     '',
+            'GATEWAY': '',
+            'STATUS': ''
+        }
+
+        cmd = 'cat /tmp/wwan-ip'
+        lines = subprocess.check_output(cmd, shell=True).splitlines()
+
+        if 'Successfully connected' in lines[0]:
+            response['STATUS'] = True
+            for line in lines:
+                if 'IP [0]' in line:
+                    response['IP'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'Gateway' in line:
+                    response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+
+        return response
+    except Exception as e:
+        return response
 
 def connect_to_lte(params):
     interface_name = dev_id_to_linux_if(params['dev_id'])
     apn = params['apn']
 
     try:
-        os.system('echo "APN=%s" > /etc/mbim-network.conf' % apn)
+        output = subprocess.check_output('echo "APN=%s" > /etc/mbim-network.conf' % apn, shell=True)
 
-        return True
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-registration-state --no-open=3 --no-close', shell=True)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --attach-packet-service --no-open=4 --no-close', shell=True)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --connect=apn=%sasdasd,ip-type=ipv4 --no-open=5 --no-close > /tmp/wwan-ip' % apn, shell=True)
+
+        info = get_lte_provier_info()
+
+        if info['STATUS'] == True:
+            return (True, None)
+
+        return (False, None)
+        # os.environ["IP"] = "my_export"
+        # # output = subprocess.check_output(cmd2, shell=True)
+
         # ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
 
         # response = run_serial_command(ser, 'At!scact?')
@@ -1901,8 +1939,8 @@ def connect_to_lte(params):
         #     return True
         # else:
         #     return False
-    except subprocess.CalledProcessError:
-        return False
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
 def is_wifi_interface(dev_id):
     """Check if interface is WIFI.

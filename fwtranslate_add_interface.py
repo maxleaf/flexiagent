@@ -79,7 +79,7 @@ def add_interface(params):
 
     dev_id  = params['dev_id']
     iface_addr = params.get('addr', '')
-    iface_name = fwutils.pci_to_linux_iface(iface_pci)
+    iface_name = fwutils.dev_id_to_linux_if(dev_id)
     iface_addr_bytes = ''
     if iface_addr:
         iface_addr_bytes, _ = fwutils.ip_str_to_bytes(iface_addr)
@@ -120,7 +120,7 @@ def add_interface(params):
         }
         cmd_list.append(cmd)
 
-    if fwutils.is_non_dpdk_interface(iface_name):
+    if fwutils.is_non_dpdk_interface(dev_id):
         # create tap for this interface in vpp and linux
         cmd = {}
         cmd['cmd'] = {}
@@ -398,13 +398,13 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-            cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_pci, iface_addr)
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+            cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
+            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                         'is_add':1, 'is_inside':1 }
             cmd['revert'] = {}
             cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-            cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_pci, iface_addr)
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+            cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
+            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
                                         'is_add':0, 'is_inside':1 }
             cmd_list.append(cmd)
 

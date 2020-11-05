@@ -390,15 +390,16 @@ class FWAGENT_API:
             raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
 
     def _connect_to_lte(self, params):
-        fwglobals.log.info("FWAGENT_API: _connect_to_lte STARTED")
-
         try:
-            if fwutils.is_lte_interface(params['dev_id']):
-                result = fwutils.connect_to_lte(params)
-                fwglobals.log.info("FWAGENT_API: _connect_to_lte FINISHED")
-                return {'message': result, 'ok': result}
+            if fwutils.is_lte_interface(params['dev_id']) == False:
+                return {'message': 'This interface is not LTE', 'ok': 0}
 
-            return {'message': 'This interface is not LTE', 'ok': 0}
+            is_success, error = fwutils.connect_to_lte(params)
+            if is_success:
+                return {'message': '', 'ok': is_success}
+
+            return {'message': error, 'ok': is_success}
+
         except:
             raise Exception("_connect_to_lte: failed to connect to lte: %s" % format(sys.exc_info()[1]))
 
