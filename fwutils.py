@@ -317,18 +317,17 @@ def pci_to_short(pci):
         pci = l[0] + '.' + l[1][1]
     return pci
 
-def get_linux_pcis():
+def get_linux_interfaces():
     """ Get the list of PCI-s of all network interfaces available in Linux.
     """
-    pci_list = fwglobals.g.get_cache_data('PCIS')
-    if not pci_list:
-        interfaces = psutil.net_if_addrs()
-        for (nicname, _) in interfaces.items():
-            pci, _ = get_interface_pci(nicname)
+    interfaces = fwglobals.g.get_cache_data('PCIS')
+    if not interfaces:
+        for (if_name, _) in psutil.net_if_addrs().items():
+            pci, _ = get_interface_pci(if_name)
             if not pci:
                 continue
-            pci_list.append(pci)
-    return pci_list
+            interfaces[pci_to_full(pci)] = if_name
+    return interfaces
 
 def get_interface_pci(linuxif):
     """Convert Linux interface name into PCI address.
@@ -1675,3 +1674,32 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
+
+def vmxnet3_unassigned_interfaces_up():
+    """This function finds vmxnet3 interfaces that should NOT be controlled by
+    VPP and brings them up. We call these interfaces 'unassigned'.
+    This hack is needed to prevent disappearing of unassigned interfaces from
+    Linux, as VPP captures all down interfaces on start.
+
+    Note for non vmxnet3 interfaces we solve this problem in elegant way - we
+    just add assigned interfaces to the white list in the VPP startup.conf,
+    so VPP captures only them, while ignoring the unassigned interfaces, either
+    down or up. In case of vmxnet3 we can't use the startup.conf white list,
+    as placing them there causes VPP to bind them to vfio-pci driver on start,
+    so trial to bind them later to the vmxnet3 driver by call to the VPP
+    vmxnet3_create() API fails. Hence we go with the dirty workaround of UP state.
+    """
+    try:
+        linux_interfaces = get_linux_interfaces()
+        assigned_list    = fwglobals.g.router_cfg.get_interfaces()
+        assigned_pcis    = [params['pci'] for params in assigned_list]
+
+        for pci in linux_interfaces.keys():
+            if not pci in assigned_pcis:
+                if pci_is_vmxnet3(pci):
+                    os.system("ip link set dev %s up" % linux_interfaces[pci])
+
+    except Exception as e:
+        fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
+        pass
+

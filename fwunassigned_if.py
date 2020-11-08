@@ -203,7 +203,7 @@ class FwUnassignedIfs:
         """
         res = ''
 
-        linux_pci_list    = fwutils.get_linux_pcis()
+        linux_pci_list    = fwutils.get_linux_interfaces().keys()
         assigned_pci_list = self._get_assigned_interfaces()
 
         for pci in linux_pci_list:

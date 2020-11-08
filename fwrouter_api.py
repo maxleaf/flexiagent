@@ -1112,6 +1112,8 @@ class FWROUTER_API:
 
         fwtranslate_add_tunnel.init_tunnels()
 
+        fwutils.vmxnet3_unassigned_interfaces_up()
+
     def _on_start_router_after(self):
         """Handles post start VPP activities.
         :returns: None.
