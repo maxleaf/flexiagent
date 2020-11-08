@@ -81,6 +81,8 @@ g_dumpers = {
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
     'fwagent_version':              { 'shell_cmd': 'fwagent version > <dumper_out_file>' },
 
+    'fwsystem_checker':              { 'shell_cmd': 'fwsystem_checker --check_only > <dumper_out_file>' },
+
     ############################################################################
     # VPP stuff - !!! PLEASE KEEP ALPHABET ORDER !!!
     #
