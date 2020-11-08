@@ -28,6 +28,7 @@ import fwglobals
 import fwnetplan
 import fwtranslate_revert
 import fwutils
+import fwtranslate_add_non_dpdk_interface
 
 # add_interface
 # --------------------------------------
@@ -78,6 +79,12 @@ def add_interface(params):
     cmd_list = []
 
     dev_id  = params['dev_id']
+
+    if fwutils.is_non_dpdk_interface(dev_id):
+        commands =  fwtranslate_add_non_dpdk_interface.add_non_dpdk_interface(params)
+        cmd_list.extend(commands)
+        return cmd_list
+
     iface_addr = params.get('addr', '')
     iface_name = fwutils.dev_id_to_linux_if(dev_id)
     iface_addr_bytes = ''
@@ -120,343 +127,202 @@ def add_interface(params):
         }
         cmd_list.append(cmd)
 
-    if fwutils.is_non_dpdk_interface(dev_id):
-        # create tap for this interface in vpp and linux
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'configure_tap_in_linux_and_vpp',
-                    'args': { 'linux_if_name': iface_name }
-        }
-        cmd['cmd']['descr'] = "create tap interface in linux and vpp"
-        cmd_list.append(cmd)
-
-        # add tap into a bridge.
-        # Note: the bridge is created on start_router translator
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "exec"
-        cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                    "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
-        cmd['cmd']['descr']  = "add tap into a bridge"
-
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                    "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
-        cmd['revert']['descr']  = "remove tap from a bridge"
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "exec"
-        cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
-        cmd['cmd']['descr']  = "add linux interface into a bridge"
-
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
-        cmd['revert']['descr']  = "remove linux interface from a bridge"
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
-        cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "UP interface create by tap-inject in Linux"
-        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_by_linux_interface_name', 'arg': iface_name } ]},
-                                    "sudo ip link set dev DEV-STUB up" ]
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['descr']  = "DOWN interface created by tap-inject in Linux"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_tap_by_linux_interface_name', 'arg': iface_name } ]},
-                                    "sudo ip link set dev DEV-STUB down" ]
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_inf_from_netplan',
-                    'args': { 'is_add'       : 0,
-                            'linux_interface': iface_name
-                    }
-        }
-        cmd_list.append(cmd)
-
-        # add interface into netplan configuration
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_netplan_interface',
-                    'args': { 'is_add'       : 1,
-                            'dev_id'         : None,
-                            'ip'             : iface_addr,
-                            'gw'             : gw,
-                            'metric'         : metric,
-                            'dhcp'           : dhcp,
-                            'type'           : int_type
-                    }
-        }
-        cmd['cmd']['descr'] = "add interface into netplan config file"
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_netplan_interface',
-                    'args': {
-                            'is_add'         : 0,
-                            'pci'            : None,
-                            'ip'             : iface_addr,
-                            'gw'             : gw,
-                            'metric'         : metric,
-                            'dhcp'           : dhcp,
-                            'type'           : int_type,
-                    }
-        }
-        cmd['revert']['descr'] = "remove interface from netplan config file"
-        cmd_list.append(cmd)
-
-        # Enable NAT.
-        # On WAN interfaces run
-        #   'nat44 add interface address GigabitEthernet0/9/0'
-        #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
-        # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-        if 'type' not in params or params['type'].lower() == 'wan':
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-            cmd['cmd']['descr']   = "enable NAT for tapcli interface"
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':1, 'twice_nat':0 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_add_del_interface_addr"
-            cmd['revert']['descr']  = "disable NAT for tapcli interface"
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':0, 'twice_nat':0 }
-            cmd_list.append(cmd)
-
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-            cmd['cmd']['descr']   = "add interface tapcli to output path" 
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':1, 'is_inside':0 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-            cmd['revert']['descr']  = "remove interface tapcli from output path"
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'linux_if_name_to_vpp_sw_if_index', 'arg':iface_name } ],
-                                        'is_add':0, 'is_inside':0 }
-            cmd_list.append(cmd)
-
-    else:
-        # add interface into netplan configuration
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_netplan_interface',
-                    'args': { 'is_add'  : 1,
-                            'dev_id'    : dev_id,
-                            'ip'        : iface_addr,
-                            'gw'        : gw,
-                            'metric'    : metric,
-                            'dhcp'      : dhcp,
-                            'type'      : int_type
-                            }
-        }
-        cmd['cmd']['descr'] = "add interface into netplan config file"
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['params'] = {
-                    'module': 'fwnetplan',
-                    'func': 'add_remove_netplan_interface',
-                    'args': {
-                            'is_add'  : 0,
-                            'dev_id'  : dev_id,
-                            'ip'      : iface_addr,
-                            'gw'      : gw,
-                            'metric'  : metric,
-                            'dhcp'    : dhcp,
-                            'type'    : int_type
-                    }
-        }
-        cmd['revert']['descr'] = "remove interface from netplan config file"
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, dev_id)
-        cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
-                                    "sudo ip link set dev DEV-STUB up" ]
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, dev_id)
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
-                                    "sudo ip link set dev DEV-STUB down" ]
-        cmd_list.append(cmd)
-
-        # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
-        if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
-            labels = params['multilink']['labels']
-            if len(labels) > 0:
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "python"
-                cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
-                cmd['cmd']['params']  = {
-                                'module': 'fwutils',
-                                'func'  : 'vpp_multilink_update_labels',
-                                'args'  : { 'labels':   labels,
-                                            'next_hop': gw,
-                                            'dev':      dev_id,
-                                            'remove':   False
-                                        }
+    # add interface into netplan configuration
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+                'module': 'fwnetplan',
+                'func': 'add_remove_netplan_interface',
+                'args': { 'is_add'  : 1,
+                        'dev_id'    : dev_id,
+                        'ip'        : iface_addr,
+                        'gw'        : gw,
+                        'metric'    : metric,
+                        'dhcp'      : dhcp,
+                        'type'      : int_type
+                        }
+    }
+    cmd['cmd']['descr'] = "add interface into netplan config file"
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+                'module': 'fwnetplan',
+                'func': 'add_remove_netplan_interface',
+                'args': {
+                        'is_add'  : 0,
+                        'dev_id'  : dev_id,
+                        'ip'      : iface_addr,
+                        'gw'      : gw,
+                        'metric'  : metric,
+                        'dhcp'    : dhcp,
+                        'type'    : int_type
                 }
-                cmd['revert'] = {}
-                cmd['revert']['name']   = "python"
-                cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
-                cmd['revert']['params'] = {
-                                'module': 'fwutils',
-                                'func'  : 'vpp_multilink_update_labels',
-                                'args'  : { 'labels':   labels,
-                                            'next_hop': gw,
-                                            'dev':      dev_id,
-                                            'remove':   True
-                                        }
-                }
-                cmd_list.append(cmd)
+    }
+    cmd['revert']['descr'] = "remove interface from netplan config file"
+    cmd_list.append(cmd)
 
-        # Enable NAT.
-        # On WAN interfaces run
-        #   'nat44 add interface address GigabitEthernet0/9/0'
-        #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
-        # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-        if 'type' not in params or params['type'].lower() == 'wan':
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "UP interface %s %s in Linux" % (iface_addr, dev_id)
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
+                                "sudo ip link set dev DEV-STUB up" ]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "DOWN interface %s %s in Linux" % (iface_addr, dev_id)
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg':dev_id } ]},
+                                "sudo ip link set dev DEV-STUB down" ]
+    cmd_list.append(cmd)
+
+    # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
+    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
+        labels = params['multilink']['labels']
+        if len(labels) > 0:
             cmd = {}
             cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-            cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (dev_id, iface_addr)
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'is_add':1, 'twice_nat':0 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_add_del_interface_addr"
-            cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (dev_id, iface_addr)
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'is_add':0, 'twice_nat':0 }
-            cmd_list.append(cmd)
-
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-            cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_pci, iface_addr)
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                        'is_add':1, 'is_inside':0 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-            cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_pci, iface_addr)
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                        'is_add':0, 'is_inside':0 }
-            cmd_list.append(cmd)
-
-            # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
-            vxlan_port = 4789
-            udp_proto = 17
-
-            if iface_addr_bytes:
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-                cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                                'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
-                cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-                cmd['revert'] = {}
-                cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-                cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                                'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
-                cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-
-                cmd_list.append(cmd)
-
-        # On LAN interfaces run
-        #   'set interface nat44 in GigabitEthernet0/8/0 output-feature'
-        # nat.api.json: nat44_interface_add_del_output_feature(inside=1)
-        else:
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-            cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
-            cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'is_add':1, 'is_inside':1 }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-            cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
-            cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'is_add':0, 'is_inside':1 }
-            cmd_list.append(cmd)
-
-        # Update ospfd.conf.
-        ospfd_file = fwglobals.g.FRR_OSPFD_FILE
-        if 'routing' in params and params['routing'].lower() == 'ospf':
-
-            # Create /etc/frr/ospfd.conf file if it does not exist yet
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']      = "python"
-            cmd['cmd']['descr']     = "create ospfd file if needed"
-            cmd['cmd']['params']    = {
-                                        'module': 'fwutils',
-                                        'func':   'frr_create_ospfd',
-                                        'args': {
-                                            'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
-                                            'ospfd_cfg_file':   ospfd_file,
-                                            'router_id':        iface_addr.split('/')[0]   # Get rid of address length
-                                        }
+            cmd['cmd']['name']    = "python"
+            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
+            cmd['cmd']['params']  = {
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels':   labels,
+                                        'next_hop': gw,
+                                        'dev':      dev_id,
+                                        'remove':   False
                                     }
-            # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
-            cmd_list.append(cmd)
-
-            # Escape slash in address with length to prevent sed confusing
-            addr = iface_addr.split('/')[0] + r"\/" + iface_addr.split('/')[1]
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['descr']   =  "add %s to %s" % (iface_addr , ospfd_file)
-            cmd['cmd']['params']  = [
-                'if [ -z "$(grep \'network %s\' %s)" ]; then sed -i -E "s/([ ]+)(ospf router-id .*)/\\1\\2\\n\\1network %s area 0.0.0.0/" %s; fi' %
-                (addr , ospfd_file , addr , ospfd_file) ]
+            }
             cmd['revert'] = {}
-            cmd['revert']['name']    = "exec"
-            cmd['revert']['descr']   =  "remove %s from %s" % (iface_addr , ospfd_file)
-            # Delete 'network' parameter from ospfd.conf.
-            # If no more networks are configured, delete file itself. This is to clean the 'ospf router-id' field.
-            # Note more sophisticated code is needed to replace 'ospf router-id' value with other network
-            # that might exist in ospfd.conf after removal of this interface. Implement it on demand :)
-            cmd['revert']['params']  = [
-                'sed -i -E "/[ ]+network %s area 0.0.0.0.*/d" %s; if [ -z "$(grep \' network \' %s)" ]; then rm -rf %s; fi; sudo systemctl restart frr' %
-                (addr , ospfd_file , ospfd_file , ospfd_file) ]
-            cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
+            cmd['revert']['name']   = "python"
+            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
+            cmd['revert']['params'] = {
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels':   labels,
+                                        'next_hop': gw,
+                                        'dev':      dev_id,
+                                        'remove':   True
+                                    }
+            }
             cmd_list.append(cmd)
 
+    # Enable NAT.
+    # On WAN interfaces run
+    #   'nat44 add interface address GigabitEthernet0/9/0'
+    #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
+    # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
+    if 'type' not in params or params['type'].lower() == 'wan':
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "nat44_add_del_interface_addr"
+        cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (dev_id, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                    'is_add':1, 'twice_nat':0 }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "nat44_add_del_interface_addr"
+        cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (dev_id, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                    'is_add':0, 'twice_nat':0 }
+        cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                    'is_add':1, 'is_inside':0 }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                    'is_add':0, 'is_inside':0 }
+        cmd_list.append(cmd)
+
+        # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
+        vxlan_port = 4789
+        udp_proto = 17
+
+        if iface_addr_bytes:
             cmd = {}
             cmd['cmd'] = {}
-            cmd['cmd']['name']    = 'exec'
-            cmd['cmd']['params']  = [ 'sudo systemctl restart frr; if [ -z "$(pgrep frr)" ]; then exit 1; fi' ]
-            cmd['cmd']['descr']   = "restart frr"
+            cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
+            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
+            cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+            cmd['revert'] = {}
+            cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
+            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
+            cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+
             cmd_list.append(cmd)
+
+    # On LAN interfaces run
+    #   'set interface nat44 in GigabitEthernet0/8/0 output-feature'
+    # nat.api.json: nat44_interface_add_del_output_feature(inside=1)
+    else:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                    'is_add':1, 'is_inside':1 }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                    'is_add':0, 'is_inside':1 }
+        cmd_list.append(cmd)
+
+    # Update ospfd.conf.
+    ospfd_file = fwglobals.g.FRR_OSPFD_FILE
+    if 'routing' in params and params['routing'].lower() == 'ospf':
+
+        # Create /etc/frr/ospfd.conf file if it does not exist yet
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "create ospfd file if needed"
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'frr_create_ospfd',
+                                    'args': {
+                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
+                                        'ospfd_cfg_file':   ospfd_file,
+                                        'router_id':        iface_addr.split('/')[0]   # Get rid of address length
+                                    }
+                                }
+        # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
+        cmd_list.append(cmd)
+
+        # Escape slash in address with length to prevent sed confusing
+        addr = iface_addr.split('/')[0] + r"\/" + iface_addr.split('/')[1]
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "exec"
+        cmd['cmd']['descr']   =  "add %s to %s" % (iface_addr , ospfd_file)
+        cmd['cmd']['params']  = [
+            'if [ -z "$(grep \'network %s\' %s)" ]; then sed -i -E "s/([ ]+)(ospf router-id .*)/\\1\\2\\n\\1network %s area 0.0.0.0/" %s; fi' %
+            (addr , ospfd_file , addr , ospfd_file) ]
+        cmd['revert'] = {}
+        cmd['revert']['name']    = "exec"
+        cmd['revert']['descr']   =  "remove %s from %s" % (iface_addr , ospfd_file)
+        # Delete 'network' parameter from ospfd.conf.
+        # If no more networks are configured, delete file itself. This is to clean the 'ospf router-id' field.
+        # Note more sophisticated code is needed to replace 'ospf router-id' value with other network
+        # that might exist in ospfd.conf after removal of this interface. Implement it on demand :)
+        cmd['revert']['params']  = [
+            'sed -i -E "/[ ]+network %s area 0.0.0.0.*/d" %s; if [ -z "$(grep \' network \' %s)" ]; then rm -rf %s; fi; sudo systemctl restart frr' %
+            (addr , ospfd_file , ospfd_file , ospfd_file) ]
+        cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
+        cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = 'exec'
+        cmd['cmd']['params']  = [ 'sudo systemctl restart frr; if [ -z "$(pgrep frr)" ]; then exit 1; fi' ]
+        cmd['cmd']['descr']   = "restart frr"
+        cmd_list.append(cmd)
 
     return cmd_list
 

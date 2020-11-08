@@ -156,22 +156,22 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-# need to change after i will change  the add_remove_netplan_interface function
-def add_remove_inf_from_netplan(is_add, linux_interface):
-    config = {}
-    fname_run = '/etc/netplan/01-netcfg.fwrun.yaml'
-    with open(fname_run, 'r+') as stream:
-        config = yaml.safe_load(stream)
+# # need to change after i will change  the add_remove_netplan_interface function
+# def add_remove_inf_from_netplan(is_add, linux_interface):
+#     config = {}
+#     fname_run = '/etc/netplan/01-netcfg.fwrun.yaml'
+#     with open(fname_run, 'r+') as stream:
+#         config = yaml.safe_load(stream)
 
-    if 'network' in config:
-        network = config['network']
-        ethernets = network['ethernets']
+#     if 'network' in config:
+#         network = config['network']
+#         ethernets = network['ethernets']
 
-        if linux_interface in ethernets:
-            del ethernets[linux_interface]
+#         if linux_interface in ethernets:
+#             del ethernets[linux_interface]
 
-            with open(fname_run, 'w') as stream:
-                yaml.safe_dump(config, stream)
+#             with open(fname_run, 'w') as stream:
+#                 yaml.safe_dump(config, stream)
 
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type):
     config_section = {}

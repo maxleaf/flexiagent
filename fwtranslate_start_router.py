@@ -112,21 +112,7 @@ def start_router(params=None):
             #   1. They should not appear in /etc/vpp/startup.conf because they don't have a pci address.
             #   2. They should not be removed from linux
             # Additional logic for these interfaces is at add_interface translator
-            if fwutils.is_non_dpdk_interface(linux_if):
-                # create linux bridge
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']   = "exec"
-                cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  linux_if ]
-                cmd['cmd']['descr']  = "create linux bridge"
-
-                cmd['revert'] = {}
-                cmd['revert']['name']   = "exec"
-                cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s && sudo netplan apply" %  (linux_if, linux_if) ]
-                cmd['revert']['descr']  = "remove linux bridge"
-
-                cmd_list.append(cmd)
-
+            if fwutils.is_non_dpdk_interface(params['dev_id']):
                 cmd = {}
                 cmd['cmd'] = {}
                 cmd['cmd']['name']    = "exec"

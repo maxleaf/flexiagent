@@ -471,18 +471,16 @@ def dev_id_is_vmxnet3(dev_id):
 # into name of interface in VPP, eg. 'GigabitEthernet0/8/0'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
 def dev_id_to_vpp_if_name(dev_id):
-    """Convert PCI address into VPP interface name.
+    """Convert interface bus address into VPP interface name.
 
     :param dev_id:      device bus address.
 
     :returns: VPP interface name.
     """
-    addr_type, _ = dev_id_parse(dev_id)
-    if addr_type == "pci":
-        dev_id = dev_id_to_full(dev_id)
-        vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
-        if vpp_if_name: return vpp_if_name
-        else: return _build_dev_id_to_vpp_if_name_maps(dev_id, None)
+    dev_id = dev_id_to_full(dev_id)
+    vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+    if vpp_if_name: return vpp_if_name
+    else: return _build_dev_id_to_vpp_if_name_maps(dev_id, None)
 
     return None
 
@@ -515,6 +513,17 @@ def vpp_if_name_to_dev_id(vpp_if_name):
 #   pci: device 8086:100e subsystem 8086:001e address 0000:00:08.00 numa 0
 #
 def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
+
+    vpp_tap_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_tap_dump()
+    for tap in vpp_tap_interfaces:
+        dev_name = tap.dev_name.rstrip(' \t\r\n\0')
+        linux_dev_name = dev_name.split('_')[-1]
+        addr = get_interface_dev_id(linux_dev_name)
+        vpp_name = vpp_sw_if_index_to_name(tap.sw_if_index)
+        if vpp_name and addr:
+            fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[addr] = vpp_name
+            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[vpp_name] = addr
+
     shif = _vppctl_read('show hardware-interfaces')
     if shif == None:
         fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps: Error reading interface info")
@@ -615,27 +624,6 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 
     return None
 
-# 'linux_if_name_to_vpp_sw_if_index' function maps linux interface referenced by interface name, e.g 'eth0'
-# into index of this tapcli interface in VPP, eg. tapcli-0
-def linux_if_name_to_vpp_sw_if_index(interface_name):
-    """Convert Linux Interface Name into VPP sw_if_index.
-
-    :param interface_name:      Linux interface name.
-
-    :returns: sw_if_index.
-    """
-    vpp_if_name = vpp_tapcli_by_linux_interface_name(interface_name)
-    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, str(vpp_if_name)))
-    if vpp_if_name is None:
-        return None
-
-    sw_ifs = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
-    for sw_if in sw_ifs:
-        if re.match(vpp_if_name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
-            return sw_if.sw_if_index
-    fwglobals.log.debug("linux_if_name_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (interface_name, yaml.dump(sw_ifs, canonical=True)))
-    return None
-
 # 'dev_id_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
 # To do that we convert firstly the pci into name of interface in VPP,
@@ -645,15 +633,12 @@ def linux_if_name_to_vpp_sw_if_index(interface_name):
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
 def dev_id_to_tap(dev_id):
-    """Convert PCI address into TAP name.
+    """Convert Bus address into TAP name.
 
-    :param pci:      PCI address.
+    :param dev_id:      Bus address.
 
     :returns: Linux TAP interface name.
     """
-    addr_type, _ = dev_id_parse(dev_id)
-    if addr_type == 'usb':
-        return None
 
     dev_id_full = dev_id_to_full(dev_id)
     cache    = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
@@ -696,14 +681,6 @@ def vpp_if_name_to_tap(vpp_if_name):
     tap = match.group(1)
     return tap
 
-def vpp_tap_by_linux_interface_name(linux_if_name):
-    tapcli = vpp_tapcli_by_linux_interface_name(linux_if_name)
-    return vpp_if_name_to_tap(tapcli)
-
-def vpp_tapcli_by_linux_interface_name(linux_if_name):
-    linux_tap = linux_tap_by_interface_name(linux_if_name)
-    words = linux_tap.split('cli-')
-    return "tapcli-%s" % words[-1]
 
 def linux_tap_by_interface_name(linux_if_name):
     try:
@@ -713,7 +690,7 @@ def linux_tap_by_interface_name(linux_if_name):
         for line in lines:
             words = line.split(': ')
             return words[1]
-    except:        
+    except:
         return None
 
 def configure_tap_in_linux_and_vpp(linux_if_name):
@@ -722,27 +699,24 @@ def configure_tap_in_linux_and_vpp(linux_if_name):
         1. linux tap interface.
         2. vpp tap interface in vpp.
         3. linux interface for tap-inject.
-    
+
     :param linux_if_name: name of the linux interface to create tap for
 
-    :returns: VPP tap interface name.
-    """    
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    # length = str(len(vpp_if_name_to_pci))
+    linux_tap_name = "tap_%s" % linux_if_name
+
     try:
-        vpp_if_name_to_pci = subprocess.check_output("sudo vppctl show int | grep tapcli-", shell=True).splitlines()
-    except: 
-        vpp_if_name_to_pci = []
-
-    length = str(len(vpp_if_name_to_pci))
-    linux_tap_name = "tap_%s_cli-%s" % (linux_if_name, length)
-
-    vpp_tap_connect(linux_tap_name)
-
-    return (True, None)
+        vpp_tap_connect(linux_tap_name)
+        return (True, None)
+    except Exception as e:
+        return (False, "Failed to create tap interface for %s\nOutput: %s" % (linux_if_name, str(e)))
 
 def vpp_tap_connect(linux_tap_if_name):
     """Run vpp tap connect command.
       This command will create a linux tap interface and also tapcli interface in vpp.
-      
      :param linux_tap_if_name: name to be assigned to linux tap device
 
      :returns: VPP tap interface name.
@@ -751,6 +725,16 @@ def vpp_tap_connect(linux_tap_if_name):
     vppctl_cmd = "tap connect %s" % linux_tap_if_name
     fwglobals.log.debug("vppctl " + vppctl_cmd)
     subprocess.check_output("sudo vppctl %s" % vppctl_cmd, shell=True).splitlines()
+
+def vpp_add_static_arp(dev_id, gw, mac):
+    try:
+        vpp_if_name = dev_id_to_vpp_if_name(dev_id)
+        vppctl_cmd = "set ip arp static %s %s %s" % (vpp_if_name, gw, mac)
+        fwglobals.log.debug("vppctl " + vppctl_cmd)
+        subprocess.check_output("sudo vppctl %s" % vppctl_cmd, shell=True).splitlines()
+        return (True, None)
+    except Exception as e:
+        return (False, "Failed to add static arp in vpp for dev_id: %s\nOutput: %s" % (dev_id, str(e)))
 
 def vpp_sw_if_index_to_name(sw_if_index):
     """Convert VPP sw_if_index into VPP interface name.
@@ -1898,6 +1882,34 @@ def get_lte_provier_info():
     except Exception as e:
         return response
 
+def lte_dev_id_to_iface_addr_bytes(dev_id):
+    if is_lte_interface(dev_id):
+        info = get_lte_provier_info()
+        return ip_str_to_bytes(info['IP'])[0]
+
+    return None
+
+def get_lte_info(key):
+    """Get IP from LTE provider
+
+    :param ket: Filter info by key
+
+    :returns: ip address.
+    """
+    info = get_lte_provier_info()
+
+    if key:
+        return info[key]
+
+    return info
+
+def disconnect_from_lte():
+    try:
+        output = subprocess.check_output('mbim-network /dev/cdc-wdm0 stop', shell=True)
+        return (True, None)
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+
 def connect_to_lte(params):
     interface_name = dev_id_to_linux_if(params['dev_id'])
     apn = params['apn']
@@ -1909,7 +1921,7 @@ def connect_to_lte(params):
         output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-registration-state --no-open=3 --no-close', shell=True)
         output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --attach-packet-service --no-open=4 --no-close', shell=True)
         output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
-        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --connect=apn=%sasdasd,ip-type=ipv4 --no-open=5 --no-close > /tmp/wwan-ip' % apn, shell=True)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --connect=apn=%s,ip-type=ipv4 --no-open=5 --no-close > /tmp/wwan-ip' % apn, shell=True)
 
         info = get_lte_provier_info()
 
@@ -2001,7 +2013,6 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-
 def get_bus_info(interface_name):
     """Get LTE device bus info.
 
@@ -2016,6 +2027,7 @@ def get_bus_info(interface_name):
         return str(vals[-1])
     except subprocess.CalledProcessError:
         return ''
+
 def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
     '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
     ensures that ospf is switched on in the frr configuration'''
