@@ -84,8 +84,8 @@ class OS_DECODERS:
             if daddr['gateway']:
                 # Find Public port and IP for the address. At that point
                 # the STUN interfaces cache should be already initialized.
-                daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
-                    fwglobals.g.stun_wrapper.find_addr(daddr['IPv4'])
+                _, daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
+                    fwglobals.g.stun_wrapper.find_addr(pci)
 
             out.append(daddr)
         return (out,1)
