@@ -220,31 +220,30 @@ def get_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
-def get_interface_address_all(filtr=None):
-    """ Get all interfaces from linux, and add only the ones that have address family of
-    AF_INET. if filter=='gw', add only interfaces with GW.
-    : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
-                    if filtr is None, return all IP addresses in the system.
-    : return : list of WAN interfaces
+def get_interface_address_all():
+    """ Get all interfaces from linux. For PCI with address family of AF_INET,
+        also store gateway, if exists.
+        : return : Dictionary of PCI->IP,GW
     """
-    ip_list = []
+    pci_ip_gw_dict = {}
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         pci, _ = get_interface_pci(nicname)
         if not pci:
             continue
+        pci_ip_gw_dict[pci] = {}
+        pci_ip_gw_dict[pci]['addr'] = ''
+        pci_ip_gw_dict[pci]['gw']   = ''
         for addr in addrs:
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
-                if filtr == 'gw':
-                    gateway, _ = get_interface_gateway(nicname)
-                    if gateway != '':
-                        ip_list.append(ip)
-                        break
-                else:
-                    ip_list.append(ip)
-                    break
-    return ip_list
+                pci_ip_gw_dict[pci]['addr'] = ip
+                gateway, _ = get_interface_gateway(nicname)
+                if gateway != '':
+                    pci_ip_gw_dict[pci]['gw'] = gateway
+                break
+
+    return pci_ip_gw_dict
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -255,7 +254,6 @@ def get_interface_address(if_name):
     """
     interfaces = psutil.net_if_addrs()
     if if_name not in interfaces:
-        fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
         return None
 
     addresses = interfaces[if_name]
@@ -265,7 +263,6 @@ def get_interface_address(if_name):
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
 
-    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
 def get_interface_name(ip_no_mask):
@@ -1675,3 +1672,41 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
+
+def get_reconfig_hash():
+    """ This function creates a string that holds all the information added to the reconfig
+    data, and then create a hash string from it.
+
+    : return : md5 hash result of all the data collected or empty string.
+    """
+    res = ''
+
+    linux_pci_list = get_linux_pcis()
+    vpp_run = vpp_does_run()
+
+    for pci in linux_pci_list:
+        name = pci_to_linux_iface(pci)
+        if name is None and vpp_run:
+            name = pci_to_tap(pci)
+        if name is None:
+            continue
+
+        addr = get_interface_address(name)
+        addr = addr.split('/')[0] if addr else ''
+        gw, metric = get_interface_gateway(name)
+
+        res += 'addr:'    + addr + ','
+        res += 'gateway:' + gw + ','
+        res += 'metric:'  + metric + ','
+        if gw and addr:
+            local_ip, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(pci)
+            res += 'public_ip:'   + public_ip + ','
+            res += 'public_port:' + str(public_port) + ','
+
+    if res != '':
+        fwglobals.log.debug('get_reconfig_hash: %s' % res)
+        hash = hashlib.md5(res).hexdigest()
+        return hash
+    else:
+        return ''
+
