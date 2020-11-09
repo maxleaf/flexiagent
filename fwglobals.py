@@ -179,6 +179,26 @@ class Fwglobals:
             if self.DEBUG:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 
+    class FwCache:
+        """Storage for data that is valid during one FwAgent lifecycle only.
+        """
+        def __init__(self):
+            self.db = {
+                'LINUX_INTERFACES': {},
+                'PCI_TO_VPP_IF_NAME': {},
+                'PCI_TO_VPP_TAP_NAME': {},
+                'PCIS': [],
+                'STUN_INTERFACES': {},
+                'VPP_IF_NAME_TO_PCI': {},
+            }
+            self.linux_interfaces    = self.db['LINUX_INTERFACES']
+            self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
+            self.pci_to_vpp_tap_name = self.db['PCI_TO_VPP_TAP_NAME']
+            self.pcis                = self.db['PCIS']
+            self.stun_interfaces     = self.db['STUN_INTERFACES']
+            self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
+
+
     def __init__(self):
         """Constructor method
         """
@@ -220,14 +240,8 @@ class Fwglobals:
         self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
         self.WS_STATUS_OK                 = 1000
         self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
-        # Cache to save various global data
-        self.AGENT_CACHE = {}
-        # PCI to VPP names, assuming names and PCI are unique and not changed during operation
-        self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
-        self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
-        self.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
-        self.AGENT_CACHE['PCIS'] = []
         self.fwagent = None
+        self.cache   = self.FwCache()
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -242,13 +256,6 @@ class Fwglobals:
         self.signal_names = dict((getattr(signal, n), n) \
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
-
-    def get_cache_data(self, key):
-        """get the cache data for a given key
-
-        :returns: data for a given key, None if key does not exist
-        """
-        return self.AGENT_CACHE.get(key)
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.

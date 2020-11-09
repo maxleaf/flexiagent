@@ -33,9 +33,8 @@ class FwStunWrap:
     every 60 seconds. Note, those counters are managed for each of the addresses
     separately.
 
-    From globals, we use the global cache, and create fwglobals.g.AGENT_CACHE['stun_interfaces']
-    sub dictionary. This dictionary has the following structure:
-    fwglobals.g.AGENT_CACHE['stun_interfaces'][IP address] = {
+    From globals, we use the global cache where following elements are kept:
+    {
         'public_ip':
         'public_port':
         'sec_counter':
@@ -54,17 +53,16 @@ class FwStunWrap:
     def _log_address_cache(self):
         """ prints the content on the local cache
         """
-        if self.local_cache['stun_interfaces']:
-            for addr in self.local_cache['stun_interfaces'].keys():
+        if self.cache_interfaces:
+            for addr in self.cache_interfaces.keys():
                 if addr:
-                    fwglobals.log.debug("FwStunWrap: " + addr+':'+str(self.local_cache['stun_interfaces'][addr]))
+                    fwglobals.log.debug("FwStunWrap: " + addr+':'+str(self.cache_interfaces[addr]))
 
     def __init__(self):
         """ Init function. This function inits the cache, gets the router-db handle
             and register callback and request names to listen too.
         """
-        self.local_cache = fwglobals.g.AGENT_CACHE
-        self.local_cache['stun_interfaces'] = {}
+        self.cache_interfaces = fwglobals.g.cache.stun_interfaces
         self.thread_stun = None
         self.is_running = False
         fwglobals.g.router_cfg.register_callback('fwstunwrap', self.fwstuncb, \
@@ -119,7 +117,7 @@ class FwStunWrap:
         tunnels             = fwglobals.g.router_cfg.get_tunnels()
         tunnel_up_addr_list = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
         os_addr_list        = fwutils.get_interface_address_all(filtr = 'gw')
-        cache_addr_list     = list(self.local_cache['stun_interfaces'].keys())
+        cache_addr_list     = list(self.cache_interfaces.keys())
 
         os_addr_list.sort()
         cache_addr_list.sort()
@@ -168,7 +166,7 @@ class FwStunWrap:
             fwglobals.log.debug("adding address %s to Cache with public information" %(str(addr)))
 
         # 2 if address already in cache, do not add it, so its counters won't reset
-        elif addr not in self.local_cache['stun_interfaces'].keys():
+        elif addr not in self.cache_interfaces.keys():
             cached_addr = self.initialize_addr(addr, wait)
             cached_addr['stun_server']      = ''
             cached_addr['stun_server_port'] = ''
@@ -177,7 +175,7 @@ class FwStunWrap:
         else:
         # 3 Address in cache but we still need its public data. Just make sure we are
         # continuing sending STUN request on that address
-            self.local_cache['stun_interfaces'][addr]['success']          = False
+            self.cache_interfaces[addr]['success']          = False
 
     def remove_addr(self, addr, params=None):
         """ remove address from cache. The interface is no longer valid, no need to send
@@ -192,12 +190,12 @@ class FwStunWrap:
         if addr == '':
             return
 
-        if addr in self.local_cache['stun_interfaces'].keys():
+        if addr in self.cache_interfaces.keys():
             if (fwglobals.g.unassigned_interfaces.is_unassigned_addr(addr) == True) or \
                 (params and params.get('gateway','')!= ''):
                     fwglobals.log.debug("remove_addr: Address %s has gateway, not removing" %(str(addr)))
             else:
-                del self.local_cache['stun_interfaces'][addr]
+                del self.cache_interfaces[addr]
                 fwglobals.log.debug("remove_addr: Removed address %s from Cache" %(str(addr)))
 
     def find_addr(self,addr_no_mask):
@@ -208,8 +206,8 @@ class FwStunWrap:
                     public_port of a local 4789 port or empty string
                     nat_type which is the NAT server the device is behind or empty string
         """
-        if addr_no_mask in self.local_cache['stun_interfaces'].keys():
-            c = self.local_cache['stun_interfaces'][addr_no_mask]
+        if addr_no_mask in self.cache_interfaces.keys():
+            c = self.cache_interfaces[addr_no_mask]
             return c.get('public_ip'), c.get('public_port'), c.get('nat_type')
         else:
             return '', '', ''
@@ -234,14 +232,14 @@ class FwStunWrap:
                            of connectring). False: start 'next_time' counter from 1.
         : return: the address entry in the cache
         """
-        if address in self.local_cache['stun_interfaces'].keys():
-            cached_addr = self.local_cache['stun_interfaces'][address]
+        if address in self.cache_interfaces.keys():
+            cached_addr = self.cache_interfaces[address]
             cached_addr['public_ip']   = ''
             cached_addr['public_port'] = ''
             cached_addr['sec_counter'] = 0
             cached_addr['success']     = False
         else:
-            self.local_cache['stun_interfaces'][address] = {
+            self.cache_interfaces[address] = {
                                 'public_ip':  '',
                                 'public_port':'',
                                 'sec_counter':0,
@@ -251,11 +249,11 @@ class FwStunWrap:
                                 'nat_type'        : '',
                            }
         if wait == True:
-            self.local_cache['stun_interfaces'][address]['next_time'] = 30
+            self.cache_interfaces[address]['next_time'] = 30
         else:
-            self.local_cache['stun_interfaces'][address]['next_time'] = 0
+            self.cache_interfaces[address]['next_time'] = 0
 
-        return self.local_cache['stun_interfaces'][address]
+        return self.cache_interfaces[address]
 
     def reset_all(self):
         """ reset all data in the STUN cache for every interface that is not part
@@ -265,7 +263,7 @@ class FwStunWrap:
         tunnel_stats = fwtunnel_stats.tunnel_stats_get()
         tunnels      = fwglobals.g.router_cfg.get_tunnels()
         ip_up_set    = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
-        for addr in self.local_cache['stun_interfaces']:
+        for addr in self.cache_interfaces:
             # Do not reset info on interface participating in a connected tunnel
             if addr in ip_up_set:
                 continue
@@ -274,8 +272,8 @@ class FwStunWrap:
     def _increase_sec(self):
         """ For each address not received an answer, increase the seconds counter by 1.
         """
-        for addr in self.local_cache['stun_interfaces'].keys():
-            address = self.local_cache['stun_interfaces'][addr]
+        for addr in self.cache_interfaces.keys():
+            address = self.cache_interfaces[addr]
             if address['success'] == False:
                 address['sec_counter']+=1
 
@@ -286,7 +284,7 @@ class FwStunWrap:
 
         : param address : the address for which we did not receive STUN reply
         """
-        cached_addr = self.local_cache['stun_interfaces'][address]
+        cached_addr = self.cache_interfaces[address]
         if cached_addr['next_time'] < 60:
             cached_addr['next_time'] += 4
         if cached_addr['next_time'] > 60:
@@ -307,7 +305,7 @@ class FwStunWrap:
         : param st_port  : The STUN server port
         """
         fwglobals.log.debug("found external %s:%s for %s:4789" %(p_ip, p_port, address))
-        cached_addr = self.local_cache['stun_interfaces'][address]
+        cached_addr = self.cache_interfaces[address]
         cached_addr['success']     = True
         cached_addr['next_time']   = 0
         cached_addr['sec_counter'] = 0
@@ -322,12 +320,12 @@ class FwStunWrap:
         updated in the cache. Sent only if the seconds counter equals to
         the calculated time it should be sent ('next_time').
         """
-        if not self.local_cache['stun_interfaces']:
+        if not self.cache_interfaces:
             return
 
         # now start sending STUN request
-        for addr in self.local_cache['stun_interfaces'].keys():
-            elem = copy.deepcopy(self.local_cache['stun_interfaces'].get(addr))
+        for addr in self.cache_interfaces.keys():
+            elem = copy.deepcopy(self.cache_interfaces.get(addr))
             if not elem or elem.get('success',False) == True:
                 continue
             else:
@@ -337,8 +335,8 @@ class FwStunWrap:
                         elem['stun_server_port'])
                     elem['sec_counter'] = 0
                     # address can be removed by another thread while iterating
-                    if addr in self.local_cache['stun_interfaces'].keys():
-                        self.local_cache['stun_interfaces'][addr] = copy.deepcopy(elem)
+                    if addr in self.cache_interfaces.keys():
+                        self.cache_interfaces[addr] = copy.deepcopy(elem)
                     else:
                         continue
 
