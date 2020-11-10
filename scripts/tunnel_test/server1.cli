@@ -46,9 +46,9 @@
       "remote-sa": {
          "spi": 4,
          "crypto-alg": "aes-cbc-128",
-         "crypto-key": "4a506a794f574265564551694d653768",
+         "crypto-key": "4c0647ee00839b1a885300eb67a58eea",
          "integr-alg": "sha-256-128",
-         "integr-key": "4339314b55523947594d6d3547666b45764e6a58"
+         "integr-key": "32501314d47f52d73ea73ef42d7fd930"
          }
       }
     }
