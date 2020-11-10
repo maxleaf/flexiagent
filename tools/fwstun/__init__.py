@@ -195,16 +195,19 @@ def stun_test(sock, host, port, source_ip, source_port, send_data="", log = None
 
     return retVal
 
-def get_nat_type(s, source_ip, source_port, stun_host, stun_port, log):
+def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start, log):
     _initialize()
     port = stun_port
     stun_log(log, 'debug', "Stun: Do Test1")
     resp = False
+    found_idx = 0
     if stun_host:
         ret = stun_test(s, stun_host, port, source_ip, source_port, log = log)
         resp = ret['Resp']
     else:
-        for stun_host_ in stun_servers_list:
+        list_len = len(stun_servers_list)
+        for idx in range(idx_start, idx_start+list_len):
+            stun_host_ = stun_servers_list[idx%list_len]
             #FLEXIWAN_FIX: handle STUN server addresses in the form of ip:port
             stun_info = stun_host_.split(':')
             stun_host_ = stun_info[0]
@@ -216,11 +219,12 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, log):
             ret = stun_test(s, stun_host_, port, source_ip, source_port, log = log)
             resp = ret['Resp']
             if resp:
+                found_idx = idx
                 stun_host = stun_host_
                 break
 
     if not resp:
-        return Blocked, ret, '', ''
+        return Blocked, ret, '', '', ''
     stun_log(log, 'debug', "Stun: Result: %s" %(ret))
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
@@ -267,11 +271,11 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, log):
         ret['ExternalIP'] = exIP
     if ret['ExternalPort'] is None and exPort is not None:
         ret['ExternalPort'] = exPort
-    return typ, ret ,stun_host, port
+    return typ, ret ,stun_host, port, found_idx
 
 
 def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
-                stun_port=3478, dev_name = None, log = None):
+                stun_port=3478, dev_name = None, idx = 0, log = None):
     """
     This function is the outside API to the stun client module.
     It retrieves the STUN type, the public IP as seen from the STUN on the other side of the
@@ -281,6 +285,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     : param stun_host   : the stun server host name or IP address
     : param stun_port   : the stun server port
     : param dev_name    : device name to bind() to
+    : param idx         : index in list of STUN servers, pointing to the server to send STUN from
     : param log         : log object to use for logging
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -294,15 +299,15 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     except Exception as e:
         stun_log(log, 'debug', "get_ip_info: bind: %s" % str(e))
         s.close()
-        return ('', '', '', '', '')
+        return ('', '', '', '', '', '')
     else:
-        nat_type, nat, stun_h, stun_p = get_nat_type(s, source_ip, source_port,
-                                 stun_host=stun_host, stun_port=stun_port, log=log)
+        nat_type, nat, stun_h, stun_p, stun_idx = get_nat_type(s, source_ip, source_port,
+                                 stun_host=stun_host, stun_port=stun_port, idx_start = idx, log=log)
         external_ip = nat['ExternalIP'] if nat['ExternalIP'] != None else ''
         external_port = nat['ExternalPort'] if nat['ExternalPort'] != None else ''
         s.close()
         nat_type = '' if nat_type == None else nat_type
-        return (nat_type, external_ip, external_port, stun_h, stun_p)
+        return (nat_type, external_ip, external_port, stun_h, stun_p, stun_idx)
 
 def stun_log(log, level, string):
     """ Log string to log file

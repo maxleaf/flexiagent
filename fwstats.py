@@ -141,8 +141,8 @@ def get_system_health():
         fwglobals.log.excep("Error getting disk stats: %s" % str(e))
         disk_stats = 0
     # Get temperature info
+    temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
     try:
-        temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
         all_temp = psutil.sensors_temperatures()
         for ttype, templist in all_temp.items():
             for temp in templist:
