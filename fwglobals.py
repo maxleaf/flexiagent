@@ -226,7 +226,7 @@ class Fwglobals:
         self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
         self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
         self.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
-        self.AGENT_CACHE['PCIS'] = []
+        self.AGENT_CACHE['PCIS'] = {}
         self.fwagent = None
 
         # Load configuration from file
