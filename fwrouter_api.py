@@ -97,6 +97,11 @@ class FWROUTER_API:
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
 
+        # Initialize global data that persists device reboot / daemon restart.
+        #
+        if not 'router_api' in fwglobals.g.db:
+            fwglobals.g.db['router_api'] = { 'sa_id' : 0 }
+
     def finalize(self):
         """Destructor method
         """
@@ -1110,7 +1115,11 @@ class FWROUTER_API:
         #
         self._unset_router_failure()
 
-        fwtranslate_add_tunnel.init_tunnels()
+        # Reset sa-id used by tunnels
+        #
+        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+        router_api_db['sa_id'] = 0
+        fwglobals.g.db['router_api'] = router_api_db
 
         fwutils.vmxnet3_unassigned_interfaces_up()
 

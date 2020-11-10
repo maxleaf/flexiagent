@@ -30,6 +30,8 @@ import time
 import traceback
 import yaml
 
+from sqlitedict import SqliteDict
+
 from fwagent import FwAgent
 from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
@@ -209,6 +211,7 @@ class Fwglobals:
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
+        self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.NETPLAN_FILES       = {}
         self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
@@ -282,8 +285,9 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
+        self.db            = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent       = FwAgent(handle_signals=False)
-        self.router_cfg    = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
+        self.router_cfg    = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize configuration database before rest modules!
         self.agent_api     = FWAGENT_API()
         self.router_api    = FWROUTER_API(self.MULTILINK_DB_FILE)
         self.os_api        = OS_API()
@@ -325,6 +329,7 @@ class Fwglobals:
         del self.agent_api
         del self.fwagent
         self.fwagent = None
+        self.db.close()
         return None
 
     def __str__(self):
