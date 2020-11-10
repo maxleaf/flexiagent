@@ -48,6 +48,7 @@ g_dumpers = {
     ############################################################################
     # Linux stuff - !!! PLEASE KEEP ALPHABET ORDER !!!
     #
+    'linux_dpdk_devbind_status':    { 'shell_cmd': 'dpdk-devbind -s > <dumper_out_file>' },
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
     'linux_netplan':                { 'shell_cmd': 'mkdir -p <temp_folder>/linux_netplan && ' +
@@ -56,11 +57,16 @@ g_dumpers = {
                                                    'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
                                                    'ps -elf | grep vpp >> <dumper_out_file>' },
     'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
-    'linux_syslog':                 { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && ' +
-                                                   'cp /var/log/syslog <temp_folder>/linux_syslog/ 2>/dev/null ;' +
+    'linux_sys_class_net':          { 'shell_cmd': 'ls -l /sys/class/net/ > <dumper_out_file>' },
+    'linux_syslog':                 { 'shell_cmd': 'cp /var/log/syslog <temp_folder>/linux_syslog.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'linux_syslog.1':               { 'shell_cmd': 'mkdir -p <temp_folder>/linux_syslog && ' +
-                                                   'cp /var/log/syslog.156 <temp_folder>/linux_syslog/ 2>/dev/null ;' +
+    'linux_syslog.1':               { 'shell_cmd': 'cp /var/log/syslog.1 <temp_folder>/linux_syslog_1.log 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+
+    ############################################################################
+    # VPP related stuff in Linux - !!! PLEASE KEEP ALPHABET ORDER !!!
+    #
+    'linux_vpp_startup_conf':       { 'shell_cmd': 'mkdir -p <temp_folder>/vpp_startup_conf && cp /etc/vpp/* <temp_folder>/vpp_startup_conf/ 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
     ############################################################################
@@ -73,15 +79,15 @@ g_dumpers = {
     #
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
                                                    'cp /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
-    'fwagent_log':                  { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
-                                                   'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent/ 2>/dev/null ;' +
+    'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwagent_log.1':                { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
-                                                   'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent/ 2>/dev/null ;' +
+    'fwagent_log.1':                { 'shell_cmd': 'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent_1.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --router multilink-policy > <dumper_out_file>' },
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --router configuration > <dumper_out_file>' },
     'fwagent_version':              { 'shell_cmd': 'fwagent version > <dumper_out_file>' },
+
+    'fwsystem_checker':              { 'shell_cmd': 'fwsystem_checker --check_only > <dumper_out_file>' },
 
     ############################################################################
     # VPP stuff - !!! PLEASE KEEP ALPHABET ORDER !!!
@@ -97,8 +103,7 @@ g_dumpers = {
     'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
     'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
     'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' },
-    'vpp_startup_conf':             { 'shell_cmd': 'mkdir -p <temp_folder>/vpp_startup_conf && cp /etc/vpp/* <temp_folder>/vpp_startup_conf/ 2>/dev/null ;' +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+
 }
 
 class FwDump:
