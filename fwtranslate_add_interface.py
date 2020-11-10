@@ -234,20 +234,19 @@ def add_interface(params):
         vxlan_port = 4789
         udp_proto = 17
 
-        if iface_addr_bytes:
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
-            cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-            cmd['revert'] = {}
-            cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
-            cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
+        cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
+        cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (iface_pci, vxlan_port)
+        cmd['revert'] = {}
+        cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
+        cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':0 }
+        cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (iface_pci, vxlan_port)
 
-            cmd_list.append(cmd)
+        cmd_list.append(cmd)
 
     # On LAN interfaces run
     #   'set interface nat44 in GigabitEthernet0/8/0 output-feature'
