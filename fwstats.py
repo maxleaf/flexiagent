@@ -73,7 +73,7 @@ def update_stats():
             if fwglobals.g.stun_wrapper:
                 fwglobals.g.stun_wrapper.add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels)
             for intf, counts in stats['last'].items():
-                if (intf.startswith('ipsec-gre') or
+                if (intf.startswith('gre') or
                     intf.startswith('loop')): continue
                 prev_stats_if = prev_stats['last'].get(intf, None)
                 if prev_stats_if != None:
