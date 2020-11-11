@@ -68,7 +68,7 @@ import fwutils
 #
 #    07. sudo systemctl restart frr
 #
-def add_non_dpdk_interface(params):
+def add(params):
     """Generate commands to configure interface in Linux and VPP
 
      :param params:        Parameters from flexiManage.
@@ -87,38 +87,6 @@ def add_non_dpdk_interface(params):
     metric    = params.get('metric', 0)
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
-
-    is_lte = fwutils.is_lte_interface(dev_id)
-
-    if is_lte:
-        # connect to provider
-        try:
-            apn = params['configuration']['apn']
-        except KeyError:
-            raise Exception("add_non_dpdk_interface: apn is not configured for %s interface" % iface_name)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'connect_to_lte',
-                    'args': {
-                        'params': {
-                            'dev_id'    : dev_id,
-                            'apn'       : apn,
-                        }
-                    }
-        }
-        cmd['cmd']['descr'] = "connect to lte provider"
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'disconnect_from_lte'
-        }
-        cmd['revert']['descr'] = "disconnect from lte provider"
-        cmd_list.append(cmd)
 
     # enable DHCP packets detection in VPP
     if dhcp == 'yes':
@@ -141,20 +109,18 @@ def add_non_dpdk_interface(params):
         }
         cmd_list.append(cmd)
 
-    # The bridge solution is not for LTE interface
-    if not is_lte:
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "exec"
-        cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  iface_name ]
-        cmd['cmd']['descr']  = "create linux bridge for interface %s" % iface_name
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "exec"
+    cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  iface_name ]
+    cmd['cmd']['descr']  = "create linux bridge for interface %s" % iface_name
 
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_name, iface_name) ]
-        cmd['revert']['descr']  = "remove linux bridge for interface %s" % iface_name
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_name, iface_name) ]
+    cmd['revert']['descr']  = "remove linux bridge for interface %s" % iface_name
 
-        cmd_list.append(cmd)
+    cmd_list.append(cmd)
 
     # create tap for this interface in vpp and linux
     cmd = {}
@@ -168,43 +134,45 @@ def add_non_dpdk_interface(params):
     cmd['cmd']['descr'] = "create tap interface in linux and vpp"
     cmd_list.append(cmd)
 
-    if not is_lte:
-        # add tap into a bridge.
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "exec"
-        cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                    "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
-        cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge" % iface_name
+    # add tap into a bridge.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "exec"
+    cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
+                                "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
+    cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge" % iface_name
 
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                    "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
-        cmd['revert']['descr']  = "remove tap from a bridge"
-        cmd_list.append(cmd)
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
+                                "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
+    cmd['revert']['descr']  = "remove tap from a bridge"
+    cmd_list.append(cmd)
 
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "exec"
-        cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
-        cmd['cmd']['descr']  = "add linux interface into a bridge"
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "exec"
+    cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
+    cmd['cmd']['descr']  = "add linux interface into a bridge"
 
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
-        cmd['revert']['descr']  = "remove linux interface from a bridge"
-        cmd_list.append(cmd)
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
+    cmd['revert']['descr']  = "remove linux interface from a bridge"
+    cmd_list.append(cmd)
 
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "exec"
-        cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
-        cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
-        cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
+    cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
+    cmd_list.append(cmd)
 
     # add interface into netplan configuration
-    netplan_params = {
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
             'module': 'fwnetplan',
             'func': 'add_remove_netplan_interface',
             'args': { 'is_add'  : 1,
@@ -216,17 +184,6 @@ def add_non_dpdk_interface(params):
                     'type'      : int_type
                     }
     }
-
-    if is_lte:
-        netplan_params['substs'] = [
-            { 'add_param':'ip', 'val_by_func':'get_lte_info', 'arg':'IP' },
-            { 'add_param':'gw', 'val_by_func':'get_lte_info', 'arg':'GATEWAY' }
-        ]
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = netplan_params
     cmd['cmd']['descr'] = "add interface into netplan config file"
 
     cmd['revert'] = {}
@@ -269,29 +226,21 @@ def add_non_dpdk_interface(params):
                                     'is_add':0, 'is_inside':0 }
         cmd_list.append(cmd)
 
-         # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
+        # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
         vxlan_port = 4789
         udp_proto = 17
 
-        iface_addr_bytes = ''
-        if iface_addr:
-            iface_addr_bytes, _ = fwutils.ip_str_to_bytes(iface_addr)
-
-        if iface_addr_bytes or is_lte:
-            substs = [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]
-
-            if is_lte:
-                substs.append({ 'add_param':'ip_address', 'val_by_func':'lte_dev_id_to_iface_addr_bytes', 'arg':dev_id })
-
+        if iface_addr_bytes:
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-            cmd['cmd']['params']        = { 'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0, 'substs': substs }
+            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
             cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-
             cmd['revert'] = {}
             cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-            cmd['revert']['params']     = { 'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0, 'substs': substs }
+            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
             cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
 
             cmd_list.append(cmd)

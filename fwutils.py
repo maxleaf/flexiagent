@@ -170,6 +170,21 @@ def vpp_does_run():
     runs = True if vpp_pid() else False
     return runs
 
+def get_vpp_tap_interface_mac_addr(dev_id):
+    tap = dev_id_to_tap(dev_id)
+    return get_interface_mac_addr(tap)
+
+def get_interface_mac_addr(interface_name):
+    interfaces = psutil.net_if_addrs()
+
+    if interface_name in interfaces:
+        addrs = interfaces[interface_name]
+        for addr in addrs:
+            if addr.family == psutil.AF_LINK:
+                return addr.address
+
+    return None
+
 def af_to_name(af_type):
     """Convert socket type.
 
@@ -680,7 +695,6 @@ def vpp_if_name_to_tap(vpp_if_name):
         return None
     tap = match.group(1)
     return tap
-
 
 def linux_tap_by_interface_name(linux_if_name):
     try:
@@ -1194,6 +1208,58 @@ def vpp_startup_conf_remove_nat(vpp_config_filename):
         p.remove_element(config,key)
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def get_lte_interfaces_names():
+    names = []
+    interfaces = psutil.net_if_addrs()
+
+    for nicname, addrs in interfaces.items():
+        dev_id = get_interface_dev_id(nicname)
+        if dev_id and is_lte_interface(dev_id):
+            names.append(nicname)
+
+    return names
+
+def traffic_control_add_del_dev_ingress(dev_name, is_add):
+    try:
+        subprocess.check_output('sudo tc -force qdisc %s dev %s ingress handle ffff:' % ('add' if is_add else 'delete', dev_name), shell=True)
+        return (True, None)
+    except Exception as e:
+        return (True, None)
+
+def traffic_control_replace_dev_root(dev_name):
+    try:
+        subprocess.check_output('sudo tc -force qdisc replace dev %s root handle 1: htb' % dev_name, shell=True)
+        return (True, None)
+    except Exception as e:
+        return (True, None)
+
+def traffic_control_remove_dev_root(dev_name):
+    try:
+        subprocess.check_output('sudo tc -force qdisc del dev %s root' % dev_name, shell=True)
+        return (True, None)
+    except Exception as e:
+        return (True, None)
+
+def reset_traffic_control():
+    search = []
+    lte_interfaces = get_lte_interfaces_names()
+
+    if lte_interfaces:
+        search.extend(lte_interfaces)
+
+    for term in search:
+        try:
+            subprocess.check_output('sudo tc -force qdisc del dev %s root' % term, shell=True)
+        except:
+            pass
+
+        try:
+            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff:' % term, shell=True)
+        except:
+            pass
+
+    return True
 
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
@@ -1914,6 +1980,9 @@ def connect_to_lte(params):
     interface_name = dev_id_to_linux_if(params['dev_id'])
     apn = params['apn']
 
+    if not apn:
+        return (False, "apn is not configured for %s interface" % interface_name)
+
     try:
         output = subprocess.check_output('echo "APN=%s" > /etc/mbim-network.conf' % apn, shell=True)
 
@@ -1993,6 +2062,8 @@ def get_interface_driver(dev_id):
 
     return ''
 
+def is_dpdk_interface(dev_id):
+    return not is_non_dpdk_interface(dev_id)
 
 def is_non_dpdk_interface(dev_id):
     """Check if interface is not supported by dpdk.
