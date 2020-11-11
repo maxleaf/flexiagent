@@ -1704,7 +1704,6 @@ def get_reconfig_hash():
             res += 'public_port:' + str(public_port) + ','
 
     if res != '':
-        fwglobals.log.debug('get_reconfig_hash: %s' % res)
         hash = hashlib.md5(res).hexdigest()
         return hash
     else:
