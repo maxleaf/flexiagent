@@ -233,6 +233,7 @@ def get_all_interfaces():
             continue
         pci_ip_gw[pci] = {}
         pci_ip_gw[pci]['addr'] = ''
+        pci_ip_gw[pci]['gw']   = ''
         for addr in addrs:
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
