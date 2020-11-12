@@ -76,16 +76,18 @@ class OS_DECODERS:
                 'deviceType': ''
             }
 
+            daddr['driver'] = fwutils.get_interface_driver(dev_id)
+
+            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
+            daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
+
             if fwutils.is_wifi_interface(dev_id):
                 daddr['deviceType'] = 'wifi'
 
             if fwutils.is_lte_interface(dev_id):
                 daddr['deviceType'] = 'lte'
+                daddr['dhcp'] = 'yes'
 
-            daddr['driver'] = fwutils.get_interface_driver(dev_id)
-
-            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
-            daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
                 daddr[addr_af_name] = addr.address.split('%')[0]

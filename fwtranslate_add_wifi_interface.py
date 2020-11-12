@@ -88,27 +88,6 @@ def add(params):
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
 
-    # enable DHCP packets detection in VPP
-    if dhcp == 'yes':
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['descr']  = "Enable DHCP detect"
-        cmd['cmd']['params'] = {
-                        'module': 'fwutils',
-                        'func': 'vpp_set_dhcp_detect',
-                        'args': {'dev_id': dev_id, 'remove': False}
-        }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "Disable DHCP detect"
-        cmd['revert']['params'] = {
-                        'module': 'fwutils',
-                        'func': 'vpp_set_dhcp_detect',
-                        'args': {'dev_id': dev_id, 'remove': True}
-        }
-        cmd_list.append(cmd)
-
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']   = "exec"
@@ -119,7 +98,6 @@ def add(params):
     cmd['revert']['name']   = "exec"
     cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_name, iface_name) ]
     cmd['revert']['descr']  = "remove linux bridge for interface %s" % iface_name
-
     cmd_list.append(cmd)
 
     # create tap for this interface in vpp and linux
@@ -153,12 +131,12 @@ def add(params):
     cmd['cmd'] = {}
     cmd['cmd']['name']   = "exec"
     cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
-    cmd['cmd']['descr']  = "add linux interface into a bridge"
+    cmd['cmd']['descr']  = "add wifi interface into a bridge"
 
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
     cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
-    cmd['revert']['descr']  = "remove linux interface from a bridge"
+    cmd['revert']['descr']  = "remove wifi interface from a bridge"
     cmd_list.append(cmd)
 
     cmd = {}
@@ -202,69 +180,8 @@ def add(params):
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
 
-    # Enable NAT.
-    # On WAN interfaces run
-    #   'nat44 add interface address GigabitEthernet0/9/0'
-    #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
-    # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-    if 'type' not in params or params['type'].lower() == 'wan':
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "python"
-        cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
-        cmd['cmd']['params']    = {
-                                    'module': 'fwutils',
-                                    'func':   'vpp_nat_add_remove_interface',
-                                    'args':   {
-                                        'remove': False,
-                                        'dev_id': dev_id,
-                                        'metric': metric
-                                    }
-                                  }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
-        cmd['revert']['params'] = {
-                                    'module': 'fwutils',
-                                    'func':   'vpp_nat_add_remove_interface',
-                                    'args':   {
-                                        'remove': True,
-                                        'dev_id': dev_id,
-                                        'metric': metric
-                                    }
-                                  }
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':1, 'is_inside':0 }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':0, 'is_inside':0 }
-        cmd_list.append(cmd)
-
-        # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
-        vxlan_port = 4789
-        udp_proto = 17
-
-        if iface_addr_bytes:
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
-            cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-            cmd['revert'] = {}
-            cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
-            cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-
-            cmd_list.append(cmd)
+    # Configure hostapd with saved configuration
+    # run hostapd
+    # configure dhcp server for this interface
 
     return cmd_list

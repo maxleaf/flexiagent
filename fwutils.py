@@ -1262,6 +1262,23 @@ def reset_traffic_control():
 
     return True
 
+def remove_linux_bridges():
+    lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).splitlines()
+
+    for line in lines:
+        bridge_name = line.rstrip().split('/')[-1]
+        try:
+            output = subprocess.check_output("sudo ip link set %s down " % bridge_name, shell=True)
+        except:
+            pass
+
+        try:
+            subprocess.check_output('sudo brctl delbr %s' % bridge_name, shell=True)
+        except:
+            pass
+
+    return True
+
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)

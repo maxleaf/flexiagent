@@ -216,7 +216,7 @@ def add(params):
                                     'func':   'vpp_nat_add_remove_interface',
                                     'args':   {
                                         'remove': False,
-                                        'dev'   : dev_id,
+                                        'dev_id': dev_id,
                                         'metric': metric
                                     }
                                   }
@@ -228,7 +228,7 @@ def add(params):
                                     'func':   'vpp_nat_add_remove_interface',
                                     'args':   {
                                         'remove': True,
-                                        'dev'   : dev_id,
+                                        'dev_id': dev_id,
                                         'metric': metric
                                     }
                                   }
