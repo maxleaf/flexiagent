@@ -82,7 +82,6 @@ def add(params):
     dev_id  = params['dev_id']
 
     iface_addr = params.get('addr', '')
-    iface_name = fwutils.dev_id_to_linux_if(dev_id)
     iface_addr_bytes = ''
     if iface_addr:
         iface_addr_bytes, _ = fwutils.ip_str_to_bytes(iface_addr)
@@ -130,14 +129,14 @@ def add(params):
     cmd['cmd']['params'] = {
                 'module': 'fwnetplan',
                 'func': 'add_remove_netplan_interface',
-                'args': { 'is_add'  : 1,
-                        'dev_id'    : dev_id,
-                        'ip'        : iface_addr,
-                        'gw'        : gw,
-                        'metric'    : metric,
-                        'dhcp'      : dhcp,
-                        'type'      : int_type
-                        }
+                'args': { 'is_add'   : 1,
+                          'dev_id'  : dev_id,
+                          'ip'       : iface_addr,
+                          'gw'       : gw,
+                          'metric'   : metric,
+                          'dhcp'     : dhcp,
+                          'type'  : int_type
+                         }
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
     cmd['revert'] = {}
@@ -146,13 +145,13 @@ def add(params):
                 'module': 'fwnetplan',
                 'func': 'add_remove_netplan_interface',
                 'args': {
-                        'is_add'  : 0,
-                        'dev_id'  : dev_id,
-                        'ip'      : iface_addr,
-                        'gw'      : gw,
-                        'metric'  : metric,
-                        'dhcp'    : dhcp,
-                        'type'    : int_type
+                          'is_add'  : 0,
+                          'dev_id' : dev_id,
+                          'ip'      : iface_addr,
+                          'gw'      : gw,
+                          'metric'  : metric,
+                          'dhcp'    : dhcp,
+                          'type'  : int_type
                 }
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"
@@ -186,7 +185,7 @@ def add(params):
                                         'next_hop': gw,
                                         'dev':      dev_id,
                                         'remove':   False
-                                    }
+                                      }
             }
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
@@ -198,7 +197,7 @@ def add(params):
                                         'next_hop': gw,
                                         'dev':      dev_id,
                                         'remove':   True
-                                    }
+                                      }
             }
             cmd_list.append(cmd)
 
@@ -210,15 +209,29 @@ def add(params):
     if 'type' not in params or params['type'].lower() == 'wan':
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "nat44_add_del_interface_addr"
-        cmd['cmd']['descr']   = "enable NAT for interface %s (%s)" % (dev_id, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':1, 'twice_nat':0 }
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'vpp_nat_add_remove_interface',
+                                    'args':   {
+                                        'remove': False,
+                                        'dev'   : dev_id,
+                                        'metric': metric
+                                    }
+                                  }
         cmd['revert'] = {}
-        cmd['revert']['name']   = "nat44_add_del_interface_addr"
-        cmd['revert']['descr']  = "disable NAT for interface %s (%s)" % (dev_id, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':0, 'twice_nat':0 }
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
+        cmd['revert']['params'] = {
+                                    'module': 'fwutils',
+                                    'func':   'vpp_nat_add_remove_interface',
+                                    'args':   {
+                                        'remove': True,
+                                        'dev'   : dev_id,
+                                        'metric': metric
+                                    }
+                                  }
         cmd_list.append(cmd)
 
         cmd = {}
@@ -238,20 +251,19 @@ def add(params):
         vxlan_port = 4789
         udp_proto = 17
 
-        if iface_addr_bytes:
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-            cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
-            cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-            cmd['revert'] = {}
-            cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-            cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                            'ip_address':iface_addr_bytes, 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
-            cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
+        cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
+        cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (dev_id, vxlan_port)
+        cmd['revert'] = {}
+        cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
+        cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':0 }
+        cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (dev_id, vxlan_port)
 
-            cmd_list.append(cmd)
+        cmd_list.append(cmd)
 
     # On LAN interfaces run
     #   'set interface nat44 in GigabitEthernet0/8/0 output-feature'

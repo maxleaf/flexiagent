@@ -822,6 +822,7 @@ def _vppctl_read(cmd, wait=True):
     for _ in range(retries):
         try:
             _ = open(os.devnull, 'r+b', 0)
+            fwglobals.log.debug("vppctl " + cmd)
             handle = os.popen('sudo vppctl ' + cmd + ' 2>/dev/null')
             data = handle.read()
             retcode = handle.close()
@@ -1390,8 +1391,6 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
 
     vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
 
-    fwglobals.log.debug("vppctl " + vppctl_cmd)
-
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
@@ -1444,8 +1443,6 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
         vppctl_cmd += ' group %u %s labels %s' % (group_id, order, ids)
         group_id = group_id + 1
 
-    fwglobals.log.debug("vppctl " + vppctl_cmd)
-
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None or re.search('unknown|failed|ret=-', out):
         return (False, "failed vppctl_cmd=%s: %s" % (vppctl_cmd, out))
@@ -1473,8 +1470,6 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
     ip_version = 'ip6' if is_ipv6 else 'ip4'
 
     vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
-
-    fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None or re.search('unknown|failed|ret=-', out):
@@ -1614,8 +1609,6 @@ def vpp_set_dhcp_detect(dev_id, remove):
 
 
     vppctl_cmd = 'set dhcp detect intfc %s %s' % (int_name, op)
-
-    fwglobals.log.debug("vppctl " + vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
@@ -2223,3 +2216,56 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
+
+def vpp_nat_add_remove_interface(remove, dev_id, metric):
+    default_gw = ''
+    vpp_if_name_add = ''
+    vpp_if_name_remove = ''
+    metric_min = -1
+
+    dev_metric = int(metric)
+    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+
+    for wan in wan_list:
+        metric_cur_str = wan.get('metric', None)
+        if not metric_cur_str:
+            continue
+        metric_cur = int(metric_cur_str)
+        wan_dev_id = wan['dev_id']
+
+        if wan_dev_id == dev_id:
+            continue
+
+        if metric_min == -1 or metric_min > metric_cur:
+            metric_min = metric_cur
+            default_gw = wan_dev_id
+
+    if remove:
+        if dev_metric < metric_min or not default_gw:
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+        if dev_metric < metric_min and default_gw:
+            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
+
+    if not remove:
+        if dev_metric < metric_min and default_gw:
+            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
+        if dev_metric < metric_min or not default_gw:
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+
+    if vpp_if_name_remove:
+        vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
+        out = _vppctl_read(vppctl_cmd, wait=False)
+        if out is None:
+            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    if vpp_if_name_add:
+        vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_add
+        out = _vppctl_read(vppctl_cmd, wait=False)
+        if out is None:
+            # revert 'nat44 add interface address del'
+            if vpp_if_name_remove:
+                vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_remove
+                _vppctl_read(vppctl_cmd, wait=False)
+            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)
