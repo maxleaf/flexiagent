@@ -88,6 +88,24 @@ def add(params):
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
 
+    # Configure hostapd with saved configuration
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+            'module': 'fwutils',
+            'func': 'start_hostapd',
+    }
+    cmd['cmd']['descr']  = "start hostpad"
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func': 'stop_hostapd'
+    }
+    cmd['revert']['descr']  = "stop hostpad"
+    cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']   = "exec"
@@ -180,8 +198,12 @@ def add(params):
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
 
-    # Configure hostapd with saved configuration
-    # run hostapd
     # configure dhcp server for this interface
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "exec"
+    cmd['cmd']['params'] =  [ 'sudo systemctl start isc-dhcp-server' ]
+    cmd['cmd']['descr']  = "start hostpad"
+    cmd_list.append(cmd)
 
     return cmd_list

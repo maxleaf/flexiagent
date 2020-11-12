@@ -1131,6 +1131,7 @@ class FWROUTER_API:
         fwutils.reset_dhcpd()
         fwutils.reset_traffic_control()
         fwutils.remove_linux_bridges()
+        fwutils.stop_hostapd()
         # CLEAN BRIDGES
         fwglobals.g.AGENT_CACHE['DEV_ID_TO_VPP_TAP_NAME_MAP'] = {}
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))

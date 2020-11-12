@@ -1979,6 +1979,20 @@ def get_lte_info(key):
 
     return info
 
+def start_hostapd():
+    try:
+        os.system('sudo hostapd -d /etc/hostapd/hostapd.conf -B')
+        return (True, None)
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+
+def stop_hostapd():
+    try:
+        os.system('killall hostapd')
+        return (True, None)
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+
 def disconnect_from_lte():
     try:
         output = subprocess.check_output('mbim-network /dev/cdc-wdm0 stop', shell=True)
