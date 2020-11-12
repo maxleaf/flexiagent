@@ -1804,7 +1804,7 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
 
-def vpp_nat_add_remove_interface(remove, dev, metric):
+def vpp_nat_add_remove_interface(remove, dev_id, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
@@ -1818,26 +1818,26 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
         if not metric_cur_str:
             continue
         metric_cur = int(metric_cur_str)
-        pci = wan['pci']
+        wan_dev_id = wan['dev_id']
 
-        if pci == dev:
+        if wan_dev_id == dev_id:
             continue
 
         if metric_min == -1 or metric_min > metric_cur:
             metric_min = metric_cur
-            default_gw = pci
+            default_gw = wan_dev_id
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(dev)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(default_gw)
+            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
 
     if not remove:
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(default_gw)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(dev)
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
