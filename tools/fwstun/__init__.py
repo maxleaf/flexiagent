@@ -10,6 +10,8 @@ sys.path.append(globals)
 
 __version__ = '1.0.0'
 
+g_stun_log = None # log object
+
 # FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
     'stun2.l.google.com:19302',
@@ -112,7 +114,7 @@ def gen_tran_id():
     # return binascii.a2b_hex(a)
     return a
 
-def stun_test(sock, host, port, source_ip, source_port, send_data="", log = None):
+def stun_test(sock, host, port, source_ip, source_port, send_data=""):
     retVal = {'Resp': False, 'ExternalIP': None, 'ExternalPort': None,
               'SourceIP': None, 'SourcePort': None, 'ChangedIP': None,
               'ChangedPort': None}
@@ -122,7 +124,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data="", log = None
     data = binascii.a2b_hex(str_data)
 
     for _ in range (2):
-        stun_log(log, 'debug', "Stun: sendto: %s:%s" %(str(host), str(port)))
+        stun_log("Stun: sendto: %s:%s" %(str(host), str(port)))
         try:
             sock.sendto(data, (host, port))
         except Exception as e:
@@ -130,9 +132,9 @@ def stun_test(sock, host, port, source_ip, source_port, send_data="", log = None
             return retVal
         try:
             buf, addr = sock.recvfrom(2048)
-            stun_log(log, 'debug', "Stun: recvfrom: %s" %(str(addr)))
+            stun_log("Stun: recvfrom: %s" %(str(addr)))
         except Exception as e:
-            stun_log(log, 'warning', "Stun: recvfrom: %s" %(str(e)))
+            stun_log("Stun: recvfrom: %s" %(str(e)), 'warning')
             continue
 
         msgtype = b2a_hexstr(buf[0:2])
@@ -140,7 +142,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data="", log = None
             # from some reason we sometimes get msgtype u'00800' resulting KeyError exception
             bind_resp_msg = dictValToMsgType[msgtype] == "BindResponseMsg"
         except KeyError:
-            stun_log(log, 'debug', "Stun: received unknown message type: %s" %(msgtype))
+            stun_log("Stun: received unknown message type: %s" %(msgtype))
             retVal['Resp'] = False
             return retVal
         trans_id_match = trans_id.upper() == b2a_hexstr(buf[4:20]).upper()
@@ -195,14 +197,14 @@ def stun_test(sock, host, port, source_ip, source_port, send_data="", log = None
 
     return retVal
 
-def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start, log):
+def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start):
     _initialize()
     port = stun_port
-    stun_log(log, 'debug', "Stun: Do Test1")
+    stun_log("Stun: Do Test1")
     resp = False
     found_idx = 0
     if stun_host:
-        ret = stun_test(s, stun_host, port, source_ip, source_port, log = log)
+        ret = stun_test(s, stun_host, port, source_ip, source_port)
         resp = ret['Resp']
     else:
         list_len = len(stun_servers_list)
@@ -215,8 +217,8 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start, log
                 port = int(stun_info[1])
             else:
                 port = 3789
-            stun_log(log, 'debug', 'Stun: Trying STUN host: %s' %(stun_host_))
-            ret = stun_test(s, stun_host_, port, source_ip, source_port, log = log)
+            stun_log('Stun: Trying STUN host: %s' %(stun_host_))
+            ret = stun_test(s, stun_host_, port, source_ip, source_port)
             resp = ret['Resp']
             if resp:
                 found_idx = idx
@@ -225,7 +227,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start, log
 
     if not resp:
         return Blocked, ret, '', '', ''
-    stun_log(log, 'debug', "Stun: Result: %s" %(ret))
+    stun_log("Stun: Result: %s" %(ret))
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
     changedIP = ret['ChangedIP']
@@ -233,33 +235,33 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start, log
     if ret['ExternalIP'] == source_ip:
         changeRequest = ''.join([ChangeRequest, '0004', "00000006"])
         ret = stun_test(s, stun_host, port, source_ip, source_port,
-                        changeRequest, log = log)
+                        changeRequest)
         if ret['Resp']:
             typ = OpenInternet
         else:
             typ = SymmetricUDPFirewall
     else:
         changeRequest = ''.join([ChangeRequest, '0004', "00000006"])
-        stun_log(log, 'debug', "Stun: Do Test2")
+        stun_log("Stun: Do Test2")
         ret = stun_test(s, stun_host, port, source_ip, source_port,
-                        changeRequest, log = log)
-        stun_log(log, 'debug', "Stun: Result: %s" %(ret))
+                        changeRequest)
+        stun_log("Stun: Result: %s" %(ret))
         if ret['Resp']:
             typ = FullCone
         else:
-            stun_log(log, 'debug', "Stun: Do Test1")
-            ret = stun_test(s, changedIP, changedPort, source_ip, source_port, log = log)
-            stun_log(log, 'debug', "Stun: Result: %s" %(ret))
+            stun_log("Stun: Do Test1")
+            ret = stun_test(s, changedIP, changedPort, source_ip, source_port)
+            stun_log("Stun: Result: %s" %(ret))
             if not ret['Resp']:
                 typ = SymmetricNAT
             else:
                 if exIP == ret['ExternalIP'] and exPort == ret['ExternalPort']:
                     changePortRequest = ''.join([ChangeRequest, '0004',
                                                  "00000002"])
-                    stun_log(log, 'debug', "Stun: Do Test3")
+                    stun_log("Stun: Do Test3")
                     ret = stun_test(s, changedIP, port, source_ip, source_port,
-                                    changePortRequest, log = log)
-                    stun_log(log, 'debug', "Stun: Result: %s" %(ret))
+                                    changePortRequest)
+                    stun_log("Stun: Result: %s" %(ret))
                     if ret['Resp']:
                         typ = RestricNAT
                     else:
@@ -286,37 +288,41 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     : param stun_port   : the stun server port
     : param dev_name    : device name to bind() to
     : param idx         : index in list of STUN servers, pointing to the server to send STUN from
-    : param log         : log object to use for logging
+    : param log         : logging object to log message
     """
+    global g_stun_log
+
+    if not g_stun_log:
+        g_stun_log = log
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(3)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        stun_log(log, 'debug', "get_ip_info, binding to %s:%d" %(source_ip, source_port))
+        stun_log("get_ip_info, binding to %s:%d" %(source_ip, source_port))
         if dev_name != None:
             s.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
         s.bind((source_ip, source_port))
     except Exception as e:
-        stun_log(log, 'debug', "get_ip_info: bind: %s" % str(e))
+        stun_log("get_ip_info: bind: %s" % str(e))
         s.close()
         return ('', '', '', '', '', '')
     else:
         nat_type, nat, stun_h, stun_p, stun_idx = get_nat_type(s, source_ip, source_port,
-                                 stun_host=stun_host, stun_port=stun_port, idx_start = idx, log=log)
+                                 stun_host=stun_host, stun_port=stun_port, idx_start = idx)
         external_ip = nat['ExternalIP'] if nat['ExternalIP'] != None else ''
         external_port = nat['ExternalPort'] if nat['ExternalPort'] != None else ''
         s.close()
         nat_type = '' if nat_type == None else nat_type
         return (nat_type, external_ip, external_port, stun_h, stun_p, stun_idx)
 
-def stun_log(log, level, string):
+def stun_log(string, level = 'debug'):
     """ Log string to log file
-    : param log    : log object
-    : param level  : severity as a string (e.g. 'debug')
     : param string : string to print into the log
+    : param level  : severity as a string (e.g. 'debug')
     """
-    if not log:
+    if not g_stun_log:
         return
-    func = getattr(log, level)
+    func = getattr(g_stun_log, level)
     if func:
         func(string)

@@ -67,10 +67,8 @@ def update_stats():
         # Update info if previous stats valid
         if prev_stats['ok'] == 1:
             if_bytes = {}
-            tunnel_bytes = {}
             tunnel_stats = tunnel_stats_get()
-            tunnels = fwglobals.g.router_cfg.get_tunnels()
-            fwglobals.g.stun_wrapper.add_address_of_down_tunnels_to_stun_cache(tunnel_stats, tunnels)
+            fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
             for intf, counts in stats['last'].items():
                 if (intf.startswith('ipsec-gre') or
                     intf.startswith('loop')): continue
@@ -97,7 +95,6 @@ def update_stats():
                         pci = fwutils.vpp_if_name_to_pci(intf)
                         if pci:
                             if_bytes[pci] = calc_stats
-
 
             stats['bytes'] = if_bytes
             stats['tunnel_stats'] = tunnel_stats

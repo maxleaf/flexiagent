@@ -220,30 +220,28 @@ def get_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
-def get_interface_address_all():
+def get_all_interfaces():
     """ Get all interfaces from linux. For PCI with address family of AF_INET,
         also store gateway, if exists.
         : return : Dictionary of PCI->IP,GW
     """
-    pci_ip_gw_dict = {}
+    pci_ip_gw = {}
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         pci, _ = get_interface_pci(nicname)
         if not pci:
             continue
-        pci_ip_gw_dict[pci] = {}
-        pci_ip_gw_dict[pci]['addr'] = ''
-        pci_ip_gw_dict[pci]['gw']   = ''
+        pci_ip_gw[pci] = {}
+        pci_ip_gw[pci]['addr'] = ''
         for addr in addrs:
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
-                pci_ip_gw_dict[pci]['addr'] = ip
+                pci_ip_gw[pci]['addr'] = ip
                 gateway, _ = get_interface_gateway(nicname)
-                if gateway != '':
-                    pci_ip_gw_dict[pci]['gw'] = gateway
+                pci_ip_gw[pci]['gw'] = gateway if gateway else ''
                 break
 
-    return pci_ip_gw_dict
+    return pci_ip_gw
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -254,6 +252,7 @@ def get_interface_address(if_name):
     """
     interfaces = psutil.net_if_addrs()
     if if_name not in interfaces:
+        fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
         return None
 
     addresses = interfaces[if_name]
@@ -263,6 +262,7 @@ def get_interface_address(if_name):
             mask = IPAddress(addr.netmask).netmask_bits()
             return '%s/%s' % (ip, mask)
 
+    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
 def get_interface_name(ip_no_mask):
@@ -1692,7 +1692,7 @@ def get_reconfig_hash():
         res += 'gateway:' + gw + ','
         res += 'metric:'  + metric + ','
         if gw and addr:
-            local_ip, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(pci)
+            _, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(pci)
             res += 'public_ip:'   + public_ip + ','
             res += 'public_port:' + str(public_port) + ','
 

@@ -18,7 +18,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-# This migration script fix the dhcp and metric configuration for device interfaces
+# This migration script adds new fleximanage felids to tunnel creation.
 
 import os
 import re
@@ -37,11 +37,13 @@ import fwutils
 
 from fwrouter_cfg import FwRouterCfg
 
-
-
-def _set_signature():
+def _enforce_sync_device():
+    """ We are forcing sync in upgrade because sync should update device router configuration
+    items with new parameters added in the latest flexiManage. For example, the 'pci' field
+    in the add-tunnel request.
+    """
     with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
-        router_cfg['signature'] = 'enforce-sync-device'
+        router_cfg.db['signature'] = 'enforce-sync-device'
 
 def migrate(prev_version, new_version, upgrade):
     if upgrade != 'upgrade':
@@ -49,7 +51,7 @@ def migrate(prev_version, new_version, upgrade):
 
     try:
         print("* Migrating PCI address for tunnel creation...")
-        _set_signature()
+        _enforce_sync_device()
 
     except Exception as e:
         print("Migration error: %s : %s" % (__file__, str(e)))
