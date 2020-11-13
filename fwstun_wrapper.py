@@ -69,6 +69,7 @@ class FwStunWrap:
         self.thread_stun = None
         self.is_running  = False
         self.standalone  = standalone
+        fwstun.set_log(fwglobals.log)
 
     def _log_address_cache(self):
         """ prints the content on the local cache
@@ -321,8 +322,7 @@ class FwStunWrap:
                 if cached_addr['curr_time'] >= cached_addr['send_time']:
                     local_ip = cached_addr['local_ip']
                     nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port, server_index = \
-                        self._send_single_stun_request(local_ip, 4789, cached_addr['server_index'], \
-                            fwglobals.log)
+                        self._send_single_stun_request(local_ip, 4789, cached_addr['server_index'])
                     cached_addr['curr_time'] = 0
 
                     if nat_ext_port == '':
@@ -331,16 +331,13 @@ class FwStunWrap:
                         self._handle_stun_response(pci, nat_ext_ip, nat_ext_port,\
                              nat_type, stun_host, stun_port, server_index)
 
-    def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_idx, log):
+    def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_idx):
         """ sends one STUN request for an address.
 
         : param lcl_src_ip   : local IP address
         : param lcl_srt_port : local port
         : param stun_idx     : The STUN index in the list of STUN from which STUN requests will
                                be sent from
-        : param log          : log object, so that fwstun can be used as a standalone
-                               module without dependency of fwglobals
-
         : return :  nat_type     - nat type of the NAT -> str
                     net_ext_ip   - the public IP address -> str
                     nat_ext_port - the public port -> int
@@ -356,7 +353,7 @@ class FwStunWrap:
         fwutils.set_linux_reverse_path_filter(dev_name, False)
 
         nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port, stun_index = \
-            fwstun.get_ip_info(lcl_src_ip, lcl_src_port, None, None, dev_name, stun_idx, log)
+            fwstun.get_ip_info(lcl_src_ip, lcl_src_port, None, None, dev_name, stun_idx)
 
         fwutils.set_linux_reverse_path_filter(dev_name, True)
         return nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port, stun_index

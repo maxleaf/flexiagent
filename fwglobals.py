@@ -39,7 +39,6 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
-from fwunassigned_if import FwUnassignedIfs
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),

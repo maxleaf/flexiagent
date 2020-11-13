@@ -109,6 +109,10 @@ def _initialize():
     dictValToAttr= {v: k for k, v in dictAttrToVal.items()}
     dictValToMsgType = {v: k for k, v in dictMsgTypeToVal.items()}
 
+def set_log(log):
+    global g_stun_log
+    g_stun_log = log
+
 def gen_tran_id():
     a = ''.join(random.choice('0123456789ABCDEF') for i in range(32))
     # return binascii.a2b_hex(a)
@@ -277,7 +281,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start):
 
 
 def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
-                stun_port=3478, dev_name = None, idx = 0, log = None):
+                stun_port=3478, dev_name = None, idx = 0):
     """
     This function is the outside API to the stun client module.
     It retrieves the STUN type, the public IP as seen from the STUN on the other side of the
@@ -288,13 +292,8 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     : param stun_port   : the stun server port
     : param dev_name    : device name to bind() to
     : param idx         : index in list of STUN servers, pointing to the server to send STUN from
-    : param log         : logging object to log message
+
     """
-    global g_stun_log
-
-    if not g_stun_log:
-        g_stun_log = log
-
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(3)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

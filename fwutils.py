@@ -1697,11 +1697,8 @@ def get_reconfig_hash():
             res += 'public_ip:'   + public_ip + ','
             res += 'public_port:' + str(public_port) + ','
 
-    if res != '':
-        hash = hashlib.md5(res).hexdigest()
-        return hash
-    else:
-        return ''
+    hash = hashlib.md5(res).hexdigest()
+    return hash
 
 def vpp_nat_add_remove_interface(remove, dev, metric):
     default_gw = ''
