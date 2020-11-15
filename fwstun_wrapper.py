@@ -43,8 +43,6 @@ class FwStunWrap:
         'curr_time':
         'send_time':
         'success':
-        'stun_server':
-        'stun_server_port':
         'server_index':
         'nat_type':
     }
@@ -169,8 +167,6 @@ class FwStunWrap:
             cached_addr = self.initialize_addr(pci)
             cached_addr['local_ip']        = addr
             cached_addr['gateway']         = gateway
-            cached_addr['stun_server']      = ''
-            cached_addr['stun_server_port'] = ''
             cached_addr['server_index']     = 0
             cached_addr['nat_type']         = ''
             if addr:
@@ -229,8 +225,6 @@ class FwStunWrap:
                                 'curr_time'  : 0,
                                 'send_time'  : 0,
                                 'success'    : False,
-                                'stun_server': '',
-                                'stun_server_port': '',
                                 'server_index'    : 0,
                                 'nat_type'        : '',
                            }
@@ -271,13 +265,11 @@ class FwStunWrap:
             return
         cached_addr['send_time'] = 60
         cached_addr['success'] = False
-        cached_addr['stun_server'] = ''
-        cached_addr['stun_server_port'] = ''
         cached_addr['server_index'] = 0
         fwglobals.log.debug("_handle_stun_none_response: failed getting public IP/port for address %s, retry in %d seconds"\
              %(cached_addr['local_ip'], cached_addr['send_time']))
 
-    def _handle_stun_response(self, pci, p_ip, p_port, nat_type, st_host, st_port, st_index):
+    def _handle_stun_response(self, pci, p_ip, p_port, nat_type, st_index):
         """ Handle STUN response for an address. Reset all the counters,
         update the results, and set the 'success' flag to True.
 
@@ -285,8 +277,6 @@ class FwStunWrap:
         : param p_ip     : the public IP received from STUN reply
         : param p_port   : the public port received from STUN reply
         : param nat_type : the NAT type of the NAT the STUN request was passed through
-        : param st_host  : The STUN server address
-        : param st_port  : The STUN server port
         : param st_index : The index of the STUN server in the list of servers from which a
                            good response was received
         """
@@ -300,8 +290,6 @@ class FwStunWrap:
         cached_addr['nat_type']         = nat_type
         cached_addr['public_ip']        = p_ip
         cached_addr['public_port']      = p_port
-        cached_addr['stun_server']      = st_host
-        cached_addr['stun_server_port'] = st_port
         cached_addr['server_index']     = st_index
 
     def _send_stun_requests(self):
@@ -321,15 +309,15 @@ class FwStunWrap:
             else:
                 if cached_addr['curr_time'] >= cached_addr['send_time']:
                     local_ip = cached_addr['local_ip']
-                    nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port, server_index = \
+                    nat_type, nat_ext_ip, nat_ext_port, server_index = \
                         self._send_single_stun_request(local_ip, 4789, cached_addr['server_index'])
                     cached_addr['curr_time'] = 0
 
                     if nat_ext_port == '':
                         self._handle_stun_none_response(pci)
                     else:
-                        self._handle_stun_response(pci, nat_ext_ip, nat_ext_port,\
-                             nat_type, stun_host, stun_port, server_index)
+                        self._handle_stun_response(pci, nat_ext_ip, nat_ext_port,
+                             nat_type, server_index)
 
     def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_idx):
         """ sends one STUN request for an address.
@@ -341,22 +329,20 @@ class FwStunWrap:
         : return :  nat_type     - nat type of the NAT -> str
                     net_ext_ip   - the public IP address -> str
                     nat_ext_port - the public port -> int
-                    stun_host    - the STUN server the request was answered by -> str
-                    stun_port    - the STUN server's port -> int
                     stun_index   - the STUN server's index in the list of servers -> int
         """
         dev_name = fwutils.get_interface_name(lcl_src_ip)
         if dev_name == None:
-            return '','','','',''
+            return '','','',''
 
         fwglobals.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
         fwutils.set_linux_reverse_path_filter(dev_name, False)
 
-        nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port, stun_index = \
+        nat_type, nat_ext_ip, nat_ext_port, stun_index = \
             fwstun.get_ip_info(lcl_src_ip, lcl_src_port, None, None, dev_name, stun_idx)
 
         fwutils.set_linux_reverse_path_filter(dev_name, True)
-        return nat_type, nat_ext_ip, nat_ext_port, stun_host, stun_port, stun_index
+        return nat_type, nat_ext_ip, nat_ext_port, stun_index
 
     def _stun_thread(self, *args):
         """STUN thread
@@ -477,10 +463,9 @@ class FwStunWrap:
         : param tunnel_id : the ID of the tunnel for which we need the PCI for
         : return : PCI address, or None -> str
         """
-        tunnels = fwglobals.g.router_cfg.get_tunnels()
-        for tunnel in tunnels:
-            if tunnel['tunnel-id'] == tunnel_id:
-                return tunnel.get('pci')
+        tunnel = fwglobals.g.router_cfg.get_tunnels(tunnel_id)
+        if tunnel and tunnel[0]:
+            return tunnel[0].get('pci')
         return None
 
     def _map_ip_addr_to_pci(self, ip_no_mask):
