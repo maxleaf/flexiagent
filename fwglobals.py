@@ -215,6 +215,7 @@ class Fwglobals:
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
+        self.HOSTAPD_CONFIG_FILE = '/etc/hostapd/hostapd.conf'
         self.NETPLAN_FILES       = {}
         self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'

@@ -1334,9 +1334,16 @@ def modify_dhcpd(is_add, params):
     else:
         dns_string = ''
 
+    # Add interface name in case of wifi interface
+    if is_wifi_interface(dev_id):
+        intf_name = dev_id_to_linux_if(dev_id)
+        intf_string = 'interface %s;\n' % intf_name
+    else:
+        intf_string = ''
+
     subnet_string = 'subnet %s netmask %s' % (subnet, netmask)
     routers_string = 'option routers %s;\n' % (router)
-    dhcp_string = 'echo "' + subnet_string + ' {\n' + range_string + \
+    dhcp_string = 'echo "' + subnet_string + ' {\n' + intf_string + range_string + \
                  routers_string + dns_string + '}"' + ' | sudo tee -a %s;' % config_file
 
     if is_add == 1:
@@ -1979,19 +1986,60 @@ def get_lte_info(key):
 
     return info
 
+def configure_hostapd(dev_id, configuration):
+    try:
+
+        config = {
+            'ssid'                 : configuration.get('ssid', 'fwrouter_ap'),
+            'wpa_passphrase'       : configuration.get('password', 'fwrouter_ap'),
+            'interface'            : dev_id_to_linux_if(dev_id),
+            'channel'              : 6,
+            'macaddr_acl'          : 0,
+            'hw_mode'              : 'g',
+            'ignore_broadcast_ssid': 0,
+            'driver'               : 'nl80211',
+            'auth_algs'            : 1,
+            'eap_server'           : 0,
+            'macaddr_acl'          : 0,
+            'wmm_enabled'          : 0,
+            'wpa'                  : 2,
+            'wpa_pairwise'         : 'TKIP',
+            'rsn_pairwise'         : 'CCMP',
+            'logger_syslog'        : -1,
+            'logger_syslog_level'  : 2,
+            'logger_stdout'        : -1,
+            'logger_stdout_level'  : 2
+        }
+
+        with open(fwglobals.g.HOSTAPD_CONFIG_FILE, 'w+') as f:
+            data = ''
+            for key in config:
+                data += '%s=%s\n' % (key, config[key])
+
+            file_write_and_flush(f, data)
+
+        # driver = if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+
+
+        # config_file = 
+
+        return (True, None)
+    except Exception as e:
+        return (False, "Exception: %s" % str(e))
+
 def start_hostapd():
     try:
         os.system('sudo hostapd -d /etc/hostapd/hostapd.conf -B')
         return (True, None)
     except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % str(e))
 
 def stop_hostapd():
     try:
         os.system('killall hostapd')
         return (True, None)
     except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % str(e))
 
 def disconnect_from_lte():
     try:

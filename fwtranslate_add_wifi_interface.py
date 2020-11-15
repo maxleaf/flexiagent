@@ -87,8 +87,19 @@ def add(params):
     metric    = params.get('metric', 0)
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
+    configuration  = params.get('configuration', None)
 
     # Configure hostapd with saved configuration
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+            'module': 'fwutils',
+            'func': 'configure_hostapd',
+            'args': { 'dev_id': dev_id, 'configuration': configuration }
+    }
+    cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']   = "python"
