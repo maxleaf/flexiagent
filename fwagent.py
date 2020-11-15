@@ -189,7 +189,7 @@ class FwAgent:
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
         interfaces = fwglobals.g.handle_request({'message':'interfaces'})
-        default_route = fwutils.get_default_route()
+        (dr_via, dr_dev) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
         serial = fwutils.get_machine_serial()
@@ -203,8 +203,8 @@ class FwAgent:
                                 'serial' : serial,
                                 'machine_name': machine_name,
                                 'ip_list': ip_list,
-                                'default_route': default_route[0],
-                                'default_dev': default_route[1],
+                                'default_route': dr_via,
+                                'default_dev': dr_dev,
                                 'interfaces': json.dumps(interfaces['message'])}).encode()
         req = ureq.Request(url, data)
         ctx = ssl.create_default_context()

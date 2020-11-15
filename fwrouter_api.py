@@ -745,11 +745,11 @@ class FWROUTER_API:
 
         def _should_reconnect_agent_on_modify_interface(new_params):
             old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
-            if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
+            if new_params.get('addr') != old_params.get('addr'):
                 return True
-            if new_params.get('gateway') and new_params.get('gateway') != old_params.get('gateway'):
+            if new_params.get('gateway') != old_params.get('gateway'):
                 return True
-            if new_params.get('metric') and new_params.get('metric') != old_params.get('metric'):
+            if new_params.get('metric') != old_params.get('metric'):
                 return True
             return False
 

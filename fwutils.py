@@ -186,22 +186,23 @@ def get_os_routing_table():
 def get_default_route():
     """Get default route.
 
-    :returns: Default route.
+    :returns: tuple (<IP of GW>, <name of network interface>).
     """
+    (via, dev, metric) = ("", "", 0xffffffff)
     try:
         output = os.popen('ip route list match default').read()
         if output:
             routes = output.splitlines()
-            if routes:
-                route = routes[0]
-                dev_split = route.split('dev ')
-                rdev = dev_split[1].split(' ')[0] if len(dev_split) > 1 else ''
-                rip_split = route.split('via ')
-                rip = rip_split[1].split(' ')[0] if len(rip_split) > 1 else ''
-                return (rip, rdev)
+            for r in routes:
+                _dev = ''   if not 'dev '    in r else r.split('dev ')[1].split(' ')[0]
+                _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
+                _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
+                if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
+                    dev = _dev
+                    via = _via
     except:
         return ("", "")
-    return ("", "")
+    return (via, dev)
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -263,6 +264,7 @@ def get_interface_address(if_name):
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
+            fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
     fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))

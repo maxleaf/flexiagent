@@ -58,12 +58,11 @@ def test():
 
             # Execute step and ensure proper configuration afterwards
             #
-            (ok, _) = agent.cli('-f %s' % steps[idx], daemon=daemon)
-            assert ok
-            vpp_configured = fwtests.wait_vpp_to_be_configured(expected_vpp_cfg[idx], timeout=30)
-            assert vpp_configured
-            router_configured = fwtests.router_is_configured(expected_dump_cfg[idx], fwagent_py=agent.fwagent_py)
-            assert router_configured
+            (ok, err_str) = agent.cli('-f %s' % steps[idx],
+                                    daemon=daemon,
+                                    expected_vpp_cfg=expected_vpp_cfg[idx],
+                                    expected_router_cfg=expected_dump_cfg[idx])
+            assert ok, err_str
 
             # Kill the daemon after the initial configuration step (step 1)
             #
