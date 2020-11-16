@@ -207,6 +207,15 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
             del config_section['dhcp6']
 
         if re.match('yes', dhcp):
+            if 'addresses' in config_section:
+                del config_section['addresses']
+            if 'routes' in config_section:
+                del config_section['routes']
+            if 'gateway4' in config_section:
+                del config_section['gateway4']
+            if 'nameservers' in config_section:
+                del config_section['nameservers']
+
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
             config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
