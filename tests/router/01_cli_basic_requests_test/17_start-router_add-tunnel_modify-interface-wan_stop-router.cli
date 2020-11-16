@@ -25,6 +25,7 @@
   "message": "add-tunnel",
   "params": {
     "src": "8.8.1.1",
+    "pci":"0000:00:08.00",
     "dst": "8.8.1.2",
     "dstPort": "1068",
     "tunnel-id": 1,
