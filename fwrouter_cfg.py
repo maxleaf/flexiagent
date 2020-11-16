@@ -382,12 +382,6 @@ class FwRouterCfg:
             result.append(params)
         return result
 
-    def get_tunnel(self, tunnel_id):
-        requests = self._get_requests('add-tunnel:%d' %(tunnel_id))
-        if requests:
-            return requests[0]
-        return None
-
     def get_tunnels(self):
         return self._get_requests('add-tunnel')
 

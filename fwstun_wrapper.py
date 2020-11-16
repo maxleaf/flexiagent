@@ -11,6 +11,7 @@ import fwutils
 import time
 import traceback
 import copy
+from sqlitedict import SqliteDict
 
 tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
 sys.path.append(tools)
@@ -62,11 +63,12 @@ class FwStunWrap:
                                  they will produce nothing.
         """
         fwglobals.g.AGENT_CACHE['stun_interfaces'] = {}
-        self.stun_cache  = fwglobals.g.AGENT_CACHE['stun_interfaces']
-        self.thread_stun = None
-        self.is_running  = False
-        self.standalone  = standalone
-        self.stun_retry  = 60
+        self.stun_cache    = fwglobals.g.AGENT_CACHE['stun_interfaces']
+        self.thread_stun   = None
+        self.is_running    = False
+        self.standalone    = standalone
+        self.stun_retry    = 60
+        self.router_cfg_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
         fwstun.set_log(fwglobals.log)
 
     def _log_address_cache(self):
@@ -451,9 +453,9 @@ class FwStunWrap:
         : param tunnel_id : the ID of the tunnel for which we need the PCI for
         : return : PCI address, or None -> str
         """
-        tunnel = fwglobals.g.router_cfg.get_tunnel(tunnel_id)
-        if tunnel:
-            return tunnel.get('pci')
+        key = 'add-tunnel:%d' %(tunnel_id)
+        if self.router_cfg_db[key].get('params'):
+            return self.router_cfg_db[key]['params'].get('pci')
         return None
 
     def _map_ip_addr_to_pci(self, ip_no_mask):
