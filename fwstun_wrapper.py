@@ -68,7 +68,6 @@ class FwStunWrap:
         self.is_running    = False
         self.standalone    = standalone
         self.stun_retry    = 60
-        self.router_cfg_db = SqliteDict(fwglobals.g.ROUTER_CFG_FILE, autocommit=True)
         fwstun.set_log(fwglobals.log)
 
     def _log_address_cache(self):
@@ -453,9 +452,9 @@ class FwStunWrap:
         : param tunnel_id : the ID of the tunnel for which we need the PCI for
         : return : PCI address, or None -> str
         """
-        key = 'add-tunnel:%d' %(tunnel_id)
-        if key in self.router_cfg_db and self.router_cfg_db[key].get('params'):
-            return self.router_cfg_db[key]['params'].get('pci')
+        tunnel = fwglobals.g.router_cfg.get_tunnel(tunnel_id)
+        if tunnel:
+            return tunnel.get('pci')
         return None
 
     def _map_ip_addr_to_pci(self, ip_no_mask):
