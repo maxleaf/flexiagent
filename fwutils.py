@@ -1471,7 +1471,7 @@ def fix_aggregated_message_format(msg):
         return  \
             {
                 'message': 'aggregated',
-                'params' : { 'requests': msg }
+                'params' : { 'requests': copy.deepcopy(msg) }
             }
 
     # 'start-router' aggregation
@@ -1524,7 +1524,7 @@ def fix_aggregated_message_format(msg):
             requests.append(
                 {
                     'message': msg['message'],
-                    'params' : params
+                    'params' : copy.deepcopy(params)
                 })
 
         return \
@@ -1536,7 +1536,7 @@ def fix_aggregated_message_format(msg):
     # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
     #
     if msg['message'] == 'aggregated':
-        requests = [r for r in msg['params']['requests'] if r]
+        requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
         return \
             {
                 'message': 'aggregated',
