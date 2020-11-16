@@ -454,7 +454,7 @@ class FwStunWrap:
         : return : PCI address, or None -> str
         """
         key = 'add-tunnel:%d' %(tunnel_id)
-        if self.router_cfg_db[key].get('params'):
+        if key in self.router_cfg_db and self.router_cfg_db[key].get('params'):
             return self.router_cfg_db[key]['params'].get('pci')
         return None
 
