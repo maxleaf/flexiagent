@@ -306,18 +306,18 @@ class FwStunWrap:
             if not cached_addr or cached_addr.get('success',False) == True or cached_addr.get('gateway','') == '' \
                 or self._is_useStun(pci) == False:
                 continue
-            else:
-                if cached_addr['curr_time'] >= cached_addr['send_time']:
-                    local_ip = cached_addr['local_ip']
-                    nat_type, nat_ext_ip, nat_ext_port, server_index = \
-                        self._send_single_stun_request(local_ip, 4789, cached_addr['server_index'])
-                    cached_addr['curr_time'] = 0
 
-                    if nat_ext_port == '':
-                        self._handle_stun_none_response(pci)
-                    else:
-                        self._handle_stun_response(pci, nat_ext_ip, nat_ext_port,
-                             nat_type, server_index)
+            if cached_addr['curr_time'] >= cached_addr['send_time']:
+                local_ip = cached_addr['local_ip']
+                nat_type, nat_ext_ip, nat_ext_port, server_index = \
+                    self._send_single_stun_request(local_ip, 4789, cached_addr['server_index'])
+                cached_addr['curr_time'] = 0
+
+                if nat_ext_port == '':
+                    self._handle_stun_none_response(pci)
+                else:
+                    self._handle_stun_response(pci, nat_ext_ip, nat_ext_port,
+                            nat_type, server_index)
 
     def _send_single_stun_request(self, lcl_src_ip, lcl_src_port, stun_idx):
         """ sends one STUN request for an address.
@@ -400,8 +400,9 @@ class FwStunWrap:
 
         tunnels = fwglobals.g.router_cfg.get_tunnels()
 
-        if not tunnel_stats or not tunnels:
+        if not tunnels:
             return
+
         # Get list if IP addresses used by tunnels
         ip_up_set = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
         # Get list of all IP addresses in the system
@@ -463,9 +464,9 @@ class FwStunWrap:
         : param tunnel_id : the ID of the tunnel for which we need the PCI for
         : return : PCI address, or None -> str
         """
-        tunnel = fwglobals.g.router_cfg.get_tunnels(tunnel_id)
-        if tunnel and tunnel[0]:
-            return tunnel[0].get('pci')
+        tunnel = fwglobals.g.router_cfg.get_tunnel(tunnel_id)
+        if tunnel:
+            return tunnel.get('pci')
         return None
 
     def _map_ip_addr_to_pci(self, ip_no_mask):

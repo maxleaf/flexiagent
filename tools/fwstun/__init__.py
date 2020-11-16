@@ -230,7 +230,7 @@ def get_nat_type(s, source_ip, source_port, stun_host, stun_port, idx_start):
                 break
 
     if not resp:
-        return Blocked, ret, '', '', ''
+        return Blocked, ret, ''
     stun_log("Stun: Result: %s" %(ret))
     exIP = ret['ExternalIP']
     exPort = ret['ExternalPort']
@@ -306,14 +306,14 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
         stun_log("get_ip_info: bind: %s" % str(e))
         s.close()
         return ('', '', '', '')
-    else:
-        nat_type, nat, stun_idx = get_nat_type(s, source_ip, source_port, \
-                                 stun_host=stun_host, stun_port=stun_port, idx_start = idx)
-        external_ip = nat['ExternalIP'] if nat['ExternalIP'] != None else ''
-        external_port = nat['ExternalPort'] if nat['ExternalPort'] != None else ''
-        s.close()
-        nat_type = '' if nat_type == None else nat_type
-        return (nat_type, external_ip, external_port, stun_idx)
+
+    nat_type, nat, stun_idx = get_nat_type(s, source_ip, source_port, \
+                                stun_host=stun_host, stun_port=stun_port, idx_start = idx)
+    external_ip = nat['ExternalIP'] if nat['ExternalIP'] != None else ''
+    external_port = nat['ExternalPort'] if nat['ExternalPort'] != None else ''
+    s.close()
+    nat_type = '' if nat_type == None else nat_type
+    return (nat_type, external_ip, external_port, stun_idx)
 
 def stun_log(string, level = 'debug'):
     """ Log string to log file
