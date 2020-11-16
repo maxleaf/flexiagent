@@ -299,6 +299,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
+            "pci":"0000:00:08.00",
 			"dst": "20.0.0.4",
 			"tunnel-id": 1,
 			"ipsec": {
@@ -334,6 +335,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
+            "pci":"0000:00:08.00",
 			"dst": "30.0.0.4",
 			"tunnel-id": 2,
 			"ipsec": {
@@ -369,6 +371,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
+            "pci":"0000:00:08.00",
 			"dst": "70.0.0.7",
 			"tunnel-id": 7,
 			"ipsec": {

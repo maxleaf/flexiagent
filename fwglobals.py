@@ -41,7 +41,6 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
-from fwunassigned_if import FwUnassignedIfs
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -285,21 +284,16 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
-        self.db            = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
-        self.fwagent       = FwAgent(handle_signals=False)
-        self.router_cfg    = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize configuration database before rest modules!
-        self.agent_api     = FWAGENT_API()
-        self.router_api    = FWROUTER_API(self.MULTILINK_DB_FILE)
-        self.os_api        = OS_API()
-        self.apps          = FwApps(self.APP_REC_DB_FILE)
-        self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
-        self.unassigned_interfaces  = FwUnassignedIfs()
-
-        if standalone:
-            self.stun_wrapper = None
-        else:
-            self.stun_wrapper = FwStunWrap()
-            self.stun_wrapper.initialize()
+        self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
+        self.fwagent      = FwAgent(handle_signals=False)
+        self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
+        self.agent_api    = FWAGENT_API()
+        self.router_api   = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.os_api       = OS_API()
+        self.apps         = FwApps(self.APP_REC_DB_FILE)
+        self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.stun_wrapper = FwStunWrap(standalone)
+        self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -313,15 +307,12 @@ class Fwglobals:
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return None
 
-        if self.stun_wrapper:
-            self.stun_wrapper.finalize()
+        self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
 
-        if self.stun_wrapper:
-            del self.stun_wrapper
-        del self.unassigned_interfaces
+        del self.stun_wrapper
         del self.apps
         del self.policies
         del self.os_api
