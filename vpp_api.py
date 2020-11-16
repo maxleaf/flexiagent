@@ -66,7 +66,7 @@ class VPP_API:
             raise Exception("VPP_API.connect_to_vpp: no vpp api files were found")
         fwglobals.log.debug("VPP_API.connect_to_vpp: connecting")
         self.vpp = VPP(self.jsonfiles)
-        num_retries = 3
+        num_retries = 5
         for i in range(num_retries):
             try:
                 fwglobals.log.debug("VPP_API.connect_to_vpp: trying to connect, num " + str(i))
