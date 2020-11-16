@@ -40,7 +40,6 @@ class FwStunWrap:
         'gateway':
         'public_ip':
         'public_port':
-        'curr_time':
         'send_time':
         'success':
         'server_index':
@@ -67,6 +66,7 @@ class FwStunWrap:
         self.thread_stun = None
         self.is_running  = False
         self.standalone  = standalone
+        self.stun_retry  = 60
         fwstun.set_log(fwglobals.log)
 
     def _log_address_cache(self):
@@ -213,7 +213,6 @@ class FwStunWrap:
             cached_addr['gateway']     = ''
             cached_addr['public_ip']   = ''
             cached_addr['public_port'] = ''
-            cached_addr['curr_time']   = 0
             cached_addr['send_time']   = 0
             cached_addr['success']     = False
         else:
@@ -222,7 +221,6 @@ class FwStunWrap:
                                 'gateway':     '',
                                 'public_ip':   '',
                                 'public_port': '',
-                                'curr_time'  : 0,
                                 'send_time'  : 0,
                                 'success'    : False,
                                 'server_index'    : 0,
@@ -245,17 +243,9 @@ class FwStunWrap:
                 continue
             self.initialize_addr(pci)
 
-    def _increase_sec(self):
-        """ For each address not received an answer, increase the seconds counter by 1.
-        """
-        for pci in self.stun_cache:
-            pci = self.stun_cache.get(pci)
-            if pci.get('success') == False and pci.get('gateway') != '':
-                pci['curr_time']+=1
-
     def _handle_stun_none_response(self, pci):
         """ Handle non response after STUN request was sent.
-        continue to retry every 60 seconds.
+        continue to retry every self.stun_retry seconds.
 
         : param pci : the PCI address associated with an IP address for which we did not receive
                       STUN reply
@@ -263,11 +253,11 @@ class FwStunWrap:
         cached_addr = self.stun_cache.get(pci)
         if not cached_addr:
             return
-        cached_addr['send_time'] = 60
+        cached_addr['send_time'] = time.time() + self.stun_retry # next retry after 60 seconds
         cached_addr['success'] = False
         cached_addr['server_index'] = 0
         fwglobals.log.debug("_handle_stun_none_response: failed getting public IP/port for address %s, retry in %d seconds"\
-             %(cached_addr['local_ip'], cached_addr['send_time']))
+             %(cached_addr['local_ip'], self.stun_retry))
 
     def _handle_stun_response(self, pci, p_ip, p_port, nat_type, st_index):
         """ Handle STUN response for an address. Reset all the counters,
@@ -286,7 +276,6 @@ class FwStunWrap:
         fwglobals.log.debug("found external %s:%s for %s:4789" %(p_ip, p_port, cached_addr['local_ip']))
         cached_addr['success']     = True
         cached_addr['send_time']   = 0
-        cached_addr['curr_time']   = 0
         cached_addr['nat_type']         = nat_type
         cached_addr['public_ip']        = p_ip
         cached_addr['public_port']      = p_port
@@ -294,7 +283,7 @@ class FwStunWrap:
 
     def _send_stun_requests(self):
         """ Send STUN request for each address that has no public IP and port
-        updated in the cache. Sent only if the seconds counter equals to
+        updated in the cache. Sent only if the current time equals or greater than
         the calculated time it should be sent ('send_time').
         """
         if not self.stun_cache:
@@ -307,11 +296,10 @@ class FwStunWrap:
                 or self._is_useStun(pci) == False:
                 continue
 
-            if cached_addr['curr_time'] >= cached_addr['send_time']:
+            if time.time() >= cached_addr['send_time']:
                 local_ip = cached_addr['local_ip']
                 nat_type, nat_ext_ip, nat_ext_port, server_index = \
                     self._send_single_stun_request(local_ip, 4789, cached_addr['server_index'])
-                cached_addr['curr_time'] = 0
 
                 if nat_ext_port == '':
                     self._handle_stun_none_response(pci)
@@ -366,7 +354,6 @@ class FwStunWrap:
                     # them, or for ones that did not get reply previously
                     if slept % send_stun_timeout == 0:
                         self._send_stun_requests()
-                    self._increase_sec()
 
                     if slept % reset_all_timeout == 0:
                         # reset all STUN information every 10 minutes
@@ -435,7 +422,7 @@ class FwStunWrap:
                         self.stun_cache[pci]['success'] = False
                         # it takes around 30 seconds to create a tunnel, so don't
                         # start sending STUN requests right away
-                        self.stun_cache[pci]['send_time'] = 30
+                        self.stun_cache[pci]['send_time'] = time.time() + 30
 
     def _is_useStun(self, pci):
         """ check router DB for 'useStun' flag for a PCI address
