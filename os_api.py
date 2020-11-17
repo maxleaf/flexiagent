@@ -73,7 +73,8 @@ class OS_DECODERS:
                 'dhcp':'',
                 'gateway':'',
                 'metric': '',
-                'deviceType': ''
+                'deviceType': '',
+                'deviceParams': {}
             }
 
             daddr['driver'] = fwutils.get_interface_driver(dev_id)
@@ -83,6 +84,7 @@ class OS_DECODERS:
 
             if fwutils.is_wifi_interface(dev_id):
                 daddr['deviceType'] = 'wifi'
+                daddr['deviceParams'] = fwutils.wifi_get_capabilities(dev_id)
 
             if fwutils.is_lte_interface(dev_id):
                 daddr['deviceType'] = 'lte'

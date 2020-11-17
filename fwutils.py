@@ -1986,6 +1986,19 @@ def get_lte_info(key):
 
     return info
 
+def wifi_get_capabilities(dev_id):
+    result = {
+        'AccessPoint': True,
+        'Support802.11n': False,
+        'Channels': [],
+    }
+
+    try:
+        linux_if = dev_id_to_linux_if(dev_id)
+        output = subprocess.check_output('iwlist %s freq' % linux_if, shell=True)
+    except Exception as e:
+        return {}
+
 def configure_hostapd(dev_id, configuration):
     try:
 
