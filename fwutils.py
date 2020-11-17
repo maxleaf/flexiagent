@@ -1688,7 +1688,7 @@ def vmxnet3_unassigned_interfaces_up():
         assigned_list    = fwglobals.g.router_cfg.get_interfaces()
         assigned_pcis    = [params['pci'] for params in assigned_list]
 
-        for pci in linux_interfaces.keys():
+        for pci in linux_interfaces:
             if not pci in assigned_pcis:
                 if pci_is_vmxnet3(pci):
                     os.system("ip link set dev %s up" % linux_interfaces[pci])
@@ -1705,16 +1705,9 @@ def get_reconfig_hash():
     """
     res = ''
 
-    linux_pci_list = get_linux_pcis()
-    vpp_run = vpp_does_run()
-
-    for pci in linux_pci_list:
-        name = pci_to_linux_iface(pci)
-        if name is None and vpp_run:
-            name = pci_to_tap(pci)
-        if name is None:
-            continue
-
+    linux_interfaces = get_linux_interfaces()
+    for pci in linux_interfaces:
+        name = linux_interfaces[pci]
         addr = get_interface_address(name)
         addr = addr.split('/')[0] if addr else ''
         gw, metric = get_interface_gateway(name)

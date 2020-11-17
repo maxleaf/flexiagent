@@ -54,7 +54,7 @@ def kill_vpp_and_restore(agent, expected_vpp_cfg):
         return (False, "vpp was not re-started probably, same pid: %d" % vpp_pid_after)
 
     # Ensure that restore finished
-    restored = agent.wait_log_line("restore finished", timeout=40)
+    restored = agent.wait_log_line("restore finished", timeout=90)
     if not restored:
         return (False, "'restore finished' line was not found in log")
 
