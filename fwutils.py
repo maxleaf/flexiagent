@@ -220,31 +220,29 @@ def get_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
-def get_interface_address_all(filtr=None):
-    """ Get all interfaces from linux, and add only the ones that have address family of
-    AF_INET. if filter=='gw', add only interfaces with GW.
-    : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
-                    if filtr is None, return all IP addresses in the system.
-    : return : list of WAN interfaces
+def get_all_interfaces():
+    """ Get all interfaces from linux. For dev id with address family of AF_INET,
+        also store gateway, if exists.
+        : return : Dictionary of dev_id->IP,GW
     """
-    ip_list = []
+    dev_id_ip_gw = {}
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         dev_id = get_interface_dev_id(nicname)
         if dev_id == '':
             continue
+        dev_id_ip_gw[dev_id] = {}
+        dev_id_ip_gw[dev_id]['addr'] = ''
+        dev_id_ip_gw[dev_id]['gw']   = ''
         for addr in addrs:
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
-                if filtr == 'gw':
-                    gateway, _ = get_interface_gateway(nicname)
-                    if gateway != '':
-                        ip_list.append(ip)
-                        break
-                else:
-                    ip_list.append(ip)
-                    break
-    return ip_list
+                dev_id_ip_gw[dev_id]['addr'] = ip
+                gateway, _ = get_interface_gateway(nicname)
+                dev_id_ip_gw[dev_id]['gw'] = gateway if gateway else ''
+                break
+
+    return dev_id_ip_gw
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -491,14 +489,14 @@ def dev_id_to_vpp_if_name(dev_id):
     return None
 
 # 'vpp_if_name_to_dev_id' function maps interface name, eg. 'GigabitEthernet0/8/0'
-# into the pci of that interface, eg. '0000:00:08.00'.
+# into the dev id of that interface, eg. '0000:00:08.00'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
 def vpp_if_name_to_dev_id(vpp_if_name):
-    """Convert PCI address into VPP interface name.
+    """Convert vpp interface name address into interface bus address.
 
     :param vpp_if_name:      VPP interface name.
 
-    :returns: PCI address.
+    :returns: Interface bus address.
     """
     dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
     if dev_id: return dev_id
@@ -619,18 +617,18 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 
     return None
 
-# 'dev_id_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
+# 'dev_id_to_tap' function maps interface referenced by dev_id, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
-# To do that we convert firstly the pci into name of interface in VPP,
+# To do that we convert firstly the dev_id into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0' and than we grep output of 'vppctl sh tap-inject'
 # command by this name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
 def dev_id_to_tap(dev_id):
-    """Convert PCI address into TAP name.
+    """Convert dev_id address into TAP name.
 
-    :param pci:      PCI address.
+    :param dev_id:      Interface bus address.
 
     :returns: Linux TAP interface name.
     """
@@ -662,7 +660,7 @@ def dev_id_to_tap(dev_id):
 def vpp_if_name_to_tap(vpp_if_name):
     """Convert VPP interface name into Linux TAP interface name.
 
-     :param vpp_if_name:      PCI address.
+     :param vpp_if_name:  interface name.
 
      :returns: Linux TAP interface name.
      """
@@ -1804,7 +1802,40 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
 
-def vpp_nat_add_remove_interface(remove, dev_id, metric):
+def get_reconfig_hash():
+    """ This function creates a string that holds all the information added to the reconfig
+    data, and then create a hash string from it.
+
+    : return : md5 hash result of all the data collected or empty string.
+    """
+    res = ''
+
+    linux_dev_id_list = get_linux_dev_ids()
+    vpp_run = vpp_does_run()
+
+    for dev_id in linux_dev_id_list:
+        name = dev_id_to_linux_if(dev_id)
+        if name is None and vpp_run:
+            name = dev_id_to_tap(dev_id)
+        if name is None:
+            continue
+
+        addr = get_interface_address(name)
+        addr = addr.split('/')[0] if addr else ''
+        gw, metric = get_interface_gateway(name)
+
+        res += 'addr:'    + addr + ','
+        res += 'gateway:' + gw + ','
+        res += 'metric:'  + metric + ','
+        if gw and addr:
+            _, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(dev_id)
+            res += 'public_ip:'   + public_ip + ','
+            res += 'public_port:' + str(public_port) + ','
+
+    hash = hashlib.md5(res).hexdigest()
+    return hash
+
+def vpp_nat_add_remove_interface(remove, dev, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
