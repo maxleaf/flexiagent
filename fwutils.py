@@ -1707,14 +1707,14 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
     vpp_if_name_remove = ''
     metric_min = -1
 
-    dev_metric = int(metric)
+    dev_metric = int(metric or 0)
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
     for wan in wan_list:
         metric_cur_str = wan.get('metric', None)
         if not metric_cur_str:
             continue
-        metric_cur = int(metric_cur_str)
+        metric_cur = int(metric_cur_str or 0)
         pci = wan['pci']
 
         if pci == dev:
