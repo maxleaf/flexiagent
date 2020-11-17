@@ -9,6 +9,7 @@
     {
       "Key": "add-interface:0000:00:08.00", 
       "Params": {
+        "PublicPort": 19001, 
         "addr": "10.0.0.4/24", 
         "gateway": "10.0.0.10", 
         "multilink": {
@@ -65,6 +66,7 @@
           }, 
           "routing": "ospf"
         }, 
+        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 1
       }
@@ -101,6 +103,7 @@
           }, 
           "routing": "ospf"
         }, 
+        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 2
       }

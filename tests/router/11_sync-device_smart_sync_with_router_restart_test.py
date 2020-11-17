@@ -92,20 +92,12 @@ def test():
             # running on background, so it could receive further injects.
             #
             daemon = True if idx == 0 else False
-            (ok, error_str) = agent.cli('-f %s' % step, daemon=daemon)
-            assert ok, error_str
-
-            # Ensure validity of VPP and database configurations.
-            #
-            vpp_configured = fwtests.wait_vpp_to_be_configured(expected_vpp_cfg[idx], timeout=30)
-            assert vpp_configured, "VPP configuration does not match %s" % expected_vpp_cfg[idx]
-            router_configured = fwtests.router_is_configured(expected_dump_cfg[idx], fwagent_py=agent.fwagent_py)
-            assert router_configured, "configuration dump does not match %s" % expected_dump_cfg[idx]
-
-            # Ensure no errors in log
-            #
-            lines = agent.grep_log('error: ')
-            assert len(lines) == 0, "errors found in log: %s" % '\n'.join(lines)
+            (ok, err_str) = agent.cli('-f %s' % step,
+                                    daemon=daemon,
+                                    expected_vpp_cfg=expected_vpp_cfg[idx],
+                                    expected_router_cfg=expected_dump_cfg[idx],
+                                    check_log=True)
+            assert ok, err_str
 
             # Ensure smart sync is noted in log.
             # Note the first step does not perform sync, but loads initial
@@ -123,6 +115,7 @@ def test():
                 # Ensure that the configuration database signature was reset as a result of 'sync-device'
                 #
                 (ok, ret) = agent.cli('-f %s' % cli_get_device_stats_file)
+                assert ok, ret
                 cfg_signature = ret.get('router-cfg-hash')
                 assert cfg_signature == '', "signature was not reset on 'sync-device' success: %s" % cfg_signature
 

@@ -1,0 +1,146 @@
+[
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "10.0.0.4",
+    "dst": "20.0.0.4",
+    "pci": "0000:00:08.00",
+    "tunnel-id": 1,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1020,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.1/31",
+      "mac":"08:00:27:fd:00:02",
+      "mtu":1420,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "brown", "gray" ]
+      }
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "10.0.0.4",
+    "dst": "70.0.0.7",
+    "pci": "0000:00:08.00",
+    "tunnel-id": 7,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1070,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "7030aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "7030ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 7010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "7010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "7010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.7/31",
+      "mac":"08:00:27:fd:00:07",
+      "mtu":1420,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "orange" ]
+      }
+    }
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "add-multilink-policy",
+  "params": {
+    "id": "5ed4127aa81d8258b96b4853",
+    "rules": [
+      {
+        "id": "1",
+        "priority": 0,
+        "classification": {
+          "prefix": {
+            "ip": "8.8.8.8/32",
+            "ports": "",
+            "protocol": ""
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "green" , "blue" ],
+              "order": "load-balance"
+            },
+            {
+              "pathlabels": [ "blue" ],
+              "order": "priority"
+            }
+          ],
+          "order": "load-balance",
+          "fallback": "by-destination"
+        }
+      },
+      {
+        "id": "2",
+        "priority": 1,
+        "classification": {
+          "application": {
+            "importance": "low"
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "black" ],
+              "order": "priority"
+            }
+          ],
+          "order": "priority",
+          "fallback": "by-destination"
+        }
+      },
+      {
+        "id": "3",
+        "priority": 1,
+        "classification": {
+          "application": {
+            "importance": "low"
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "orange" ],
+              "order": "load-balance"
+            }
+          ],
+          "order": "priority",
+          "fallback": "drop"
+        }
+      }
+    ]
+  }
+}
+]

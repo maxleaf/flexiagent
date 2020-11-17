@@ -1018,6 +1018,8 @@ class Checker:
             return True
 
         # configuration file exist
+        if conf and conf['cpu'] == None:
+            conf.append(self.fw_ac_db.create_element('cpu'))
         string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
         if string:
             tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)

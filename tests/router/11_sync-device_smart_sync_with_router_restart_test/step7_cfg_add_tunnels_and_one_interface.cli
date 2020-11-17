@@ -2,7 +2,6 @@
   "entity": "agent",
   "message": "sync-device",
   "params": {
-    "router-cfg-hash": "kukuriku",
     "requests": [
 		{
 		  "entity":  "agent",
@@ -51,6 +50,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
+            "pci":"0000:00:08.00",
 			"dst": "100.0.0.4",
 			"tunnel-id": 1,
 			"ipsec": {
@@ -86,6 +86,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
+            "pci":"0000:00:08.00",
 			"dst": "30.0.0.4",
 			"tunnel-id": 2,
 			"ipsec": {
@@ -121,6 +122,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
+            "pci":"0000:00:08.00",
 			"dst": "90.0.0.9",
 			"tunnel-id": 9,
 			"ipsec": {

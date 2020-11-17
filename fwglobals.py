@@ -30,6 +30,8 @@ import time
 import traceback
 import yaml
 
+from sqlitedict import SqliteDict
+
 from fwagent import FwAgent
 from fwrouter_api import FWROUTER_API
 from fwagent_api import FWAGENT_API
@@ -39,7 +41,6 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
-from fwunassigned_if import FwUnassignedIfs
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -179,6 +180,26 @@ class Fwglobals:
             if self.DEBUG:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 
+    class FwCache:
+        """Storage for data that is valid during one FwAgent lifecycle only.
+        """
+        def __init__(self):
+            self.db = {
+                'LINUX_INTERFACES': {},
+                'PCI_TO_VPP_IF_NAME': {},
+                'PCI_TO_VPP_TAP_NAME': {},
+                'PCIS': {},
+                'STUN': {},
+                'VPP_IF_NAME_TO_PCI': {},
+            }
+            self.linux_interfaces    = self.db['LINUX_INTERFACES']
+            self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
+            self.pci_to_vpp_tap_name = self.db['PCI_TO_VPP_TAP_NAME']
+            self.pcis                = self.db['PCIS']
+            self.stun_cache          = self.db['STUN']
+            self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
+
+
     def __init__(self):
         """Constructor method
         """
@@ -209,6 +230,7 @@ class Fwglobals:
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
+        self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.NETPLAN_FILES       = {}
         self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
@@ -220,14 +242,8 @@ class Fwglobals:
         self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
         self.WS_STATUS_OK                 = 1000
         self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
-        # Cache to save various global data
-        self.AGENT_CACHE = {}
-        # PCI to VPP names, assuming names and PCI are unique and not changed during operation
-        self.AGENT_CACHE['PCI_TO_VPP_IF_NAME_MAP'] = {}
-        self.AGENT_CACHE['VPP_IF_NAME_TO_PCI_MAP'] = {}
-        self.AGENT_CACHE['PCI_TO_VPP_TAP_NAME_MAP'] = {}
-        self.AGENT_CACHE['PCIS'] = []
         self.fwagent = None
+        self.cache   = self.FwCache()
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -242,13 +258,6 @@ class Fwglobals:
         self.signal_names = dict((getattr(signal, n), n) \
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
-
-    def get_cache_data(self, key):
-        """get the cache data for a given key
-
-        :returns: data for a given key, None if key does not exist
-        """
-        return self.AGENT_CACHE.get(key)
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
@@ -282,20 +291,16 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
-        self.fwagent       = FwAgent(handle_signals=False)
-        self.router_cfg    = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
-        self.agent_api     = FWAGENT_API()
-        self.router_api    = FWROUTER_API(self.MULTILINK_DB_FILE)
-        self.os_api        = OS_API()
-        self.apps          = FwApps(self.APP_REC_DB_FILE)
-        self.policies      = FwPolicies(self.POLICY_REC_DB_FILE)
-        self.unassigned_interfaces  = FwUnassignedIfs()
-
-        if standalone:
-            self.stun_wrapper = None
-        else:
-            self.stun_wrapper = FwStunWrap()
-            self.stun_wrapper.initialize()
+        self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
+        self.fwagent      = FwAgent(handle_signals=False)
+        self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
+        self.agent_api    = FWAGENT_API()
+        self.router_api   = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.os_api       = OS_API()
+        self.apps         = FwApps(self.APP_REC_DB_FILE)
+        self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.stun_wrapper = FwStunWrap(standalone)
+        self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
 
@@ -309,15 +314,12 @@ class Fwglobals:
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return None
 
-        if self.stun_wrapper:
-            self.stun_wrapper.finalize()
+        self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
 
-        if self.stun_wrapper:
-            del self.stun_wrapper
-        del self.unassigned_interfaces
+        del self.stun_wrapper
         del self.apps
         del self.policies
         del self.os_api
@@ -325,6 +327,7 @@ class Fwglobals:
         del self.agent_api
         del self.fwagent
         self.fwagent = None
+        self.db.close()
         return None
 
     def __str__(self):
@@ -367,7 +370,7 @@ class Fwglobals:
         if not ok:
             func_str = request['params'].get('func')
             if args:
-                args_str = ', '.join([ "%s=%s" % (arg_name, args[arg_name]) for arg_name in args.keys() ])
+                args_str = ', '.join([ "%s=%s" % (arg_name, args[arg_name]) for arg_name in args ])
             else:
                 args_str = ''
             log.error('_call_python_api: %s(%s) failed: %s' % (func_str, args_str, val))
