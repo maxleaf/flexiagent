@@ -84,7 +84,7 @@ class OS_DECODERS:
 
             if fwutils.is_wifi_interface(dev_id):
                 daddr['deviceType'] = 'wifi'
-                # daddr['deviceParams'] = fwutils.wifi_get_capabilities(dev_id)
+                daddr['deviceParams'] = fwutils.wifi_get_capabilities(dev_id)
 
             if fwutils.is_lte_interface(dev_id):
                 daddr['deviceType'] = 'lte'

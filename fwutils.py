@@ -1986,18 +1986,6 @@ def get_lte_info(key):
 
     return info
 
-def wifi_get_capabilities(dev_id):
-    result = {
-        'AccessPoint': True,
-        'Support802.11n': False,
-        'Channels': [],
-    }
-
-    try:
-        linux_if = dev_id_to_linux_if(dev_id)
-        output = subprocess.check_output('iwlist %s freq' % linux_if, shell=True)
-    except Exception as e:
-        return {}
 
 def configure_hostapd(dev_id, configuration):
     try:
@@ -2360,3 +2348,76 @@ def vpp_nat_add_remove_interface(remove, dev_id, metric):
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
+
+def wifi_get_capabilities(dev_id):
+
+    result = {
+        'SupportedModes': [],
+        'Band 1': {
+            'Frequencies': [],
+            'Capabilities': [],
+            'Bitrates': [],
+            'Exists': False
+        },
+        'Band 2': {
+            'Frequencies': [],
+            'Capabilities': [],
+            'Bitrates': [],
+            'Exists': False
+        }
+    }
+
+    def _get_band(output, band_number):
+        regex = r'(Band ' + str(band_number) + r':.*?\\n\\t(?!\\t))'
+        match = re.search(regex, output,  re.MULTILINE | re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        return ""
+
+    def _parse_key_data(text, output, negative_look_count = 1):
+        regex = text + r'.*?(\\n\\t(?!' + (r'\\t' * negative_look_count) + '))'
+        match = re.search(regex, output,  re.MULTILINE | re.IGNORECASE)
+
+        res = list()
+
+        if match:
+            result = match.group()
+            splitted = result.replace('\\t', '\t').replace('\\n', '\n').splitlines()
+            for line in splitted[1:-1]:
+                res.append(line.lstrip('\t').strip(' *'))
+            return res
+
+        return res
+
+    try:
+        output = subprocess.check_output('iw dev', shell=True).splitlines()
+        linux_if = dev_id_to_linux_if(dev_id)
+        if linux_if in output[1]:
+            phy_name = output[0].replace('#', '')
+            #output = subprocess.check_output('cat /tmp/jaga', shell=True).replace('\\\\t', '\\t').replace('\\\\n', '\\n')
+            # banda1 = _get_band(output2, 1)
+            # banda2 = _get_band(output2, 2)
+
+            output = subprocess.check_output('iw %s info' % phy_name, shell=True).replace('\t', '\\t').replace('\n', '\\n')
+            result['SupportedModes'] = _parse_key_data('Supported interface modes', output)
+
+
+            band1 = _get_band(output, 1)
+            band2 = _get_band(output, 2)
+
+            if band1:
+                result['Band 1']['Exists'] = True
+                result['Band 1']['Frequencies'] = _parse_key_data('Frequencies', band1)
+                result['Band 1']['Bitrates'] = _parse_key_data('Bitrates', band1, 2)
+                result['Band 1']['Capabilities'] = _parse_key_data('Capabilities', band1, 2)
+
+            if band2:
+                result['Band 2']['Exists'] = True
+                result['Band 2']['Frequencies'] = _parse_key_data('Frequencies', band2)
+                result['Band 2']['Bitrates'] = _parse_key_data('Bitrates', band2, 2)
+                result['Band 2']['Capabilities'] = _parse_key_data('Capabilities', band2, 2)
+
+        return result
+    except Exception as e:
+        return result
