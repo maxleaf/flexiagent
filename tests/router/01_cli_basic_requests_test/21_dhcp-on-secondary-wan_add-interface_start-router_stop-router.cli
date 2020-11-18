@@ -1,0 +1,30 @@
+[
+{
+  "entity": "agent",
+  "message": "add-interface",
+  "params": {
+        "pci":"0000:00:09.00",
+		"dhcp":"yes",
+        "type":"wan"
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+      {
+        "pci":"0000:00:08.00",
+		"dhcp":"yes",
+        "type":"wan"
+      }
+    ]
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "stop-router"
+}
+]

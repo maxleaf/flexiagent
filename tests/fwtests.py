@@ -37,7 +37,7 @@ class TestFwagent:
         code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
         self.fwkill_py  = 'python ' + os.path.join(code_root, 'tools', 'common', 'fwkill.py')
-        self.log_start_time = get_log_time()
+        self.set_log_start_marker()
 
     def __enter__(self):
         self.clean()
@@ -58,14 +58,80 @@ class TestFwagent:
         if vpp_does_run():
             os.system('%s --quiet' % self.fwkill_py)            # The kill shot - ensure vpp does not run
         os.system('%s reset --soft --quiet' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
+
+        # Print exception if it is not caused by 'assert' statement
+        # The 'assert' is printed by pytest.
         if traceback:
-            print("!!!! TestFwagent got exception !!!")
-            tb.print_tb(traceback)
+            last_frame     = tb.extract_tb(traceback)[-1]
+            failed_command = last_frame[3]
+            if failed_command and not re.match('assert ', failed_command):
+                print("!!!! TestFwagent got exception !!!")
+                lines = tb.format_tb(traceback)   # 'print_tb' output is not captured by pytest for some reason
+                for l in lines:
+                    print(l)
 
-    def set_log_start_time(self):
-        self.log_start_time = get_log_time()
+    def set_log_start_marker(self):
+        self.start_time = datetime.datetime.now()
+        time.sleep(1)   # Ensure that all further log times are greater than now()
+                        # The now() uses microseconds, when log uses seconds only.
 
-    def cli(self, args, daemon=False, print_output_on_error=True):
+    def cli(self, args, daemon=False, expected_vpp_cfg=None, expected_router_cfg=None, check_log=False):
+        '''Invokes fwagent API.
+
+        :param args:   the API function name and parameters to be invoked.
+
+        :param daemon: if True the fwagent will be created and run by background
+                    process. Otherwise, the local instance of agent will be created,
+                    the API will be invoked on it and the instance will be destroyed.
+
+        :param expected_vpp_cfg: The name of the JSON file with dictionary or
+                    the python list of VPP configuration items that describes
+                    expected VPP configuration upon successful API invocation
+                    in terms of numbers of existing objects, e.g.:
+                                    {
+                                        "interfaces" :  8,
+                                        "tunnels":      3,
+                                        "dhcp-servers": 1
+                                    }
+                        On API return the VPP configuration is dumped and is
+                    compared to the provided dictionary. If there is no match,
+                    the error is returned.
+
+        :param expected_router_cfg: The name of the JSON file with dictionary
+                    that describes expected router configuration upon successful
+                    API invocation as it would be retrieved by the
+                    'agent show --router configuration' command:
+                                    {
+                                    "======= START COMMAND =======": [
+                                        {
+                                        "Key": "start-router",
+                                        "Params": {}
+                                        }
+                                    ],
+                                    "======== INTERFACES ========": [
+                                        {
+                                        "Key": "add-interface:0000:00:08.00",
+                                        "Params": {
+                                            "addr": "10.0.0.4/24",
+                                            "gateway": "10.0.0.10",
+                                            "multilink": {
+                                    ...
+                                    }
+                    Note the router configuration is stored in the agent request
+                    database file, that persists reboots and that is valid even
+                    if the VPP does not run.
+                        On API return the router configuration is dumped and is
+                    compared to the provided dictionary. If there is no match,
+                    the error is returned.
+
+        :param check_log: if True, the log since API execution will be grepped
+                    for 'error: '. If found, the error will be returned.
+        '''
+
+        if check_log:
+            start_time = datetime.datetime.now()
+            time.sleep(1)   # Ensure that all further log times are greater than now()
+                            # The now() uses microseconds, when log uses seconds only.
 
         # Create instance of background fwagent if asked.
         if daemon:
@@ -98,26 +164,31 @@ class TestFwagent:
         # Deserialize object printed by CLI onto STDOUT
         match = re.search('return-value-start (.*) return-value-end', out)
         if not match:
-            print("TestFwagent::cli: BAD OUTPUT START")
-            print("TestFwagent::cli: command: '%s'" % cmd)
-            print("TestFwagent::cli: output:")
-            print(out)
-            print("TestFwagent::cli: BAD OUTPUT END")
-            return (False, { 'error': 'bad CLI output format'})
+            return (False, { 'error': 'bad CLI output format: ' + out})
         ret = json.loads(match.group(1))
         if 'ok' in ret and ret['ok'] == 0:
-            ok = False
-            if print_output_on_error:
-                print("TestFwagent::cli: FAILURE REPORT START")
-                print("TestFwagent::cli: command: '%s'" % cmd)
-                print("TestFwagent::cli: error:   '%s'" % ret['error'])
-                print("TestFwagent::cli: output:")
-                print(out)
-                print("TestFwagent::cli: FAILURE REPORT END")
-        else:
-            ok = True
+            return (False, "ret=%s, out=%s" % (ret, out))
 
-        return (ok, ret)
+        # Ensure VPP configuration success.
+        if expected_vpp_cfg:
+            vpp_configured = wait_vpp_to_be_configured(expected_vpp_cfg, timeout=60)
+            if not vpp_configured:
+                return (False, "VPP configuration does not match %s" % expected_vpp_cfg)
+
+        # Ensure router configuration success.
+        if expected_router_cfg:
+            router_configured = router_is_configured(expected_router_cfg, self.fwagent_py)
+            if not router_configured:
+                return (False, "router configuration does not match %s" % expected_router_cfg)
+
+        # Ensure no errors in log.
+        if check_log:
+            lines = self.grep_log('error: ', since=start_time)
+            if lines:
+                return (False, "errors found in log: %s" % '\n'.join(lines))
+
+        return (True, ret)
+
 
     def show(self, args):
         cmd = '%s show %s' % (self.fwagent_py, args)
@@ -127,7 +198,7 @@ class TestFwagent:
     def grep_log(self, pattern, print_findings=True, since=None):
         found = []
         if not since:
-            since = self.log_start_time
+            since = self.start_time
 
         grep_cmd = "sudo grep -a -E '%s' /var/log/flexiwan/agent.log" % pattern
         try:
@@ -137,6 +208,7 @@ class TestFwagent:
                 for (idx, line) in enumerate(lines):
                     # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
                     line_time = get_log_line_time(line)
+                    line_time = line_time.replace(since.year)   # Fix year that does not present in log line
                     if line_time >= since:
                         found = lines[idx:]
                         break
@@ -144,7 +216,7 @@ class TestFwagent:
                     for line in found:
                         print('FwTest:grep_log(%s): %s' % (pattern, line))
         except subprocess.CalledProcessError:
-            pass   # 'egrep' returns failure on no match!
+            pass   # 'grep' returns failure on no match!
         return found
 
     def wait_log_line(self, pattern, timeout=1):
@@ -157,7 +229,6 @@ class TestFwagent:
         '''
         # If 'cfg_to_check' is a file, convert it into list of tuples.
         #
-        to = timeout
         found = self.grep_log(pattern, print_findings=False)
         while not found and timeout > 0:
             time.sleep(1)
@@ -268,6 +339,7 @@ def wait_vpp_to_start(timeout=1000000):
         pid = vpp_pid()
     if timeout == 0:
         return False
+
     # Wait for vpp to be ready to process cli requests
     res = subprocess.call("sudo vppctl sh version", shell=True)
     while res != 0 and timeout > 0:
@@ -342,18 +414,6 @@ def router_is_configured(expected_cfg_dump_filename,
     elif print_error:
         print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
     return ok
-
-def get_log_time(log='/var/log/flexiwan/agent.log'):
-    out = subprocess.check_output(['tail','-1','/var/log/flexiwan/agent.log'])
-    # Ensure that output is in the following format:
-    # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...
-    tokens = out.split()[0:3]
-    if len(tokens) < 3:  # If it is not (for example due to partially flushed line), take the one line before
-        out = subprocess.check_output(['tail','-2','/var/log/flexiwan/agent.log'])
-        tokens = out.split()[0:3]
-        if len(tokens) < 3:     # If still no luck, start from epoch
-            out = "Jan 01 00:00:01"
-    return get_log_line_time(out)
 
 def get_log_line_time(log_line):
     # Jul 29 15:57:19 localhost fwagent: error: _preprocess_request: current requests: [{"message": ...

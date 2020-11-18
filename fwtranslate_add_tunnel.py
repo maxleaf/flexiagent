@@ -152,36 +152,21 @@ from vpp_papi import VppEnum
 #     +--------------------------------------------------------------------------------+
 #
 
-def init_tunnels():
-    """Initialize global values.
-
-    :returns: None.
-    """
-    global sa_index
-
-    sa_index = 0
-
-def generate_id(ret):
-    """Generate identifier.
-
-    :param ret:         Initial id value.
-
-    :returns: identifier.
-    """
-    ret += 1
-    if ret == 2**32:       # sad_id is u32 in VPP
-        ret = 0
-    return ret
-
-sa_index = 0
 def generate_sa_id():
     """Generate SA identifier.
 
     :returns: New SA identifier.
     """
-    global sa_index
-    sa_index = generate_id(sa_index)
-    return copy.deepcopy(sa_index)
+    router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+
+    sa_id = router_api_db['sa_id']
+    sa_id += 1
+    if sa_id == 2**32:       # sad_id is u32 in VPP
+        sa_id = 0
+    router_api_db['sa_id'] = sa_id
+
+    fwglobals.g.db['router_api'] = router_api_db
+    return sa_id
 
 def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     """Add loopback command into the list.

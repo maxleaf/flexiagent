@@ -2,7 +2,6 @@
   "entity": "agent",
   "message": "sync-device",
   "params": {
-    "router-cfg-hash": "kukuriku",
     "requests": [
 		{
 		  "entity": "agent",

@@ -3,7 +3,6 @@
   "message": "sync-device",
   "params": {
     "type": "full-sync",
-    "router-cfg-hash": "kukuriku",
     "requests": [
 		{
 		  "entity":  "agent",
