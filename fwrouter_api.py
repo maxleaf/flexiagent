@@ -818,6 +818,16 @@ class FWROUTER_API:
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
             new_params.update(_params.items())
+
+            # Preserve watermark that FwWanMonitor might put on metric in
+            # router_cfg, flexiManage is not aware of it.
+            #
+            old_metric = old_params.get('metric')
+            new_metric = new_params.get('metric')
+            if old_metric and new_metric and \
+               int(old_metric) > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                new_params['metric'] = str(int(new_metric) + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+
             return [
                 { 'message': remove_req, 'params' : old_params },
                 { 'message': add_req,    'params' : new_params }

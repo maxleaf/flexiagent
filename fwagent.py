@@ -188,7 +188,7 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces = fwglobals.g.handle_request({'message':'interfaces'})
+        interfaces       = fwutils.get_linux_interfaces(cached=False).values()
         (dr_via, dr_dev) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
@@ -205,7 +205,7 @@ class FwAgent:
                                 'ip_list': ip_list,
                                 'default_route': dr_via,
                                 'default_dev': dr_dev,
-                                'interfaces': json.dumps(interfaces['message'])}).encode()
+                                'interfaces': json.dumps(interfaces)}).encode()
         req = ureq.Request(url, data)
         ctx = ssl.create_default_context()
         if fwglobals.g.cfg.BYPASS_CERT:
@@ -769,7 +769,8 @@ class FwagentDaemon(object):
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
         self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
-        self.agent = fwglobals.g.finalize_agent()
+        fwglobals.g.finalize_agent()
+        self.agent = None
         fwglobals.log.debug("FwagentDaemon: exited")
 
     def _check_system(self):
