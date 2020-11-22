@@ -342,6 +342,7 @@ class FwStunWrap:
         reset_all_timeout = 10 * 60
         update_cache_from_os_timeout = 2 * 60
         send_stun_timeout = 3
+        log_stun_timeout = 2.5 * 60
 
         while self.is_running == True:
 
@@ -363,6 +364,9 @@ class FwStunWrap:
                     if slept % update_cache_from_os_timeout == 0:
                         # every update_cache_timeout, refresh cache with updated IP addresses from OS
                         self._update_cache_from_OS()
+
+                    if slept % log_stun_timeout == 0:
+                        self._log_address_cache()
 
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
