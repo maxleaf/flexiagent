@@ -794,9 +794,11 @@ def vpp_ip_to_sw_if_index(ip):
     for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
         tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
         if tap:
-            int_address = IPNetwork(get_interface_address(tap))
-            if network == int_address:
-                return sw_if.sw_if_index
+            addr = get_interface_address(tap)
+            if addr:
+                int_address = IPNetwork(addr)
+                if network == int_address:
+                    return sw_if.sw_if_index
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
@@ -1263,21 +1265,23 @@ def reset_traffic_control():
     return True
 
 def remove_linux_bridges():
-    lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).splitlines()
+    try:
+        lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).splitlines()
 
-    for line in lines:
-        bridge_name = line.rstrip().split('/')[-1]
-        try:
-            output = subprocess.check_output("sudo ip link set %s down " % bridge_name, shell=True)
-        except:
-            pass
+        for line in lines:
+            bridge_name = line.rstrip().split('/')[-1]
+            try:
+                output = subprocess.check_output("sudo ip link set %s down " % bridge_name, shell=True)
+            except:
+                pass
 
-        try:
-            subprocess.check_output('sudo brctl delbr %s' % bridge_name, shell=True)
-        except:
-            pass
-
-    return True
+            try:
+                subprocess.check_output('sudo brctl delbr %s' % bridge_name, shell=True)
+            except:
+                pass
+        return True
+    except:
+        return True
 
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
@@ -1515,6 +1519,11 @@ def get_interface_sw_if_index(ip):
         if_name = get_interface_name(ip)
         if if_name:
             dev_id = get_interface_dev_id(if_name)
+            if not dev_id:
+                cache = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+                for dev in cache:
+                    if cache[dev] == if_name:
+                        dev_id = dev
     if not dev_id:
         return None
     return dev_id_to_vpp_sw_if_index(dev_id)
@@ -2067,6 +2076,10 @@ def connect_to_lte(params):
         info = get_lte_provier_info()
 
         if info['STATUS'] == True:
+            ip_no_mask = info['IP'].split('/')[0]
+            fwglobals.g.stun_wrapper.initialize_addr(ip_no_mask)
+            # public_ip, public_port, nat_type = \
+            #         fwglobals.g.stun_wrapper.find_addr(ip_no_mask)
             return (True, None)
 
         return (False, None)
