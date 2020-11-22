@@ -186,22 +186,23 @@ def get_os_routing_table():
 def get_default_route():
     """Get default route.
 
-    :returns: Default route.
+    :returns: tuple (<IP of GW>, <name of network interface>).
     """
+    (via, dev, metric) = ("", "", 0xffffffff)
     try:
         output = os.popen('ip route list match default').read()
         if output:
             routes = output.splitlines()
-            if routes:
-                route = routes[0]
-                dev_split = route.split('dev ')
-                rdev = dev_split[1].split(' ')[0] if len(dev_split) > 1 else ''
-                rip_split = route.split('via ')
-                rip = rip_split[1].split(' ')[0] if len(rip_split) > 1 else ''
-                return (rip, rdev)
+            for r in routes:
+                _dev = ''   if not 'dev '    in r else r.split('dev ')[1].split(' ')[0]
+                _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
+                _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
+                if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
+                    dev = _dev
+                    via = _via
     except:
         return ("", "")
-    return ("", "")
+    return (via, dev)
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -261,6 +262,7 @@ def get_interface_address(if_name):
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
+            fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
     fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
@@ -384,6 +386,18 @@ def dev_id_add_type(dev_id):
 
     return 'pci:%s' % dev_id
 
+def get_linux_interfaces():
+    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """
+    interfaces = fwglobals.g.cache.dev_ids
+    if not interfaces:
+        for (if_name, _) in psutil.net_if_addrs().items():
+            pci, _ = get_interface_pci(if_name)
+            if not pci:
+                continue
+            interfaces[pci_to_full(pci)] = if_name
+    return interfaces
+
 def get_interface_dev_id(linuxif):
     """Convert Linux interface name into bus address.
 
@@ -482,7 +496,8 @@ def dev_id_to_vpp_if_name(dev_id):
     addr_type, _ = dev_id_parse(dev_id)
     if addr_type == "pci":
         dev_id = dev_id_to_full(dev_id)
-        vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+        vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(pci)
+        # vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
         if vpp_if_name: return vpp_if_name
         else: return _build_dev_id_to_vpp_if_name_maps(dev_id, None)
 
@@ -498,7 +513,7 @@ def vpp_if_name_to_dev_id(vpp_if_name):
 
     :returns: Interface bus address.
     """
-    dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
+    dev_id = fwglobals.g.cache.vpp_if_name_to_dev_id.get(vpp_if_name)
     if dev_id: return dev_id
     else: return _build_dev_id_to_vpp_if_name_maps(None, vpp_if_name)
 
@@ -530,21 +545,21 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
         if k and v:
             k = dev_id_add_type(k)
             full_addr = dev_id_to_full(k)
-            fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[full_addr] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[v] = full_addr
+            fwglobals.g.cache.dev_id_to_vpp_if_name[full_addr] = v
+            fwglobals.g.cache.vpp_if_name_to_dev_id[v] = full_addr
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
         pci_addr = pci_bytes_to_str(hw_if.pci_addr)
-        fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
-        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[vpp_if_name] = pci_addr
+        fwglobals.g.cache.dev_id_to_vpp_if_name[pci_addr] = vpp_if_name
+        fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_if_name] = pci_addr
 
     if dev_id:
-        vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+        vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(dev_id)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
+        dev_id = fwglobals.g.cache.vpp_if_name_to_dev_id.get(vpp_if_name)
         if dev_id: return dev_id
 
     fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (dev_id, vpp_if_name, shif))
@@ -637,8 +652,10 @@ def dev_id_to_tap(dev_id):
         return None
 
     dev_id_full = dev_id_to_full(dev_id)
-    cache    = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+    cache    = fwglobals.g.cache.dev_id_to_vpp_tap_name
+
     tap = cache.get(dev_id_full)
+
     if tap:
         return tap
 
@@ -1598,7 +1615,7 @@ def fix_aggregated_message_format(msg):
         return  \
             {
                 'message': 'aggregated',
-                'params' : { 'requests': msg }
+                'params' : { 'requests': copy.deepcopy(msg) }
             }
 
     # 'start-router' aggregation
@@ -1651,7 +1668,7 @@ def fix_aggregated_message_format(msg):
             requests.append(
                 {
                     'message': msg['message'],
-                    'params' : params
+                    'params' : copy.deepcopy(params)
                 })
 
         return \
@@ -1663,7 +1680,7 @@ def fix_aggregated_message_format(msg):
     # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
     #
     if msg['message'] == 'aggregated':
-        requests = [r for r in msg['params']['requests'] if r]
+        requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
         return \
             {
                 'message': 'aggregated',
@@ -1802,6 +1819,34 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
 
+def vmxnet3_unassigned_interfaces_up():
+    """This function finds vmxnet3 interfaces that should NOT be controlled by
+    VPP and brings them up. We call these interfaces 'unassigned'.
+    This hack is needed to prevent disappearing of unassigned interfaces from
+    Linux, as VPP captures all down interfaces on start.
+
+    Note for non vmxnet3 interfaces we solve this problem in elegant way - we
+    just add assigned interfaces to the white list in the VPP startup.conf,
+    so VPP captures only them, while ignoring the unassigned interfaces, either
+    down or up. In case of vmxnet3 we can't use the startup.conf white list,
+    as placing them there causes VPP to bind them to vfio-pci driver on start,
+    so trial to bind them later to the vmxnet3 driver by call to the VPP
+    vmxnet3_create() API fails. Hence we go with the dirty workaround of UP state.
+    """
+    try:
+        linux_interfaces = get_linux_interfaces()
+        assigned_list    = fwglobals.g.router_cfg.get_interfaces()
+        assigned_pcis    = [params['pci'] for params in assigned_list]
+
+        for pci in linux_interfaces:
+            if not pci in assigned_pcis:
+                if pci_is_vmxnet3(pci):
+                    os.system("ip link set dev %s up" % linux_interfaces[pci])
+
+    except Exception as e:
+        fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
+        pass
+
 def get_reconfig_hash():
     """ This function creates a string that holds all the information added to the reconfig
     data, and then create a hash string from it.
@@ -1810,16 +1855,9 @@ def get_reconfig_hash():
     """
     res = ''
 
-    linux_dev_id_list = get_linux_dev_ids()
-    vpp_run = vpp_does_run()
-
-    for dev_id in linux_dev_id_list:
-        name = dev_id_to_linux_if(dev_id)
-        if name is None and vpp_run:
-            name = dev_id_to_tap(dev_id)
-        if name is None:
-            continue
-
+    linux_interfaces = get_linux_interfaces()
+    for dev_id in linux_interfaces:
+        name = linux_interfaces[dev_id]
         addr = get_interface_address(name)
         addr = addr.split('/')[0] if addr else ''
         gw, metric = get_interface_gateway(name)
@@ -1841,14 +1879,15 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
     vpp_if_name_remove = ''
     metric_min = -1
 
-    dev_metric = int(metric)
+    dev_metric = int(metric or 0)
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
     for wan in wan_list:
         metric_cur_str = wan.get('metric', None)
         if not metric_cur_str:
             continue
-        metric_cur = int(metric_cur_str)
+
+        metric_cur = int(metric_cur_str or 0)
         wan_dev_id = wan['dev_id']
 
         if wan_dev_id == dev_id:
@@ -1872,18 +1911,8 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
-        out = _vppctl_read(vppctl_cmd, wait=False)
-        if out is None:
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
-
-    if vpp_if_name_add:
-        vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_add
-        out = _vppctl_read(vppctl_cmd, wait=False)
         if out is None:
-            # revert 'nat44 add interface address del'
-            if vpp_if_name_remove:
-                vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_remove
-                _vppctl_read(vppctl_cmd, wait=False)
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)

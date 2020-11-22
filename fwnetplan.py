@@ -266,29 +266,16 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type):
 
         # If needed, remove dev-id-to-tap cached value for this dev id, as netplan might change
         # interface name.
-        cache = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
-        dev_id = fwutils.dev_id_to_full(dev_id)
-        if dev_id in cache:
-            del cache[dev_id]
+        #
+        cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
+        dev_id_full = fwutils.dev_id_to_full(dev_id)
+        if dev_id_full in cache:
+            del cache[dev_id_full]
 
         # make sure IP address is applied in Linux
-        if is_add == 1:
-            ip_address_is_found = False
-            for i in range(50):
-                ifname = fwutils.dev_id_to_tap(dev_id)
-                if fwutils.get_interface_address(ifname):
-                    ip_address_is_found = True
-                    break
-                if i % 10 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
-                    cmd = "systemctl restart systemd-networkd"
-                    fwglobals.log.debug("add_remove_netplan_interface: " + cmd)
-                    os.system(cmd)
-                time.sleep(1)
-            if not ip_address_is_found:
-                err_str = "add_remove_netplan_interface: %s has no ip address" % ifname
-                fwglobals.log.error(err_str)
-                _dump_netplan_file(fname_run)
-                return (False, err_str)
+        #
+        if is_add and not _has_ip(ifname, dhcp=(dhcp=='yes')):
+            raise Exception("ip was not assigned")
 
     except Exception as e:
         err_str = "add_remove_netplan_interface failed: dev_id: %s, file: %s, error: %s"\
@@ -323,3 +310,35 @@ def get_dhcp_netplan_interface(if_name):
                         if interface['dhcp4'] == True:
                             return 'yes'
     return 'no'
+
+def _has_ip(if_name, dhcp=False):
+
+    for i in range(50):
+        if fwutils.get_interface_address(if_name):
+            return True
+        if i % 30 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+            cmd = "systemctl restart systemd-networkd"
+            fwglobals.log.debug("fwnetplan: _has_ip: " + cmd)
+            os.system(cmd)
+        time.sleep(1)
+
+    # At this point no IP was found on the interface.
+    # If IP was not assigned to the interface, we still return OK if:
+    # - DHCP was configured on secondary interface (not default route),
+    #   hopefully it will get IP at some time later. Right now we don't
+    #   want to fail router-start or router restore on reboot/watchdog.
+    #   The fwagent will take care of dhcp interfaces with no IP, while
+    #   handling tunnels, static routes, etc.
+    #
+    # We return error if:
+    # - IP was configured statically
+    # - DHCP was configured on primary (default route) interface,
+    #   as connection to flexiManage will be lost, so we prefer to revert
+    #   to the previous configuration
+    #
+    if dhcp:
+        (_, dev) = fwutils.get_default_route()
+        if if_name != dev:
+            return True
+
+    return False

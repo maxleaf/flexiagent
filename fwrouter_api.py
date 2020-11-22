@@ -97,6 +97,11 @@ class FWROUTER_API:
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
 
+        # Initialize global data that persists device reboot / daemon restart.
+        #
+        if not 'router_api' in fwglobals.g.db:
+            fwglobals.g.db['router_api'] = { 'sa_id' : 0 }
+
     def finalize(self):
         """Destructor method
         """
@@ -212,7 +217,7 @@ class FWROUTER_API:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
-            fwglobals.g.AGENT_CACHE['DEV_ID_TO_VPP_TAP_NAME_MAP'] = {}
+            fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -742,9 +747,9 @@ class FWROUTER_API:
             old_params = fwglobals.g.router_cfg.get_interfaces(dev_id=new_params['dev_id'])[0]
             if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
                 return True
-            if new_params.get('gateway') and new_params.get('gateway') != old_params.get('gateway'):
+            if new_params.get('gateway') != old_params.get('gateway'):
                 return True
-            if new_params.get('metric') and new_params.get('metric') != old_params.get('metric'):
+            if new_params.get('metric') != old_params.get('metric'):
                 return True
             return False
 
@@ -1110,7 +1115,13 @@ class FWROUTER_API:
         #
         self._unset_router_failure()
 
-        fwtranslate_add_tunnel.init_tunnels()
+        # Reset sa-id used by tunnels
+        #
+        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+        router_api_db['sa_id'] = 0
+        fwglobals.g.db['router_api'] = router_api_db
+
+        fwutils.vmxnet3_unassigned_interfaces_up()
 
     def _on_start_router_after(self):
         """Handles post start VPP activities.
@@ -1129,7 +1140,7 @@ class FWROUTER_API:
         self.router_started = False
         self._stop_threads()
         fwutils.reset_dhcpd()
-        fwglobals.g.AGENT_CACHE['DEV_ID_TO_VPP_TAP_NAME_MAP'] = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_after(self):

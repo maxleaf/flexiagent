@@ -34,9 +34,8 @@ class FwStunWrap:
     every 60 seconds. Note, those counters are managed for each of the addresses
     separately.
 
-    From globals, we use the global cache, and create fwglobals.g.AGENT_CACHE['stun_interfaces']
-    sub dictionary. This dictionary has the following structure:
-    fwglobals.g.AGENT_CACHE['stun_interfaces'][dev_id] = {
+    From globals, we use the global cache where following elements are kept:
+    {
         'local_ip':
         'gateway':
         'public_ip':
@@ -62,8 +61,7 @@ class FwStunWrap:
                                  do not want to sent STUN requests on their behalf as
                                  they will produce nothing.
         """
-        fwglobals.g.AGENT_CACHE['stun_interfaces'] = {}
-        self.stun_cache    = fwglobals.g.AGENT_CACHE['stun_interfaces']
+        self.stun_cache    = fwglobals.g.cache.stun_cache
         self.thread_stun   = None
         self.is_running    = False
         self.standalone    = standalone
