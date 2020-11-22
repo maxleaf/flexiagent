@@ -398,15 +398,15 @@ def dev_id_add_type(dev_id):
     return 'pci:%s' % dev_id
 
 def get_linux_interfaces():
-    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """ Get the list of dev id's of all network interfaces available in Linux.
     """
     interfaces = fwglobals.g.cache.dev_ids
     if not interfaces:
         for (if_name, _) in psutil.net_if_addrs().items():
-            pci, _ = get_interface_pci(if_name)
-            if not pci:
+            dev_id = get_interface_dev_id(if_name)
+            if not dev_id:
                 continue
-            interfaces[pci_to_full(pci)] = if_name
+            interfaces[dev_id_to_full(dev_id)] = if_name
     return interfaces
 
 def get_interface_dev_id(linuxif):
@@ -546,8 +546,8 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
         addr = get_interface_dev_id(linux_dev_name)
         vpp_name = vpp_sw_if_index_to_name(tap.sw_if_index)
         if vpp_name and addr:
-            fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[addr] = vpp_name
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[vpp_name] = addr
+            fwglobals.g.cache.dev_id_to_vpp_if_name[addr] = vpp_name
+            fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_name] = addr
 
     shif = _vppctl_read('show hardware-interfaces')
     if shif == None:
