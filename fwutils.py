@@ -259,6 +259,11 @@ def get_all_interfaces():
         dev_id = get_interface_dev_id(nicname)
         if dev_id == '':
             continue
+
+        if is_lte_interface(dev_id) and vpp_does_run():
+            nicname = dev_id_to_tap(dev_id)
+            addrs = interfaces.get(nicname)
+
         dev_id_ip_gw[dev_id] = {}
         dev_id_ip_gw[dev_id]['addr'] = ''
         dev_id_ip_gw[dev_id]['gw']   = ''
@@ -2087,10 +2092,6 @@ def connect_to_lte(params):
         info = get_lte_provier_info()
 
         if info['STATUS'] == True:
-            ip_no_mask = info['IP'].split('/')[0]
-            fwglobals.g.stun_wrapper.initialize_addr(ip_no_mask)
-            # public_ip, public_port, nat_type = \
-            #         fwglobals.g.stun_wrapper.find_addr(ip_no_mask)
             return (True, None)
 
         return (False, None)
@@ -2359,6 +2360,10 @@ def get_reconfig_hash():
     linux_interfaces = get_linux_interfaces()
     for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]
+
+        if is_lte_interface(dev_id) and vpp_does_run():
+            name = dev_id_to_tap(dev_id)
+
         addr = get_interface_address(name)
         addr = addr.split('/')[0] if addr else ''
         gw, metric = get_interface_gateway(name)
@@ -2374,7 +2379,7 @@ def get_reconfig_hash():
     hash = hashlib.md5(res).hexdigest()
     return hash
 
-def vpp_nat_add_remove_interface(remove, dev, metric):
+def vpp_nat_add_remove_interface(remove, dev_id, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
@@ -2400,15 +2405,15 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(dev)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(default_gw)
+            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
 
     if not remove:
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(default_gw)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(dev)
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove

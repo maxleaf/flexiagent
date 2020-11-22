@@ -89,6 +89,10 @@ class OS_DECODERS:
             if fwutils.is_lte_interface(dev_id):
                 daddr['deviceType'] = 'lte'
                 daddr['dhcp'] = 'yes'
+                tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
+                if tap:
+                    addrs = inp[tap]
+                    daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(tap)
 
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
