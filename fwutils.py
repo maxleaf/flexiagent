@@ -2073,6 +2073,28 @@ def disconnect_from_lte():
     except Exception as e:
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
+def get_inet6_by_linux_name(inf_name):
+    interfacaes = psutil.net_if_addrs()
+    if inf_name in interfacaes:
+        for addr in interfacaes[inf_name]:
+            if addr.family == socket.AF_INET6:
+                inet6 = addr.address.split('%')[0]
+                if addr.netmask != None:
+                    inet6 += "/" + (str(IPAddress(addr.netmask).netmask_bits()))
+                return inet6
+
+    return None
+
+def update_lte_params(orig_req_params, dev_id):
+    info = get_lte_provier_info()
+    orig_req_params['addr'] = unicode(info['IP'])
+    orig_req_params['gateway'] = unicode(info['GATEWAY'])
+
+    tap = dev_id_to_tap(dev_id)
+    inet6 = get_inet6_by_linux_name(tap)
+    if inet6:
+        orig_req_params['addr6'] = unicode(inet6)
+
 def connect_to_lte(params):
     interface_name = dev_id_to_linux_if(params['dev_id'])
     apn = params['apn']
@@ -2280,6 +2302,8 @@ def compare_request_params(params1, params2):
         val1 = params1[key]
         val2 = params2[key]
         if val1 and val2:   # Both values are neither None-s nor empty strings.
+            a1 = type(val2)
+            a2 = type(val1)
             if type(val1) != type(val2):
                 return False        # Not comparable types
             if type(val1) == str:

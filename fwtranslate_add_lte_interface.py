@@ -124,6 +124,16 @@ def add(params):
     cmd['revert']['descr'] = "disconnect from lte provider"
     cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'update_lte_params',
+                'args': { 'orig_req_params': params, 'dev_id': dev_id}
+    }
+    cmd_list.append(cmd)
+
     # create tap for this interface in vpp and linux
     cmd = {}
     cmd['cmd'] = {}
