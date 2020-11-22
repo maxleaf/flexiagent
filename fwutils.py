@@ -364,7 +364,7 @@ def dev_id_to_short(dev_id):
 def get_linux_dev_ids():
     """ Get the list of PCI-s of all network interfaces available in Linux.
     """
-    dev_id_list = fwglobals.g.get_cache_data('DEV_ID')
+    dev_id_list = fwglobals.g.cache.dev_ids
     if not dev_id_list:
         interfaces = psutil.net_if_addrs()
         for (nicname, _) in interfaces.items():
@@ -1536,7 +1536,7 @@ def get_interface_sw_if_index(ip):
         if if_name:
             dev_id = get_interface_dev_id(if_name)
             if not dev_id:
-                cache = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+                cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
                 for dev in cache:
                     if cache[dev] == if_name:
                         dev_id = dev
