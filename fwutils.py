@@ -1899,20 +1899,31 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+            vpp_if_name_remove = pci_to_vpp_if_name(dev)
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
+            vpp_if_name_add = pci_to_vpp_if_name(default_gw)
 
     if not remove:
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
+            vpp_if_name_remove = pci_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+            vpp_if_name_add = pci_to_vpp_if_name(dev)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
-            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+        out = _vppctl_read(vppctl_cmd, wait=False)
         if out is None:
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
+    if vpp_if_name_add:
+        vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_add
+        out = _vppctl_read(vppctl_cmd, wait=False)
+        if out is None:
+            # revert 'nat44 add interface address del'
+            if vpp_if_name_remove:
+                vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_remove
+                _vppctl_read(vppctl_cmd, wait=False)
+            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
     return (True, None)
+
