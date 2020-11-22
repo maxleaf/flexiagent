@@ -385,6 +385,12 @@ class FwRouterCfg:
     def get_tunnels(self):
         return self._get_requests('add-tunnel')
 
+    def get_tunnel(self, tunnel_id):
+        key = 'add-tunnel:%d' % (tunnel_id)
+        if key in self.db:
+            return self.db[key].get('params')
+        return None
+
     def get_multilink_policy(self):
         if 'add-multilink-policy' in self.db:
             return self.db['add-multilink-policy']['params']

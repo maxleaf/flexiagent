@@ -84,15 +84,13 @@ def test():
         assert ok
 
         # Start router and ensure that configuration was applied successfully
-        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
-        assert ok, "'start-router' request failed"
-
-        configured = fwtests.wait_vpp_to_be_configured([('interfaces', 1),('tunnels', 0)], timeout=30)
-        assert configured
+        (ok, err_str) = agent.cli('-f %s' % cli_start_router_file,
+                                  expected_vpp_cfg=[('interfaces', 1),('tunnels', 0)])
+        assert ok, err_str
 
         # Stop router
-        (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
-        assert ok
+        (ok, err_str) = agent.cli('-f %s' % cli_stop_router_file)
+        assert ok, err_str
 
 if __name__ == '__main__':
     test()

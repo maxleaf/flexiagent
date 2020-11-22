@@ -67,11 +67,8 @@ def update_stats():
         # Update info if previous stats valid
         if prev_stats['ok'] == 1:
             if_bytes = {}
-            tunnel_bytes = {}
             tunnel_stats = tunnel_stats_get()
-            tunnels = fwglobals.g.router_cfg.get_tunnels()
-            if fwglobals.g.stun_wrapper:
-                fwglobals.g.stun_wrapper.add_address_of_down_tunnels_to_stun(tunnel_stats, tunnels)
+            fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
             for intf, counts in stats['last'].items():
                 if (intf.startswith('ipsec-gre') or
                     intf.startswith('loop')): continue
@@ -98,7 +95,6 @@ def update_stats():
                         dev_id = fwutils.vpp_if_name_to_dev_id(intf)
                         if dev_id:
                             if_bytes[dev_id] = calc_stats
-
 
             stats['bytes'] = if_bytes
             stats['tunnel_stats'] = tunnel_stats
@@ -162,7 +158,7 @@ def get_stats():
     res_update_list = list(updates_list)
     del updates_list[:]
 
-    reconfig = fwglobals.g.unassigned_interfaces.get_reconfig_hash()
+    reconfig = fwutils.get_reconfig_hash()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update

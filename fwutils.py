@@ -213,22 +213,23 @@ def get_os_routing_table():
 def get_default_route():
     """Get default route.
 
-    :returns: Default route.
+    :returns: tuple (<IP of GW>, <name of network interface>).
     """
+    (via, dev, metric) = ("", "", 0xffffffff)
     try:
         output = os.popen('ip route list match default').read()
         if output:
             routes = output.splitlines()
-            if routes:
-                route = routes[0]
-                dev_split = route.split('dev ')
-                rdev = dev_split[1].split(' ')[0] if len(dev_split) > 1 else ''
-                rip_split = route.split('via ')
-                rip = rip_split[1].split(' ')[0] if len(rip_split) > 1 else ''
-                return (rip, rdev)
+            for r in routes:
+                _dev = ''   if not 'dev '    in r else r.split('dev ')[1].split(' ')[0]
+                _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
+                _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
+                if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
+                    dev = _dev
+                    via = _via
     except:
         return ("", "")
-    return ("", "")
+    return (via, dev)
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -247,31 +248,29 @@ def get_interface_gateway(if_name):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
-def get_interface_address_all(filtr=None):
-    """ Get all interfaces from linux, and add only the ones that have address family of
-    AF_INET. if filter=='gw', add only interfaces with GW.
-    : param filtr : if filtr='gw', return only interfaces with IP address and Gateway.
-                    if filtr is None, return all IP addresses in the system.
-    : return : list of WAN interfaces
+def get_all_interfaces():
+    """ Get all interfaces from linux. For dev id with address family of AF_INET,
+        also store gateway, if exists.
+        : return : Dictionary of dev_id->IP,GW
     """
-    ip_list = []
+    dev_id_ip_gw = {}
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         dev_id = get_interface_dev_id(nicname)
         if dev_id == '':
             continue
+        dev_id_ip_gw[dev_id] = {}
+        dev_id_ip_gw[dev_id]['addr'] = ''
+        dev_id_ip_gw[dev_id]['gw']   = ''
         for addr in addrs:
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
-                if filtr == 'gw':
-                    gateway, _ = get_interface_gateway(nicname)
-                    if gateway != '':
-                        ip_list.append(ip)
-                        break
-                else:
-                    ip_list.append(ip)
-                    break
-    return ip_list
+                dev_id_ip_gw[dev_id]['addr'] = ip
+                gateway, _ = get_interface_gateway(nicname)
+                dev_id_ip_gw[dev_id]['gw'] = gateway if gateway else ''
+                break
+
+    return dev_id_ip_gw
 
 def get_interface_address(if_name):
     """Get interface IP address.
@@ -290,6 +289,7 @@ def get_interface_address(if_name):
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
+            fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
     fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
@@ -397,6 +397,18 @@ def dev_id_add_type(dev_id):
 
     return 'pci:%s' % dev_id
 
+def get_linux_interfaces():
+    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """
+    interfaces = fwglobals.g.cache.dev_ids
+    if not interfaces:
+        for (if_name, _) in psutil.net_if_addrs().items():
+            pci, _ = get_interface_pci(if_name)
+            if not pci:
+                continue
+            interfaces[pci_to_full(pci)] = if_name
+    return interfaces
+
 def get_interface_dev_id(linuxif):
     """Convert Linux interface name into bus address.
 
@@ -493,23 +505,21 @@ def dev_id_to_vpp_if_name(dev_id):
     :returns: VPP interface name.
     """
     dev_id = dev_id_to_full(dev_id)
-    vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+    vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(dev_id)
     if vpp_if_name: return vpp_if_name
     else: return _build_dev_id_to_vpp_if_name_maps(dev_id, None)
 
-    return None
-
 # 'vpp_if_name_to_dev_id' function maps interface name, eg. 'GigabitEthernet0/8/0'
-# into the pci of that interface, eg. '0000:00:08.00'.
+# into the dev id of that interface, eg. '0000:00:08.00'.
 # We use the interface cache mapping, if doesn't exist we rebuild the cache
 def vpp_if_name_to_dev_id(vpp_if_name):
-    """Convert PCI address into VPP interface name.
+    """Convert vpp interface name address into interface bus address.
 
     :param vpp_if_name:      VPP interface name.
 
-    :returns: PCI address.
+    :returns: Interface bus address.
     """
-    dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
+    dev_id = fwglobals.g.cache.vpp_if_name_to_dev_id.get(vpp_if_name)
     if dev_id: return dev_id
     else: return _build_dev_id_to_vpp_if_name_maps(None, vpp_if_name)
 
@@ -552,21 +562,21 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
         if k and v:
             k = dev_id_add_type(k)
             full_addr = dev_id_to_full(k)
-            fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[full_addr] = v
-            fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[v] = full_addr
+            fwglobals.g.cache.dev_id_to_vpp_if_name[full_addr] = v
+            fwglobals.g.cache.vpp_if_name_to_dev_id[v] = full_addr
 
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
         pci_addr = pci_bytes_to_str(hw_if.pci_addr)
-        fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP')[pci_addr] = vpp_if_name
-        fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP')[vpp_if_name] = pci_addr
+        fwglobals.g.cache.dev_id_to_vpp_if_name[pci_addr] = vpp_if_name
+        fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_if_name] = pci_addr
 
     if dev_id:
-        vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+        vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(dev_id)
         if vpp_if_name: return vpp_if_name
     elif vpp_if_name:
-        dev_id = fwglobals.g.get_cache_data('VPP_IF_NAME_TO_DEV_ID_MAP').get(vpp_if_name)
+        dev_id = fwglobals.g.cache.vpp_if_name_to_dev_id.get(vpp_if_name)
         if dev_id: return dev_id
 
     fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (dev_id, vpp_if_name, shif))
@@ -639,9 +649,9 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 
     return None
 
-# 'dev_id_to_tap' function maps interface referenced by pci, e.g '0000:00:08.00'
+# 'dev_id_to_tap' function maps interface referenced by dev_id, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.
-# To do that we convert firstly the pci into name of interface in VPP,
+# To do that we convert firstly the dev_id into name of interface in VPP,
 # e.g. 'GigabitEthernet0/8/0' and than we grep output of 'vppctl sh tap-inject'
 # command by this name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
@@ -651,13 +661,14 @@ def dev_id_to_tap(dev_id):
     """Convert Bus address into TAP name.
 
     :param dev_id:      Bus address.
-
     :returns: Linux TAP interface name.
     """
 
     dev_id_full = dev_id_to_full(dev_id)
-    cache    = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_TAP_NAME_MAP')
+    cache    = fwglobals.g.cache.dev_id_to_vpp_tap_name
+
     tap = cache.get(dev_id_full)
+
     if tap:
         return tap
 
@@ -679,7 +690,7 @@ def dev_id_to_tap(dev_id):
 def vpp_if_name_to_tap(vpp_if_name):
     """Convert VPP interface name into Linux TAP interface name.
 
-     :param vpp_if_name:      PCI address.
+     :param vpp_if_name:  interface name.
 
      :returns: Linux TAP interface name.
      """
@@ -1755,7 +1766,7 @@ def fix_aggregated_message_format(msg):
         return  \
             {
                 'message': 'aggregated',
-                'params' : { 'requests': msg }
+                'params' : { 'requests': copy.deepcopy(msg) }
             }
 
     # 'start-router' aggregation
@@ -1808,7 +1819,7 @@ def fix_aggregated_message_format(msg):
             requests.append(
                 {
                     'message': msg['message'],
-                    'params' : params
+                    'params' : copy.deepcopy(params)
                 })
 
         return \
@@ -1820,7 +1831,7 @@ def fix_aggregated_message_format(msg):
     # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
     #
     if msg['message'] == 'aggregated':
-        requests = [r for r in msg['params']['requests'] if r]
+        requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
         return \
             {
                 'message': 'aggregated',
@@ -2309,20 +2320,75 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
 
-def vpp_nat_add_remove_interface(remove, dev_id, metric):
+def vmxnet3_unassigned_interfaces_up():
+    """This function finds vmxnet3 interfaces that should NOT be controlled by
+    VPP and brings them up. We call these interfaces 'unassigned'.
+    This hack is needed to prevent disappearing of unassigned interfaces from
+    Linux, as VPP captures all down interfaces on start.
+
+    Note for non vmxnet3 interfaces we solve this problem in elegant way - we
+    just add assigned interfaces to the white list in the VPP startup.conf,
+    so VPP captures only them, while ignoring the unassigned interfaces, either
+    down or up. In case of vmxnet3 we can't use the startup.conf white list,
+    as placing them there causes VPP to bind them to vfio-pci driver on start,
+    so trial to bind them later to the vmxnet3 driver by call to the VPP
+    vmxnet3_create() API fails. Hence we go with the dirty workaround of UP state.
+    """
+    try:
+        linux_interfaces = get_linux_interfaces()
+        assigned_list    = fwglobals.g.router_cfg.get_interfaces()
+        assigned_pcis    = [params['pci'] for params in assigned_list]
+
+        for pci in linux_interfaces:
+            if not pci in assigned_pcis:
+                if pci_is_vmxnet3(pci):
+                    os.system("ip link set dev %s up" % linux_interfaces[pci])
+
+    except Exception as e:
+        fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
+        pass
+
+def get_reconfig_hash():
+    """ This function creates a string that holds all the information added to the reconfig
+    data, and then create a hash string from it.
+
+    : return : md5 hash result of all the data collected or empty string.
+    """
+    res = ''
+
+    linux_interfaces = get_linux_interfaces()
+    for dev_id in linux_interfaces:
+        name = linux_interfaces[dev_id]
+        addr = get_interface_address(name)
+        addr = addr.split('/')[0] if addr else ''
+        gw, metric = get_interface_gateway(name)
+
+        res += 'addr:'    + addr + ','
+        res += 'gateway:' + gw + ','
+        res += 'metric:'  + metric + ','
+        if gw and addr:
+            _, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(dev_id)
+            res += 'public_ip:'   + public_ip + ','
+            res += 'public_port:' + str(public_port) + ','
+
+    hash = hashlib.md5(res).hexdigest()
+    return hash
+
+def vpp_nat_add_remove_interface(remove, dev, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
     metric_min = -1
 
-    dev_metric = int(metric)
+    dev_metric = int(metric or 0)
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
     for wan in wan_list:
         metric_cur_str = wan.get('metric', None)
         if not metric_cur_str:
             continue
-        metric_cur = int(metric_cur_str)
+
+        metric_cur = int(metric_cur_str or 0)
         wan_dev_id = wan['dev_id']
 
         if wan_dev_id == dev_id:
@@ -2334,15 +2400,15 @@ def vpp_nat_add_remove_interface(remove, dev_id, metric):
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+            vpp_if_name_remove = pci_to_vpp_if_name(dev)
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
+            vpp_if_name_add = pci_to_vpp_if_name(default_gw)
 
     if not remove:
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
+            vpp_if_name_remove = pci_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+            vpp_if_name_add = pci_to_vpp_if_name(dev)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
@@ -2368,7 +2434,6 @@ def wifi_get_capabilities(dev_id):
         'SupportedModes': [],
         'Band 1': {
             'Frequencies': [],
-            'Capabilities': [],
             'Bitrates': [],
             'Exists': False
         },

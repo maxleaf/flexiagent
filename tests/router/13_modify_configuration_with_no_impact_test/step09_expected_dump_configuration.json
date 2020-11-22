@@ -9,7 +9,6 @@
     {
       "Key": "add-interface:pci:0000:00:08.00", 
       "Params": {
-        "PublicIP": "52.52.52.52", 
         "addr": "10.0.0.4/24", 
         "dev_id": "pci:0000:00:08.00", 
         "gateway": "10.0.0.10", 
@@ -20,7 +19,8 @@
             "red"
           ]
         }, 
-        "type": "wan"
+        "type": "wan", 
+        "useStun": false
       }
     }, 
     {
@@ -66,6 +66,7 @@
           }, 
           "routing": "ospf"
         }, 
+        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 1
       }
@@ -102,6 +103,7 @@
           }, 
           "routing": "ospf"
         }, 
+        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 2
       }
