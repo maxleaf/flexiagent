@@ -261,8 +261,10 @@ def get_all_interfaces():
             continue
 
         if is_lte_interface(dev_id) and vpp_does_run():
-            nicname = dev_id_to_tap(dev_id)
-            addrs = interfaces.get(nicname)
+            tap_name = dev_id_to_tap(dev_id)
+            if tap_name:
+                nicname = tap_name
+                addrs = interfaces.get(nicname)
 
         dev_id_ip_gw[dev_id] = {}
         dev_id_ip_gw[dev_id]['addr'] = ''
@@ -2362,12 +2364,12 @@ def vmxnet3_unassigned_interfaces_up():
     try:
         linux_interfaces = get_linux_interfaces()
         assigned_list    = fwglobals.g.router_cfg.get_interfaces()
-        assigned_pcis    = [params['pci'] for params in assigned_list]
+        assigned_dev_ids    = [params['dev_id'] for params in assigned_list]
 
-        for pci in linux_interfaces:
-            if not pci in assigned_pcis:
-                if pci_is_vmxnet3(pci):
-                    os.system("ip link set dev %s up" % linux_interfaces[pci])
+        for dev_id in linux_interfaces:
+            if not dev_id in assigned_dev_ids:
+                if dev_id_is_vmxnet3(dev_id):
+                    os.system("ip link set dev %s up" % linux_interfaces[dev_id])
 
     except Exception as e:
         fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
@@ -2386,7 +2388,9 @@ def get_reconfig_hash():
         name = linux_interfaces[dev_id]
 
         if is_lte_interface(dev_id) and vpp_does_run():
-            name = dev_id_to_tap(dev_id)
+            tap_name = dev_id_to_tap(dev_id)
+            if tap_name:
+                name = tap_name
 
         addr = get_interface_address(name)
         addr = addr.split('/')[0] if addr else ''
