@@ -2304,8 +2304,6 @@ def compare_request_params(params1, params2):
         val1 = params1[key]
         val2 = params2[key]
         if val1 and val2:   # Both values are neither None-s nor empty strings.
-            a1 = type(val2)
-            a2 = type(val1)
             if type(val1) != type(val2):
                 return False        # Not comparable types
             if type(val1) == str:

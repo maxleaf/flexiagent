@@ -400,4 +400,14 @@ def add(params):
     }
     cmd_list.append(cmd)
 
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']   = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'update_lte_tunnels_source',
+    #             'args': { 'dev_id': dev_id}
+    # }
+    # cmd_list.append(cmd)
+
     return cmd_list
