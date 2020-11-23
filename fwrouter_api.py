@@ -1276,6 +1276,19 @@ class FWROUTER_API:
         if params is None:
             return
 
+        # Perform substitutions in nested dictionaries and lists
+        if type(params)==dict:
+            nested_params = params.values()
+        elif type(params)==list:
+            nested_params = params
+        else:
+            nested_params = []
+        for param in nested_params:
+            if type(param)==list:
+                self._substitute(cache, param)
+            if type(param)==dict and not 'substs' in param: # No need to process 'substs' element itself
+                self._substitute(cache, param)
+
         # Fetch list of substitutions
         substs = None
         if type(params)==dict and 'substs' in params:
