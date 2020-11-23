@@ -256,8 +256,6 @@ class FWAGENT_API:
 
         :param params: Request parameters received from flexiManage:
                         {
-                          'router-cfg-hash': <the signature of the device
-                                    configuration stored on flexiManage>
                           'requests': <list of 'add-X' requests that represent
                                     device configuration stored on flexiManage>
                         }
@@ -265,25 +263,7 @@ class FWAGENT_API:
         """
         fwglobals.log.info("FWAGENT_API: _sync_device STARTED")
 
-        # Check if there is a need to sync at all.
-        # It might be race between receiving sync-device request from server
-        # and sending success reply to the previous request, so server might
-        # deduce that we out of sync, when we are OK.
-        # So we ensure that the configuration signature received from server
-        # differs from the one of the current configuration. If it is not,
-        # we are OK - simply return.
-        #
-        remote_signature = params['router-cfg-hash']
-        local_signature  = fwglobals.g.router_cfg.get_signature()
-        fwglobals.log.debug(
-            "FWAGENT_API: _sync_device: cfg signature: received=%s, stored=%s" %
-            (remote_signature, local_signature))
-        if remote_signature == local_signature:
-            fwglobals.log.info("FWAGENT_API: _sync_device: no need to sync")
-            fwglobals.g.router_cfg.reset_signature()
-            return {'ok': 1}
-
-        # Now go over configuration requests received within sync-device request,
+        # Go over configuration requests received within sync-device request,
         # intersect them against the requests stored locally and generate new list
         # of remove-X and add-X requests that should take device to configuration
         # received with the sync-device.

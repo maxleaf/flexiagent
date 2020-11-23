@@ -43,11 +43,9 @@ def test():
             print("   " + os.path.basename(t))
 
             # Load router configuration with spoiled lists
-            agent.cli('--api inject_requests filename=%s ignore_errors=True' % t)
-
-            # Ensure that spoiled lists were reverted completely
-            configured = fwtests.wait_vpp_to_be_configured([('interfaces', 0),('tunnels', 0)], timeout=30)
-            assert configured
+            ok, err_str = agent.cli('--api inject_requests filename=%s ignore_errors=True' % t,
+                                    expected_vpp_cfg=[('interfaces', 0),('tunnels', 0)])
+            assert ok, err_str
 
             # For route test only: ensure that route table has no routes
             # that *_list_routes.cli tried to add from list, but failed

@@ -189,7 +189,7 @@ class FwAgent:
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
         interfaces = fwglobals.g.handle_request({'message':'interfaces'})
-        default_route = fwutils.get_default_route()
+        (dr_via, dr_dev) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
         serial = fwutils.get_machine_serial()
@@ -203,8 +203,8 @@ class FwAgent:
                                 'serial' : serial,
                                 'machine_name': machine_name,
                                 'ip_list': ip_list,
-                                'default_route': default_route[0],
-                                'default_dev': default_route[1],
+                                'default_route': dr_via,
+                                'default_dev': dr_dev,
                                 'interfaces': json.dumps(interfaces['message'])}).encode()
         req = ureq.Request(url, data)
         ctx = ssl.create_default_context()
@@ -696,20 +696,9 @@ def show(agent_info, router_info, daemon_info):
     :returns: None.
     """
     if agent_info:
-        if agent_info == 'version':
-            fwglobals.log.info('Agent version: %s'
-                % fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version'],
-                to_syslog=False)
-        if agent_info == 'cache':
-            fwglobals.log.info("Agent cache...")
-            cache = daemon_rpc('cache')
-            fwglobals.log.info(pprint.pformat(cache, indent=1))
-        if agent_info == 'threads':
-            fwglobals.log.info("Agent threads...")
-            thread_list = daemon_rpc('threads')
-            if thread_list:
-                for name in thread_list:
-                    fwglobals.log.info(name)
+        out = daemon_rpc('show', what=agent_info)
+        if out:
+            fwglobals.log.info(out, to_syslog=False)
 
     if router_info:
         if router_info == 'state':
@@ -881,22 +870,16 @@ class FwagentDaemon(object):
         self.stop()
         self.start()
 
-    def cache(self):
-        """Show Agent cache.
-
-        :returns: cache maps.
-        """
-        return (fwglobals.g.AGENT_CACHE)
-
-    def threads(self):
-        """show agent threads.
-
-        :returns: list of thread names
-        """
-        thread_list = []
-        for thd in threading.enumerate():
-            thread_list.append(thd.name)
-        return (thread_list)
+    def show(self, what=None):
+        if what == 'version':
+            return fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version']
+        if what == 'cache':
+            return json.dumps(fwglobals.g.cache.db, indent=2, sort_keys=True)
+        if what == 'threads':
+            thread_list = []
+            for thd in threading.enumerate():
+                thread_list.append(thd.name)
+            return json.dumps(sorted(thread_list), indent=2, sort_keys=True)
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -1023,7 +1006,7 @@ def daemon_rpc(func, **kwargs):
     try:
         agent_daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
         remote_func = getattr(agent_daemon, func)
-        fwglobals.log.debug("invoke remote FwagentDaemon::%s(%s)" % (func, json.dumps(kwargs)))
+        fwglobals.log.debug("invoke remote FwagentDaemon::%s(%s)" % (func, json.dumps(kwargs)), to_terminal=False)
         return remote_func(**kwargs)
     except Pyro4.errors.CommunicationError:
         fwglobals.log.debug("ignore FwagentDaemon::%s(%s): daemon does not run" % (func, json.dumps(kwargs)))

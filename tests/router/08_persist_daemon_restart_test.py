@@ -32,20 +32,18 @@ import fwtests
 cli_path = __file__.replace('.py', '')
 
 ################################################################################
-# This test feeds agent with router configuration out of step1_X.cli file.
-# Than it injects a number of 'aggregated' requests each of them include list of
-# 'add-X', 'remove-X' and 'modify-X' requests to test modification of router
-# configuration.
-# Every injected 'aggregated' request is named a 'step'.
-#   After every step test ensures that resulted VPP configuration and
-# configuration database dump match the expected VPP configuration and dump.
-#   As well test ensures that vpp is restarted if needed after modificaion.
-# For example the 'add-interface' and 'remove-interface' requests require vpp
-# restart.
+# This test runs agent as a daemon, than injects into it router configuration
+# out of <cli_start_router_file> that includes all configuration items like
+# interfaces, tunnels, dhcp-server, routes, applications, multilink-policies, etc.
+# Than it restarts the agent daemon, causing thus reset and restore of global
+# variables. Than it removes some configuration items and adds them back,
+# ensuring proper restore of global data and successful post restart configuration.
 ################################################################################
 def test():
     with fwtests.TestFwagent() as agent:
 
+        # Now go and execute rest steps - add/remove configuration, etc.
+        #
         steps             = sorted(glob.glob(cli_path + '/' + 'step*.cli'))
         expected_vpp_cfg  = sorted(glob.glob(cli_path + '/' + 'step*vpp*.json'))
         expected_dump_cfg = sorted(glob.glob(cli_path + '/' + 'step*dump*.json'))
@@ -56,27 +54,27 @@ def test():
                 print("")
             print("   " + os.path.basename(step))
 
-            # Inject request.
-            # Note the first request comes with 'daemon=True' to leave agent
-            # running on background, so it could receive further injects.
+            daemon = True if idx == 0 or idx == 1 else False
+
+            # Execute step and ensure proper configuration afterwards
             #
-            daemon = True if idx == 0 else False
-            (ok, err_str) = agent.cli('-f %s' % step,
+            (ok, err_str) = agent.cli('-f %s' % steps[idx],
                                     daemon=daemon,
                                     expected_vpp_cfg=expected_vpp_cfg[idx],
-                                    expected_router_cfg=expected_dump_cfg[idx],
-                                    check_log=True)
+                                    expected_router_cfg=expected_dump_cfg[idx])
             assert ok, err_str
 
-        # Ensure that vpp was restarted if needed.
-        # For now only steps #4, #5 and #6 require restarts, so we expect 3
-        # vpp starts to be printed in log for this steps. And one more start
-        # for initial configuration - step #1.
-        #
-        lines = agent.grep_log('router was started: vpp_pid=', print_findings=False)
-        assert len(lines) == 4, "log has not expected number (4) of VPP starts: %d:%s" % \
-                                (len(lines), '\n'.join(lines))
+            # Kill the daemon after the initial configuration step (step 1)
+            #
+            if idx == 0:
+                daemon_pid = fwtests.fwagent_daemon_pid()
+                assert daemon_pid, "agent daemon pid was not found!"
+                os.system('kill -9 %s' % daemon_pid)
 
+            # Ensure no errors in log
+            #
+            lines = agent.grep_log('error: ')
+            assert len(lines) == 0, "errors found in log: %s" % '\n'.join(lines)
 
 if __name__ == '__main__':
     test()

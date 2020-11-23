@@ -31,7 +31,6 @@ sys.path.append(test_root)
 import fwtests
 
 cli_path = __file__.replace('.py', '')
-cli_get_device_stats_file  = os.path.join(cli_path, 'get_device_stats.cli')
 
 ################################################################################
 # This test feeds agent with router configuration out of step1_X.cli file.
@@ -64,18 +63,18 @@ def test():
                 print("   " + os.path.basename(step))
                 (ok, error_str) = agent.cli('-f %s' % step, daemon=True)
                 assert ok, error_str
-                time.sleep(1)               # Ensure difference in time between the first and the further steps
-                agent.set_log_start_time()  # mark log start. It is needed for checks on log run by further steps
+
+                # Reset log start time, so later "grep 'execute'" will not found
+                # executions made during loading the initial configuration.
+                #
+                agent.set_log_start_marker()
                 continue
 
             print("   " + os.path.basename(step))
-            (ok, _) = agent.cli('-f %s' % step)
-            assert ok, "failed to inject %s" % step
-
-            # Ensure validity of database configurations.
-            #
-            router_configured = fwtests.router_is_configured(expected_dump_cfg[idx], fwagent_py=agent.fwagent_py)
-            assert router_configured, "configuration dump does not match %s" % expected_dump_cfg[idx]
+            (ok, str_err) = agent.cli('-f %s' % step,
+                                    expected_router_cfg=expected_dump_cfg[idx],
+                                    check_log=True)
+            assert ok, str_err
 
             # Ensure no mention of command execution in log
             #
@@ -86,11 +85,6 @@ def test():
             #
             lines = agent.grep_log('connect')
             assert len(lines) == 0, "'connect' found in log: %s" % '\n'.join(lines)
-
-            # Ensure no errors in log
-            #
-            lines = agent.grep_log('error: ')
-            assert len(lines) == 0, "errors found in log: %s" % '\n'.join(lines)
 
 
 if __name__ == '__main__':
