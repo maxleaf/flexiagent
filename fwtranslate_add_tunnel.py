@@ -394,20 +394,16 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
         'type': 1, # VppEnum.vl_api_gre_tunnel_type_t.GRE_API_TUNNEL_TYPE_TEB,
         'mode': 0  # VppEnum.vl_api_tunnel_mode_t.TUNNEL_API_MODE_P2P
     }
-    cmd_params = {
-            'is_add'       : 1,
-            'tunnel'       : tunnel
-    }
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "gre_tunnel_add_del"
-    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['params']        = {'is_add': 1, 'tunnel': tunnel}
     cmd['cmd']['cache_ret_val'] = (ret_attr , cache_key)
     cmd['cmd']['descr']         = "create gre tunnel %s -> %s" % (src, dst)
     cmd['revert'] = {}
     cmd['revert']['name']       = 'gre_tunnel_add_del'
-    cmd['revert']['params']     = copy.deepcopy(cmd_params)
-    cmd['revert']['params']['is_add'] = 0
+    cmd['revert']['params']     = {'is_add': 0, 'tunnel': tunnel}
     cmd['revert']['descr']      = "delete gre tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
@@ -419,14 +415,10 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
         'sa_in': [local_sa_id],
         'nh': "0.0.0.0"}
 
-    cmd_params = {
-            'tunnel'       : tunnel
-    }
-
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "ipsec_tunnel_protect_update"
-    cmd['cmd']['params']        = cmd_params
+    cmd['cmd']['params']        = {'tunnel': tunnel}
     cmd['cmd']['descr']         = "add tunnel ipsec protect %s -> %s" % (src, dst)
     cmd['revert'] = {}
     cmd['revert']['name']       = 'ipsec_tunnel_protect_del'
@@ -558,19 +550,14 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
         }
     }
 
-    cmd_params = {
-        'is_add': 1 ,
-        'entry': entry
-    }
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "ipsec_sad_entry_add_del"
-    cmd['cmd']['params']  = cmd_params
+    cmd['cmd']['params']  = {'is_add': 1, 'entry': entry}
     cmd['cmd']['descr']   = "add SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd['revert'] = {}
     cmd['revert']['name']   = 'ipsec_sad_entry_add_del'
-    cmd['revert']['params'] = copy.deepcopy(cmd_params)
-    cmd['revert']['params']['is_add'] = 0
+    cmd['revert']['params'] = {'is_add': 0, 'entry': entry}
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
