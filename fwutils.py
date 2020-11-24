@@ -447,14 +447,15 @@ def get_interface_dev_id(linuxif):
     try:
         if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-        if re.search('pci', if_addr):
-            if re.search('usb', if_addr):
-                address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-                return dev_id_add_type(address)
-            else:
-                address = if_addr.split('/net')[0].split('/')[-1]
-                address = dev_id_add_type(address)
-                return dev_id_to_full(address)
+        if re.search('usb', if_addr):
+            address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
+            return dev_id_add_type(address)
+        # elif re.search('pci', if_addr):
+        #     address = if_addr.split('/net')[0].split('/')[-1]
+        #     address = dev_id_add_type(address)
+        #     return dev_id_to_full(address)
+        # else:
+        #     tap = tap_to_dev_id(if_addr)
     except:
         return ""
 

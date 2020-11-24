@@ -96,9 +96,10 @@ class OS_DECODERS:
 
             for addr in addrs:
                 addr_af_name = fwutils.af_to_name(addr.family)
-                daddr[addr_af_name] = addr.address.split('%')[0]
-                if addr.netmask != None:
-                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+                if not daddr[addr_af_name]:
+                    daddr[addr_af_name] = addr.address.split('%')[0]
+                    if addr.netmask != None:
+                        daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
             if daddr['gateway']:
                 # Find Public port and IP for the address. At that point
