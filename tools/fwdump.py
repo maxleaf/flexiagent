@@ -51,8 +51,13 @@ g_dumpers = {
     'linux_dpdk_devbind_status':    { 'shell_cmd': 'dpdk-devbind -s > <dumper_out_file>' },
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
-    'linux_netplan':                { 'shell_cmd': 'mkdir -p <temp_folder>/linux_netplan && ' +
-                                                   'cp /etc/netplan/* <temp_folder>/linux_netplan/ 2>/dev/null' },
+    'linux_netplan':                { 'shell_cmd': 'mkdir -p <temp_folder>/linux_netplan/etc/ && ' +
+                                                   'cp /etc/netplan/*yaml* <temp_folder>/linux_netplan/etc 2>/dev/null && ' +
+                                                   'mkdir -p <temp_folder>/linux_netplan/lib/ && ' +
+                                                   'cp /lib/netplan/*yaml* <temp_folder>/linux_netplan/lib 2>/dev/null ; ' +
+                                                   'mkdir -p <temp_folder>/linux_netplan/run/ && ' +
+                                                   'cp /run/netplan/*yaml* <temp_folder>/linux_netplan/run 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; ' +
                                                    'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
                                                    'ps -elf | grep vpp >> <dumper_out_file>' },
