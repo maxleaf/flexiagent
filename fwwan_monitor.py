@@ -67,13 +67,13 @@ class FwWanMonitor:
         self.current_server = self.num_servers - 1  # The first selection will take #0
         self.routes         = {}
         self.route_rule_re  = re.compile(r"(\w+) via ([0-9.]+) dev (\w+)(.*)") #  'default via 20.20.20.22 dev enp0s9 proto dhcp metric 100'
-# TEST:
-# self.__class__.__name__  how does it looks like :)
-# connectivity lost/restore when VPP does not run
-# connectivity lost/restore when VPP does run
-# connectivity lost/restore after reboot when VPP does not run
-# connectivity lost/restore after reboot when VPP does not run
-# Look of the get-device-info response / REGISTER with updated fwutils.get_linux_interfaces!
+
+        # On initialization due to either device reboot or daemon restart
+        # if vpp does not run, apply metrics found in router configuration.
+        # This is to reduce period of 'no connection to flexiManage'.
+        #
+        if not fwglobals.g.router_api.router_started:
+            self._restore_metrics()
 
         self.active           = True
         self.thread_main_loop = threading.Thread(target=self.main_loop, name=str(self))
@@ -141,16 +141,16 @@ class FwWanMonitor:
 #12. V - Ask Oleg: ensure that MAX+metric can be used in get_reconfig_hash()!
 #11. V - On modify-interface, modify-device, sync-device - preserve MAX+metric!
 #7.  V - Support in disabling interface for monitoring !!!!!! monitorInternet = true/false !!!!!
-#8.  V - Monitor unassigned interfaces, only if conigured in yaml.conf, if param not exists - make it True!
+#8.  V - Monitor unassigned interfaces, only if configured in yaml.conf, if param not exists - make it True!
 #14. V - NO: Ask Nir: disable monitor if there is only one 'default' route in system?
-#5.  On initialization (due to reboot or daemon restart) - restore metrics from router_cfg
+#5.  V - On initialization (due to reboot or daemon restart) - restore metrics from router_cfg
 #3.  Create request queue in router_api! to avoid race on requests from management!!
 #4.  Check how to do reconnect if VPP does not run! And if VPP does run!
 #10. Handle multi hop default routes !!!
 #6.  ? - Ask Nir: do you want to impelement detection of server (1.1.1.1) down?
 #13. Think of backward compatibility with old agents ...
 #    V - if 'monitorInternet' does not present in DB, the interface will be not monitored!
-
+#14. Try to refactor logger to add class name automatically to all log prints!
     def _get_server(self):
         self.current_server = (self.current_server + 1) % self.num_servers
         return self.SERVERS[self.current_server]
@@ -162,7 +162,7 @@ class FwWanMonitor:
             'via':      <gw, e.g. '192.168.1.1'>
             'dev_name': <name, e.g. 'enp0s8'>,
             'dev_pci':  <pci in full form, e.g. "0000:00:08.00">
-            'metric':   <metric>/0
+            'metric':   <metric>/0 - OPTIONAL, may not present!
             'proto':    'static'/'dhcp'/''
         }
         '''
@@ -187,7 +187,6 @@ class FwWanMonitor:
             pci, _ = fwutils.get_interface_pci(route['dev_name'])
             route['dev_pci']    = pci
             route['proto']      = 'static'
-            route['metric']     = 0
             route['probes']     = []
             route['failures']   = 0
             if m.group(4):  # proto and metric are optional, so parse them manually
@@ -270,27 +269,28 @@ class FwWanMonitor:
         successes = route['probes'].count(True)
         failures  = self.WND_SIZE - successes
 
-        if route['metric'] < self.METRIC_WATERMARK and failures >= self.THRESHOLD:
+        metric = route.get('metric', 0)
+        if metric < self.METRIC_WATERMARK and failures >= self.THRESHOLD:
             fwglobals.log.debug("%s: connectivity lost on %s" % (str(self), route['name']))
-            self._flush_route(route, connectivity_lost=True)
+            new_metric = metric + self.METRIC_WATERMARK
+            self._flush_route(route, new_metric)
 
-        if route['metric'] >= self.METRIC_WATERMARK and successes >= self.THRESHOLD:
+        if metric >= self.METRIC_WATERMARK and successes >= self.THRESHOLD:
             fwglobals.log.debug("%s: connectivity restored on %s" % (str(self), route['name']))
-            self._flush_route(route, connectivity_lost=False)
+            new_metric = metric - self.METRIC_WATERMARK
+            self._flush_route(route, new_metric)
 
 
-    def _flush_route(self, route, connectivity_lost):
+    def _flush_route(self, route, metric):
         '''Update route in Linux and in vpp with new metric that reflects
         connectivity lost or restore.
 
-        :param route: the route to be updated with new metric
-        :param connectivity_lost: if True, the new metric will be current + WATERMARK,
-                                  if False, it will be current - WATERMARK
+        :param route:   the route to be updated with new metric
+        :param metric:  the new metric
         '''
-
-        pci    = route['dev_pci']
-        metric = route['metric'] + self.METRIC_WATERMARK if connectivity_lost else \
-                 route['metric'] - self.METRIC_WATERMARK
+        route_str = _str_route(route)
+        fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d" % \
+            (str(self), route_str, str(route.get('metric', 0)), str(metric)))
 
         if metric < 0 or metric > (self.METRIC_WATERMARK * 2):
             fwglobals.log.error("%s: not expected metric %d for %s" %
@@ -301,13 +301,13 @@ class FwWanMonitor:
         # To do that we inject 'modify-device' request with new metric,
         # as it would be received from .
         #
-        interfaces      = fwglobals.g.router_cfg.get_interfaces(type='wan', pci=pci)
+        interfaces      = fwglobals.g.router_cfg.get_interfaces(type='wan', pci=route['dev_pci'])
         interface_in_db = len(interfaces) > 0
         if interface_in_db:
             request = {
                 'message': 'modify-interface',
                 'params': {
-                    'pci': pci,
+                    'pci': route['dev_pci'],
                     'metric': metric
                 }
             }
@@ -320,22 +320,19 @@ class FwWanMonitor:
                     (str(self), json.dumps(request), ret['message']))
                 # Don't return here, continue and update metric directly in Linux
 
-        route_str = _str_route(route)
-
         # Now, if vpp runs, we done, as Linux routing table will be updated
         # by the router_api while handling the injected 'modify-interface'.
         # If vpp does not run, we have to update Linux explicitly.
         #
         if interface_in_db and fwglobals.g.router_api.router_started:
-            fwglobals.log.debug("%s: '%s': metric modified: %s -> %d" %
-                                (str(self), route_str, route['metric'], metric))
             return
 
         # Firstly remove the route with the current metric.
         #
+        old_metric = '' if not 'metric' in route else str(route['metric'])
         (ok, err_str) = fwutils.add_static_route(
-            route['prefix'], route['via'], route['metric'], True,
-            pci=route['dev_pci'], enable_default=True)
+                                    route['prefix'], route['via'], old_metric, True,
+                                    pci=route['dev_pci'], enable_default=True)
         if not ok:
             fwglobals.log.error("%s: '%s': failed to remove route from OS: %s" % \
                 (str(self), route_str, err_str))
@@ -344,20 +341,36 @@ class FwWanMonitor:
         # Now add the route with modified metric.
         #
         (ok, err_str) = fwutils.add_static_route(
-            route['prefix'], route['via'], metric, False,
-            pci=route['dev_pci'], enable_default=True)
+                                    route['prefix'], route['via'], str(metric), False,
+                                    pci=route['dev_pci'], enable_default=True)
         if not ok:
             fwglobals.log.error("%s: '%s': failed to update metric in OS (new metric %d)" %
                                 (str(self), route_str, metric))
             return
 
-        fwglobals.log.debug("%s: '%s': metric modified in OS: %s -> %d" %
-                            (str(self), route_str, route['metric'], metric))
+        fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d - done" % \
+            (str(self), route_str, str(route.get('metric', 0)), str(metric)))
 
+def _restore_metrics(self):
+    '''On FwWanMonitor/agent initialization updates Linux with metrics found
+    in router configuration database. This is needed to reduce failover time
+    when vpp does not run.
+    '''
+    routes     = self._get_routes()
+    interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    for interface in interfaces:
+        metric_in_db = interface.get('metric')
+        if metric_in_db:
+            for r in routes:
+                metric_in_os = route.get('metric', 0)
+                if r['dev_pci'] == interface['pci'] and metric_in_os != metric_in_db:
+                    fwglobals.log.debug("%s: restore metric on %s" % (str(self), r['dev_name']))
+                    self._flush_route(route, metric_in_db)
 
 def _str_route(route):
-    route_str = '%s via %s dev %s(%s) proto %s metric %s' % \
+    metric_str = '' if not 'metric' in route else ' metric ' + str(route['metric'])
+    route_str = '%s via %s dev %s(%s) proto %s%s' % \
                 (route['prefix'],  route['via'],   route['dev_name'],
-                route['dev_pci'], route['proto'], route['metric'])
+                 route['dev_pci'], route['proto'], metric_str)
     return route_str
 

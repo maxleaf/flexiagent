@@ -1677,7 +1677,11 @@ def compare_request_params(params1, params2):
     for key in keys_common:
         val1 = params1[key]
         val2 = params2[key]
-        if val1 and val2:   # Both values are neither None-s nor empty strings.
+
+        # If both values are neither None-s nor empty strings.
+        # False booleans will be handled by next 'elif'.
+        #
+        if val1 and val2:
             if type(val1) != type(val2):
                 return False        # Not comparable types
             if type(val1) == str:
@@ -1695,6 +1699,13 @@ def compare_request_params(params1, params2):
                     return False    # Strings are not equal
             elif val1 != val2:
                 return False        # Values are not equal
+
+        # If False booleans or
+        # if one of values not exists or empty string
+        #
+        elif (val1 and not val2) or (not val1 and val2):
+            return False
+
     return True
 
 def check_if_virtual_environment():
