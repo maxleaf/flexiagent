@@ -1589,6 +1589,7 @@ def netplan_apply(caller_name=None):
     fwglobals.log.debug(log_str)
     os.system(cmd)
     time.sleep(1)  # Give a second to Linux to configure interfaces
+    fwglobals.g.cache.pcis = {}     # netplan might change interface name, so reset the cache (e.g. enp0s3 -> vpp0)
 
 def compare_request_params(params1, params2):
     """ Compares two dictionaries while normalizing them for comparison
