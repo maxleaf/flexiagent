@@ -1717,11 +1717,12 @@ def get_reconfig_hash():
         res += 'gateway:' + gw + ','
         res += 'metric:'  + metric + ','
         if gw and addr:
-            _, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(pci)
+            _, public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(pci)
             res += 'public_ip:'   + public_ip + ','
             res += 'public_port:' + str(public_port) + ','
 
     hash = hashlib.md5(res).hexdigest()
+    fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
 def vpp_nat_add_remove_interface(remove, dev, metric):

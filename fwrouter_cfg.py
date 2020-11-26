@@ -545,27 +545,3 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
-
-    def get_interface_public_addresses(self):
-        """
-        builds a list of WAN interfaces from router DB. if 'useStun' does not exist or False,
-        do not add this interface to the list.
-        : return : list of WAN interfaces from router DB
-        """
-        addr_list = []
-        wan_list = self.get_interfaces(type='wan')
-        for wan in wan_list:
-            if wan.get('gateway', '') == '':
-                continue
-            elif wan.get('useStun', False) == False:
-                continue
-            else:
-                entry = {}
-                entry['address']     = wan.get('addr').split('/')[0]
-                if entry['address'] == '':
-                    continue
-                entry['public_ip']   = wan.get('PublicIP','')
-                entry['public_port'] = wan.get('PublicPort','')
-                addr_list.append(entry)
-        return addr_list
-
