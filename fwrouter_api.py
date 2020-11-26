@@ -1148,6 +1148,7 @@ class FWROUTER_API:
         :returns: None.
         """
         self.router_stopping = False
+        fwglobals.g.cache.pci_to_vpp_tap_name = {}
 
     def _set_router_failure(self, err_str):
         """Set router failure state.
