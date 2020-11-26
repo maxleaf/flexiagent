@@ -389,7 +389,7 @@ class FWAGENT_API:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
             addr = fwutils.get_interface_address(interface_name)
-            apn = fwutils.get_lte_configuration()
+            apn = fwutils.lte_get_saved_apn()
             connectivity = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
             response = {

@@ -1954,21 +1954,7 @@ def is_lte_interface(dev_id):
 
     return False
 
-def run_serial_command(ser, command):
-    ser.write('%s\r\n' % command)
-    time.sleep(2)
-    ret = []
-
-    while ser.inWaiting() > 0:
-		msg = ser.readline().strip()
-		msg = msg.replace("\r","")
-		msg = msg.replace("\n","")
-		if msg!="":
-			ret.append(msg)
-
-    return ret
-
-def get_lte_configuration():
+def lte_get_saved_apn():
     cmd = 'cat /etc/mbim-network.conf'
     try:
         out = subprocess.check_output(cmd, shell=True).strip()
@@ -1981,60 +1967,12 @@ def get_lte_configuration():
 
     return ''
 
-    #ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
-    #ser.write('At+cgdcont?\r\n')
-    # ser.write('AT!GSTATUS?\r\n')
-    # time.sleep(0.3)
-    # s = ser.readline().strip()
-
-    #ser.close()
-    # return ''
-def get_lte_provier_info():
-    try:
-        response = {
-            'IP':     '',
-            'GATEWAY': '',
-            'STATUS': ''
-        }
-
-        cmd = 'cat /tmp/wwan-ip'
-        lines = subprocess.check_output(cmd, shell=True).splitlines()
-
-        if 'Successfully connected' in lines[0]:
-            response['STATUS'] = True
-            for line in lines:
-                if 'IP [0]' in line:
-                    response['IP'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
-                if 'Gateway' in line:
-                    response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
-
-        return response
-    except Exception as e:
-        return response
-
 def lte_dev_id_to_iface_addr_bytes(dev_id):
     if is_lte_interface(dev_id):
-        info = get_lte_provier_info()
+        info = lte_get_configuration_received_from_provider()
         return ip_str_to_bytes(info['IP'])[0]
 
     return None
-
-def get_lte_info(key):
-    """Get IP from LTE provider
-
-    :param ket: Filter info by key
-
-    :returns: ip address.
-    """
-    info = get_lte_provier_info()
-
-    if key:
-        return info[key]
-
-    return info
-
 
 def configure_hostapd(dev_id, configuration):
     try:
@@ -2090,13 +2028,6 @@ def stop_hostapd():
     except Exception as e:
         return (False, "Exception: %s" % str(e))
 
-def disconnect_from_lte():
-    try:
-        output = subprocess.check_output('mbim-network /dev/cdc-wdm0 stop', shell=True)
-        return (True, None)
-    except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
-
 def get_inet6_by_linux_name(inf_name):
     interfacaes = psutil.net_if_addrs()
     if inf_name in interfacaes:
@@ -2109,8 +2040,177 @@ def get_inet6_by_linux_name(inf_name):
 
     return None
 
-def update_lte_params(orig_req_params, dev_id):
-    info = get_lte_provier_info()
+def set_lte_info_on_linux_interface():
+    interfacaes = psutil.net_if_addrs()
+    for nicname, addrs in interfacaes.items():
+        dev_id = get_interface_dev_id(nicname)
+        if dev_id and is_lte_interface(dev_id):
+            ip_info = lte_get_configuration_received_from_provider()
+            if ip_info['STATUS']:
+                os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
+                os.system('route add -net 0.0.0.0 gw %s' % ip_info['GATEWAY'])
+
+    return None
+
+# def lte_get_status():
+    # RSSI - query by mbimcli --device /dev/cdc-wdm0 --query-signal-state  --no-open=3 --no-close
+    # 2 - 9 Marginal
+    # 10 - 14 OK
+    # 15 - 19 Good
+    # 20 - 30 Excellent
+
+    # RSSI to dbm = 2n - 113 - e.g. RSSI 10: (10 * 2) - 113 = -93 dbm)
+    #
+
+
+def mbim_is_open():
+    '''
+    The function will check if there is an open session to the modem.
+    This done by set the no-open flag, to try send a command without open a new session.
+    If it fails, it means that no exists session is already open
+
+    :returns: boolean indicates if an open session is already exists
+    '''
+    try:
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close --no-open=1', shell=True, stderr=subprocess.STDOUT)
+        return True
+    except subprocess.CalledProcessError as err:
+        return False
+
+def mbim_open_new_session():
+    '''
+    The function will open a new session to the modem without closing it.
+    '''
+    try:
+        subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as err:
+        raise err
+
+def mbim_close_opened_session():
+    '''
+    The function will close existing opened session
+    '''
+    try:
+        subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status', shell=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as err:
+        pass
+
+    return True
+
+def mbim_get_signals_state(force_new_session=False):
+    try:
+        if not mbim_is_open() or force_new_session:
+            mbim_open_new_session()
+
+        output = subprocess.check_output('mbimcli --device /dev/cdc-wdm0 --query-signal-state  --no-open=3 --no-close', shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
+def mbim_get_home_provider(force_new_session=False):
+    '''
+    The function retrive the home provider burn on the sim
+    '''
+    try:
+        if not mbim_is_open() or force_new_session:
+            mbim_open_new_session()
+
+        output = subprocess.check_output('mbimcli --device /dev/cdc-wdm0 --query-home-provider --no-open=3 --no-close', shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
+def mbim_get_connection_state(force_new_session=False):
+    '''
+    The function will return the connection status.
+    This is not about existsin session to the modem. But connectivity between modem to the cellular provider
+    '''
+    try:
+        if not mbim_is_open() or force_new_session:
+            mbim_open_new_session()
+
+        output = subprocess.check_output('mbimcli --device /dev/cdc-wdm0 --query-connection-state --no-open=3 --no-close', shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
+def mbim_get_ip_configuration(force_new_session=False):
+    '''
+    The function will return the connection status.
+    This is not about existsin session to the modem. But connectivity between modem to the cellular provider
+    '''
+    try:
+        if not mbim_is_open() or force_new_session:
+            mbim_open_new_session()
+
+        current_connection_state = mbim_get_connection_state()
+        if current_connection_state and 'deactivated' in current_connection_state:
+            return None
+
+        output = subprocess.check_output('mbimcli --device /dev/cdc-wdm0 --query-ip-configuration --no-open=3 --no-close', shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
+
+def lte_connect(apn, dev_id):
+    if not apn:
+        return (False, "apn is not configured for %s" % dev_id)
+
+    try:
+        current_connection_state = mbim_get_connection_state()
+        if current_connection_state and not 'deactivated' in current_connection_state:
+            return (True, None)
+
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-registration-state --no-open=3 --no-close', shell=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --attach-packet-service --no-open=4 --no-close', shell=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --connect=apn=%s,ip-type=ipv4 --no-open=5 --no-close' % apn, shell=True, stderr=subprocess.STDOUT)
+        ip_info = mbim_get_ip_configuration()
+        return (True, None)
+    except subprocess.CalledProcessError as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+
+def lte_get_configuration_received_from_provider():
+    try:
+        response = {
+            'IP'      : '',
+            'GATEWAY' : '',
+            'STATUS'  : ''
+        }
+
+        ip_info = mbim_get_ip_configuration()
+
+        if ip_info:
+            response['STATUS'] = True
+            lines = ip_info.splitlines()
+            for line in lines:
+                if 'IP [0]' in line:
+                    response['IP'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'Gateway' in line:
+                    response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+
+            return response
+    except Exception as e:
+        return response
+
+def lte_get_provider_config(key):
+    """Get IP from LTE provider
+
+    :param ket: Filter info by key
+
+    :returns: ip address.
+    """
+    info = lte_get_configuration_received_from_provider()
+
+    if key:
+        return info[key]
+
+    return info
+
+def lte_update_params(orig_req_params, dev_id):
+    info = lte_get_configuration_received_from_provider()
     orig_req_params['addr'] = unicode(info['IP'])
     orig_req_params['gateway'] = unicode(info['GATEWAY'])
 
@@ -2119,52 +2219,67 @@ def update_lte_params(orig_req_params, dev_id):
     if inet6:
         orig_req_params['addr6'] = unicode(inet6)
 
-def connect_to_lte(params):
-    interface_name = dev_id_to_linux_if(params['dev_id'])
-    apn = params['apn']
+# def disconnect_from_lte():
+#     try:
+#         output = subprocess.check_output('mbim-network /dev/cdc-wdm0 stop', shell=True)
+#         return (True, None)
+#     except Exception as e:
+#         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
-    if not apn:
-        return (False, "apn is not configured for %s interface" % interface_name)
+# def connect_to_lte(params):
+#     interface_name = dev_id_to_linux_if(params['dev_id'])
+#     apn = params['apn']
 
-    try:
-        output = subprocess.check_output('echo "APN=%s" > /etc/mbim-network.conf' % apn, shell=True)
+#     if not apn:
+#         return (False, "apn is not configured for %s interface" % interface_name)
 
-        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
-        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-registration-state --no-open=3 --no-close', shell=True)
-        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --attach-packet-service --no-open=4 --no-close', shell=True)
-        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
-        output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --connect=apn=%s,ip-type=ipv4 --no-open=5 --no-close > /tmp/wwan-ip' % apn, shell=True)
 
-        info = get_lte_provier_info()
+#     def _run_mbim_command(cmd):
+#         try:
+#             output = subprocess.check_output(cmd, shell=True)
+#         except Exception as e:
+#             if "Session not closed" in str(e.output):
+#                 session = e.output.split("TRID: '")[-1]
+#                 session_number = session.replace("'", "")
+#                 try:
+#                     output = subprocess.check_output(cmd + '--no-open=%s' % session_number , shell=True)
+#                 except Exception as e:
+#                     pass
 
-        if info['STATUS'] == True:
-            return (True, None)
+#     num_retries = 3
+#     for i in range(num_retries):
+#         try:
+#             output = subprocess.check_output('echo "APN=%s" > /etc/mbim-network.conf' % apn, shell=True)
 
-        return (False, None)
-        # os.environ["IP"] = "my_export"
-        # # output = subprocess.check_output(cmd2, shell=True)
+#             _run_mbim_command('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close')
+#             _run_mbim_command('mbimcli -d /dev/cdc-wdm0 --query-registration-state --no-open=3 --no-close')
+#             _run_mbim_command('mbimcli -d /dev/cdc-wdm0 --attach-packet-service --no-open=4 --no-close')
+#             _run_mbim_command('mbimcli -d /dev/cdc-wdm0 --connect=apn=%s,ip-type=ipv4 --no-open=5 --no-close > /tmp/wwan-ip' % apn)
 
-        # ser = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
+#             # output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
+#             # output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-registration-state --no-open=3 --no-close', shell=True)
+#             # output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --attach-packet-service --no-open=4 --no-close', shell=True)
+#             # output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True)
+#             # output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --connect=apn=%s,ip-type=ipv4 --no-open=5 --no-close > /tmp/wwan-ip' % apn, shell=True)
 
-        # response = run_serial_command(ser, 'At!scact?')
+#             info = lte_get_configuration_received_from_provider()
 
-        # if not 'OK' in response or '!SCACT: 1,0' in response:
-        #     response = run_serial_command(ser, 'At+cgdcont=1,"ip","%s"' % str(apn))
+#             if info['STATUS'] == True:
+#                 return (True, None)
+#         except Exception as e:
+#             if i == num_retries-1:
+#                 return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+#             else:
+#                 # time.sleep(1)
+#                 # if "Session not close" in str(e.output):
+#                 #     try:
+#                 #         output = subprocess.check_output(e.cmd, shell=True)
+#                 #         output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --disconnect=4', shell=True)
+#                 #         output = subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --disconnect=5', shell=True)
+#                 #     except Exception as e:
+#                 pass
 
-        #     if 'ERROR' in response:
-        #         return False
-
-        #     response = run_serial_command(ser, 'At!scact=1,1')
-
-        # ser.close()
-
-        # if (True):
-        #     subprocess.check_output('dhclient %s' % str(interface_name), shell=True)
-        #     return True
-        # else:
-        #     return False
-    except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+#     return (False, "Couldn't connect to lte provider")
 
 def is_wifi_interface(dev_id):
     """Check if interface is WIFI.

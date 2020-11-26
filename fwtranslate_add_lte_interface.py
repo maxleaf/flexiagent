@@ -93,35 +93,19 @@ def add(params):
     cmd['cmd']['name']      = "exec"
     cmd['cmd']['descr']     = "UP interface %s in Linux" % iface_name
     cmd['cmd']['params']    = [ "sudo ip link set dev %s up" %  iface_name]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN interface %s in Linux" % iface_name
-    cmd['revert']['params'] = [ "sudo ip link set dev %s down" % iface_name ]
     cmd_list.append(cmd)
 
-    # connect to provider
-    apn = params['configuration']['apn'] if params['configuration'] else ''
+    # connect the modem to the cellular provider
+    apn = params['configuration']['apn'] if params['configuration'] else None
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']   = "python"
     cmd['cmd']['params'] = {
                 'module': 'fwutils',
-                'func': 'connect_to_lte',
-                'args': {
-                    'params': {
-                        'dev_id'    : dev_id,
-                        'apn'       : apn,
-                    }
-                }
+                'func': 'lte_connect',
+                'args': { 'apn': apn, 'dev_id': dev_id }
     }
-    cmd['cmd']['descr'] = "connect to lte provider"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-                'module': 'fwutils',
-                'func': 'disconnect_from_lte'
-    }
-    cmd['revert']['descr'] = "disconnect from lte provider"
+    cmd['cmd']['descr'] = "connect modem to lte cellular network provider"
     cmd_list.append(cmd)
 
     # create tap for this interface in vpp and linux
@@ -152,8 +136,8 @@ def add(params):
                     'type'      : int_type
                     },
             'substs':  [
-                { 'add_param':'ip', 'val_by_func':'get_lte_info', 'arg':'IP' },
-                { 'add_param':'gw', 'val_by_func':'get_lte_info', 'arg':'GATEWAY' }
+                { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
+                { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
             ]
     }
     cmd['cmd']['descr'] = "add interface into netplan config file"
@@ -172,8 +156,8 @@ def add(params):
                     'type'      : int_type
                     },
             'substs':  [
-                { 'add_param':'ip', 'val_by_func':'get_lte_info', 'arg':'IP' },
-                { 'add_param':'gw', 'val_by_func':'get_lte_info', 'arg':'GATEWAY' }
+                { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
+                { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
             ]
     }
     cmd['revert']['descr'] = "remove interface from netplan config file"
@@ -258,7 +242,7 @@ def add(params):
                         'gw'      : '',
                         'mac'     : '00:00:00:00:00:00',
                 },
-                'substs': [ { 'add_param':'gw', 'val_by_func':'get_lte_info', 'arg':'GATEWAY' }]
+                'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }]
     }
     cmd['cmd']['descr']         = "create static arp entry for dev_id %s" % dev_id
     cmd_list.append(cmd)
@@ -266,13 +250,13 @@ def add(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'get_lte_info', 'arg':'GATEWAY' } ]},
+    cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
                             "sudo arp -s DEV-STUB 00:00:00:00:00:00" ]
     cmd['cmd']['descr'] = "set arp entry on linux for lte interface"
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
     cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'get_lte_info', 'arg':'GATEWAY' } ]},
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
                                 "sudo arp -d DEV-STUB" ]
     cmd_list.append(cmd)
 
@@ -390,23 +374,13 @@ def add(params):
     cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
     cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'update_lte_params',
-                'args': { 'orig_req_params': params, 'dev_id': dev_id}
-    }
-    cmd_list.append(cmd)
-
     # cmd = {}
     # cmd['cmd'] = {}
     # cmd['cmd']['name']   = "python"
     # cmd['cmd']['params'] = {
     #             'module': 'fwutils',
-    #             'func': 'update_lte_tunnels_source',
-    #             'args': { 'dev_id': dev_id}
+    #             'func': 'lte_update_params',
+    #             'args': { 'orig_req_params': params, 'dev_id': dev_id}
     # }
     # cmd_list.append(cmd)
 

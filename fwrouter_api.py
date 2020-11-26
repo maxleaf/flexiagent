@@ -1151,6 +1151,7 @@ class FWROUTER_API:
         fwutils.reset_traffic_control()
         fwutils.remove_linux_bridges()
         fwutils.stop_hostapd()
+        fwutils.set_lte_info_on_linux_interface()
 
     def _set_router_failure(self, err_str):
         """Set router failure state.
