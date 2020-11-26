@@ -423,26 +423,6 @@ def get_interface_dev_id(linuxif):
 
     :returns: dev_id.
     """
-    NETWORK_BASE_CLASS = "02"
-    vpp_run = vpp_does_run()
-    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-    for line in lines:
-        vals = line.decode().split("\t", 1)
-        if len(vals) == 2:
-            # keep slot number
-            if vals[0] == 'Slot:':
-                slot = vals[1]
-            if vals[0] == 'Class:':
-                if vals[1][0:2] == NETWORK_BASE_CLASS:
-                    slot = dev_id_add_type(slot)
-                    interface = dev_id_to_linux_if(slot)
-                    if not interface and vpp_run:
-                        interface = dev_id_to_tap(slot)
-                    if not interface:
-                        continue
-                    if interface == linuxif:
-                        return dev_id_to_full(slot)
-
     # in case of non-pci interface try to get from /sys/class/net
     try:
         if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
@@ -450,12 +430,30 @@ def get_interface_dev_id(linuxif):
         if re.search('usb', if_addr):
             address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
             return dev_id_add_type(address)
-        # elif re.search('pci', if_addr):
-        #     address = if_addr.split('/net')[0].split('/')[-1]
-        #     address = dev_id_add_type(address)
-        #     return dev_id_to_full(address)
-        # else:
-        #     tap = tap_to_dev_id(if_addr)
+        elif re.search('pci', if_addr):
+            address = if_addr.split('/net')[0].split('/')[-1]
+            address = dev_id_add_type(address)
+            return dev_id_to_full(address)
+
+        NETWORK_BASE_CLASS = "02"
+        vpp_run = vpp_does_run()
+        lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+        for line in lines:
+            vals = line.decode().split("\t", 1)
+            if len(vals) == 2:
+                # keep slot number
+                if vals[0] == 'Slot:':
+                    slot = vals[1]
+                if vals[0] == 'Class:':
+                    if vals[1][0:2] == NETWORK_BASE_CLASS:
+                        slot = dev_id_add_type(slot)
+                        interface = dev_id_to_linux_if(slot)
+                        if not interface and vpp_run:
+                            interface = dev_id_to_tap(slot)
+                        if not interface:
+                            continue
+                        if interface == linuxif:
+                            return dev_id_to_full(slot)
     except:
         return ""
 
@@ -2082,9 +2080,11 @@ def mbim_open_new_session():
     The function will open a new session to the modem without closing it.
     '''
     try:
+        os.system('ifconfig wwan0 0')
         subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --query-subscriber-ready-status --no-close', shell=True, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
-        raise err
+        raise Exception(err)
+        # raise err
 
 def mbim_close_opened_session():
     '''
@@ -2152,6 +2152,24 @@ def mbim_get_ip_configuration(force_new_session=False):
     except subprocess.CalledProcessError as err:
         return None
 
+def mbim_get_packet_service_state(force_new_session=False):
+    '''
+    The function will return the connection status.
+    This is not about existsin session to the modem. But connectivity between modem to the cellular provider
+    '''
+    try:
+        if not mbim_is_open() or force_new_session:
+            mbim_open_new_session()
+
+        current_connection_state = mbim_get_connection_state()
+        if current_connection_state and 'deactivated' in current_connection_state:
+            return None
+
+        output = subprocess.check_output('mbimcli --device /dev/cdc-wdm0 --query-packet-service-state --no-open=3 --no-close', shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
 
 def lte_connect(apn, dev_id):
     if not apn:
@@ -2169,6 +2187,79 @@ def lte_connect(apn, dev_id):
         return (True, None)
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+
+def lte_get_packets_state():
+    try:
+        result = {
+            'Uplink_speed'  : 0,
+            'Downlink_speed': 0
+        }
+
+        modem_info = mbim_get_packet_service_state()
+        if modem_info:
+            data = modem_info.splitlines()
+            for line in data:
+                if 'Uplink speed' in line:
+                    result['Uplink_speed'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'Downlink speed' in line:
+                    result['Downlink_speed'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+        return result
+    except Exception as e:
+        return result
+
+def lte_get_connection_state():
+    try:
+        result = {
+            'Activation_state' : 0,
+            'IP_type'  : 0,
+        }
+
+        modem_info = mbim_get_connection_state()
+        if modem_info:
+            data = modem_info.splitlines()
+            for line in data:
+                if 'Activation state:' in line:
+                    result['Activation_state'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'IP type' in line:
+                    result['IP_type'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+        return result
+    except Exception as e:
+        return result
+
+def lte_get_radio_signals_state():
+    try:
+        result = {
+            'RSSI' : 0,
+            'dBm'  : 0,
+            'text' : ''
+        }
+        modem_info = mbim_get_signals_state()
+        if modem_info:
+            data = modem_info.splitlines()
+            for line in data:
+                if 'RSSI [0' in line:
+                    result['RSSI'] = int(line.split(':')[-1].strip().replace("'", ''))
+                    result['dBm'] = (result['RSSI'] * 2) - 113
+
+                    if -95 >= result['dBm']:
+                        result['text'] = 'Marginal'
+                    elif -85 >= result['dBm']:
+                        result['text'] = 'Very low'
+                    elif -80 >= result['dBm']:
+                        result['text'] = 'Low'
+                    elif -70 >= result['dBm']:
+                        result['text'] = 'Good'
+                    elif -60 >= result['dBm']:
+                        result['text'] = 'Very Good'
+                    elif -50 >= result['dBm']:
+                        result['text'] = 'Excellent'
+        return result
+    except Exception as e:
+        return result
 
 def lte_get_configuration_received_from_provider():
     try:

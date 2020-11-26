@@ -46,7 +46,7 @@ fwagent_api = {
     'get-wifi-interface-status':        '_get_wifi_interface_status',
     'connect-to-wifi':                  '_connect_to_wifi',
     'connect-to-lte':                   '_connect_to_lte',
-    'get-lte-interface-status':         '_get_lte_interface_status'
+    'get-lte-interface-info':           '_get_lte_interface_info'
 }
 
 class FWAGENT_API:
@@ -383,23 +383,30 @@ class FWAGENT_API:
         except:
             raise Exception("_connect_to_lte: failed to connect to lte: %s" % format(sys.exc_info()[1]))
 
-    def _get_lte_interface_status(self, params):
-        fwglobals.log.info("FWAGENT_API: _get_lte_interface_status STARTED")
+    def _get_lte_interface_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
+            signals = fwutils.lte_get_radio_signals_state()
+            connection_state = fwutils.lte_get_connection_state()
+            packet_service_state = fwutils.lte_get_packets_state()
+
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])[0]
+            if fwutils.vpp_does_run() and is_assigned:
+                interface_name = fwutils.dev_id_to_tap(params['dev_id'])
+
             addr = fwutils.get_interface_address(interface_name)
-            apn = fwutils.lte_get_saved_apn()
-            connectivity = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+            connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
             response = {
-                'address':      addr,
-                'apn':          apn,
-                'connectivity': connectivity
+                'address'             : addr,
+                'signals'             : signals,
+                'connection_state'    : connection_state,
+                'connectivity'        : connectivity,
+                'packet_service_state': packet_service_state
             }
 
-            fwglobals.log.info("FWAGENT_API: _get_lte_interface_status FINISHED")
             return {'message': response, 'ok': 1}
-        except:
-            raise Exception("_get_lte_interface_status: failed to connect to lte: %s" % format(sys.exc_info()[1]))
+        except Exception as e:
+            raise Exception("_get_lte_interface_status: %s" % str(e))
 
