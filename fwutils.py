@@ -2209,15 +2209,15 @@ def lte_get_provider_config(key):
 
     return info
 
-def lte_update_params(orig_req_params, dev_id):
-    info = lte_get_configuration_received_from_provider()
-    orig_req_params['addr'] = unicode(info['IP'])
-    orig_req_params['gateway'] = unicode(info['GATEWAY'])
+# def lte_update_params(orig_req_params, dev_id):
+#     info = lte_get_configuration_received_from_provider()
+#     orig_req_params['addr'] = unicode(info['IP'])
+#     orig_req_params['gateway'] = unicode(info['GATEWAY'])
 
-    tap = dev_id_to_tap(dev_id)
-    inet6 = get_inet6_by_linux_name(tap)
-    if inet6:
-        orig_req_params['addr6'] = unicode(inet6)
+#     tap = dev_id_to_tap(dev_id)
+#     inet6 = get_inet6_by_linux_name(tap)
+#     if inet6:
+#         orig_req_params['addr6'] = unicode(inet6)
 
 # def disconnect_from_lte():
 #     try:
