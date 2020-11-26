@@ -162,7 +162,7 @@ class FWROUTER_API:
 
                     name = fwutils.dev_id_to_tap(wan['dev_id'])
                     addr = fwutils.get_interface_address(name)
-                    if not addr:
+                    if name and not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                         apply_netplan = True
 
