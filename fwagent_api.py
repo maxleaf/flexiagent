@@ -388,8 +388,10 @@ class FWAGENT_API:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
             signals = fwutils.lte_get_radio_signals_state()
+            hardware_info = fwutils.lte_get_hardware_info()
             connection_state = fwutils.lte_get_connection_state()
             packet_service_state = fwutils.lte_get_packets_state()
+            system_info = fwutils.lte_get_system_info()
 
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])[0]
             if fwutils.vpp_does_run() and is_assigned:
@@ -403,7 +405,9 @@ class FWAGENT_API:
                 'signals'             : signals,
                 'connection_state'    : connection_state,
                 'connectivity'        : connectivity,
-                'packet_service_state': packet_service_state
+                'packet_service_state': packet_service_state,
+                'hardware_info'       : hardware_info,
+                'system_info'         : system_info
             }
 
             return {'message': response, 'ok': 1}
