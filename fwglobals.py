@@ -171,7 +171,7 @@ class Fwglobals:
                 self.MANAGEMENT_URL = agent_conf.get('server', DEFAULT_MANAGEMENT_URL)
                 self.TOKEN_FILE     = agent_conf.get('token',  DEFAULT_TOKEN_FILE)
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
-                self.MONITOR_UNASSIGNED_INTERAFCES = ('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERAFCES)
+                self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERAFCES)
             except Exception as e:
                 log.excep("FwConfiguration: %s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
@@ -179,7 +179,7 @@ class Fwglobals:
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
                 self.TOKEN_FILE     = DEFAULT_TOKEN_FILE
                 self.UUID           = DEFAULT_UUID
-                self.MONITOR_UNASSIGNED_INTERAFCES = DEFAULT_MONITOR_UNASSIGNED_INTERAFCES
+                self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERAFCES
             if self.DEBUG:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 

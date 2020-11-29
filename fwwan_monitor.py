@@ -176,7 +176,7 @@ class FwWanMonitor:
                 if 'proto ' in m.group(4):
                     route['proto']  = m.group(4).split('proto ')[1].split(' ')[0]
                 if 'metric ' in m.group(4):
-                    route['metric'] = int(m.group(4).split('metric ')[1])
+                    route['metric'] = int(m.group(4).split('metric ')[1].split(' ')[0])
 
             # Filter out routes on some interfaces.
             #
@@ -185,7 +185,7 @@ class FwWanMonitor:
             if interfaces and interfaces[0].get('monitor-internet', False) == False:
                 continue
             # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
-            if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERAFCES:
+            if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
                 continue
 
             # if this route is known to us, update counters from cache
