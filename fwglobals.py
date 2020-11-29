@@ -207,7 +207,6 @@ class Fwglobals:
         """Constructor method
         """
         # Set default configuration
-        self.NUM_RETRIES_ALLOWED = 3
         self.RETRY_INTERVAL_MIN  = 5 # seconds - is used for both registration and main connection
         self.RETRY_INTERVAL_MAX  = 15
         self.RETRY_INTERVAL_LONG_MIN = 50
@@ -243,8 +242,6 @@ class Fwglobals:
         self.FWAGENT_DAEMON_URI  = 'PYRO:%s@%s:%d' % (self.FWAGENT_DAEMON_NAME, self.FWAGENT_DAEMON_HOST, self.FWAGENT_DAEMON_PORT)
         self.WS_STATUS_ERROR_NOT_APPROVED = 403
         self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
-        self.WS_STATUS_OK                 = 1000
-        self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
         self.fwagent = None
         self.cache   = self.FwCache()
         self.WAN_FAILOVER_SERVERS          = [ '1.1.1.1' , '8.8.8.8' ]
@@ -355,7 +352,6 @@ class Fwglobals:
             'DEBUG':                self.cfg.DEBUG,
             'UUID':                 self.cfg.UUID,
             'FWAGENT_CONF_FILE':    self.FWAGENT_CONF_FILE,
-            'NUM_RETRIES_ALLOWED':  self.NUM_RETRIES_ALLOWED,
             'RETRY_INTERVAL_MIN':   self.RETRY_INTERVAL_MIN,
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)

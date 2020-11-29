@@ -131,26 +131,9 @@ class FwWanMonitor:
             else:
                 prev_time = current_time
 
-
         fwglobals.log.debug("%s: loop stopped" % str(self))
 
 
-# TODO:
-#1.  V - Update reconfig code with (metric % MAX), add 'internetAccess' field
-#2.  V - Suppress RPF check in Linux!
-#12. V - Ask Oleg: ensure that MAX+metric can be used in get_reconfig_hash()!
-#11. V - On modify-interface, modify-device, sync-device - preserve MAX+metric!
-#7.  V - Support in disabling interface for monitoring !!!!!! monitorInternet = true/false !!!!!
-#8.  V - Monitor unassigned interfaces, only if configured in yaml.conf, if param not exists - make it True!
-#14. V - NO: Ask Nir: disable monitor if there is only one 'default' route in system?
-#5.  V - On initialization (due to reboot or daemon restart) - restore metrics from router_cfg
-#3.  Create request queue in router_api! to avoid race on requests from management!!
-#4.  Check how to do reconnect if VPP does not run! And if VPP does run!
-#10. Handle multi hop default routes !!!
-#6.  ? - Ask Nir: do you want to impelement detection of server (1.1.1.1) down?
-#13. Think of backward compatibility with old agents ...
-#    V - if 'monitorInternet' does not present in DB, the interface will be not monitored!
-#14. Try to refactor logger to add class name automatically to all log prints!
     def _get_server(self):
         self.current_server = (self.current_server + 1) % self.num_servers
         return self.SERVERS[self.current_server]
@@ -348,24 +331,29 @@ class FwWanMonitor:
                                 (str(self), route_str, metric))
             return
 
+        # Ensure that connection to flexiManage was revived after metric update.
+        #
+        fwglobals.g.fwagent.reconnect()
+
         fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d - done" % \
             (str(self), route_str, str(route.get('metric', 0)), str(metric)))
 
-def _restore_metrics(self):
-    '''On FwWanMonitor/agent initialization updates Linux with metrics found
-    in router configuration database. This is needed to reduce failover time
-    when vpp does not run.
-    '''
-    routes     = self._get_routes()
-    interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan')
-    for interface in interfaces:
-        metric_in_db = interface.get('metric')
-        if metric_in_db:
-            for r in routes:
-                metric_in_os = route.get('metric', 0)
-                if r['dev_pci'] == interface['pci'] and metric_in_os != metric_in_db:
-                    fwglobals.log.debug("%s: restore metric on %s" % (str(self), r['dev_name']))
-                    self._flush_route(route, metric_in_db)
+
+    def _restore_metrics(self):
+        '''On FwWanMonitor/agent initialization updates Linux with metrics found
+        in router configuration database. This is needed to reduce failover time
+        when vpp does not run.
+        '''
+        routes     = self._get_routes()
+        interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan')
+        for interface in interfaces:
+            metric_in_db = interface.get('metric')
+            if metric_in_db:
+                for r in routes:
+                    metric_in_os = r.get('metric', 0)
+                    if r['dev_pci'] == interface['pci'] and metric_in_os != metric_in_db:
+                        fwglobals.log.debug("%s: restore metric on %s" % (str(self), r['dev_name']))
+                        self._flush_route(r, metric_in_db)
 
 def _str_route(route):
     metric_str = '' if not 'metric' in route else ' metric ' + str(route['metric'])
