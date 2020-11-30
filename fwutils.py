@@ -1806,3 +1806,4 @@ def netplan_set_mac_addresses():
         with open(netplan, 'w') as yaml_fd, open("netplan.json", "r") as json_fd:
             yaml.safe_dump(json.load(json_fd), yaml_fd, encoding='utf-8', allow_unicode=True)
         os.system('rm -rf netplan.json')
+
