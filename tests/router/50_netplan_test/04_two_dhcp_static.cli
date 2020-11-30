@@ -34,10 +34,8 @@
         "message": "add-interface",
         "params": {
             "pci": "0000:00:09.00",
-            "dhcp": "yes",
+            "dhcp": "no",
             "addr": "10.0.2.10/24",
-            "gateway": "10.0.2.1",
-            "metric": "200",
             "routing": "NONE",
             "type": "wan",
             "multilink": {
