@@ -428,7 +428,7 @@ class FWAGENT_API:
             packet_service_state = fwutils.lte_get_packets_state()
             system_info = fwutils.lte_get_system_info()
 
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])[0]
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
                 interface_name = fwutils.dev_id_to_tap(params['dev_id'])
 
