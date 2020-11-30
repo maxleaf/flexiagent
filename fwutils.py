@@ -2057,6 +2057,9 @@ def _run_qmicli_command(flag):
     except subprocess.CalledProcessError as err:
         return None
 
+def qmi_get_simcard_status():
+    return _run_qmicli_command('uim-get-card-status')
+
 def qmi_get_signals_state():
     return _run_qmicli_command('nas-get-signal-strength')
 
@@ -2122,7 +2125,25 @@ def qmi_reset_wds():
     except subprocess.CalledProcessError as e:
         return None
 
+def lte_sim_status():
+    status = qmi_get_simcard_status()
+    if status:
+            data = status.splitlines()
+            for line in data:
+                if 'Card state:' in line:
+                    state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
+                    return state
+
+    return False
+
+def lte_is_sim_inserted():
+    return lte_sim_status() == "present"
+
 def lte_connect(apn, dev_id, reset=False):
+
+    if not lte_is_sim_inserted():
+        return (False, "Sim is not presented")
+
     if not apn:
         return (False, "apn is not configured for %s" % dev_id)
 

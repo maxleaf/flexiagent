@@ -387,6 +387,7 @@ class FWAGENT_API:
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
+            sim_status = fwutils.lte_sim_status()
             signals = fwutils.lte_get_radio_signals_state()
             hardware_info = fwutils.lte_get_hardware_info()
             connection_state = fwutils.lte_get_connection_state()
@@ -407,7 +408,8 @@ class FWAGENT_API:
                 'connectivity'        : connectivity,
                 'packet_service_state': packet_service_state,
                 'hardware_info'       : hardware_info,
-                'system_info'         : system_info
+                'system_info'         : system_info,
+                'sim_status'          : sim_status
             }
 
             return {'message': response, 'ok': 1}
