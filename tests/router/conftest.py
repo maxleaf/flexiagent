@@ -22,4 +22,5 @@ def netplan_backup():
     for file in orig_yaml:
         orig_backup = file.replace('yaml.backup', 'yaml')
         shutil.move(file, orig_backup)
+    os.system('netplan apply')
     os.system('sudo fwkill vpp')

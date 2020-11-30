@@ -51,16 +51,17 @@ import os
 import sys
 import shutil
 import fwtests
-import netplan_mac_addr
 
 CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
 TEST_ROOT = CODE_ROOT + '/tests/'
+sys.path.append(CODE_ROOT)
 sys.path.append(TEST_ROOT)
+import fwutils
 
 CLI_PATH = __file__.replace('.py', '')
 CLI_STOP_ROUTER = os.path.join(CLI_PATH, 'stop-router.cli')
 CLI_START_ROUTER = os.path.join(CLI_PATH, 'start-router.cli')
-ULTIPLE_NETPLAN = os.path.join(CLI_PATH, 'multiple_netplans/')
+MULTIPLE_NETPLAN = os.path.join(CLI_PATH, 'multiple_netplans/')
 
 # pylint: disable-msg=unused-argument
 # These are unused arguments are fixture name contains in conftest.py file
@@ -81,13 +82,13 @@ def test_netplan(netplan_backup):
             else:
                 shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
             #apply netplan
-            netplan_mac_addr.convert_netplan_macaddr()
+            fwutils.netplan_set_mac_addresses()
             os.system('netplan apply')
 
             with fwtests.TestFwagent() as agent:
-                print "   " + os.path.basename(test)
+                #print "   " + os.path.basename(test)
                 (start_ok, out) = agent.cli('-f %s' % CLI_START_ROUTER)
-                assert start_ok
+                assert start_ok, "Failed to start router"
                 #print "start_router: %s" % out
 
                 lines = agent.grep_log('Exception: API failed')
@@ -95,13 +96,13 @@ def test_netplan(netplan_backup):
                 # Load router configuration with spoiled lists
                 (cli_ok, out) = agent.cli('--api inject_requests filename=%s \
                     ignore_errors=False' % test)
-                assert cli_ok
+                assert cli_ok, "Failed to start router by %s" % test
                 #print "Inject cli '%s': %s" %(os.path.basename(test), out)
 
                 lines = agent.grep_log('Exception: API failed')
                 assert len(lines) == 0, "Errors in %s cli: %s" %(test, '\n'.join(lines))
                 (stop_ok, out) = agent.cli('-f %s' % CLI_STOP_ROUTER)
-                assert stop_ok
+                assert stop_ok, "Failed to stop router"
                 #print "stop_router: %s" % out
 
                 lines = agent.grep_log('Exception: API failed')
