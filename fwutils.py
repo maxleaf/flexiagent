@@ -2111,6 +2111,9 @@ def qmi_get_model():
 def qmi_get_imei():
     return _run_qmicli_command('dms-get-ids')
 
+def qmi_get_default_settings():
+    return _run_qmicli_command('wds-get-default-settings=3gpp')
+
 def qmi_reset_nas():
     try:
         output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-mbim --nas-reset', shell=True, stderr=subprocess.STDOUT)
@@ -2125,14 +2128,24 @@ def qmi_reset_wds():
     except subprocess.CalledProcessError as e:
         return None
 
+def lte_get_default_apn():
+    default_settings = qmi_get_default_settings()
+    if default_settings:
+        data = default_settings.splitlines()
+        for line in data:
+            if 'APN' in line:
+                return line.split(':')[-1].strip().replace("'", '')
+
+    return None
+
 def lte_sim_status():
     status = qmi_get_simcard_status()
     if status:
-            data = status.splitlines()
-            for line in data:
-                if 'Card state:' in line:
-                    state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
-                    return state
+        data = status.splitlines()
+        for line in data:
+            if 'Card state:' in line:
+                state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
+                return state
 
     return False
 
@@ -2158,8 +2171,8 @@ def lte_connect(apn, dev_id, reset=False):
 
     if not apn:
         # try to fetch it from the sim
-        sys_info = lte_get_system_info()
-        if sys_info['Operator_Name']:
+        default_apn = lte_get_default_apn()
+        if default_apn:
             apn = sys_info['Operator_Name']
         else:
             return (False, "apn is not configured for %s" % dev_id)
