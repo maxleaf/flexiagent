@@ -89,6 +89,7 @@ class OS_DECODERS:
             if fwutils.is_lte_interface(dev_id):
                 daddr['deviceType'] = 'lte'
                 daddr['dhcp'] = 'yes'
+                daddr['deviceParams'] = {'apn' : fwutils.lte_get_default_apn() }
                 tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
                 if tap:
                     addrs = inp[tap]
