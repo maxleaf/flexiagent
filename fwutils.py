@@ -1386,7 +1386,7 @@ def get_interface_gateway_from_router_db(ip):
         return None
     return ip_str_to_bytes(gw_ip)[0]
 
-def add_static_route(addr, via, metric, remove, pci=None, enable_default=False):
+def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 
     :param addr:            Destination network.
@@ -1394,11 +1394,10 @@ def add_static_route(addr, via, metric, remove, pci=None, enable_default=False):
     :param metric:          Metric.
     :param remove:          True to remove route.
     :param pci:             Device to be used for outgoing packets.
-    :param enable_default:  True to support addr = 'default'
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-    if addr == 'default' and enable_default == False:
+    if addr == 'default':
         return (True, None)
 
     metric = ' metric %s' % metric if metric else ''
@@ -1682,9 +1681,8 @@ def compare_request_params(params1, params2):
         # False booleans will be handled by next 'elif'.
         #
         if val1 and val2:
-            if type(val1) != type(val2):
-                return False        # Not comparable types
-            if type(val1) == str:
+            if (type(val1) == str or type(val1) == unicode) and \
+               (type(val2) == str or type(val2) == unicode):
                 # Take special care of the 'metric' parameter.
                 # The FwWanMonitor can put watermark on it, and flexiManage
                 # is not aware of it, so remove the watermark before comparison.
@@ -1697,6 +1695,8 @@ def compare_request_params(params1, params2):
                 #
                 elif val1.lower() != val2.lower():
                     return False    # Strings are not equal
+            elif type(val1) != type(val2):
+                return False        # Types are not equal
             elif val1 != val2:
                 return False        # Values are not equal
 

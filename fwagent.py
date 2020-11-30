@@ -95,6 +95,7 @@ class FwAgent:
         self.thread_stun          = None
         self.pending_msg_replies  = []
         self.handling_request     = False
+        self.reconnecting         = False
 
         if handle_signals:
             signal.signal(signal.SIGTERM, self._signal_handler)

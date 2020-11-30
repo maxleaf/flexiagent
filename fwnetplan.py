@@ -160,6 +160,10 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
+    fwglobals.log.debug(
+        "add_remove_netplan_interface: is_add=%d, pci=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
+        (is_add, pci, ip, gw, metric, dhcp, type))
+
     set_name = ''
     old_ifname = ''
     ifname = fwutils.pci_to_tap(pci)
@@ -218,7 +222,6 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
 
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
-            config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
         else:
             config_section['dhcp4'] = False
             if 'dhcp4-overrides' in config_section:

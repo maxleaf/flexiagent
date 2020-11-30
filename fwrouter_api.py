@@ -706,7 +706,7 @@ class FWROUTER_API:
                 else:
                     out_requests.append(_request)
             if not out_requests:
-                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(out_requests))
+                fwglobals.log.debug("_strip_noop_request: aggregated request has no impact")
                 return None
             if len(out_requests) < len(inp_requests):
                 fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
@@ -826,12 +826,20 @@ class FWROUTER_API:
 
             # Preserve watermark that FwWanMonitor might put on metric in
             # router_cfg, flexiManage is not aware of it.
+            # Note the 'modify-interface' might be injected by FwWanMonitor.
+            # In that case we should not preserve the watermark.
             #
-            old_metric = old_params.get('metric')
-            new_metric = new_params.get('metric')
-            if old_metric and new_metric and \
-               int(old_metric) > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-                new_params['metric'] = str(int(new_metric) + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+            if _params.get('internals', {}).get('sender') == None:
+                old_metric = old_params.get('metric')
+                new_metric = new_params.get('metric')
+                if old_metric and new_metric and \
+                int(old_metric) > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                    new_params['metric'] = str(int(new_metric) + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+
+            # Don't store internal 'sender' to avoid unnecessary sync-s
+            #
+            if 'internals' in new_params:
+                del new_params['internals']
 
             return [
                 { 'message': remove_req, 'params' : old_params },

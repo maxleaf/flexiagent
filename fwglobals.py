@@ -161,7 +161,7 @@ class Fwglobals:
             DEFAULT_MANAGEMENT_URL = 'https://app.flexiwan.com:443'
             DEFAULT_TOKEN_FILE     = data_path + 'token.txt'
             DEFAULT_UUID           = None
-            DEFAULT_MONITOR_UNASSIGNED_INTERAFCES = True
+            DEFAULT_MONITOR_UNASSIGNED_INTERFACES = True
             try:
                 with open(filename, 'r') as conf_file:
                     conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
@@ -171,7 +171,7 @@ class Fwglobals:
                 self.MANAGEMENT_URL = agent_conf.get('server', DEFAULT_MANAGEMENT_URL)
                 self.TOKEN_FILE     = agent_conf.get('token',  DEFAULT_TOKEN_FILE)
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
-                self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERAFCES)
+                self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERFACES)
             except Exception as e:
                 log.excep("FwConfiguration: %s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
@@ -179,7 +179,7 @@ class Fwglobals:
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
                 self.TOKEN_FILE     = DEFAULT_TOKEN_FILE
                 self.UUID           = DEFAULT_UUID
-                self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERAFCES
+                self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERFACES
             if self.DEBUG:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 
@@ -247,7 +247,6 @@ class Fwglobals:
         self.WAN_FAILOVER_SERVERS          = [ '1.1.1.1' , '8.8.8.8' ]
         self.WAN_FAILOVER_WND_SIZE         = 20         # 20 pings, every ping waits a second for response
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
-        self.WAN_FAILOVER_NET_RESTART_TH   = 8          # 40% of subsequent failures trigger network restart
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
 
 
