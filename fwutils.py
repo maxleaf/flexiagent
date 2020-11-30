@@ -2139,13 +2139,30 @@ def lte_sim_status():
 def lte_is_sim_inserted():
     return lte_sim_status() == "present"
 
+def lte_disconnect():
+    try:
+        file_path = '/tmp/mbim_network'
+        if os.path.exists(file_path):
+            start_data = subprocess.check_output('cat %s' % file_path, shell=True).splitlines()
+            pdh = start_data[0].split('=')[-1]
+            cid = start_data[1].split('=')[-1]
+            output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-stop-network=%s --client-cid=%s' % (pdh, cid), shell=True, stderr=subprocess.STDOUT)
+        return (True, None)
+    except subprocess.CalledProcessError as e:
+        return (False, "Exception: %s" % (str(e)))
+
 def lte_connect(apn, dev_id, reset=False):
 
     if not lte_is_sim_inserted():
         return (False, "Sim is not presented")
 
     if not apn:
-        return (False, "apn is not configured for %s" % dev_id)
+        # try to fetch it from the sim
+        sys_info = lte_get_system_info()
+        if sys_info['Operator_Name']:
+            apn = sys_info['Operator_Name']
+        else:
+            return (False, "apn is not configured for %s" % dev_id)
 
     try:
         if reset:
@@ -2156,7 +2173,16 @@ def lte_connect(apn, dev_id, reset=False):
             return (True, None)
 
         output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-start-network="ip-type=4,apn=%s" --client-no-release-cid' % apn, shell=True, stderr=subprocess.STDOUT)
-        ip_info = qmi_get_ip_configuration()
+        data = output.splitlines()
+
+        for line in data:
+            if 'Packet data handle' in line:
+                ret = os.system('echo "PDH=%s" > /tmp/mbim_network' % line.split(':')[-1].strip().replace("'", ''))
+                continue
+            if 'CID' in line:
+                ret = os.system('echo "CID=%s" >> /tmp/mbim_network' % line.split(':')[-1].strip().replace("'", ''))
+                break
+
         return (True, None)
     except subprocess.CalledProcessError as e:
         if not reset:

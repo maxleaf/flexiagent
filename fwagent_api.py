@@ -45,7 +45,7 @@ fwagent_api = {
     'sync-device':                      '_sync_device',
     'get-wifi-interface-status':        '_get_wifi_interface_status',
     'connect-to-wifi':                  '_connect_to_wifi',
-    'connect-to-lte':                   '_connect_to_lte',
+    'lte-perform-operation':            '_lte_perform_operation',
     'get-lte-interface-info':           '_get_lte_interface_info'
 }
 
@@ -356,8 +356,6 @@ class FWAGENT_API:
         return {'message': 'This interface is not WIFI', 'ok': 0}
 
     def _connect_to_wifi(self, params):
-        fwglobals.log.info("FWAGENT_API: _connect_to_wifi STARTED")
-
         try:
             result = fwutils.connect_to_wifi(params)
 
@@ -369,19 +367,55 @@ class FWAGENT_API:
         except:
             raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
 
+    def _lte_perform_operation(self, params):
+        try:
+            operation = params['operation'] if 'operation' in params else None
+            if not operation:
+                raise Exception("Operation was not specified")
+
+            if operation == 'connect':
+                is_success, error = self._connect_to_lte(params)
+            elif operation == 'disconnect':
+                is_success, error = self._disconnect_from_lte(params)
+            else:
+                is_success, error = (False, {'err_msg': 'No supported operation was requested' })
+
+            return {'message': error, 'ok': is_success}
+        except Exception as e:
+            raise Exception("_lte_perform_operation: failed. %s" % str(e))
+
+    def _disconnect_from_lte(self, params):
+        try:
+            if fwutils.is_lte_interface(params['dev_id']) == False:
+                return (False, {'err_msg': 'This interface is not LTE' })
+
+            # don't perform disconnect if this interface is already assigned to vpp and vpp is run
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])[0]
+            if fwutils.vpp_does_run() and is_assigned:
+                return (False, {'err_msg': 'Cannot disconnect LTE network while it\'s in use by a running router' })
+
+            is_success, error = fwutils.lte_disconnect()
+            os.system('ifconfig wwan0 0')
+
+            return is_success, error
+        except Exception as e:
+            raise Exception("_connect_to_lte: failed to connect to lte: %s" % str(e))
+
+
     def _connect_to_lte(self, params):
         try:
             if fwutils.is_lte_interface(params['dev_id']) == False:
-                return {'message': 'This interface is not LTE', 'ok': 0}
+                return (True, {'err_msg': 'This interface is not LTE' })
 
-            is_success, error = fwutils.connect_to_lte(params)
+            apn = params['apn'] if 'apn' in params else ''
+            is_success, error =  fwutils.lte_connect(apn, params['dev_id'])
+
             if is_success:
-                return {'message': '', 'ok': is_success}
+                fwutils.set_lte_info_on_linux_interface()
 
-            return {'message': error, 'ok': is_success}
-
-        except:
-            raise Exception("_connect_to_lte: failed to connect to lte: %s" % format(sys.exc_info()[1]))
+            return is_success, error
+        except Exception as e:
+            raise Exception("_connect_to_lte: failed to connect to lte: %s" % str(e))
 
     def _get_lte_interface_info(self, params):
         try:
