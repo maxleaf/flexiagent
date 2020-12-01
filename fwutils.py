@@ -2046,7 +2046,13 @@ def set_lte_info_on_linux_interface():
             ip_info = lte_get_configuration_received_from_provider()
             if ip_info['STATUS']:
                 os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
-                os.system('route add -net 0.0.0.0 gw %s' % ip_info['GATEWAY'])
+
+                metric = 0
+                is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+                if is_assigned:
+                    metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
+
+                os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric))
 
     return None
 
