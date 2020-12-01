@@ -1779,6 +1779,20 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
 
     return (True, None)
 
+def get_interfaces_mac_addresses():
+    '''
+    This function returns a dictonary of the local machine's interfaces
+    and it's corresponding MAC addresses
+    '''
+    intf_mac_addr = {}
+    interfaces = psutil.net_if_addrs()
+    for nicname, addrs in interfaces.items():
+        for addr in addrs:
+            if addr.family == psutil.AF_LINK:
+                intf_mac_addr[nicname] = addr.address
+    return intf_mac_addr
+
+
 def netplan_set_mac_addresses():
     '''
     This function replaces the netplan files macaddr with the actual macaddr
@@ -1787,23 +1801,16 @@ def netplan_set_mac_addresses():
     #Changing mac addresses in all netplan files
     #Copy the current yaml into json file, change the mac addr
     #Remove the existing netplan and convert json file back to yaml
+    int_mac_addr = get_interfaces_mac_addresses()
     for netplan in netplan_paths:
-        with open("netplan.json", "w") as json_fd:
-            with open(netplan) as yaml_fd:
-                netplan_json = yaml.load(yaml_fd)
-                for intf in netplan_json['network']['ethernets']:
-                    if netplan_json['network']['ethernets'][intf].get('match'):
-                        cmd = 'ip addr show %s' %intf
-                        conn = subprocess.Popen(shlex.split(cmd),
-                                                stdout=subprocess.PIPE,
-                                                stderr=subprocess.PIPE)
-                        res, _ = conn.communicate()
-                        mac_str = re.search('ether ([a-z0-9:]*) ', res)
-                        mac = mac_str.group(1)
-                        netplan_json['network']['ethernets'][intf]['match']['macaddress'] = mac
-                json.dump(netplan_json, json_fd)
-            os.system('rm -rf netplan')
+        with open("netplan.json", "w") as json_fd, open(netplan) as yaml_fd:
+            netplan_json = yaml.load(yaml_fd)
+            for if_name in netplan_json['network']['ethernets']:
+                interface = netplan_json['network']['ethernets'][if_name]
+                if interface.get('match'):
+                    interface['match']['macaddress'] = int_mac_addr[if_name]
+            json.dump(netplan_json, json_fd)
+        os.system('rm -rf netplan')
         with open(netplan, 'w') as yaml_fd, open("netplan.json", "r") as json_fd:
             yaml.safe_dump(json.load(json_fd), yaml_fd, encoding='utf-8', allow_unicode=True)
         os.system('rm -rf netplan.json')
-
