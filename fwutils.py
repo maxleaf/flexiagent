@@ -1799,18 +1799,17 @@ def netplan_set_mac_addresses():
     '''
     netplan_paths = glob.glob('/etc/netplan/*.yaml')
     #Changing mac addresses in all netplan files
-    #Copy the current yaml into json file, change the mac addr
-    #Remove the existing netplan and convert json file back to yaml
+    #Copy the current yaml into json variable, change the mac addr
+    #Copy the coverted json string back to yaml file
     int_mac_addr = get_interfaces_mac_addresses()
     for netplan in netplan_paths:
-        with open("netplan.json", "w") as json_fd, open(netplan) as yaml_fd:
-            netplan_json = yaml.load(yaml_fd)
+        with open(netplan, "r+") as fd:
+            netplan_json = yaml.load(fd)
             for if_name in netplan_json['network']['ethernets']:
                 interface = netplan_json['network']['ethernets'][if_name]
                 if interface.get('match'):
                     interface['match']['macaddress'] = int_mac_addr[if_name]
-            json.dump(netplan_json, json_fd)
-        os.system('rm -rf netplan')
-        with open(netplan, 'w') as yaml_fd, open("netplan.json", "r") as json_fd:
-            yaml.safe_dump(json.load(json_fd), yaml_fd, encoding='utf-8', allow_unicode=True)
-        os.system('rm -rf netplan.json')
+	    netplan_str = yaml.dump(netplan_json)
+	    fd.seek(0)
+	    fd.write(netplan_str)
+	    fd.truncate()
