@@ -160,6 +160,10 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
+    fwglobals.log.debug(
+        "add_remove_netplan_interface: is_add=%d, pci=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
+        (is_add, pci, ip, gw, metric, dhcp, type))
+
     set_name = ''
     old_ifname = ''
     ifname = fwutils.pci_to_tap(pci)

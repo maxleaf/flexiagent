@@ -109,11 +109,8 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwglobals.g.handle_request({ 'message': 'interfaces'})['message']
-            if loadsimulator.g.enabled():
-                info['reconfig'] = ''
-            else:
-                info['reconfig'] = fwutils.get_reconfig_hash()
+            info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
+            info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])

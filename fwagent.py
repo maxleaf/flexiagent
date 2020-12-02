@@ -93,9 +93,9 @@ class FwAgent:
         self.ws                   = None
         self.thread_statistics    = None
         self.thread_stun          = None
-        self.should_reconnect     = False
         self.pending_msg_replies  = []
         self.handling_request     = False
+        self.reconnecting         = False
 
         if handle_signals:
             signal.signal(signal.SIGTERM, self._signal_handler)
@@ -135,7 +135,7 @@ class FwAgent:
     def _mark_connection_failure(self, err):
         try:
             with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as f:
-                fwutils.file_write_and_flush(f, 'Failed to connect to MGMT: %s' % err)
+                fwutils.file_write_and_flush(f, 'Failed to connect to flexiManage: %s' % err)
                 fwglobals.log.debug("_mark_connection_failure: %s" % str(err))
         except Exception as e:
             fwglobals.log.excep("Failed to create connection failure file: %s" % str(e))
@@ -156,7 +156,7 @@ class FwAgent:
         :returns: `True` if registration succeeded, `False` otherwise.
         """
 
-        fwglobals.log.info("registering with flexiWAN orchestrator...")
+        fwglobals.log.info("registering with flexiManage...")
 
         self.register_error = ''
 
@@ -188,7 +188,7 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces = fwglobals.g.handle_request({'message':'interfaces'})
+        interfaces       = fwutils.get_linux_interfaces(cached=False).values()
         (dr_via, dr_dev) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
@@ -205,7 +205,7 @@ class FwAgent:
                                 'ip_list': ip_list,
                                 'default_route': dr_via,
                                 'default_dev': dr_dev,
-                                'interfaces': json.dumps(interfaces['message'])}).encode()
+                                'interfaces': json.dumps(interfaces)}).encode()
         req = ureq.Request(url, data)
         ctx = ssl.create_default_context()
         if fwglobals.g.cfg.BYPASS_CERT:
@@ -226,7 +226,7 @@ class FwAgent:
             fwglobals.log.info("  Hostname:  " + machine_name)
             fwglobals.log.info("  IP List:   " + ip_list)
             fwglobals.log.info("  Device ID: " + machine_id)
-            fwglobals.log.info("Run connect after approving device in the orchestrator")
+            fwglobals.log.info("Run connect after approving device in flexiManage")
 
         except uerr.URLError as e:
             if hasattr(e, 'code'):
@@ -288,11 +288,13 @@ class FwAgent:
 
     def connect(self):
         """Establishes the main WebSocket connection between device and manager,
-        on which Fwagent receives manager requests.
+        on which Fwagent receives manager requests, and enters into the infinite
+        event loop on it.
 
-        :returns: `True` if connection was established, `False` otherwise.
+        :returns: `True` if connection was established and than was closed gracefully,
+                  `False` otherwise.
         """
-        fwglobals.log.info("connecting to flexiWAN orchestrator...")
+        fwglobals.log.info("connecting to flexiManage...")
 
         self.connection_error_code = 0
 
@@ -335,7 +337,6 @@ class FwAgent:
                                     on_message = on_message,
                                     on_error   = on_error,
                                     on_close   = on_close)
-        self.connection_error_code = 0
 
         cert_required = ssl.CERT_NONE if fwglobals.g.cfg.BYPASS_CERT else ssl.CERT_REQUIRED
 
@@ -349,14 +350,34 @@ class FwAgent:
         #self.ws.run_forever(sslopt={"cert_reqs": cert_required},
         #                    ping_interval=0, ping_timeout=0)
         if self.connection_error_code:
-            error_str = "connection to flexiWAN orchestrator was closed due to: %s" % self.connection_error_msg
-            if self.connection_error_code < fwglobals.g.WS_STATUS_OK:
-                fwglobals.log.error(error_str)
-            else:
-                fwglobals.log.info(error_str)
+            error_str = "connection to flexiManage was closed due to %s" % self.connection_error_msg
+            fwglobals.log.error(error_str)
             return False
-        fwglobals.log.info("connection to flexiWAN orchestrator was closed")
+        fwglobals.log.info("connection to flexiManage was closed")
         return True
+
+    def reconnect(self):
+        """Closes and reestablishes the main WebSocket connection between
+        device and manager, on which Fwagent receives manager requests.
+        When WAN address or default route are changed, the connection might
+        loose connectivity, while relying on TCP/WebSocket keep-alive mechanism
+        to detect that. That might take up to few minutes! As we have full
+        control of device IPs and routes, we can short the connection down period
+        significantly by enforcing connection re-establishment.
+        This function closes the current connection and opens the new one.
+        """
+        if self.ws == None:
+            fwglobals.log.info("flexiManage is not connected, ignore reconnection request")
+        elif self.reconnecting:
+            fwglobals.log.info("reconnection to flexiManage was initiated already")
+        else:
+            fwglobals.log.info("initiate reconnection to flexiManage")
+            self.reconnecting = True
+            self.ws.close()
+            # The new connection will be opened by the FwagentDaemon object from
+            # within the connection loop, when the current connection
+            # will be closed gracefully.
+
 
     def _on_error(self, ws, error):
         """Handles WebSocket connection errors either local errors, like name
@@ -376,7 +397,7 @@ class FwAgent:
         else:
             self.connection_error_code = fwglobals.g.WS_STATUS_ERROR_LOCAL_ERROR
             self.connection_error_msg  = str(error)
-        fwglobals.log.error("connection got error: " + self.connection_error_msg)
+        fwglobals.log.error("_on_error: connection got error '%s'" % self.connection_error_msg)
 
         # Create a file to signal the upgrade process that the
         # upgraded agent failed to connect to the management.
@@ -391,7 +412,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("connection to orchestrator is closed")
+        fwglobals.log.info("_on_close: connection to flexiManage is closed")
         if self.thread_statistics:
             self.connected = False
             self.thread_statistics.join()
@@ -403,17 +424,20 @@ class FwAgent:
 
         :returns: None.
         """
-        self.connected = True
+        fwglobals.log.info("connected to flexiManage")
+
+        self.connected    = True
+        self.reconnecting = False
         self._clean_connection_failure()
 
         if loadsimulator.g.enabled():
             loadsimulator.g.simulate_event.set()
 
-        # Send pending message replies to the MGMT upon connection reopen.
+        # Send pending message replies to the flexiManage upon connection reopen.
         # These are replies to messages that might have cause the connection
-        # to the MGMT to disconnect, and thus have to be sent on the new connection.
+        # to the flexiManage to disconnect, and thus have to be sent on the new connection.
         if len(self.pending_msg_replies) > 0:
-            fwglobals.log.info("_on_open: sending %d pending replies to orchestrator" % len(self.pending_msg_replies))
+            fwglobals.log.info("_on_open: send %d pending replies to flexiManage" % len(self.pending_msg_replies))
             for reply in self.pending_msg_replies:
                 fwglobals.log.debug("_on_open: sending reply: " + json.dumps(reply))
                 ws.send(json.dumps(reply))
@@ -462,7 +486,7 @@ class FwAgent:
         self.thread_statistics.start()
 
         if not fwutils.vpp_does_run():
-            fwglobals.log.info("connect: router is not running, start it in orchestrator")
+            fwglobals.log.info("connect: router is not running, start it in flexiManage")
 
 
     def _on_message(self, ws, message):
@@ -494,26 +518,16 @@ class FwAgent:
         reply_str = reply if 'message' in request and not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
         fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
 
-        # In load simulator mode self.ws is not initialized as far as connections are created
-        # outside the agent.
-        if not loadsimulator.g.enabled():
-            ws = self.ws
-
-        # Messages that change the interfaces might cause the existing connection to break
-        # (for example, if the IP/mask has changed). Since sending the reply on a broken
-        # connection will not work, we close the connection and save the reply for later.
-        # when the new connection is opened, we send the reply to the MGMT right away.
-        # We close the connection even if the request failed, as the change might have
-        # taken place regardless of the request status, hence socket might not be operational.
+        # Messages that change the interfaces might break the existing connection
+        # (for example, if the WAN interface IP/mask has changed). Since sending
+        # the reply on a broken connection will not work, we close the connection
+        # before sending the reply and save the reply into pending queue.
+        # Later, when daemon re-opens the new connection by connection loop,
+        # we will pop the reply out of queue and will send it to the flexiManage.
         #
-        if self.should_reconnect == True or ws == None:
-            fwglobals.log.info("_on_message: re-establish connection, queue reply %s" % str(pmsg['seq']))
+        if self.reconnecting == True:
+            fwglobals.log.info("_on_message: goes to reestablish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
-            self.connection_error_code = fwglobals.g.WS_STATUS_OK_DEVICE_CHANGE
-            self.connection_error_msg = 'device change'
-            if ws:     # Close connection only if it was not closed yet due to TCP timeout or any other error
-                fwglobals.log.info("_on_message: closing connection to orchestrator")
-                ws.close()
         else:
             ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
 
@@ -637,8 +651,8 @@ def reset(soft=False):
 
     CSTART = "\x1b[0;30;43m"
     CEND = "\x1b[0m"
-    choice = raw_input(CSTART + "Device must be deleted from the orchestrator before resetting the agent. " +
-                      "Already deleted from orchestrator y/n [n]" + CEND)
+    choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+                      "Already deleted in flexiManage y/n [n]" + CEND)
     if choice == 'y' or choice == 'Y':
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)
@@ -769,7 +783,8 @@ class FwagentDaemon(object):
         # arguments will be `None`.
         fwglobals.log.debug("FwagentDaemon: goes to exit")
         self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
-        self.agent = fwglobals.g.finalize_agent()
+        fwglobals.g.finalize_agent()
+        self.agent = None
         fwglobals.log.debug("FwagentDaemon: exited")
 
     def _check_system(self):
@@ -925,27 +940,20 @@ class FwagentDaemon(object):
         # That start infinite receive-send loop in Fwagent::connect().
         # -------------------------------------
         while self.active:
-            connected = self.agent.connect()
-            if not connected:
-                # If connection was closed by management because of not approved device,
-                # retry the connection in few seconds.
-                # Otherwise - retry connection in few minutes to prevent DDoS attack on server.
-                if self.active:
-                    # If immediate reconnect was requested, don't sleep
-                    if self.agent.should_reconnect:
-                        self.agent.should_reconnect = False
-                        continue
-                    # Get reconnect interval
-                    if self.agent.connection_error_code in fwglobals.g.ws_reconnect_status_codes:
-                        min_max = (fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-                    else:
-                        min_max = (fwglobals.g.RETRY_INTERVAL_LONG_MIN, fwglobals.g.RETRY_INTERVAL_LONG_MAX)
-                    retry_sec = random.randint(min_max[0], min_max[1])
-                    # Go and sleep
-                    fwglobals.log.info("retry connection in %d seconds" % retry_sec)
-                    while retry_sec > 0 and self.active:
-                        time.sleep(1)   # Check self.active every second to detect Ctrl-C as soon as possible
-                        retry_sec -= 1
+            closed_gracefully = self.agent.connect()
+            if not closed_gracefully and self.active:
+                # If connection was closed by flexiManage because of not approved
+                # device (reject 403), retry connection in few seconds.
+                # Otherwise - in few minutes in order to prevent DoS attack.
+                #
+                if self.agent.connection_error_code in fwglobals.g.ws_reconnect_status_codes:
+                    retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                else:
+                    retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_LONG_MIN, fwglobals.g.RETRY_INTERVAL_LONG_MAX)
+                fwglobals.log.info("retry connection in %d seconds" % retry_sec)
+                while retry_sec > 0 and self.active:
+                    time.sleep(1)   # Check self.active every second to detect Ctrl-C as soon as possible
+                    retry_sec -= 1
 
         fwglobals.log.info("connection loop was stopped, use 'fwagent start' to start it again")
 
@@ -1126,7 +1134,7 @@ if __name__ == '__main__':
     parser_daemon = subparsers.add_parser('daemon', help='Run agent in daemon mode: infinite register-connect loop')
     parser_daemon.add_argument('-d', '--dont_connect', action='store_true',
                         help="Don't start connection loop on daemon start")
-    parser_simulate = subparsers.add_parser('simulate', help='register and connect many fake devices to FlexiWan orchestrator')
+    parser_simulate = subparsers.add_parser('simulate', help='register and connect many fake devices with flexiManage')
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
@@ -1136,7 +1144,7 @@ if __name__ == '__main__':
                         help="show various agent parameters")
     parser_show.add_argument('--daemon', choices=['status'],
                         help="show various daemon parameters")
-    parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read orchestrator requests from command line')
+    parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read flexiManage requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
     parser_cli.add_argument('-c', '--clean', action='store_true',
