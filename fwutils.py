@@ -436,6 +436,9 @@ def get_linux_interfaces(cached=True):
             'internetAccess':   '',
         }
 
+        interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
+        interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
+
         if is_wifi_interface(dev_id):
             interface['deviceType'] = 'wifi'
             interface['deviceParams'] = wifi_get_capabilities(dev_id)
@@ -458,8 +461,6 @@ def get_linux_interfaces(cached=True):
 
         # Add information specific for WAN interfaces
         #
-        interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
-        interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
         if interface['gateway']:
 
             # Fetch public address info from STUN module
