@@ -82,8 +82,8 @@ class FwWanMonitor:
 
         self.num_servers     = len(self.SERVERS)
         self.current_server  = self.num_servers - 1  # The first selection will take #0
-        self.routes          = {}
-        self.disabled_routes = {}
+        self.routes          = fwglobals.g.cache.wan_monitor['enabled_routes']
+        self.disabled_routes = fwglobals.g.cache.wan_monitor['disabled_routes']
         self.route_rule_re   = re.compile(r"(\w+) via ([0-9.]+) dev (\w+)(.*)") #  'default via 20.20.20.22 dev enp0s9 proto dhcp metric 100'
 
         # On initialization due to either device reboot or daemon restart
@@ -331,7 +331,7 @@ class FwWanMonitor:
                             (new_metric, if_metric))
 
                 if if_metric != new_metric:
-                    fwglobals.log.debug("%s: user updated new_metric meanwhile, keep it: %d" % (str(self), if_metric))
+                    fwglobals.log.debug("%s: user updated metric meanwhile, keep it: %d" % (str(self), if_metric))
 
                 request = {
                     'message': 'modify-interface',
@@ -359,7 +359,7 @@ class FwWanMonitor:
         if not fwglobals.g.router_api.router_started:
             fwglobals.g.fwagent.reconnect()
 
-        fwglobals.log.debug("%s: '%s' update new_metric in OS: %d -> %d - done" % \
+        fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d - done" % \
             (str(self), str(route), route.metric, new_metric))
 
 

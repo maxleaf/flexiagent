@@ -194,6 +194,10 @@ class Fwglobals:
                 'PCIS': {},
                 'STUN': {},
                 'VPP_IF_NAME_TO_PCI': {},
+                'WAN_MONITOR': {
+                    'enabled_routes':  {},
+                    'disabled_routes': {},
+                }
             }
             self.linux_interfaces    = self.db['LINUX_INTERFACES']
             self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
@@ -201,6 +205,7 @@ class Fwglobals:
             self.pcis                = self.db['PCIS']
             self.stun_cache          = self.db['STUN']
             self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
+            self.wan_monitor         = self.db['WAN_MONITOR']
 
 
     def __init__(self):
