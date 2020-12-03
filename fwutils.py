@@ -1977,24 +1977,54 @@ def configure_hostapd(dev_id, configuration):
 
         config = {
             'ssid'                 : configuration.get('ssid', 'fwrouter_ap'),
-            'wpa_passphrase'       : configuration.get('password', 'fwrouter_ap'),
             'interface'            : dev_id_to_linux_if(dev_id),
-            'channel'              : 6,
+            'channel'              : configuration.get('channel', 6),
             'macaddr_acl'          : 0,
             'hw_mode'              : configuration.get('operationMode', 'g'),
             'ignore_broadcast_ssid': 0,
             'driver'               : 'nl80211',
-            'auth_algs'            : 1,
+            #'auth_algs'            : 1,
             'eap_server'           : 0,
             'wmm_enabled'          : 0,
-            'wpa'                  : 2,
-            'wpa_pairwise'         : 'TKIP',
-            'rsn_pairwise'         : 'CCMP',
+            # 'wpa'                  : 1,
+            # 'wpa_pairwise'         : 'TKIP',
+            # 'rsn_pairwise'         : 'CCMP',
             'logger_syslog'        : -1,
             'logger_syslog_level'  : 2,
             'logger_stdout'        : -1,
             'logger_stdout_level'  : 2
         }
+
+        security_mode = configuration.get('securityMode', 'wpa')
+
+        if security_mode == "wep":
+            config['wep_default_key']       = 1
+            config['wep_key1']              = '"%s"' % configuration.get('password', 'fwrouter_ap')
+            config['wep_key_len_broadcast'] = 5
+            config['wep_key_len_unicast']   = 5
+            config['wep_rekey_period']      = 300
+        elif security_mode == "wpa-psk":
+            config['wpa'] = 1
+            config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
+            config['wpa_pairwise']   = 'TKIP CCMP'
+        elif security_mode == "wpa2-psk":
+            config['wpa'] = 2
+            config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
+            config['wpa_pairwise']   = 'TKIP CCMP'
+            config['rsn_pairwise']   = 'CCMP'
+        elif security_mode == "wpa-psk/wpa2-psk":
+            config['wpa'] = 3
+            config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
+            config['wpa_pairwise']   = 'TKIP CCMP'
+            config['rsn_pairwise']   = 'CCMP'
+
+
+        # 'wpa'
+        # 'wpa-psk'
+        # 'wpa2-psk'
+        # 'wpa/wpa2'
+        # 'wpa-psk/wpa2-psk'
+
 
         with open(fwglobals.g.HOSTAPD_CONFIG_FILE, 'w+') as f:
             data = ''
