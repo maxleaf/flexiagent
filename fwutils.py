@@ -364,7 +364,7 @@ def dev_id_to_short(dev_id):
     return dev_id
 
 def get_linux_dev_ids():
-    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """ Get the list of dev id's of all network interfaces available in Linux.
     """
     dev_id_list = fwglobals.g.cache.dev_ids
     if not dev_id_list:
@@ -404,16 +404,81 @@ def dev_id_add_type(dev_id):
 
     return 'pci:%s' % dev_id
 
-def get_linux_interfaces():
-    """ Get the list of dev id's of all network interfaces available in Linux.
+def get_linux_interfaces(cached=True):
+    """Fetch interfaces from Linux.
+
+    :param cached: if True the data will be fetched from cache.
+
+    :return: Dictionary of interfaces by full form dev id.
     """
-    interfaces = fwglobals.g.cache.dev_ids
-    if not interfaces:
-        for (if_name, _) in psutil.net_if_addrs().items():
-            dev_id = get_interface_dev_id(if_name)
-            if not dev_id:
-                continue
-            interfaces[dev_id_to_full(dev_id)] = if_name
+    interfaces = {} if not cached else fwglobals.g.cache.dev_ids
+    if cached and interfaces:
+        return interfaces
+
+    linux_inf = psutil.net_if_addrs().items()
+    for (if_name, addrs) in linux_inf:
+        dev_id = get_interface_dev_id(if_name)
+        if not dev_id:
+            continue
+
+        interface = {
+            'name':             if_name,
+            'devId':            dev_id,
+            'driver':           fwutils.get_interface_driver(nicname),
+            'MAC':              '',
+            'IPv4':             '',
+            'IPv4Mask':         '',
+            'IPv6':             '',
+            'IPv6Mask':         '',
+            'dhcp':             '',
+            'gateway':          '',
+            'metric':           '',
+            'internetAccess':   '',
+        }
+
+        if fwutils.is_wifi_interface(dev_id):
+            daddr['deviceType'] = 'wifi'
+            daddr['deviceParams'] = fwutils.wifi_get_capabilities(dev_id)
+
+        if fwutils.is_lte_interface(dev_id):
+            daddr['deviceType'] = 'lte'
+            daddr['dhcp'] = 'yes'
+            daddr['deviceParams'] = {'apn' : fwutils.lte_get_default_apn() }
+            tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
+            if tap:
+                addrs = linux_inf[tap]
+                daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(tap)
+
+        for addr in addrs:
+            addr_af_name = fwutils.af_to_name(addr.family)
+            if not daddr[addr_af_name]:
+                daddr[addr_af_name] = addr.address.split('%')[0]
+                if addr.netmask != None:
+                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
+        # Add information specific for WAN interfaces
+        #
+        interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
+        interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
+        if interface['gateway']:
+
+            # Fetch public address info from STUN module
+            #
+            _, interface['public_ip'], interface['public_port'], interface['nat_type'] = \
+                fwglobals.g.stun_wrapper.find_addr(dev_id)
+
+            # Fetch internet connectivity info from WAN Monitor module.
+            # Hide the metric watermarks used for WAN failover from flexiManage.
+            #
+            metric = 0 if not interface['metric'] else int(interface['metric'])
+            if metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                interface['metric'] = str(metric - fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+                interface['internetAccess'] = False
+            else:
+                interface['internetAccess'] = True
+
+        interfaces[dev_id] = interface
+
     return interfaces
 
 def get_interface_dev_id(linuxif):
@@ -1328,7 +1393,7 @@ def reset_dhcpd():
     cmd = 'sudo systemctl stop isc-dhcp-server'
 
     try:
-        output = subprocess.check_output(cmd, shell=True)
+        subprocess.check_output(cmd, shell=True)
     except:
         return False
 
@@ -1606,12 +1671,11 @@ def get_interface_gateway_from_router_db(ip):
 def add_static_route(addr, via, metric, remove, dev_id=None):
     """Add static route.
 
-    :param params: params:
-                        addr    - Destination network.
-                        via     - Gateway address.
-                        metric  - Metric.
-                        remove  - True to remove route.
-                        dev_id  - Bus address of device to be used for outgoing packets.
+    :param addr:            Destination network.
+    :param via:             Gateway address.
+    :param metric:          Metric.
+    :param remove:          True to remove route.
+    :param dev_id:          Bus address of device to be used for outgoing packets.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -2563,6 +2627,7 @@ def netplan_apply(caller_name=None):
     fwglobals.log.debug(log_str)
     os.system(cmd)
     time.sleep(1)  # Give a second to Linux to configure interfaces
+    fwglobals.g.cache.dev_ids = {}     # netplan might change interface name, so reset the cache (e.g. enp0s3 -> vpp0)
 
 def compare_request_params(params1, params2):
     """ Compares two dictionaries while normalizing them for comparison
@@ -2601,14 +2666,36 @@ def compare_request_params(params1, params2):
     for key in keys_common:
         val1 = params1[key]
         val2 = params2[key]
-        if val1 and val2:   # Both values are neither None-s nor empty strings.
-            if type(val1) != type(val2):
-                return False        # Not comparable types
-            if type(val1) == str:
-                if val1.lower() != val2.lower():
+
+        # If both values are neither None-s nor empty strings.
+        # False booleans will be handled by next 'elif'.
+        #
+        if val1 and val2:
+            if (type(val1) == str or type(val1) == unicode) and \
+               (type(val2) == str or type(val2) == unicode):
+                # Take special care of the 'metric' parameter.
+                # The FwWanMonitor can put watermark on it, and flexiManage
+                # is not aware of it, so remove the watermark before comparison.
+                #
+                if key == 'metric':
+                    if int(val1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK != \
+                       int(val2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                        return False
+                # Now comare the general case:
+                #
+                elif val1.lower() != val2.lower():
                     return False    # Strings are not equal
+            elif type(val1) != type(val2):
+                return False        # Types are not equal
             elif val1 != val2:
                 return False        # Values are not equal
+
+        # If False booleans or
+        # if one of values not exists or empty string
+        #
+        elif (val1 and not val2) or (not val1 and val2):
+            return False
+
     return True
 
 def check_if_virtual_environment():
@@ -2630,18 +2717,36 @@ def set_linux_reverse_path_filter(dev_name, on):
     : param on       : if on is False, disable rp_filter. Else, enable it
     """
     if dev_name == None:
-        return
+        return None
 
+    # For default interface skip the setting as it is redundant
+    #
     _, metric = get_interface_gateway(dev_name)
-    # for default interface, skip the setting as it is redundant
     if metric == '' or int(metric) == 0:
-        return
+        return None
 
+    # Fetch current setting, so it could be restored later if needed.
+    #
+    current_val = None
+    try:
+        cmd = 'sysctl net.ipv4.conf.%s.rp_filter' % dev_name
+        out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
+        current_val = bool(out.split(' = ')[1])
+    except Exception as e:
+        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % dev_name, str(e))
+        return None
+
+    # Light optimization, no need to set the value
+    #
+    if current_val == on:
+        return current_val
+
+    # Finally set the value
+    #
     val = 1 if on else 0
-
-    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
-    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
-    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
+    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d > /dev/null' % (dev_name, val))
+    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (val))
+    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (val))
 
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by
@@ -2665,7 +2770,7 @@ def vmxnet3_unassigned_interfaces_up():
         for dev_id in linux_interfaces:
             if not dev_id in assigned_dev_ids:
                 if dev_id_is_vmxnet3(dev_id):
-                    os.system("ip link set dev %s up" % linux_interfaces[dev_id])
+                    os.system("ip link set dev %s up" % linux_interfaces[dev_id]['name'])
 
     except Exception as e:
         fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
@@ -2681,7 +2786,7 @@ def get_reconfig_hash():
 
     linux_interfaces = get_linux_interfaces()
     for dev_id in linux_interfaces:
-        name = linux_interfaces[dev_id]
+        name = linux_interfaces[dev_id]['name']
 
         if is_lte_interface(dev_id) and vpp_does_run():
             tap_name = dev_id_to_tap(dev_id)
@@ -2696,11 +2801,12 @@ def get_reconfig_hash():
         res += 'gateway:' + gw + ','
         res += 'metric:'  + metric + ','
         if gw and addr:
-            _, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(dev_id)
+            _, public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(dev_id)
             res += 'public_ip:'   + public_ip + ','
             res += 'public_port:' + str(public_port) + ','
 
     hash = hashlib.md5(res).hexdigest()
+    fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
 def vpp_nat_add_remove_interface(remove, dev_id, metric):
@@ -2760,7 +2866,6 @@ def vpp_nat_add_remove_interface(remove, dev_id, metric):
 def wifi_get_capabilities(dev_id):
 
     result = {
-        'SupportedModes': [],
         'Band 1': {
             'Frequencies': [],
             'Bitrates': [],
@@ -2828,3 +2933,18 @@ def wifi_get_capabilities(dev_id):
         return result
     except Exception as e:
         return result
+
+def compare_metrics(m1, m2):
+    '''Compare metrics represented by strings (or by None), while taking in account
+    watermark. The watermarked metric has a value of original metric +
+    module to implement WAN failover when default route looses internet access.
+
+    :returns: True if metrics are equal (after watermark removal), False otherwise.
+    '''
+    if not m1 and not m2:
+        return True
+    if m1 and m2:
+        if int(m1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK == \
+           int(m2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+            return True
+    return False
