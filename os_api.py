@@ -39,7 +39,6 @@ os_modules = {
 
 # TBD: define all APIs in a file
 os_api_defs = {
-    'interfaces':{'module':'psutil', 'api':'net_if_addrs', 'decode':'interfaces'},
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
     'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
@@ -48,48 +47,6 @@ os_api_defs = {
 class OS_DECODERS:
     """OS DECODERS class representation.
     """
-    def interfaces(self, inp):
-        """Get PCI address from Linux interface name for a list of interfaces.
-
-        :param inp:         Interfaces.
-
-        :returns: Array of interface descriptions.
-        """
-        out = []
-        for nicname, addrs in inp.items():
-            pci, driver = fwutils.get_interface_pci(nicname)
-            if not pci:
-                continue
-            daddr = {
-                        'name':nicname,
-                        'pciaddr':pci,
-                        'driver':driver,
-                        'MAC':'',
-                        'IPv4':'',
-                        'IPv4Mask':'',
-                        'IPv6':'',
-                        'IPv6Mask':'',
-                        'dhcp':'',
-                        'gateway':'',
-                        'metric': '',
-                    }
-            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
-            daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(nicname)
-            for addr in addrs:
-                addr_af_name = fwutils.af_to_name(addr.family)
-                daddr[addr_af_name] = addr.address.split('%')[0]
-                if addr.netmask != None:
-                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-
-            if daddr['gateway']:
-                # Find Public port and IP for the address. At that point
-                # the STUN interfaces cache should be already initialized.
-                _, daddr['public_ip'], daddr['public_port'], daddr['nat_type'] = \
-                    fwglobals.g.stun_wrapper.find_addr(pci)
-
-            out.append(daddr)
-        return (out,1)
-
     def execd(self, handle):
         """Read from a descriptor.
 
