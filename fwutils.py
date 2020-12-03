@@ -415,8 +415,8 @@ def get_linux_interfaces(cached=True):
     if cached and interfaces:
         return interfaces
 
-    linux_inf = psutil.net_if_addrs().items()
-    for (if_name, addrs) in linux_inf:
+    linux_inf = psutil.net_if_addrs()
+    for (if_name, addrs) in linux_inf.items():
         dev_id = get_interface_dev_id(if_name)
         if not dev_id:
             continue
