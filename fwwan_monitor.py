@@ -40,12 +40,12 @@ class FwWanRoute:
         self.via        = via
         self.dev        = dev
         self.metric     = metric
-        self.pci,_      = fwutils.get_interface_pci(dev)
-        self.key        = prefix + '---' + self.pci
+        self.dev_id     = fwutils.get_interface_dev_id(dev)
+        self.key        = prefix + '---' + self.dev_id
         self.probes     = []      # List of ping results
 
     def __str__(self):
-        route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.pci)
+        route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.dev_id)
         if self.metric:
             route += (' metric ' + str(self.metric))
         return route
@@ -186,27 +186,27 @@ class FwWanMonitor:
             # Note the 'monitorInternet' flag might not exist (in case of device
             # upgrade). In that case we enable the monitoring.
             #
-            interfaces = fwglobals.g.router_cfg.get_interfaces(pci=route.pci)
+            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
             if interfaces and (interfaces[0].get('monitorInternet', True) == False):
                 if not route.key in self.disabled_routes:
-                    fwglobals.log.debug("%s: disabled on %s(%s)" % (str(self), route.dev, route.pci))
+                    fwglobals.log.debug("%s: disabled on %s(%s)" % (str(self), route.dev, route.dev_id))
                     self.disabled_routes[route.key] = route
                 continue
             # If monitoring was enables again, log this.
             if interfaces and route.key in self.disabled_routes:
-                fwglobals.log.debug("%s: enabled on %s(%s)" % (str(self), route.dev, route.pci))
+                fwglobals.log.debug("%s: enabled on %s(%s)" % (str(self), route.dev, route.dev_id))
                 del self.disabled_routes[route.key]
 
             # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
             #
             if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
                 if not route.key in self.disabled_routes:
-                    fwglobals.log.debug("%s: disabled on unassigned %s(%s)" % (str(self), route.dev, route.pci))
+                    fwglobals.log.debug("%s: disabled on unassigned %s(%s)" % (str(self), route.dev, route.dev_id))
                     self.disabled_routes[route.key] = route
                 continue
             # If interface was assigned again, log this.
             if not interfaces and route.key in self.disabled_routes:
-                fwglobals.log.debug("%s: enabled on unassigned %s(%s)" % (str(self), route.dev, route.pci))
+                fwglobals.log.debug("%s: enabled on unassigned %s(%s)" % (str(self), route.dev, route.dev_id))
                 del self.disabled_routes[route.key]
 
             # if this route is known to us, update statistics from cache
@@ -313,7 +313,7 @@ class FwWanMonitor:
         # interface metric on flexiManage, it will be not overrode by us.
         #
         try:
-            interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan', pci=route.pci)
+            interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan', dev_id=route.dev_id)
             if interfaces:
                 if_metric_str = interfaces[0].get('metric')
                 if_metric     = int(if_metric_str) if if_metric_str else 0
@@ -336,7 +336,7 @@ class FwWanMonitor:
                 request = {
                     'message': 'modify-interface',
                     'params': {
-                        'pci':       route.pci,
+                        'dev_id':    route.dev_id,
                         'metric':    unicode(str(if_metric)),   # DB keeps strings in 'unicode' as this is what json.loads() uses
                         'internals': { 'sender': str(self) }
                     }
@@ -375,6 +375,6 @@ class FwWanMonitor:
             metric_in_db = 0 if not metric_in_db else int(metric_in_db)
             if metric_in_db >= self.WATERMARK:
                 for r in routes:
-                    if r.pci == interface['pci']:
+                    if r.dev_id == interface['dev_id']:
                         fwglobals.log.debug("%s: restore DOWN state of '%s'" % (str(self), str(r)))
                         r.probes = [ False ] * self.WND_SIZE

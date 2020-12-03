@@ -330,7 +330,7 @@ def dev_id_to_short(dev_id):
     return dev_id
 
 def get_linux_dev_ids():
-    """ Get the list of PCI-s of all network interfaces available in Linux.
+    """ Get the list of dev id's of all network interfaces available in Linux.
     """
     dev_id_list = fwglobals.g.get_cache_data('DEV_ID')
     if not dev_id_list:
@@ -391,7 +391,7 @@ def get_linux_interfaces(cached=True):
 
     :param cached: if True the data will be fetched from cache.
 
-    :return: Dictionary of interfaces by full form PCI.
+    :return: Dictionary of interfaces by full form dev id.
     """
     interfaces = {} if not cached else fwglobals.g.cache.dev_ids
     if cached and interfaces:
@@ -400,6 +400,10 @@ def get_linux_interfaces(cached=True):
     for (if_name, addrs) in psutil.net_if_addrs().items():
         dev_id = get_interface_dev_id(if_name)
         if not dev_id:
+            continue
+
+        addr_type, addr = fwutils.dev_id_parse(dev_id)
+        if addr_type != 'pci':
             continue
 
         interface = {
@@ -432,7 +436,7 @@ def get_linux_interfaces(cached=True):
             # Fetch public address info from STUN module
             #
             _, interface['public_ip'], interface['public_port'], interface['nat_type'] = \
-                fwglobals.g.stun_wrapper.find_addr(pci)
+                fwglobals.g.stun_wrapper.find_addr(dev_id)
 
             # Fetch internet connectivity info from WAN Monitor module.
             # Hide the metric watermarks used for WAN failover from flexiManage.
@@ -444,7 +448,7 @@ def get_linux_interfaces(cached=True):
             else:
                 interface['internetAccess'] = True
 
-        interfaces[pci] = interface
+        interfaces[dev_id] = interface
 
     return interfaces
 
@@ -546,8 +550,7 @@ def dev_id_to_vpp_if_name(dev_id):
     addr_type, _ = dev_id_parse(dev_id)
     if addr_type == "pci":
         dev_id = dev_id_to_full(dev_id)
-        vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(pci)
-        # vpp_if_name = fwglobals.g.get_cache_data('DEV_ID_TO_VPP_IF_NAME_MAP').get(dev_id)
+        vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(dev_id)
         if vpp_if_name: return vpp_if_name
         else: return _build_dev_id_to_vpp_if_name_maps(dev_id, None)
 
@@ -1788,7 +1791,7 @@ def netplan_apply(caller_name=None):
     fwglobals.log.debug(log_str)
     os.system(cmd)
     time.sleep(1)  # Give a second to Linux to configure interfaces
-    fwglobals.g.cache.pcis = {}     # netplan might change interface name, so reset the cache (e.g. enp0s3 -> vpp0)
+    fwglobals.g.cache.dev_ids = {}     # netplan might change interface name, so reset the cache (e.g. enp0s3 -> vpp0)
 
 def compare_request_params(params1, params2):
     """ Compares two dictionaries while normalizing them for comparison
@@ -1926,12 +1929,12 @@ def vmxnet3_unassigned_interfaces_up():
     try:
         linux_interfaces = get_linux_interfaces()
         assigned_list    = fwglobals.g.router_cfg.get_interfaces()
-        assigned_pcis    = [params['pci'] for params in assigned_list]
+        assigned_dev_ids    = [params['dev_id'] for params in assigned_list]
 
-        for pci in linux_interfaces:
-            if not pci in assigned_pcis:
-                if pci_is_vmxnet3(pci):
-                    os.system("ip link set dev %s up" % linux_interfaces[pci]['name'])
+        for dev_id in linux_interfaces:
+            if not dev_id in assigned_dev_ids:
+                if dev_id_is_vmxnet3(dev_id):
+                    os.system("ip link set dev %s up" % linux_interfaces[dev_id]['name'])
 
     except Exception as e:
         fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
@@ -1990,15 +1993,15 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(dev)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev)
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(default_gw)
+            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
 
     if not remove:
         if dev_metric < metric_min and default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(default_gw)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(dev)
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove

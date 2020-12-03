@@ -161,8 +161,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type):
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, pci=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
-        (is_add, pci, ip, gw, metric, dhcp, type))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
+        (is_add, dev_id, ip, gw, metric, dhcp, type))
 
     set_name = ''
     old_ifname = ''
