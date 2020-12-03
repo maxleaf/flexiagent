@@ -424,7 +424,7 @@ def get_linux_interfaces(cached=True):
         interface = {
             'name':             if_name,
             'devId':            dev_id,
-            'driver':           fwutils.get_interface_driver(nicname),
+            'driver':           get_interface_driver(dev_id),
             'MAC':              '',
             'IPv4':             '',
             'IPv4Mask':         '',
@@ -436,25 +436,25 @@ def get_linux_interfaces(cached=True):
             'internetAccess':   '',
         }
 
-        if fwutils.is_wifi_interface(dev_id):
-            daddr['deviceType'] = 'wifi'
-            daddr['deviceParams'] = fwutils.wifi_get_capabilities(dev_id)
+        if is_wifi_interface(dev_id):
+            interface['deviceType'] = 'wifi'
+            interface['deviceParams'] = wifi_get_capabilities(dev_id)
 
-        if fwutils.is_lte_interface(dev_id):
-            daddr['deviceType'] = 'lte'
-            daddr['dhcp'] = 'yes'
-            daddr['deviceParams'] = {'apn' : fwutils.lte_get_default_apn() }
-            tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
+        if is_lte_interface(dev_id):
+            interface['deviceType'] = 'lte'
+            interface['dhcp'] = 'yes'
+            interface['deviceParams'] = {'apn' : lte_get_default_apn() }
+            tap = dev_id_to_tap(dev_id) if vpp_does_run() else None
             if tap:
                 addrs = linux_inf[tap]
-                daddr['gateway'], daddr['metric'] = fwutils.get_interface_gateway(tap)
+                interface['gateway'], interface['metric'] = get_interface_gateway(tap)
 
         for addr in addrs:
-            addr_af_name = fwutils.af_to_name(addr.family)
-            if not daddr[addr_af_name]:
-                daddr[addr_af_name] = addr.address.split('%')[0]
+            addr_af_name = af_to_name(addr.family)
+            if not interface[addr_af_name]:
+                interface[addr_af_name] = addr.address.split('%')[0]
                 if addr.netmask != None:
-                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+                    interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
         # Add information specific for WAN interfaces
         #
