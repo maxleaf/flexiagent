@@ -121,7 +121,7 @@ class LoadSimulator:
         self.data = json.loads(self.simulate_device_tokens[self.simulate_id])
 
         machine_id = self.get_generated_machine_id(self.simulate_id)
-        fwglobals.log.info("connecting to flexiWAN orchestrator with uuid %s" % machine_id)
+        fwglobals.log.info("connecting to flexiManage with uuid %s" % machine_id)
 
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
         header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
