@@ -889,7 +889,7 @@ class FwagentDaemon(object):
         if what == 'version':
             return fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version']
         if what == 'cache':
-            return json.dumps(fwglobals.g.cache.db, indent=2, sort_keys=True)
+            return json.dumps(fwglobals.g.cache.db, indent=2, sort_keys=True, default=lambda x: x.__dict__)
         if what == 'threads':
             thread_list = []
             for thd in threading.enumerate():
