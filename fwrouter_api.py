@@ -164,7 +164,7 @@ class FWROUTER_API:
                         continue
 
                     name = fwutils.pci_to_tap(wan['pci'])
-                    addr = fwutils.get_interface_address(name)
+                    addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                         apply_netplan = True
