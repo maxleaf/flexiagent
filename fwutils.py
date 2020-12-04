@@ -245,10 +245,12 @@ def get_all_interfaces():
 
     return pci_ip_gw
 
-def get_interface_address(if_name):
+def get_interface_address(if_name, log=True):
     """Get interface IP address.
 
-    :param iface:        Interface name.
+    :param if_name:     Interface name.
+    :param log:         If True the found address will be logged.
+                        Errors or debug info is printed in any case.
 
     :returns: IP address.
     """
@@ -265,7 +267,8 @@ def get_interface_address(if_name):
             fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
-    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
+    if log:
+        fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
 def get_interface_name(ip_no_mask):
