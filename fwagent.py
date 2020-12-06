@@ -642,12 +642,11 @@ def reset(soft=False):
 
     :returns: None.
     """
-    daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
-
-    fwutils.reset_router_config()
     if soft:
-        daemon_rpc('start')     # Start daemon main loop if daemon is alive
+        fwutils.reset_router_config()
         return
+
+    daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
 
     CSTART = "\x1b[0;30;43m"
     CEND = "\x1b[0m"

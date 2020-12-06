@@ -99,14 +99,14 @@ class FwRouterCfg:
                 del self.callbacks[idx]
                 return
 
-    def clean(self):
+    def clean(self, new_signature=None):
         """Clean DB
 
         :returns: None.
         """
         for req_key in self.db:
             del self.db[req_key]
-        self.reset_signature()
+        self.reset_signature(new_signature)
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
@@ -452,14 +452,13 @@ class FwRouterCfg:
             self.reset_signature()
         return self.db['signature']
 
-    def reset_signature(self):
+    def reset_signature(self, new_signature=None):
         """Resets configuration signature to the empty sting.
         """
-        if not 'signature' in self.db:
-            self.db['signature'] = ""
-        if self.db['signature']:
-            fwglobals.log.debug("fwrouter_cfg: reset signature")
-            self.db['signature'] = ""
+        old_signature = self.db.get('signature', '<none>')
+        new_signature = "" if new_signature == None else new_signature
+        self.db['signature'] = new_signature
+        fwglobals.log.debug("fwrouter_cfg: reset signature: '%s' -> '%s'" % (old_signature, new_signature))
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against

@@ -809,7 +809,7 @@ def reset_router_config():
      :returns: None.
      """
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        router_cfg.clean()
+        router_cfg.clean("reset_from_shell_to_enforce_resync")
     if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
         os.remove(fwglobals.g.ROUTER_STATE_FILE)
     if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
