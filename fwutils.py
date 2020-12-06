@@ -2045,22 +2045,28 @@ def configure_hostapd(dev_id, configuration):
             'interface'            : dev_id_to_linux_if(dev_id),
             'channel'              : configuration.get('channel', 6),
             'macaddr_acl'          : 0,
-            'hw_mode'              : configuration.get('operationMode', 'g'),
-            'ignore_broadcast_ssid': 0,
+            'auth_algs'            : 3,
+            # 'hw_mode'              : configuration.get('operationMode', 'g'),
+            'ignore_broadcast_ssid': 1 if configuration.get('hideSsid', 0) == True else 0,
             'driver'               : 'nl80211',
-            #'auth_algs'            : 1,
             'eap_server'           : 0,
             'wmm_enabled'          : 0,
-            # 'wpa'                  : 1,
-            # 'wpa_pairwise'         : 'TKIP',
-            # 'rsn_pairwise'         : 'CCMP',
             'logger_syslog'        : -1,
             'logger_syslog_level'  : 2,
             'logger_stdout'        : -1,
             'logger_stdout_level'  : 2
         }
 
-        security_mode = configuration.get('securityMode', 'wpa')
+        ap_mode = configuration.get('operationMode', 'g')
+
+        if ap_mode == "g":
+            config['hw_mode']       = 'g'
+        elif ap_mode == "n":
+            config['hw_mode']       = 'g'
+            config['ieee80211n']    = 1
+            config['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
+
+        security_mode = configuration.get('securityMode', 'wpa2-psk')
 
         if security_mode == "wep":
             config['wep_default_key']       = 1
@@ -2075,8 +2081,9 @@ def configure_hostapd(dev_id, configuration):
         elif security_mode == "wpa2-psk":
             config['wpa'] = 2
             config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
-            config['wpa_pairwise']   = 'TKIP CCMP'
+            config['wpa_pairwise']   = 'CCMP'
             config['rsn_pairwise']   = 'CCMP'
+            config['wpa_key_mgmt']   = 'WPA-PSK'
         elif security_mode == "wpa-psk/wpa2-psk":
             config['wpa'] = 3
             config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
@@ -2107,12 +2114,53 @@ def configure_hostapd(dev_id, configuration):
     except Exception as e:
         return (False, "Exception: %s" % str(e))
 
+def wifi_ap_get_clients(interface_name):
+    try:
+        response = list()
+        output = subprocess.check_output('iw dev %s station dump' % interface_name, shell=True)
+        if output:
+            data = output.splitlines()
+            for (idx, line) in enumerate(data):
+                if 'Station' in line:
+                    mac = line.split(' ')[1]
+                    signal =  data[idx + 2].split(':')[-1].strip().replace("'", '') if 'signal' in data[idx + 2] else ''
+                    ip = ''
+
+                    try:
+                        arp_output = subprocess.check_output('arp -a -n | grep %s' % mac, shell=True)
+                    except:
+                        arp_output = None
+
+                    if arp_output:
+                        ip = arp_output[arp_output.find("(")+1:arp_output.find(")")]
+
+                    entry = {
+                        'mac'   : mac,
+                        'ip'    : ip,
+                        'signal': signal
+                    }
+                    response.append(entry)
+            a = "a"
+    except Exception as e:
+        return response
+
+    return response
 def start_hostapd():
     try:
-        os.system('sudo hostapd -d /etc/hostapd/hostapd.conf -B')
-        return (True, None)
-    except Exception as e:
-        return (False, "Exception: %s" % str(e))
+
+        if pid_of('hostapd'):
+            return (True, None)
+
+        proc = subprocess.check_output('sudo hostapd /etc/hostapd/hostapd.conf -B -dd', stderr=subprocess.STDOUT, shell=True)
+        time.sleep(3)
+
+        pid = pid_of('hostapd')
+        if pid:
+            return (True, None)
+
+        return (False, '')
+    except subprocess.CalledProcessError as err:
+        return (False, str(err.output))
 
 def stop_hostapd():
     try:
@@ -2868,14 +2916,14 @@ def wifi_get_capabilities(dev_id):
 
     result = {
         'Band 1': {
-            'Frequencies': [],
-            'Bitrates': [],
+            # 'Frequencies': [],
+            # 'Bitrates': [],
             'Exists': False
         },
         'Band 2': {
-            'Frequencies': [],
-            'Capabilities': [],
-            'Bitrates': [],
+            # 'Frequencies': [],
+            # 'Capabilities': [],
+            # 'Bitrates': [],
             'Exists': False
         }
     }

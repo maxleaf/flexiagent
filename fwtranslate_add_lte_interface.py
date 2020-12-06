@@ -163,6 +163,37 @@ def add(params):
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
 
+    # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
+    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
+        labels = params['multilink']['labels']
+        if len(labels) > 0:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "python"
+            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
+            cmd['cmd']['params']  = {
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels':   labels,
+                                        'next_hop': gw,
+                                        'dev':      dev_id,
+                                        'remove':   False
+                                      }
+            }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "python"
+            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
+            cmd['revert']['params'] = {
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels':   labels,
+                                        'next_hop': gw,
+                                        'dev':      dev_id,
+                                        'remove':   True
+                                      }
+            }
+            cmd_list.append(cmd)
+
     # Enable NAT.
     # On WAN interfaces run
     #   'nat44 add interface address GigabitEthernet0/9/0'

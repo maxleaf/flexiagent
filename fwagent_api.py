@@ -46,7 +46,9 @@ fwagent_api = {
     'get-wifi-interface-status':        '_get_wifi_interface_status',
     'connect-to-wifi':                  '_connect_to_wifi',
     'lte-perform-operation':            '_lte_perform_operation',
-    'get-lte-interface-info':           '_get_lte_interface_info'
+    'wifi-perform-operation':           '_wifi_perform_operation',
+    'get-lte-interface-info':           '_get_lte_interface_info',
+    'get-wifi-interface-info':          '_get_wifi_interface_info'
 }
 
 class FWAGENT_API:
@@ -74,6 +76,9 @@ class FWAGENT_API:
 
         reply = handler_func(params)
         if reply['ok'] == 0:
+            if 'readable_errors' in params:
+                raise Exception(reply['message'])
+
             raise Exception("fwagent_api: %s(%s) failed: %s" % (handler_func, format(params), reply['message']))
         return reply
 
@@ -364,18 +369,80 @@ class FWAGENT_API:
         except:
             raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
 
+    def _wifi_perform_operation(self, params):
+        try:
+            operation = params['operation'] if 'operation' in params else None
+            if not operation:
+                return (False, 'This interface is not WIFI')
+
+            if fwutils.is_wifi_interface(params['dev_id']) == False:
+                return (False, 'This interface is not a WIFI interface')
+
+            if operation == 'start':
+                is_success, error = self._wifi_start_ap(params)
+            elif operation == 'stop':
+                is_success, error = self._wifi_stop_ap(params)
+            else:
+                is_success, error = (False, 'No supported operation was requested')
+
+            return {'message': error, 'ok': is_success}
+        except Exception as e:
+            raise Exception("_wifi_perform_operation: failed. %s" % str(e))
+
+    def _wifi_start_ap(self, params):
+        try:
+            fwutils.configure_hostapd(params['dev_id'], params['configuration'])
+            is_success, error =  fwutils.start_hostapd()
+
+            return is_success, error
+        except Exception as e:
+            raise Exception("_wifi_start_ap: failed to start wifi access point: %s" % str(e))
+
+
+    def _wifi_stop_ap(self, params):
+        try:
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+            if fwutils.vpp_does_run() and is_assigned:
+                return (False, 'Please unassigned this interface in order to stop the Access Point')
+
+            is_success, error = fwutils.stop_hostapd()
+            os.system('ifconfig wlan0 0')
+
+            return is_success, error
+        except Exception as e:
+            raise Exception("_wifi_stop_ap: failed to stop wifi access point: %s" % str(e))
+
+    def _get_wifi_interface_info(self, params):
+        try:
+            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+            ap_status = fwutils.pid_of('hostapd')
+
+            clients = fwutils.wifi_ap_get_clients(interface_name)
+
+            response = {
+                'clients'             : clients,
+                'ap_status'           : ap_status != None
+            }
+
+            return {'message': response, 'ok': 1}
+        except Exception as e:
+            raise Exception("_get_lte_interface_status: %s" % str(e))
+
     def _lte_perform_operation(self, params):
         try:
             operation = params['operation'] if 'operation' in params else None
             if not operation:
                 raise Exception("Operation was not specified")
 
+            if fwutils.is_lte_interface(params['dev_id']) == False:
+                return (False, 'This interface is not LTE')
+
             if operation == 'connect':
                 is_success, error = self._connect_to_lte(params)
             elif operation == 'disconnect':
                 is_success, error = self._disconnect_from_lte(params)
             else:
-                is_success, error = (False, {'err_msg': 'No supported operation was requested' })
+                is_success, error = (False, 'No supported operation was requested')
 
             return {'message': error, 'ok': is_success}
         except Exception as e:
@@ -383,27 +450,21 @@ class FWAGENT_API:
 
     def _disconnect_from_lte(self, params):
         try:
-            if fwutils.is_lte_interface(params['dev_id']) == False:
-                return (False, {'err_msg': 'This interface is not LTE' })
-
             # don't perform disconnect if this interface is already assigned to vpp and vpp is run
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])[0]
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
-                return (False, {'err_msg': 'Cannot disconnect LTE network while it\'s in use by a running router' })
+                return (False, 'Please unassigned this interface in order to disconnect LTE ')
 
             is_success, error = fwutils.lte_disconnect()
             os.system('ifconfig wwan0 0')
 
             return is_success, error
         except Exception as e:
-            raise Exception("_connect_to_lte: failed to connect to lte: %s" % str(e))
+            raise Exception("_disconnect_from_lte: failed to disconnect from lte: %s" % str(e))
 
 
     def _connect_to_lte(self, params):
         try:
-            if fwutils.is_lte_interface(params['dev_id']) == False:
-                return (True, {'err_msg': 'This interface is not LTE' })
-
             apn = params['apn'] if 'apn' in params else ''
             is_success, error =  fwutils.lte_connect(apn, params['dev_id'])
 
