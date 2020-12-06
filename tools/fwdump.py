@@ -48,6 +48,10 @@ g_dumpers = {
     ############################################################################
     # Linux stuff - !!! PLEASE KEEP ALPHABET ORDER !!!
     #
+    'linux_dhcpd':                  { 'shell_cmd': 'mkdir -p <temp_folder>/linux_dhcpd/ && ' +
+                                                   'cp /etc/dhcp/dhcpd.conf* <temp_folder>/linux_dhcpd 2>/dev/null ; ' +
+                                                   'cp /var/log/dhcpd.log    <temp_folder>/linux_dhcpd 2>/dev/null ; ' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_dpdk_devbind_status':    { 'shell_cmd': 'dpdk-devbind -s > <dumper_out_file>' },
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
