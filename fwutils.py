@@ -264,7 +264,8 @@ def get_interface_address(if_name, log=True):
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
-            fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
+            if log:
+                fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
     if log:
