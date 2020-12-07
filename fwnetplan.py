@@ -347,7 +347,7 @@ def _has_ip(if_name, dhcp=False):
     #   to the previous configuration
     #
     if dhcp:
-        (_, dev) = fwutils.get_default_route()
+        (_, dev, _) = fwutils.get_default_route()
         if if_name != dev:
             return True
 

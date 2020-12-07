@@ -55,11 +55,11 @@ def _find_gateway_ip(pci):
     ip = ''
     ifname = fwutils.pci_to_linux_iface(pci)
     if ifname:
-        ip, metric = fwutils.get_interface_gateway(ifname)
+        ip, _ = fwutils.get_interface_gateway(ifname)
         return ip
 
     if not ip:
-        ip, dev = fwutils.get_default_route()
+        ip, _, _ = fwutils.get_default_route()
         return ip
 
     return ''

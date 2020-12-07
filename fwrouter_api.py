@@ -170,12 +170,10 @@ class FWROUTER_API:
                         apply_netplan = True
 
                 if apply_netplan:
-                    try:
-                        fwutils.netplan_apply('dhcpc_thread')
+                    default_route_changed = fwutils.netplan_apply('dhcpc_thread')
+                    if default_route_changed:
                         fwglobals.g.fwagent.disconnect()
-                        time.sleep(10)  # 10 sec
-                    except Exception as e:
-                        fwglobals.log.debug("dhcpc_thread: apply_netplan failed: %s " % (str(e)))
+                    time.sleep(10)
 
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
