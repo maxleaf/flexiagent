@@ -99,14 +99,20 @@ class FwRouterCfg:
                 del self.callbacks[idx]
                 return
 
-    def clean(self, new_signature=None):
+    def clean(self):
         """Clean DB
 
         :returns: None.
         """
         for req_key in self.db:
             del self.db[req_key]
-        self.reset_signature(new_signature)
+
+        # Reset configuration to the value, that differs from one calculated
+        # by the flexiManage. This is to enforce flexiManage to issue 'sync-device'
+        # in order to fill the configuration database again with most updated
+        # configuration.
+        #
+        self.reset_signature("empty_router_cfg")
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
@@ -454,6 +460,14 @@ class FwRouterCfg:
 
     def reset_signature(self, new_signature=None):
         """Resets configuration signature to the empty sting.
+
+        :param new_signature: string to be used as a signature of the configuration.
+                        If not provided, the empty string will be used.
+                        When flexiManage detects discrepancy between this signature
+                        and between signature that it calculated, it sends
+                        the 'sync-device' request in order to apply the user
+                        configuration onto device. On successfull sync the signature
+                        is reset to the empty string on both sides.
         """
         old_signature = self.db.get('signature', '<none>')
         new_signature = "" if new_signature == None else new_signature
