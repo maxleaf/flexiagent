@@ -317,13 +317,19 @@ def get_dhcp_netplan_interface(if_name):
 def _has_ip(if_name, dhcp=False):
 
     for i in range(50):
-        if fwutils.get_interface_address(if_name):
+        if fwutils.get_interface_address(if_name, log=False):
             return True
-        if i % 30 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+        if i % 30 == 0:   # Every X seconds try whatever might help, e.g. restart networkd
             cmd = "systemctl restart systemd-networkd"
             fwglobals.log.debug("fwnetplan: _has_ip: " + cmd)
             os.system(cmd)
         time.sleep(1)
+
+    # Try one more time, this time - with log prints. This is to avoid spamming
+    # log with 50 identical prints in the waiting cycle above.
+    #
+    if fwutils.get_interface_address(if_name, log=True):
+        return True
 
     # At this point no IP was found on the interface.
     # If IP was not assigned to the interface, we still return OK if:
@@ -340,7 +346,7 @@ def _has_ip(if_name, dhcp=False):
     #   to the previous configuration
     #
     if dhcp:
-        (_, dev) = fwutils.get_default_route()
+        (_, dev, _) = fwutils.get_default_route()
         if if_name != dev:
             return True
 
