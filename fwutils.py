@@ -213,7 +213,7 @@ def get_os_routing_table():
 def get_default_route():
     """Get default route.
 
-    :returns: tuple (<IP of GW>, <name of network interface>).
+    :returns: tuple (<IP of GW>, <name of network interface>, <Dev ID of network interface>).
     """
     (via, dev, metric) = ("", "", 0xffffffff)
     try:
@@ -228,8 +228,8 @@ def get_default_route():
                     dev = _dev
                     via = _via
     except:
-        return ("", "")
-    return (via, dev)
+        return ("", "", "")
+    return (via, dev, get_interface_dev_id(dev))
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -279,10 +279,12 @@ def get_all_interfaces():
 
     return dev_id_ip_gw
 
-def get_interface_address(if_name):
+def get_interface_address(if_name, log=True):
     """Get interface IP address.
 
-    :param iface:        Interface name.
+    :param if_name:     Interface name.
+    :param log:         If True the found address will be logged.
+                        Errors or debug info is printed in any case.
 
     :returns: IP address.
     """
@@ -296,10 +298,12 @@ def get_interface_address(if_name):
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
-            fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
+            if log:
+                fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
-    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
+    if log:
+        fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
 def get_interface_name(ip_no_mask):
@@ -475,8 +479,12 @@ def get_linux_interfaces(cached=True):
             if metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
                 interface['metric'] = str(metric - fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
                 interface['internetAccess'] = False
+            elif not interface['IPv4']:       # If DHCP interface has no IP
+                interface['internetAccess'] = False
             else:
                 interface['internetAccess'] = True
+        else:
+            interface['internetAccess'] = False  # If interface has no GW
 
         interfaces[dev_id] = interface
 
@@ -2664,13 +2672,36 @@ def netplan_apply(caller_name=None):
 
     :param f:       the python file object
     :param data:    the data to write into file
+
+    :returns: True if default route was changed as a result of netplan apply.
     '''
-    cmd = 'netplan apply'
-    log_str = caller_name + ': ' + cmd if caller_name else cmd
-    fwglobals.log.debug(log_str)
-    os.system(cmd)
-    time.sleep(1)  # Give a second to Linux to configure interfaces
-    fwglobals.g.cache.dev_ids = {}     # netplan might change interface name, so reset the cache (e.g. enp0s3 -> vpp0)
+    try:
+        # Before netplan apply go and note the default route.
+        # If it will be changed as a result of netplan apply, we return True.
+        #
+        (_, _, dr_dev_id_before) = get_default_route()
+
+        # Now go and apply the netplan
+        #
+        cmd = 'netplan apply'
+        log_str = caller_name + ': ' + cmd if caller_name else cmd
+        fwglobals.log.debug(log_str)
+        os.system(cmd)
+        time.sleep(1)  				# Give a second to Linux to configure interfaces
+
+        # Netplan might change interface names, e.g. enp0s3 -> vpp0, so reset cache
+        #
+        fwglobals.g.cache.dev_ids = {}
+
+        # Find out if the default route was changed.
+        #
+        (_, _, dr_dev_id_after) = get_default_route()
+        default_route_changed = (dr_dev_id_before != dr_dev_id_after)
+        return default_route_changed
+
+    except Exception as e:
+        fwglobals.log.debug("%s: netplan_apply failed: %s" % (caller_name, str(e)))
+        return False
 
 def compare_request_params(params1, params2):
     """ Compares two dictionaries while normalizing them for comparison
@@ -2976,18 +3007,3 @@ def wifi_get_capabilities(dev_id):
         return result
     except Exception as e:
         return result
-
-def compare_metrics(m1, m2):
-    '''Compare metrics represented by strings (or by None), while taking in account
-    watermark. The watermarked metric has a value of original metric +
-    module to implement WAN failover when default route looses internet access.
-
-    :returns: True if metrics are equal (after watermark removal), False otherwise.
-    '''
-    if not m1 and not m2:
-        return True
-    if m1 and m2:
-        if int(m1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK == \
-           int(m2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-            return True
-    return False
