@@ -375,8 +375,12 @@ def get_linux_interfaces(cached=True):
             if metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
                 interface['metric'] = str(metric - fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
                 interface['internetAccess'] = False
+            elif not interface['IPv4']:       # If DHCP interface has no IP
+                interface['internetAccess'] = False
             else:
                 interface['internetAccess'] = True
+        else:
+            interface['internetAccess'] = False  # If interface has no GW
 
         interfaces[pci] = interface
 
@@ -1869,19 +1873,3 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
-
-def compare_metrics(m1, m2):
-    '''Compare metrics represented by strings (or by None), while taking in account
-    watermark. The watermarked metric has a value of original metric +
-    fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK. It is used by the FwWanMonitor
-    module to implement WAN failover when default route looses internet access.
-
-    :returns: True if metrics are equal (after watermark removal), False otherwise.
-    '''
-    if not m1 and not m2:
-        return True
-    if m1 and m2:
-        if int(m1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK == \
-           int(m2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-            return True
-    return False
