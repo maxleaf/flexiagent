@@ -267,12 +267,14 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
         fwutils.netplan_apply('add_remove_netplan_interface')
 
         # Remove pci-to-tap cached value for this pci, as netplan might change
-        # interface name.
+        # interface name (see 'set-name' netplan option).
+        # As well re-initialize the interface name by pci.
         #
         cache = fwglobals.g.cache.pci_to_vpp_tap_name
         pci_full = fwutils.pci_to_full(pci)
         if pci_full in cache:
             del cache[pci_full]
+        ifname = fwutils.pci_to_tap(pci)
 
         # make sure IP address is applied in Linux
         #

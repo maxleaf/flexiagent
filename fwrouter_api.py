@@ -164,7 +164,7 @@ class FWROUTER_API:
                         continue
 
                     name = fwutils.pci_to_tap(wan['pci'])
-                    addr = fwutils.get_interface_address(name)
+                    addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                         apply_netplan = True
@@ -678,6 +678,21 @@ class FWROUTER_API:
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
+                    # Preserve watermark that FwWanMonitor might put on metric in
+                    # router_cfg, flexiManage is not aware of it.
+                    # Note the 'modify-interface' might be injected by FwWanMonitor.
+                    # In that case we should not preserve the watermark.
+                    #
+                    if re.match('modify-interface', req) and \
+                       params.get('internals', {}).get('sender') == None:
+                        existing_params = fwglobals.g.router_cfg.get_request_params(__request)
+                        old_metric = existing_params.get('metric')
+                        new_metric = params.get('metric')
+                        if old_metric and new_metric and \
+                        int(old_metric) > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                            params['metric'] = str(int(new_metric) + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+
+
                     fwglobals.g.router_cfg.update(__request)
                     return True
             return False
