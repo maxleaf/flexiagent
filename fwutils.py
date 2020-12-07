@@ -2040,75 +2040,64 @@ def lte_dev_id_to_iface_addr_bytes(dev_id):
 def configure_hostapd(dev_id, configuration):
     try:
 
-        config = {
-            'ssid'                 : configuration.get('ssid', 'fwrouter_ap'),
-            'interface'            : dev_id_to_linux_if(dev_id),
-            'channel'              : configuration.get('channel', 6),
-            'macaddr_acl'          : 0,
-            'auth_algs'            : 3,
-            # 'hw_mode'              : configuration.get('operationMode', 'g'),
-            'ignore_broadcast_ssid': 1 if configuration.get('hideSsid', 0) == True else 0,
-            'driver'               : 'nl80211',
-            'eap_server'           : 0,
-            'wmm_enabled'          : 0,
-            'logger_syslog'        : -1,
-            'logger_syslog_level'  : 2,
-            'logger_stdout'        : -1,
-            'logger_stdout_level'  : 2
-        }
+        for index, band in enumerate(configuration):
+            config = configuration[band]
+            data = {
+                'ssid'                 : config.get('ssid', 'fwrouter_ap'),
+                'interface'            : dev_id_to_linux_if(dev_id),
+                'channel'              : config.get('channel', 6),
+                'macaddr_acl'          : 0,
+                'auth_algs'            : 3,
+                # 'hw_mode'              : configuration.get('operationMode', 'g'),
+                'ignore_broadcast_ssid': 1 if config.get('hideSsid', 0) == True else 0,
+                'driver'               : 'nl80211',
+                'eap_server'           : 0,
+                'wmm_enabled'          : 0,
+                'logger_syslog'        : -1,
+                'logger_syslog_level'  : 2,
+                'logger_stdout'        : -1,
+                'logger_stdout_level'  : 2
+            }
 
-        ap_mode = configuration.get('operationMode', 'g')
+            ap_mode = config.get('operationMode', 'g')
 
-        if ap_mode == "g":
-            config['hw_mode']       = 'g'
-        elif ap_mode == "n":
-            config['hw_mode']       = 'g'
-            config['ieee80211n']    = 1
-            config['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
+            if ap_mode == "g":
+                data['hw_mode']       = 'g'
+            elif ap_mode == "n":
+                data['hw_mode']       = 'g'
+                data['ieee80211n']    = 1
+                data['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
 
-        security_mode = configuration.get('securityMode', 'wpa2-psk')
+            security_mode = config.get('securityMode', 'wpa2-psk')
 
-        if security_mode == "wep":
-            config['wep_default_key']       = 1
-            config['wep_key1']              = '"%s"' % configuration.get('password', 'fwrouter_ap')
-            config['wep_key_len_broadcast'] = 5
-            config['wep_key_len_unicast']   = 5
-            config['wep_rekey_period']      = 300
-        elif security_mode == "wpa-psk":
-            config['wpa'] = 1
-            config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
-            config['wpa_pairwise']   = 'TKIP CCMP'
-        elif security_mode == "wpa2-psk":
-            config['wpa'] = 2
-            config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
-            config['wpa_pairwise']   = 'CCMP'
-            config['rsn_pairwise']   = 'CCMP'
-            config['wpa_key_mgmt']   = 'WPA-PSK'
-        elif security_mode == "wpa-psk/wpa2-psk":
-            config['wpa'] = 3
-            config['wpa_passphrase'] = configuration.get('password', 'fwrouter_ap')
-            config['wpa_pairwise']   = 'TKIP CCMP'
-            config['rsn_pairwise']   = 'CCMP'
+            if security_mode == "wep":
+                data['wep_default_key']       = 1
+                data['wep_key1']              = '"%s"' % conficonfigguration.get('password', 'fwrouter_ap')
+                data['wep_key_len_broadcast'] = 5
+                data['wep_key_len_unicast']   = 5
+                data['wep_rekey_period']      = 300
+            elif security_mode == "wpa-psk":
+                data['wpa'] = 1
+                data['wpa_passphrase'] = config.get('password', 'fwrouter_ap')
+                data['wpa_pairwise']   = 'TKIP CCMP'
+            elif security_mode == "wpa2-psk":
+                data['wpa'] = 2
+                data['wpa_passphrase'] = config.get('password', 'fwrouter_ap')
+                data['wpa_pairwise']   = 'CCMP'
+                data['rsn_pairwise']   = 'CCMP'
+                data['wpa_key_mgmt']   = 'WPA-PSK'
+            elif security_mode == "wpa-psk/wpa2-psk":
+                data['wpa'] = 3
+                data['wpa_passphrase'] = config.get('password', 'fwrouter_ap')
+                data['wpa_pairwise']   = 'TKIP CCMP'
+                data['rsn_pairwise']   = 'CCMP'
 
+            with open(fwglobals.g.HOSTAPD_CONFIG_DIRECTORY + 'hostapd_%s_fwrun.conf' % band, 'w+') as f:
+                txt = ''
+                for key in data:
+                    txt += '%s=%s\n' % (key, data[key])
 
-        # 'wpa'
-        # 'wpa-psk'
-        # 'wpa2-psk'
-        # 'wpa/wpa2'
-        # 'wpa-psk/wpa2-psk'
-
-
-        with open(fwglobals.g.HOSTAPD_CONFIG_FILE, 'w+') as f:
-            data = ''
-            for key in config:
-                data += '%s=%s\n' % (key, config[key])
-
-            file_write_and_flush(f, data)
-
-        # driver = if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-
-
-        # config_file = 
+                file_write_and_flush(f, txt)
 
         return (True, None)
     except Exception as e:
@@ -2151,12 +2140,17 @@ def start_hostapd():
         if pid_of('hostapd'):
             return (True, None)
 
-        proc = subprocess.check_output('sudo hostapd /etc/hostapd/hostapd.conf -B -dd', stderr=subprocess.STDOUT, shell=True)
-        time.sleep(3)
+        files = glob.glob("%s*fwrun.conf" % fwglobals.g.HOSTAPD_CONFIG_DIRECTORY)
+        fwglobals.log.debug("get_hostapd_filenames: %s" % files)
 
-        pid = pid_of('hostapd')
-        if pid:
-            return (True, None)
+        if files:
+            files = ' '.join(files)
+            proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
+            time.sleep(3)
+
+            pid = pid_of('hostapd')
+            if pid:
+                return (True, None)
 
         return (False, '')
     except subprocess.CalledProcessError as err:
@@ -2969,15 +2963,15 @@ def wifi_get_capabilities(dev_id):
 
             if band1:
                 result['Band 1']['Exists'] = True
-                result['Band 1']['Frequencies'] = _parse_key_data('Frequencies', band1)
-                result['Band 1']['Bitrates'] = _parse_key_data('Bitrates', band1, 2)
-                result['Band 1']['Capabilities'] = _parse_key_data('Capabilities', band1, 2)
+                # result['Band 1']['Frequencies'] = _parse_key_data('Frequencies', band1)
+                # result['Band 1']['Bitrates'] = _parse_key_data('Bitrates', band1, 2)
+                # result['Band 1']['Capabilities'] = _parse_key_data('Capabilities', band1, 2)
 
             if band2:
                 result['Band 2']['Exists'] = True
-                result['Band 2']['Frequencies'] = _parse_key_data('Frequencies', band2)
-                result['Band 2']['Bitrates'] = _parse_key_data('Bitrates', band2, 2)
-                result['Band 2']['Capabilities'] = _parse_key_data('Capabilities', band2, 2)
+                # result['Band 2']['Frequencies'] = _parse_key_data('Frequencies', band2)
+                # result['Band 2']['Bitrates'] = _parse_key_data('Bitrates', band2, 2)
+                # result['Band 2']['Capabilities'] = _parse_key_data('Capabilities', band2, 2)
 
         return result
     except Exception as e:
