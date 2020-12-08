@@ -2376,7 +2376,8 @@ def lte_get_system_info():
             data = operator_name.splitlines()
             for line in data:
                 if '\tName' in line:
-                    result['Operator_Name'] = line.split(':')[-1].strip().replace("'", '')
+                    name = line.split(':')[-1].strip().replace("'", '')
+                    result['Operator_Name'] = name if name.isalnum() else ''
                     break
 
         home_network = qmi_get_home_network()
