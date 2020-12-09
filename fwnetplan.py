@@ -160,6 +160,10 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
     config_section = {}
     old_ethernets = {}
 
+    fwglobals.log.debug(
+        "add_remove_netplan_interface: is_add=%d, pci=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
+        (is_add, pci, ip, gw, metric, dhcp, type))
+
     set_name = ''
     old_ifname = ''
     ifname = fwutils.pci_to_tap(pci)
@@ -218,7 +222,6 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
 
             config_section['dhcp4'] = True
             config_section['dhcp4-overrides'] = {'route-metric': metric}
-            config_section['critical'] = True   # Prevent lease release on networkd restart or no answer from DHCP server
         else:
             config_section['dhcp4'] = False
             if 'dhcp4-overrides' in config_section:
@@ -264,12 +267,14 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type):
         fwutils.netplan_apply('add_remove_netplan_interface')
 
         # Remove pci-to-tap cached value for this pci, as netplan might change
-        # interface name.
+        # interface name (see 'set-name' netplan option).
+        # As well re-initialize the interface name by pci.
         #
         cache = fwglobals.g.cache.pci_to_vpp_tap_name
         pci_full = fwutils.pci_to_full(pci)
         if pci_full in cache:
             del cache[pci_full]
+        ifname = fwutils.pci_to_tap(pci)
 
         # make sure IP address is applied in Linux
         #
@@ -313,13 +318,19 @@ def get_dhcp_netplan_interface(if_name):
 def _has_ip(if_name, dhcp=False):
 
     for i in range(50):
-        if fwutils.get_interface_address(if_name):
+        if fwutils.get_interface_address(if_name, log=False):
             return True
-        if i % 30 == 0:   # Every 10 seconds try whatever might help, e.g. restart networkd
+        if i % 30 == 0:   # Every X seconds try whatever might help, e.g. restart networkd
             cmd = "systemctl restart systemd-networkd"
             fwglobals.log.debug("fwnetplan: _has_ip: " + cmd)
             os.system(cmd)
         time.sleep(1)
+
+    # Try one more time, this time - with log prints. This is to avoid spamming
+    # log with 50 identical prints in the waiting cycle above.
+    #
+    if fwutils.get_interface_address(if_name, log=True):
+        return True
 
     # At this point no IP was found on the interface.
     # If IP was not assigned to the interface, we still return OK if:
@@ -336,7 +347,7 @@ def _has_ip(if_name, dhcp=False):
     #   to the previous configuration
     #
     if dhcp:
-        (_, dev) = fwutils.get_default_route()
+        (_, dev, _) = fwutils.get_default_route()
         if if_name != dev:
             return True
 

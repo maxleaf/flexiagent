@@ -527,7 +527,7 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     if not local_sa['crypto-alg'] in crypto_algs:
         raise Exception("fwtranslate_add_tunnel: crypto-alg %s is not supported" % local_sa['crypto-alg'])
     if not local_sa['integr-alg'] in integr_algs:
-        raise Exception("fwtranslate_add_tunnel: crypto-alg %s is not supported" % local_sa['crypto-alg'])
+        raise Exception("fwtranslate_add_tunnel: integr-alg %s is not supported" % local_sa['integr-alg'])
 
     crypto_alg  = crypto_algs[local_sa['crypto-alg']]
     integr_alg  = integr_algs[local_sa['integr-alg']]

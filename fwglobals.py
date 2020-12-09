@@ -41,6 +41,7 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
+from fwwan_monitor import FwWanMonitor
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -101,7 +102,6 @@ request_handlers = {
     ##############################################################
 
     # OS API
-    'interfaces':                   {'name': '_call_os_api'},
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
     'ifcount':                      {'name': '_call_os_api'},
@@ -163,6 +163,7 @@ class Fwglobals:
             DEFAULT_MANAGEMENT_URL = 'https://app.flexiwan.com:443'
             DEFAULT_TOKEN_FILE     = data_path + 'token.txt'
             DEFAULT_UUID           = None
+            DEFAULT_MONITOR_UNASSIGNED_INTERFACES = True
             try:
                 with open(filename, 'r') as conf_file:
                     conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
@@ -172,6 +173,7 @@ class Fwglobals:
                 self.MANAGEMENT_URL = agent_conf.get('server', DEFAULT_MANAGEMENT_URL)
                 self.TOKEN_FILE     = agent_conf.get('token',  DEFAULT_TOKEN_FILE)
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
+                self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERFACES)
             except Exception as e:
                 log.excep("FwConfiguration: %s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
@@ -179,6 +181,7 @@ class Fwglobals:
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
                 self.TOKEN_FILE     = DEFAULT_TOKEN_FILE
                 self.UUID           = DEFAULT_UUID
+                self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERFACES
             if self.DEBUG:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 
@@ -193,6 +196,10 @@ class Fwglobals:
                 'PCIS': {},
                 'STUN': {},
                 'VPP_IF_NAME_TO_PCI': {},
+                'WAN_MONITOR': {
+                    'enabled_routes':  {},
+                    'disabled_routes': {},
+                }
             }
             self.linux_interfaces    = self.db['LINUX_INTERFACES']
             self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
@@ -200,13 +207,13 @@ class Fwglobals:
             self.pcis                = self.db['PCIS']
             self.stun_cache          = self.db['STUN']
             self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
+            self.wan_monitor         = self.db['WAN_MONITOR']
 
 
     def __init__(self):
         """Constructor method
         """
         # Set default configuration
-        self.NUM_RETRIES_ALLOWED = 3
         self.RETRY_INTERVAL_MIN  = 5 # seconds - is used for both registration and main connection
         self.RETRY_INTERVAL_MAX  = 15
         self.RETRY_INTERVAL_LONG_MIN = 50
@@ -242,10 +249,13 @@ class Fwglobals:
         self.FWAGENT_DAEMON_URI  = 'PYRO:%s@%s:%d' % (self.FWAGENT_DAEMON_NAME, self.FWAGENT_DAEMON_HOST, self.FWAGENT_DAEMON_PORT)
         self.WS_STATUS_ERROR_NOT_APPROVED = 403
         self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
-        self.WS_STATUS_OK                 = 1000
-        self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
         self.fwagent = None
         self.cache   = self.FwCache()
+        self.WAN_FAILOVER_SERVERS          = [ '1.1.1.1' , '8.8.8.8' ]
+        self.WAN_FAILOVER_WND_SIZE         = 20         # 20 pings, every ping waits a second for response
+        self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
+        self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
+
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -306,6 +316,8 @@ class Fwglobals:
 
         self.router_api.restore_vpp_if_needed()
 
+        self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
+
         return self.fwagent
 
     def finalize_agent(self):
@@ -314,13 +326,15 @@ class Fwglobals:
         if not self.fwagent:
             global log
             log.warning('Fwglobals.finalize_agent: agent does not exists')
-            return None
+            return
 
+        self.wan_monitor.finalize()
         self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
 
+        del self.wan_monitor
         del self.stun_wrapper
         del self.apps
         del self.policies
@@ -330,7 +344,7 @@ class Fwglobals:
         del self.fwagent
         self.fwagent = None
         self.db.close()
-        return None
+        return
 
     def __str__(self):
         """Get string representation of configuration.
@@ -344,7 +358,6 @@ class Fwglobals:
             'DEBUG':                self.cfg.DEBUG,
             'UUID':                 self.cfg.UUID,
             'FWAGENT_CONF_FILE':    self.FWAGENT_CONF_FILE,
-            'NUM_RETRIES_ALLOWED':  self.NUM_RETRIES_ALLOWED,
             'RETRY_INTERVAL_MIN':   self.RETRY_INTERVAL_MIN,
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)

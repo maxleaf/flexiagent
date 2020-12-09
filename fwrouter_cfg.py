@@ -106,7 +106,13 @@ class FwRouterCfg:
         """
         for req_key in self.db:
             del self.db[req_key]
-        self.reset_signature()
+
+        # Reset configuration to the value, that differs from one calculated
+        # by the flexiManage. This is to enforce flexiManage to issue 'sync-device'
+        # in order to fill the configuration database again with most updated
+        # configuration.
+        #
+        self.reset_signature("empty_router_cfg")
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
@@ -452,14 +458,21 @@ class FwRouterCfg:
             self.reset_signature()
         return self.db['signature']
 
-    def reset_signature(self):
+    def reset_signature(self, new_signature=None):
         """Resets configuration signature to the empty sting.
+
+        :param new_signature: string to be used as a signature of the configuration.
+                        If not provided, the empty string will be used.
+                        When flexiManage detects discrepancy between this signature
+                        and between signature that it calculated, it sends
+                        the 'sync-device' request in order to apply the user
+                        configuration onto device. On successfull sync the signature
+                        is reset to the empty string on both sides.
         """
-        if not 'signature' in self.db:
-            self.db['signature'] = ""
-        if self.db['signature']:
-            fwglobals.log.debug("fwrouter_cfg: reset signature")
-            self.db['signature'] = ""
+        old_signature = self.db.get('signature', '<none>')
+        new_signature = "" if new_signature == None else new_signature
+        self.db['signature'] = new_signature
+        fwglobals.log.debug("fwrouter_cfg: reset signature: '%s' -> '%s'" % (old_signature, new_signature))
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against
@@ -545,27 +558,3 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
-
-    def get_interface_public_addresses(self):
-        """
-        builds a list of WAN interfaces from router DB. if 'useStun' does not exist or False,
-        do not add this interface to the list.
-        : return : list of WAN interfaces from router DB
-        """
-        addr_list = []
-        wan_list = self.get_interfaces(type='wan')
-        for wan in wan_list:
-            if wan.get('gateway', '') == '':
-                continue
-            elif wan.get('useStun', False) == False:
-                continue
-            else:
-                entry = {}
-                entry['address']     = wan.get('addr').split('/')[0]
-                if entry['address'] == '':
-                    continue
-                entry['public_ip']   = wan.get('PublicIP','')
-                entry['public_port'] = wan.get('PublicPort','')
-                addr_list.append(entry)
-        return addr_list
-

@@ -187,7 +187,7 @@ def get_os_routing_table():
 def get_default_route():
     """Get default route.
 
-    :returns: tuple (<IP of GW>, <name of network interface>).
+    :returns: tuple (<IP of GW>, <name of network interface>, <PCI of network interface>).
     """
     (via, dev, metric) = ("", "", 0xffffffff)
     try:
@@ -202,8 +202,8 @@ def get_default_route():
                     dev = _dev
                     via = _via
     except:
-        return ("", "")
-    return (via, dev)
+        return ("", "", "")
+    return (via, dev, get_interface_pci(dev))
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -246,10 +246,12 @@ def get_all_interfaces():
 
     return pci_ip_gw
 
-def get_interface_address(if_name):
+def get_interface_address(if_name, log=True):
     """Get interface IP address.
 
-    :param iface:        Interface name.
+    :param if_name:     Interface name.
+    :param log:         If True the found address will be logged.
+                        Errors or debug info is printed in any case.
 
     :returns: IP address.
     """
@@ -263,10 +265,12 @@ def get_interface_address(if_name):
         if addr.family == socket.AF_INET:
             ip   = addr.address
             mask = IPAddress(addr.netmask).netmask_bits()
-            fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
+            if log:
+                fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
-    fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
+    if log:
+        fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
 def get_interface_name(ip_no_mask):
@@ -318,16 +322,70 @@ def pci_to_short(pci):
         pci = l[0] + '.' + l[1][1]
     return pci
 
-def get_linux_interfaces():
-    """ Get the list of PCI-s of all network interfaces available in Linux.
+def get_linux_interfaces(cached=True):
+    """Fetch interfaces from Linux.
+
+    :param cached: if True the data will be fetched from cache.
+
+    :return: Dictionary of interfaces by full form PCI.
     """
-    interfaces = fwglobals.g.cache.pcis
-    if not interfaces:
-        for (if_name, _) in psutil.net_if_addrs().items():
-            pci, _ = get_interface_pci(if_name)
-            if not pci:
-                continue
-            interfaces[pci_to_full(pci)] = if_name
+    interfaces = {} if not cached else fwglobals.g.cache.pcis
+    if cached and interfaces:
+        return interfaces
+
+    for (if_name, addrs) in psutil.net_if_addrs().items():
+        pci, driver = get_interface_pci(if_name)
+        if not pci:
+            continue
+
+        interface = {
+            'name':             if_name,
+            'pciaddr':          pci,
+            'driver':           driver,
+            'MAC':              '',
+            'IPv4':             '',
+            'IPv4Mask':         '',
+            'IPv6':             '',
+            'IPv6Mask':         '',
+            'dhcp':             '',
+            'gateway':          '',
+            'metric':           '',
+            'internetAccess':   '',
+        }
+
+        for addr in addrs:
+            addr_af_name            = af_to_name(addr.family)
+            interface[addr_af_name] = addr.address.split('%')[0]
+            if addr.netmask != None:
+                interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
+        # Add information specific for WAN interfaces
+        #
+        interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
+        interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
+        if interface['gateway']:
+
+            # Fetch public address info from STUN module
+            #
+            _, interface['public_ip'], interface['public_port'], interface['nat_type'] = \
+                fwglobals.g.stun_wrapper.find_addr(pci)
+
+            # Fetch internet connectivity info from WAN Monitor module.
+            # Hide the metric watermarks used for WAN failover from flexiManage.
+            #
+            metric = 0 if not interface['metric'] else int(interface['metric'])
+            if metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                interface['metric'] = str(metric - fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+                interface['internetAccess'] = False
+            elif not interface['IPv4']:       # If DHCP interface has no IP
+                interface['internetAccess'] = False
+            else:
+                interface['internetAccess'] = True
+        else:
+            interface['internetAccess'] = False  # If interface has no GW
+
+        interfaces[pci] = interface
+
     return interfaces
 
 def get_interface_pci(linuxif):
@@ -1077,7 +1135,7 @@ def reset_dhcpd():
     cmd = 'sudo systemctl stop isc-dhcp-server'
 
     try:
-        output = subprocess.check_output(cmd, shell=True)
+        subprocess.check_output(cmd, shell=True)
     except:
         return False
 
@@ -1340,12 +1398,11 @@ def get_interface_gateway_from_router_db(ip):
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 
-    :param params: params:
-                        addr    - Destination network.
-                        via     - Gateway address.
-                        metric  - Metric.
-                        remove  - True to remove route.
-                        pci     - Device to be used for outgoing packets.
+    :param addr:            Destination network.
+    :param via:             Gateway address.
+    :param metric:          Metric.
+    :param remove:          True to remove route.
+    :param pci:             Device to be used for outgoing packets.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1584,13 +1641,36 @@ def netplan_apply(caller_name=None):
 
     :param f:       the python file object
     :param data:    the data to write into file
+
+    :returns: True if default route was changed as a result of netplan apply.
     '''
-    cmd = 'netplan apply'
-    log_str = caller_name + ': ' + cmd if caller_name else cmd
-    fwglobals.log.debug(log_str)
-    os.system(cmd)
-    time.sleep(1)  # Give a second to Linux to configure interfaces
-    fwglobals.g.cache.pcis = {}     # netplan might change interface name, so reset the cache (e.g. enp0s3 -> vpp0)
+    try:
+        # Before netplan apply go and note the default route.
+        # If it will be changed as a result of netplan apply, we return True.
+        #
+        (_, _, dr_pci_before) = get_default_route()
+
+        # Now go and apply the netplan
+        #
+        cmd = 'netplan apply'
+        log_str = caller_name + ': ' + cmd if caller_name else cmd
+        fwglobals.log.debug(log_str)
+        os.system(cmd)
+        time.sleep(1)  				# Give a second to Linux to configure interfaces
+
+        # Netplan might change interface names, e.g. enp0s3 -> vpp0, so reset cache
+        #
+        fwglobals.g.cache.pcis = {}
+
+        # Find out if the default route was changed.
+        #
+        (_, _, dr_pci_after) = get_default_route()
+        default_route_changed = (dr_pci_before != dr_pci_after)
+        return default_route_changed
+
+    except Exception as e:
+        fwglobals.log.debug("%s: netplan_apply failed: %s" % (caller_name, str(e)))
+        return False
 
 def compare_request_params(params1, params2):
     """ Compares two dictionaries while normalizing them for comparison
@@ -1629,14 +1709,36 @@ def compare_request_params(params1, params2):
     for key in keys_common:
         val1 = params1[key]
         val2 = params2[key]
-        if val1 and val2:   # Both values are neither None-s nor empty strings.
-            if type(val1) != type(val2):
-                return False        # Not comparable types
-            if type(val1) == str:
-                if val1.lower() != val2.lower():
+
+        # If both values are neither None-s nor empty strings.
+        # False booleans will be handled by next 'elif'.
+        #
+        if val1 and val2:
+            if (type(val1) == str or type(val1) == unicode) and \
+               (type(val2) == str or type(val2) == unicode):
+                # Take special care of the 'metric' parameter.
+                # The FwWanMonitor can put watermark on it, and flexiManage
+                # is not aware of it, so remove the watermark before comparison.
+                #
+                if key == 'metric':
+                    if int(val1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK != \
+                       int(val2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                        return False
+                # Now comare the general case:
+                #
+                elif val1.lower() != val2.lower():
                     return False    # Strings are not equal
+            elif type(val1) != type(val2):
+                return False        # Types are not equal
             elif val1 != val2:
                 return False        # Values are not equal
+
+        # If False booleans or
+        # if one of values not exists or empty string
+        #
+        elif (val1 and not val2) or (not val1 and val2):
+            return False
+
     return True
 
 def check_if_virtual_environment():
@@ -1658,18 +1760,36 @@ def set_linux_reverse_path_filter(dev_name, on):
     : param on       : if on is False, disable rp_filter. Else, enable it
     """
     if dev_name == None:
-        return
+        return None
 
+    # For default interface skip the setting as it is redundant
+    #
     _, metric = get_interface_gateway(dev_name)
-    # for default interface, skip the setting as it is redundant
     if metric == '' or int(metric) == 0:
-        return
+        return None
 
+    # Fetch current setting, so it could be restored later if needed.
+    #
+    current_val = None
+    try:
+        cmd = 'sysctl net.ipv4.conf.%s.rp_filter' % dev_name
+        out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
+        current_val = bool(out.split(' = ')[1])
+    except Exception as e:
+        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % dev_name, str(e))
+        return None
+
+    # Light optimization, no need to set the value
+    #
+    if current_val == on:
+        return current_val
+
+    # Finally set the value
+    #
     val = 1 if on else 0
-
-    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d' %(dev_name, val))
-    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d' %(val))
-    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d' %(val))
+    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d > /dev/null' % (dev_name, val))
+    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (val))
+    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (val))
 
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by
@@ -1693,7 +1813,7 @@ def vmxnet3_unassigned_interfaces_up():
         for pci in linux_interfaces:
             if not pci in assigned_pcis:
                 if pci_is_vmxnet3(pci):
-                    os.system("ip link set dev %s up" % linux_interfaces[pci])
+                    os.system("ip link set dev %s up" % linux_interfaces[pci]['name'])
 
     except Exception as e:
         fwglobals.log.debug('vmxnet3_unassigned_interfaces_up: %s (%s)' % (str(e),traceback.format_exc()))
@@ -1709,7 +1829,7 @@ def get_reconfig_hash():
 
     linux_interfaces = get_linux_interfaces()
     for pci in linux_interfaces:
-        name = linux_interfaces[pci]
+        name = linux_interfaces[pci]['name']
         addr = get_interface_address(name)
         addr = addr.split('/')[0] if addr else ''
         gw, metric = get_interface_gateway(name)
@@ -1718,9 +1838,10 @@ def get_reconfig_hash():
         res += 'gateway:' + gw + ','
         res += 'metric:'  + metric + ','
         if gw and addr:
-            _, public_ip, public_port, nat_type =fwglobals.g.stun_wrapper.find_addr(pci)
+            _, public_ip, public_port, _ = fwglobals.g.stun_wrapper.find_addr(pci)
             res += 'public_ip:'   + public_ip + ','
             res += 'public_port:' + str(public_port) + ','
 
     hash = hashlib.md5(res).hexdigest()
+    fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
