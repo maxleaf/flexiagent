@@ -443,6 +443,13 @@ def get_linux_interfaces(cached=True):
         interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
         interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
 
+        for addr in addrs:
+            addr_af_name = af_to_name(addr.family)
+            if not interface[addr_af_name]:
+                interface[addr_af_name] = addr.address.split('%')[0]
+                if addr.netmask != None:
+                    interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
         if is_wifi_interface(dev_id):
             interface['deviceType'] = 'wifi'
             interface['deviceParams'] = wifi_get_capabilities(dev_id)
@@ -453,15 +460,15 @@ def get_linux_interfaces(cached=True):
             interface['deviceParams'] = {'apn' : lte_get_default_apn() }
             tap = dev_id_to_tap(dev_id) if vpp_does_run() else None
             if tap:
-                addrs = linux_inf[tap]
+                # addrs = linux_inf[tap]
                 interface['gateway'], interface['metric'] = get_interface_gateway(tap)
+                int_addr = get_interface_address(tap)
+                if int_addr:
+                    int_addr = int_addr.split('/')
+                    interface['IPv4'] = int_addr[0]
+                    interface['IPv4Mask'] = int_addr[1]
 
-        for addr in addrs:
-            addr_af_name = af_to_name(addr.family)
-            if not interface[addr_af_name]:
-                interface[addr_af_name] = addr.address.split('%')[0]
-                if addr.netmask != None:
-                    interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
+
 
         # Add information specific for WAN interfaces
         #
@@ -2190,6 +2197,7 @@ def set_lte_info_on_linux_interface():
         if dev_id and is_lte_interface(dev_id):
             ip_info = lte_get_configuration_received_from_provider()
             if ip_info['STATUS']:
+                os.system('ifconfig %s down' % nicname)
                 os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
 
                 metric = 0
@@ -2265,6 +2273,12 @@ def qmi_get_imei():
 def qmi_get_default_settings():
     return _run_qmicli_command('wds-get-default-settings=3gpp')
 
+def qmi_sim_power_off():
+    return _run_qmicli_command('uim-sim-power-off=1')
+
+def qmi_sim_power_on():
+    return _run_qmicli_command('uim-sim-power-on=1')
+
 def qmi_reset_nas():
     try:
         output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-mbim --nas-reset', shell=True, stderr=subprocess.STDOUT)
@@ -2318,7 +2332,12 @@ def lte_disconnect():
 def lte_connect(apn, dev_id, reset=False):
 
     if not lte_is_sim_inserted():
-        return (False, "Sim is not presented")
+        qmi_sim_power_off()
+        qmi_sim_power_on()
+        inserted = lte_is_sim_inserted()
+        if not inserted:
+            return (False, "Sim is not presented")
+
 
     if not apn:
         # try to fetch it from the sim
@@ -2334,6 +2353,7 @@ def lte_connect(apn, dev_id, reset=False):
 
         current_connection_state = qmi_get_connection_state()
         if current_connection_state:
+            # dis_status, dis_error = lte_disconnect()
             return (True, None)
 
         output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-start-network="ip-type=4,apn=%s" --client-no-release-cid' % apn, shell=True, stderr=subprocess.STDOUT)

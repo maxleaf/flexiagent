@@ -93,6 +93,10 @@ def add(params):
     cmd['cmd']['name']      = "exec"
     cmd['cmd']['descr']     = "UP interface %s in Linux" % iface_name
     cmd['cmd']['params']    = [ "sudo ip link set dev %s up" %  iface_name]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "Down interface %s in Linux" % iface_name
+    cmd['revert']['params'] = [ "sudo ip link set dev %s down" %  iface_name]
     cmd_list.append(cmd)
 
     # connect the modem to the cellular provider
