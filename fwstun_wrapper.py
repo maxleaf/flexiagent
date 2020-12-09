@@ -398,6 +398,7 @@ class FwStunWrap:
             and ifaces[dev_id].get('gw') != '']
         for tunnel in tunnels:
             tunnel_id = tunnel['tunnel-id']
+            dev_id = self._get_tunnel_source_dev_id(tunnel_id)
             stats = tunnel_stats.get(tunnel_id)
             if stats and stats.get('status') == 'down':
                 # Down tunnel found. However, the tunnel might be disconnected due to changes in
@@ -416,13 +417,16 @@ class FwStunWrap:
                 if tunnel['src'] not in ip_up_set:
                     fwglobals.log.debug("Tunnel %d is down, updating address %s in STUN interfaces cache"\
                         %(tunnel_id, tunnel['src']))
-                    dev_id = self._get_tunnel_source_dev_id(tunnel_id)
                     # Force sending STUN request on behalf of the tunnel's source address
                     if self.stun_cache.get(dev_id):
                         self.stun_cache[dev_id]['success'] = False
                         # it takes around 30 seconds to create a tunnel, so don't
                         # start sending STUN requests right away
                         self.stun_cache[dev_id]['send_time'] = time.time() + 30
+            else:
+                if self.stun_cache.get(dev_id):
+                    self.stun_cache[dev_id]['success'] = True
+                    self.stun_cache[dev_id]['send_time'] = 0
 
     def _is_useStun(self, dev_id):
         """ check router DB for 'useStun' flag for an interface bus address
