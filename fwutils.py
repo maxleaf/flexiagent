@@ -1494,7 +1494,13 @@ def tunnel_change_postprocess(add, addr):
     for policy_id, priority in policies.items():
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
-# Today (May-2019) message aggregation is not well defined in protocol between
+
+# The messages received from flexiManage are not perfect :)
+# Some of them should be not sent at all, some of them include modifications
+# that are not importants, some of them do not comply with expected format.
+# Below you can find list of problems fixed by this function:
+#
+# 1. May-2019 - message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:
 #   1. 'start-router' aggregation: requests are embedded into 'params' field on some request
 #   2. 'add-interface' aggregation: 'params' field is list of 'interface params'
@@ -1517,93 +1523,131 @@ def tunnel_change_postprocess(add, addr):
 # between device and server. Once the protocol is fixed, there will be no more
 # need in this proprietary format.
 #
-def fix_aggregated_message_format(msg):
+# 2. Nov-2020 - the 'add-/modify-interface' message migh include both 'dhcp': 'yes'
+# and 'ip' and 'gw' fields. These IP and GW are not used by the agent, but
+# change in their values causes unnecessary removal and adding back interface
+# and, as a result of this,  restart of network daemon and reconnection to
+# flexiManage. To avoid this we fix the received message by cleaning 'ip' and
+# 'gw' fields if 'dhcp' is 'yes'. Than if the fixed message includes no other
+# modified parameters, it will be ignored by the agent.
+#
+def fix_recieved_message(msg):
 
-    requests = []
+    def _fix_aggregation_format(msg):
+        requests = []
 
-    # 'list' aggregation
-    if type(msg) == list:
-        return  \
-            {
-                'message': 'aggregated',
-                'params' : { 'requests': copy.deepcopy(msg) }
-            }
+        # 'list' aggregation
+        if type(msg) == list:
+            return  \
+                {
+                    'message': 'aggregated',
+                    'params' : { 'requests': copy.deepcopy(msg) }
+                }
 
-    # 'start-router' aggregation
-    # 'start-router' might include interfaces and routes. Move them into list.
-    if msg['message'] == 'start-router' and 'params' in msg:
+        # 'start-router' aggregation
+        # 'start-router' might include interfaces and routes. Move them into list.
+        if msg['message'] == 'start-router' and 'params' in msg:
 
-        start_router_params = copy.deepcopy(msg['params'])  # We are going to modify params, so preserve original message
-        if 'interfaces' in start_router_params:
-            for iface_params in start_router_params['interfaces']:
+            start_router_params = copy.deepcopy(msg['params'])  # We are going to modify params, so preserve original message
+            if 'interfaces' in start_router_params:
+                for iface_params in start_router_params['interfaces']:
+                    requests.append(
+                        {
+                            'message': 'add-interface',
+                            'params' : iface_params
+                        })
+                del start_router_params['interfaces']
+            if 'routes' in start_router_params:
+                for route_params in start_router_params['routes']:
+                    requests.append(
+                        {
+                            'message': 'add-route',
+                            'params' : route_params
+                        })
+                del start_router_params['routes']
+
+            if len(requests) > 0:
+                if bool(start_router_params):  # If there are params after deletions above - use them
+                    requests.append(
+                        {
+                            'message': 'start-router',
+                            'params' : start_router_params
+                        })
+                else:
+                    requests.append(
+                        {
+                            'message': 'start-router'
+                        })
+                return \
+                    {
+                        'message': 'aggregated',
+                        'params' : { 'requests': requests }
+                    }
+
+        # 'add-X' aggregation
+        # 'add-interface'/'remove-interface' can have actually a list of interfaces.
+        # This is done by setting 'params' as a list of interface params, where
+        # every element represents parameters of some interface.
+        if re.match('add-|remove-', msg['message']) and type(msg['params']) is list:
+
+            for params in msg['params']:
                 requests.append(
                     {
-                        'message': 'add-interface',
-                        'params' : iface_params
+                        'message': msg['message'],
+                        'params' : copy.deepcopy(params)
                     })
-            del start_router_params['interfaces']
-        if 'routes' in start_router_params:
-            for route_params in start_router_params['routes']:
-                requests.append(
-                    {
-                        'message': 'add-route',
-                        'params' : route_params
-                    })
-            del start_router_params['routes']
 
-        if len(requests) > 0:
-            if bool(start_router_params):  # If there are params after deletions above - use them
-                requests.append(
-                    {
-                        'message': 'start-router',
-                        'params' : start_router_params
-                    })
-            else:
-                requests.append(
-                    {
-                        'message': 'start-router'
-                    })
             return \
                 {
                     'message': 'aggregated',
                     'params' : { 'requests': requests }
                 }
 
-    # 'add-X' aggregation
-    # 'add-interface'/'remove-interface' can have actually a list of interfaces.
-    # This is done by setting 'params' as a list of interface params, where
-    # every element represents parameters of some interface.
-    if re.match('add-|remove-', msg['message']) and type(msg['params']) is list:
-
-        for params in msg['params']:
-            requests.append(
+        # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
+        #
+        if msg['message'] == 'aggregated':
+            requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
+            return \
                 {
-                    'message': msg['message'],
-                    'params' : copy.deepcopy(params)
-                })
+                    'message': 'aggregated',
+                    'params' : { 'requests': requests }
+                }
 
-        return \
-            {
-                'message': 'aggregated',
-                'params' : { 'requests': requests }
-            }
+        # No conversion is needed here.
+        # We return copy of object in order to be consistent with previous 'return'-s
+        # which return new object. The caller function might rely on this,
+        # e.g. see the fwglobals.g.handle_request() assumes
+        #
+        return copy.deepcopy(msg)
 
-    # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
-    #
-    if msg['message'] == 'aggregated':
-        requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
-        return \
-            {
-                'message': 'aggregated',
-                'params' : { 'requests': requests }
-            }
 
-    # No conversion is needed here.
-    # We return copy of object in order to be consistent with previous 'return'-s
-    # which return new object. The caller function might rely on this,
-    # e.g. see the fwglobals.g.handle_request() assumes
-    #
-    return copy.deepcopy(msg)
+    def _fix_dhcp(msg):
+
+        def _fix_dhcp_params(params):
+            if params.get('dhcp') == 'yes':
+                params['addr']    = ''
+                params['addr6']   = ''
+                params['gateway'] = ''
+
+        if re.match('(add|modify)-interface', msg['message']):
+            _fix_dhcp_params(msg['params'])
+            return msg
+        if re.match('aggregated|sync-device', msg['message']):
+            for request in msg['params']['requests']:
+                if re.match('(add|modify)-interface', request['message']):
+                    _fix_dhcp_params(request['params'])
+            return msg
+        return msg
+
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # Order of functions is important, as the first one (_fix_aggregation_format())
+    # creates clone of the recieved message, so the rest functions can simply
+    # modify it as they wish!
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    msg = _fix_aggregation_format(msg)
+    msg = _fix_dhcp(msg)
+    return msg
+
 
 def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
     '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
