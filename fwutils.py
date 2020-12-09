@@ -47,6 +47,7 @@ from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
+from fwwan_monitor  import get_wan_failover_metric
 
 
 dpdk = __import__('dpdk-devbind')
@@ -198,11 +199,14 @@ def get_default_route():
                 _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
                 _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
                 if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
-                    dev = _dev
-                    via = _via
+                    dev    = _dev
+                    via    = _via
+                    metric = _metric
     except:
         return ("", "", "")
-    return (via, dev, get_interface_pci(dev))
+
+    (pci, _) = get_interface_pci(dev)
+    return (via, dev, pci)
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -1640,8 +1644,6 @@ def netplan_apply(caller_name=None):
 
     :param f:       the python file object
     :param data:    the data to write into file
-
-    :returns: True if default route was changed as a result of netplan apply.
     '''
     try:
         # Before netplan apply go and note the default route.
@@ -1661,11 +1663,14 @@ def netplan_apply(caller_name=None):
         #
         fwglobals.g.cache.pcis = {}
 
-        # Find out if the default route was changed.
+        # Find out if the default route was changed. If it was - reconnect agent.
         #
         (_, _, dr_pci_after) = get_default_route()
-        default_route_changed = (dr_pci_before != dr_pci_after)
-        return default_route_changed
+        if dr_pci_before != dr_pci_after:
+            fwglobals.log.debug(
+                "%s: netplan_apply: default route changed (%s->%s) - reconnect" % \
+                (caller_name, dr_pci_before, dr_pci_after))
+            fwglobals.g.fwagent.reconnect()
 
     except Exception as e:
         fwglobals.log.debug("%s: netplan_apply failed: %s" % (caller_name, str(e)))
@@ -1715,17 +1720,7 @@ def compare_request_params(params1, params2):
         if val1 and val2:
             if (type(val1) == str or type(val1) == unicode) and \
                (type(val2) == str or type(val2) == unicode):
-                # Take special care of the 'metric' parameter.
-                # The FwWanMonitor can put watermark on it, and flexiManage
-                # is not aware of it, so remove the watermark before comparison.
-                #
-                if key == 'metric':
-                    if int(val1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK != \
-                       int(val2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-                        return False
-                # Now comare the general case:
-                #
-                elif val1.lower() != val2.lower():
+                if val1.lower() != val2.lower():
                     return False    # Strings are not equal
             elif type(val1) != type(val2):
                 return False        # Types are not equal
@@ -1790,6 +1785,31 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (val))
 
+def update_linux_metric(prefix, dev, metric):
+    """Invokes 'ip route' commands to update metric on the provide device.
+    """
+    try:
+        cmd = "ip route show exact %s dev %s" % (prefix, dev)
+        os_route = subprocess.check_output(cmd, shell=True).strip()
+        if not os_route:
+            raise Exception("'%s' returned nothing" % cmd)
+        cmd = "ip route del " + os_route
+        ok = not subprocess.call(cmd, shell=True)
+        if not ok:
+            raise Exception("'%s' failed" % cmd)
+        if 'metric ' in os_route:  # Replace metric in os route string
+            os_route = re.sub('metric [0-9]+', 'metric %d' % metric, os_route)
+        else:
+            os_route += ' metric %d' % metric
+        cmd = "ip route add " + os_route
+        ok = not subprocess.call(cmd, shell=True)
+        if not ok:
+            raise Exception("'%s' failed" % cmd)
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))
+
+
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by
     VPP and brings them up. We call these interfaces 'unassigned'.
@@ -1845,32 +1865,38 @@ def get_reconfig_hash():
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
-def vpp_nat_add_remove_interface(remove, dev, metric):
+def vpp_nat_add_remove_interface(remove, pci, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
-    metric_min = -1
+    metric_min = sys.maxint
 
     dev_metric = int(metric or 0)
-    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
 
+    fo_metric = get_wan_failover_metric(pci, dev_metric)
+    if fo_metric != dev_metric:
+        fwglobals.log.debug(
+            "vpp_nat_add_remove_interface: pci=%s, use wan failover metric %d" % (pci, fo_metric))
+        dev_metric = fo_metric
+
+    # Find interface with lowest metric.
+    #
+    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
     for wan in wan_list:
-        metric_cur_str = wan.get('metric', None)
-        if not metric_cur_str:
+        if pci == wan['pci']:
+            continue
+        metric_cur_str = wan.get('metric')
+        if metric_cur_str == None:
             continue
         metric_cur = int(metric_cur_str or 0)
-        pci = wan['pci']
-
-        if pci == dev:
-            continue
-
-        if metric_min == -1 or metric_min > metric_cur:
+        metric_cur = get_wan_failover_metric(wan['pci'], metric_cur)
+        if metric_cur < metric_min:
             metric_min = metric_cur
-            default_gw = pci
+            default_gw = wan['pci']
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = pci_to_vpp_if_name(dev)
+            vpp_if_name_remove = pci_to_vpp_if_name(pci)
         if dev_metric < metric_min and default_gw:
             vpp_if_name_add = pci_to_vpp_if_name(default_gw)
 
@@ -1878,7 +1904,7 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
         if dev_metric < metric_min and default_gw:
             vpp_if_name_remove = pci_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = pci_to_vpp_if_name(dev)
+            vpp_if_name_add = pci_to_vpp_if_name(pci)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove

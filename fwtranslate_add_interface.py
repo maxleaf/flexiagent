@@ -200,7 +200,7 @@ def add_interface(params):
                                     'func':   'vpp_nat_add_remove_interface',
                                     'args':   {
                                         'remove': False,
-                                        'dev'   : iface_pci,
+                                        'pci'   : iface_pci,
                                         'metric': metric
                                     }
                                   }
@@ -212,7 +212,7 @@ def add_interface(params):
                                     'func':   'vpp_nat_add_remove_interface',
                                     'args':   {
                                         'remove': True,
-                                        'dev'   : iface_pci,
+                                        'pci'   : iface_pci,
                                         'metric': metric
                                     }
                                   }
@@ -348,6 +348,26 @@ def modify_interface(new_params, old_params):
             del copy_old_params[param]
         if param in copy_new_params:
             del copy_new_params[param]
+
+    # NNNOWWW: hack:
+    if 'addr' in copy_old_params:
+        if not copy_old_params['addr'] and copy_new_params.get('addr'):
+            del copy_old_params['addr']
+            del copy_new_params['addr']
+    if 'addr' in copy_new_params:
+        if not copy_new_params['addr'] and copy_old_params.get('addr'):
+            del copy_old_params['addr']
+            del copy_new_params['addr']
+    if 'gateway' in copy_old_params:
+        if not copy_old_params['gateway'] and copy_new_params.get('gateway'):
+            del copy_old_params['gateway']
+            del copy_new_params['gateway']
+    if 'gateway' in copy_new_params:
+        if not copy_new_params['gateway'] and copy_old_params.get('gateway'):
+            del copy_old_params['gateway']
+            del copy_new_params['gateway']
+
+
 
     same = fwutils.compare_request_params(copy_new_params, copy_old_params)
     if not same:    # There are different impacting parameters
