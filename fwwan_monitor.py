@@ -293,9 +293,9 @@ class FwWanMonitor:
         route.ok = True if new_metric < self.WATERMARK else False
 
         # Go and update Linux.
-        # Note we do that directly by 'ip route' commands and not relay on netplan,
-        # as in last case VPPSB does not handle properly kernel NETLINK messsages,
-        # thus causing VPP FIB misconfiguration.
+        # Note we do that directly by 'ip route del' & 'ip route add' commands
+        # and not relay on 'netplan apply', as in last case VPPSB does not handle
+        # properly kernel NETLINK messsages and does not update VPP FIB.
         #
         success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, new_metric)
         if not success:
@@ -307,13 +307,15 @@ class FwWanMonitor:
         #
         if fwglobals.g.router_api.router_started:
 
-            # Update netplan yaml-s to ensure that if 'netplan apply' is called
-            # due to some reason like received 'modify-interface' for other
-            # interface the new metric will be not overrode.
+            # Update netplan yaml-s in order to:
+            # 1. Ensure that if 'netplan apply' is called due to some reason
+            #    like received 'modify-interface' for other interface the new
+            #    metric will be not overrode.
+            # 2. Keep interface rule in routing table in sync with metric in default route:
+            #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
+            #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
             #
             ip   = fwutils.get_interface_address(route.dev, log=False)
-            # We can't take dhcp from route, as when user on flexiManage modifies
-            # inteface DHCP -> STATIC, netplan apply does not update protocol!
             dhcp = 'yes' if route.proto == 'dhcp' else 'no'
             (success, err_str) = fwnetplan.add_remove_netplan_interface(\
                                     True, route.pci, ip, route.via, new_metric, dhcp, 'WAN',
