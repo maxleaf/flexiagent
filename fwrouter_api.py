@@ -196,11 +196,12 @@ class FWROUTER_API:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
             self.router_started = vpp_runs
-            fwnetplan.restore_linux_netplan_files()
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
                 fwnetplan.load_netplan_filenames()
+            else:
+                fwnetplan.restore_linux_netplan_files()
             return False
 
         self._restore_vpp()
