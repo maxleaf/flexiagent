@@ -38,9 +38,7 @@ import fwutils
 from fwrouter_cfg import FwRouterCfg
 
 def _change_interface_identifier():
-    """ We are forcing sync in upgrade because sync should update device router configuration
-    items with new parameters added in the latest flexiManage. For example, the 'pci' field
-    in the add-tunnel request.
+    """ The purpose of this migration is to change the existing interface identifiers to the new format.
     """
     with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
         all_interfaces = router_cfg.get_interfaces()
@@ -112,5 +110,4 @@ def migrate(prev_version, new_version, upgrade):
 
 
 if __name__ == "__main__":
-    #migrate()
-    _change_interface_identifier()
+    migrate()
