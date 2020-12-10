@@ -2327,6 +2327,7 @@ def lte_disconnect():
             cid = start_data[1].split('=')[-1]
             output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-stop-network=%s --client-cid=%s' % (pdh, cid), shell=True, stderr=subprocess.STDOUT)
             os.system('rm %s' % file_path)
+            os.system('sudo ip link set dev wwan0 down && sudo ip addr flush dev wwan0')
         return (True, None)
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))
@@ -2355,7 +2356,6 @@ def lte_connect(apn, dev_id, reset=False):
 
         current_connection_state = qmi_get_connection_state()
         if current_connection_state:
-            # dis_status, dis_error = lte_disconnect()
             return (True, None)
 
         output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-start-network="ip-type=4,apn=%s" --client-no-release-cid' % apn, shell=True, stderr=subprocess.STDOUT)

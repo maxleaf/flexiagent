@@ -456,7 +456,6 @@ class FWAGENT_API:
                 return (False, 'Please unassigned this interface in order to disconnect LTE ')
 
             is_success, error = fwutils.lte_disconnect()
-            os.system('ifconfig wwan0 0')
 
             return is_success, error
         except Exception as e:
