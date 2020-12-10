@@ -554,10 +554,7 @@ class FwAgent:
         self.received_request = True
         self.handling_request = True
 
-        # Messages are not well defined in protocol,
-        # so align all kind of messages to the request format
-        # expected by the agent framework
-        msg = fwutils.fix_message(received_msg)
+        msg = fwutils.fix_recieved_message(received_msg)
 
         print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
         print_message = False if msg['message'] == 'add-application' else print_message

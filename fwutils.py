@@ -47,6 +47,7 @@ from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
+from fwwan_monitor  import get_wan_failover_metric
 
 
 dpdk = __import__('dpdk-devbind')
@@ -198,11 +199,14 @@ def get_default_route():
                 _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
                 _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
                 if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
-                    dev = _dev
-                    via = _via
+                    dev    = _dev
+                    via    = _via
+                    metric = _metric
     except:
         return ("", "", "")
-    return (via, dev, get_interface_dev_id(dev))
+
+    dev_id = get_interface_dev_id(dev)
+    return (via, dev, dev_id)
 
 def get_interface_gateway(if_name):
     """Get gateway.
@@ -1586,64 +1590,13 @@ def tunnel_change_postprocess(add, addr):
     for policy_id, priority in policies.items():
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
-def fix_request_params(params, message=None):
-    """ Fix incoming message parameters
-    The purpose of this function is to fix 'params' that contains the pci as interface identification.
-    The function changes the pci address into `dev_id` which is the new interface identifier.
-    Since we have different types of `params` object,
-    we need to use several if/else statements in order to handle all of them.
 
-    :param params - parameters object.
-    :param message - request message.
-
-    """
-
-    def _fix_params_key(params, key, message=None):
-        if key in params:
-            if type(params[key]) == list:
-                params['dev_id'] = [dev_id_add_type(pci) for pci in params[key]]
-                del params[key]
-            else:
-                params['dev_id'] = dev_id_add_type(params.pop(key))
-
-        if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
-            params['interface'] = dev_id_add_type(params['interface'])
-
-        return params
-
-
-    if 'requests' in params:
-        requests = params['requests']
-        for request in requests:
-            if 'params' in request:
-                request['params'] = _fix_params_key(request['params'], 'pci', request['message'])
-                request['params'] = _fix_params_key(request['params'], 'devId', request['message'])
-
-    if 'pci' in params:
-        params = _fix_params_key(params, 'pci')
-
-    if 'devId' in params:
-        params = _fix_params_key(params, 'devId')
-
-    if 'args' in params and 'params' in params['args']:
-        nested_params = params['args']['params']
-        if 'interface' in nested_params:
-            nested_params['interface'] = dev_id_add_type(nested_params['interface'])
-
-    if message and re.match('(add|remove)-dhcp-config', message) and 'interface' in params:
-        params['interface'] = dev_id_add_type(params['interface'])
-
-    return params
-
-def fix_message(msg):
-    msg = fix_aggregated_message_format(msg)
-
-    if 'params' in msg:
-        msg['params'] = fix_request_params(msg['params'], msg['message'])
-
-    return msg
-
-# Today (May-2019) message aggregation is not well defined in protocol between
+# The messages received from flexiManage are not perfect :)
+# Some of them should be not sent at all, some of them include modifications
+# that are not importants, some of them do not comply with expected format.
+# Below you can find list of problems fixed by this function:
+#
+# 1. May-2019 - message aggregation is not well defined in protocol between
 # device and server. It uses several types of aggregations:
 #   1. 'start-router' aggregation: requests are embedded into 'params' field on some request
 #   2. 'add-interface' aggregation: 'params' field is list of 'interface params'
@@ -1666,93 +1619,131 @@ def fix_message(msg):
 # between device and server. Once the protocol is fixed, there will be no more
 # need in this proprietary format.
 #
-def fix_aggregated_message_format(msg):
+# 2. Nov-2020 - the 'add-/modify-interface' message migh include both 'dhcp': 'yes'
+# and 'ip' and 'gw' fields. These IP and GW are not used by the agent, but
+# change in their values causes unnecessary removal and adding back interface
+# and, as a result of this,  restart of network daemon and reconnection to
+# flexiManage. To avoid this we fix the received message by cleaning 'ip' and
+# 'gw' fields if 'dhcp' is 'yes'. Than if the fixed message includes no other
+# modified parameters, it will be ignored by the agent.
+#
+def fix_recieved_message(msg):
 
-    requests = []
+    def _fix_aggregation_format(msg):
+        requests = []
 
-    # 'list' aggregation
-    if type(msg) == list:
-        return  \
-            {
-                'message': 'aggregated',
-                'params' : { 'requests': copy.deepcopy(msg) }
-            }
+        # 'list' aggregation
+        if type(msg) == list:
+            return  \
+                {
+                    'message': 'aggregated',
+                    'params' : { 'requests': copy.deepcopy(msg) }
+                }
 
-    # 'start-router' aggregation
-    # 'start-router' might include interfaces and routes. Move them into list.
-    if msg['message'] == 'start-router' and 'params' in msg:
+        # 'start-router' aggregation
+        # 'start-router' might include interfaces and routes. Move them into list.
+        if msg['message'] == 'start-router' and 'params' in msg:
 
-        start_router_params = copy.deepcopy(msg['params'])  # We are going to modify params, so preserve original message
-        if 'interfaces' in start_router_params:
-            for iface_params in start_router_params['interfaces']:
+            start_router_params = copy.deepcopy(msg['params'])  # We are going to modify params, so preserve original message
+            if 'interfaces' in start_router_params:
+                for iface_params in start_router_params['interfaces']:
+                    requests.append(
+                        {
+                            'message': 'add-interface',
+                            'params' : iface_params
+                        })
+                del start_router_params['interfaces']
+            if 'routes' in start_router_params:
+                for route_params in start_router_params['routes']:
+                    requests.append(
+                        {
+                            'message': 'add-route',
+                            'params' : route_params
+                        })
+                del start_router_params['routes']
+
+            if len(requests) > 0:
+                if bool(start_router_params):  # If there are params after deletions above - use them
+                    requests.append(
+                        {
+                            'message': 'start-router',
+                            'params' : start_router_params
+                        })
+                else:
+                    requests.append(
+                        {
+                            'message': 'start-router'
+                        })
+                return \
+                    {
+                        'message': 'aggregated',
+                        'params' : { 'requests': requests }
+                    }
+
+        # 'add-X' aggregation
+        # 'add-interface'/'remove-interface' can have actually a list of interfaces.
+        # This is done by setting 'params' as a list of interface params, where
+        # every element represents parameters of some interface.
+        if re.match('add-|remove-', msg['message']) and type(msg['params']) is list:
+
+            for params in msg['params']:
                 requests.append(
                     {
-                        'message': 'add-interface',
-                        'params' : iface_params
+                        'message': msg['message'],
+                        'params' : copy.deepcopy(params)
                     })
-            del start_router_params['interfaces']
-        if 'routes' in start_router_params:
-            for route_params in start_router_params['routes']:
-                requests.append(
-                    {
-                        'message': 'add-route',
-                        'params' : route_params
-                    })
-            del start_router_params['routes']
 
-        if len(requests) > 0:
-            if bool(start_router_params):  # If there are params after deletions above - use them
-                requests.append(
-                    {
-                        'message': 'start-router',
-                        'params' : start_router_params
-                    })
-            else:
-                requests.append(
-                    {
-                        'message': 'start-router'
-                    })
             return \
                 {
                     'message': 'aggregated',
                     'params' : { 'requests': requests }
                 }
 
-    # 'add-X' aggregation
-    # 'add-interface'/'remove-interface' can have actually a list of interfaces.
-    # This is done by setting 'params' as a list of interface params, where
-    # every element represents parameters of some interface.
-    if re.match('add-|remove-', msg['message']) and type(msg['params']) is list:
-
-        for params in msg['params']:
-            requests.append(
+        # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
+        #
+        if msg['message'] == 'aggregated':
+            requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
+            return \
                 {
-                    'message': msg['message'],
-                    'params' : copy.deepcopy(params)
-                })
+                    'message': 'aggregated',
+                    'params' : { 'requests': requests }
+                }
 
-        return \
-            {
-                'message': 'aggregated',
-                'params' : { 'requests': requests }
-            }
+        # No conversion is needed here.
+        # We return copy of object in order to be consistent with previous 'return'-s
+        # which return new object. The caller function might rely on this,
+        # e.g. see the fwglobals.g.handle_request() assumes
+        #
+        return copy.deepcopy(msg)
 
-    # Remove NULL elements from aggregated requests, if sent by bogus flexiManage
-    #
-    if msg['message'] == 'aggregated':
-        requests = [copy.deepcopy(r) for r in msg['params']['requests'] if r]
-        return \
-            {
-                'message': 'aggregated',
-                'params' : { 'requests': requests }
-            }
 
-    # No conversion is needed here.
-    # We return copy of object in order to be consistent with previous 'return'-s
-    # which return new object. The caller function might rely on this,
-    # e.g. see the fwglobals.g.handle_request() assumes
-    #
-    return copy.deepcopy(msg)
+    def _fix_dhcp(msg):
+
+        def _fix_dhcp_params(params):
+            if params.get('dhcp') == 'yes':
+                params['addr']    = ''
+                params['addr6']   = ''
+                params['gateway'] = ''
+
+        if re.match('(add|modify)-interface', msg['message']):
+            _fix_dhcp_params(msg['params'])
+            return msg
+        if re.match('aggregated|sync-device', msg['message']):
+            for request in msg['params']['requests']:
+                if re.match('(add|modify)-interface', request['message']):
+                    _fix_dhcp_params(request['params'])
+            return msg
+        return msg
+
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # Order of functions is important, as the first one (_fix_aggregation_format())
+    # creates clone of the recieved message, so the rest functions can simply
+    # modify it as they wish!
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    msg = _fix_aggregation_format(msg)
+    msg = _fix_dhcp(msg)
+    return msg
+
 
 def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
     '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
@@ -1793,8 +1784,6 @@ def netplan_apply(caller_name=None):
 
     :param f:       the python file object
     :param data:    the data to write into file
-
-    :returns: True if default route was changed as a result of netplan apply.
     '''
     try:
         # Before netplan apply go and note the default route.
@@ -1814,11 +1803,14 @@ def netplan_apply(caller_name=None):
         #
         fwglobals.g.cache.dev_ids = {}
 
-        # Find out if the default route was changed.
+        # Find out if the default route was changed. If it was - reconnect agent.
         #
         (_, _, dr_dev_id_after) = get_default_route()
-        default_route_changed = (dr_dev_id_before != dr_dev_id_after)
-        return default_route_changed
+        if dr_dev_id_before != dr_dev_id_after:
+            fwglobals.log.debug(
+                "%s: netplan_apply: default route changed (%s->%s) - reconnect" % \
+                (caller_name, dr_dev_id_before, dr_dev_id_after))
+            fwglobals.g.fwagent.reconnect()
 
     except Exception as e:
         fwglobals.log.debug("%s: netplan_apply failed: %s" % (caller_name, str(e)))
@@ -1868,17 +1860,7 @@ def compare_request_params(params1, params2):
         if val1 and val2:
             if (type(val1) == str or type(val1) == unicode) and \
                (type(val2) == str or type(val2) == unicode):
-                # Take special care of the 'metric' parameter.
-                # The FwWanMonitor can put watermark on it, and flexiManage
-                # is not aware of it, so remove the watermark before comparison.
-                #
-                if key == 'metric':
-                    if int(val1) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK != \
-                       int(val2) % fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-                        return False
-                # Now comare the general case:
-                #
-                elif val1.lower() != val2.lower():
+                if val1.lower() != val2.lower():
                     return False    # Strings are not equal
             elif type(val1) != type(val2):
                 return False        # Types are not equal
@@ -1943,6 +1925,31 @@ def set_linux_reverse_path_filter(dev_name, on):
     os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (val))
     os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (val))
 
+def update_linux_metric(prefix, dev, metric):
+    """Invokes 'ip route' commands to update metric on the provide device.
+    """
+    try:
+        cmd = "ip route show exact %s dev %s" % (prefix, dev)
+        os_route = subprocess.check_output(cmd, shell=True).strip()
+        if not os_route:
+            raise Exception("'%s' returned nothing" % cmd)
+        cmd = "ip route del " + os_route
+        ok = not subprocess.call(cmd, shell=True)
+        if not ok:
+            raise Exception("'%s' failed" % cmd)
+        if 'metric ' in os_route:  # Replace metric in os route string
+            os_route = re.sub('metric [0-9]+', 'metric %d' % metric, os_route)
+        else:
+            os_route += ' metric %d' % metric
+        cmd = "ip route add " + os_route
+        ok = not subprocess.call(cmd, shell=True)
+        if not ok:
+            raise Exception("'%s' failed" % cmd)
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))
+
+
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by
     VPP and brings them up. We call these interfaces 'unassigned'.
@@ -1998,33 +2005,38 @@ def get_reconfig_hash():
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
-def vpp_nat_add_remove_interface(remove, dev, metric):
+def vpp_nat_add_remove_interface(remove, dev_id, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
-    metric_min = -1
+    metric_min = sys.maxint
 
     dev_metric = int(metric or 0)
+
+    fo_metric = get_wan_failover_metric(dev_id, dev_metric)
+    if fo_metric != dev_metric:
+        fwglobals.log.debug(
+            "vpp_nat_add_remove_interface: dev_id=%s, use wan failover metric %d" % (dev_id, fo_metric))
+        dev_metric = fo_metric
+
+    # Find interface with lowest metric.
+    #
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
-
     for wan in wan_list:
-        metric_cur_str = wan.get('metric', None)
-        if not metric_cur_str:
+        if dev_id == wan['dev_id']:
             continue
-
+        metric_cur_str = wan.get('metric')
+        if metric_cur_str == None:
+            continue
         metric_cur = int(metric_cur_str or 0)
-        wan_dev_id = wan['dev_id']
-
-        if wan_dev_id == dev_id:
-            continue
-
-        if metric_min == -1 or metric_min > metric_cur:
+        metric_cur = get_wan_failover_metric(wan['dev_id'], metric_cur)
+        if metric_cur < metric_min:
             metric_min = metric_cur
-            default_gw = wan_dev_id
+            default_gw = wan['dev_id']
 
     if remove:
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(dev)
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
         if dev_metric < metric_min and default_gw:
             vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
 
@@ -2032,7 +2044,7 @@ def vpp_nat_add_remove_interface(remove, dev, metric):
         if dev_metric < metric_min and default_gw:
             vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
         if dev_metric < metric_min or not default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(dev)
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
     if vpp_if_name_remove:
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
