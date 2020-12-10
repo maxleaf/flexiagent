@@ -445,7 +445,7 @@ class Fwglobals:
         """Handle request.
 
         :param request:      The request received from flexiManage after
-                             transformation by fwutils.fix_aggregated_message_format().
+                             transformation by fwutils.fix_recieved_message().
         :param result:       Place for result.
         :param received_msg: The original message received from flexiManage.
 

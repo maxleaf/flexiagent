@@ -156,9 +156,6 @@ def start_router(params=None):
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
-    netplan_files = fwnetplan.get_netplan_filenames()
-    fwnetplan._set_netplan_filename(netplan_files)
-
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
     # Other interfaces will be not captured by vpp even if they are DOWN.
