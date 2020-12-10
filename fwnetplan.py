@@ -274,13 +274,6 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
             stream.flush()
             os.fsync(stream.fileno())
 
-        # On WAN failover we update metric only and we do it from shell using
-        # 'ip route' commands directly due to limitations in VPPSB, so no need
-        # to run 'netplan apply' and to bother with IP/dev verification.
-        #
-        if wan_failover:
-            return (True, None)
-
         fwutils.netplan_apply('add_remove_netplan_interface')
 
         # Remove pci-to-tap cached value for this pci, as netplan might change
@@ -296,7 +289,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
 
         # make sure IP address is applied in Linux.
         #
-        if is_add and not _has_ip(ifname, dhcp=(dhcp=='yes')):
+        if is_add and not _has_ip(ifname, (dhcp=='yes'), wan_failover):
             raise Exception("ip was not assigned")
 
     except Exception as e:
@@ -333,16 +326,20 @@ def get_dhcp_netplan_interface(if_name):
                             return 'yes'
     return 'no'
 
-def _has_ip(if_name, dhcp=False):
+def _has_ip(if_name, dhcp, wan_failover):
 
-    for i in range(50):
-        if fwutils.get_interface_address(if_name, log=False):
-            return True
-        if i % 30 == 0:   # Every X seconds try whatever might help, e.g. restart networkd
-            cmd = "systemctl restart systemd-networkd"
-            fwglobals.log.debug("fwnetplan: _has_ip: " + cmd)
-            os.system(cmd)
-        time.sleep(1)
+    # On WAN failover the interface might be down, so skip waiting 50 seconds
+    # and unnecessary network restart.
+    #
+    if not wan_failover:
+        for i in range(50):
+            if fwutils.get_interface_address(if_name, log=False):
+                return True
+            if i % 30 == 0:   # Every X seconds try whatever might help, e.g. restart networkd
+                cmd = "systemctl restart systemd-networkd"
+                fwglobals.log.debug("fwnetplan: _has_ip: " + cmd)
+                os.system(cmd)
+            time.sleep(1)
 
     # Try one more time, this time - with log prints. This is to avoid spamming
     # log with 50 identical prints in the waiting cycle above.
