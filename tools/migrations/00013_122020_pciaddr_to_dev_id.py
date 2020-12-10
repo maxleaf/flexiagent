@@ -44,9 +44,60 @@ def _change_interface_identifier():
     """
     with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
         all_interfaces = router_cfg.get_interfaces()
-        a = "a"
 
-        # router_cfg.db['signature'] = 'enforce-sync-device'
+        for intf in all_interfaces:
+            if 'pci' in intf:
+                # remove old request
+                req_key = 'add-interface:%s' % intf['pci']
+                del router_cfg.db[req_key]
+
+                # create a new request
+                intf['dev_id'] = fwutils.dev_id_add_type(intf['pci'])
+                del intf['pci']
+
+                new_request = {
+                    'message':   'add-interface',
+                    'params':    intf,
+                    'internals': {}
+                }
+
+                router_cfg.update(new_request, [], False)
+
+        dhcp_requests = router_cfg.dump(types=['add-dhcp-config'])
+        for request in dhcp_requests:
+            # remove old request
+            req_key = 'add-dhcp-config %s' % request['params']['interface']
+            del router_cfg.db[req_key]
+
+            # create a new request
+            request['params']['interface'] = fwutils.dev_id_add_type(request['params']['interface'])
+            router_cfg.update(request, [], False)
+
+        routes_requests = router_cfg.dump(types=['add-route'])
+        for request in routes_requests:
+            if 'pci' in request['params']:
+                # remove old request
+                key = 'add-route:%s:%s:%s' % (request['params']['addr'], request['params']['via'], request['params']['pci'])
+                del router_cfg.db[key]
+
+                # create a new request
+                request['params']['dev_id'] = fwutils.dev_id_add_type(request['params']['pci'])
+                del request['params']['pci']
+                router_cfg.update(request, [], False)
+
+        tunnels_requests = router_cfg.dump(types=['add-tunnel'])
+        for request in tunnels_requests:
+            # 'add-tunnel:%s' % (params['tunnel-id'])
+            if 'pci' in request['params']:
+                # remove old request
+                key = 'add-tunnel:%s' % request['params']['tunnel-id']
+                del router_cfg.db[key]
+
+                # create a new request
+                request['params']['dev_id'] = fwutils.dev_id_add_type(request['params']['pci'])
+                del request['params']['pci']
+                router_cfg.update(request, [], False)
+
 
 def migrate(prev_version, new_version, upgrade):
     if upgrade != 'upgrade':
