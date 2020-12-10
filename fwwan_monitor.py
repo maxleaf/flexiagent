@@ -335,7 +335,7 @@ class FwWanMonitor:
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.pci, ip, route.via, prev_metric, dhcp, 'WAN',
                         if_name=route.dev, wan_failover=True)
-                return
+                    return
 
         # If defult route was changes as a result of metric update,
         # reconnect agent to flexiManage.
