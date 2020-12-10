@@ -2197,7 +2197,7 @@ def set_lte_info_on_linux_interface():
         dev_id = get_interface_dev_id(nicname)
         if dev_id and is_lte_interface(dev_id):
             ip_info = lte_get_configuration_received_from_provider()
-            if ip_info['STATUS']:
+            if ip_info['STATUS'] and os.path.exists('/tmp/mbim_network'):
                 os.system('ifconfig %s down' % nicname)
                 os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
 
@@ -2327,7 +2327,8 @@ def lte_disconnect():
             cid = start_data[1].split('=')[-1]
             output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-stop-network=%s --client-cid=%s' % (pdh, cid), shell=True, stderr=subprocess.STDOUT)
             os.system('rm %s' % file_path)
-            os.system('sudo ip link set dev wwan0 down && sudo ip addr flush dev wwan0')
+
+        os.system('sudo ip link set dev wwan0 down && sudo ip addr flush dev wwan0')
         return (True, None)
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))
