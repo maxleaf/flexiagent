@@ -70,6 +70,7 @@ def main():
     os.system('systemctl stop flexiwan-router')
     fwutils.stop_vpp()
     fwnetplan.restore_linux_netplan_files()
+    fwutils.lte_disconnect()
     # reset startup.conf file
     if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)

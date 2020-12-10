@@ -506,15 +506,16 @@ def get_interface_dev_id(linuxif):
     """
     # in case of non-pci interface try to get from /sys/class/net
     try:
-        if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
+        if linuxif:
+            if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-        if re.search('usb', if_addr):
-            address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-            return dev_id_add_type(address)
-        elif re.search('pci', if_addr):
-            address = if_addr.split('/net')[0].split('/')[-1]
-            address = dev_id_add_type(address)
-            return dev_id_to_full(address)
+            if re.search('usb', if_addr):
+                address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
+                return dev_id_add_type(address)
+            elif re.search('pci', if_addr):
+                address = if_addr.split('/net')[0].split('/')[-1]
+                address = dev_id_add_type(address)
+                return dev_id_to_full(address)
 
         NETWORK_BASE_CLASS = "02"
         vpp_run = vpp_does_run()
@@ -2325,6 +2326,7 @@ def lte_disconnect():
             pdh = start_data[0].split('=')[-1]
             cid = start_data[1].split('=')[-1]
             output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-stop-network=%s --client-cid=%s' % (pdh, cid), shell=True, stderr=subprocess.STDOUT)
+            os.system('rm %s' % file_path)
         return (True, None)
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))
