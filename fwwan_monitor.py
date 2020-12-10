@@ -165,12 +165,15 @@ class FwWanMonitor:
         os_routes  = {}
         min_metric = sys.maxint
 
+        out = []
         cmd = 'ip route list match default | grep via'
-        try:
-            out = subprocess.check_output(cmd, shell=True).splitlines()
-        except Exception as e:
-            fwglobals.log.warning("%s: no default routes found: %s" % (str(self), str(e)))
-            out = []
+        for _ in range(5):
+            try:
+                out = subprocess.check_output(cmd, shell=True).splitlines()
+                break
+            except Exception as e:
+                fwglobals.log.warning("%s: no default routes found: %s" % (str(self), str(e)))
+                time.sleep(1)
 
         for line in out:
             m = self.route_rule_re.match(line)
