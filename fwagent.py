@@ -1089,7 +1089,7 @@ if __name__ == '__main__':
     command_functions = {
                     'version':lambda args: version(),
                     'reset': lambda args: reset(soft=args.soft),
-                    'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=True if args.dont_stop_vpp is False else False),
+                    'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=(not args.dont_stop_vpp)),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
