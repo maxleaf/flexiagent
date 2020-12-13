@@ -426,7 +426,7 @@ class FWAGENT_API:
 
             return {'message': response, 'ok': 1}
         except Exception as e:
-            raise Exception("_get_lte_interface_status: %s" % str(e))
+            raise Exception("_get_wifi_interface_info: %s" % str(e))
 
     def _lte_perform_operation(self, params):
         try:

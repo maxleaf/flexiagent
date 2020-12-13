@@ -2049,6 +2049,10 @@ def configure_hostapd(dev_id, configuration):
 
         for index, band in enumerate(configuration):
             config = configuration[band]
+
+            if config['enable'] == False:
+                continue
+
             data = {
                 'ssid'                 : config.get('ssid', 'fwrouter_ap'),
                 'interface'            : dev_id_to_linux_if(dev_id),
@@ -2063,7 +2067,9 @@ def configure_hostapd(dev_id, configuration):
                 'logger_syslog'        : -1,
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
-                'logger_stdout_level'  : 2
+                'logger_stdout_level'  : 2,
+                'country_code'         : 'IL',
+                'ieee80211d'           : 1
             }
 
             ap_mode = config.get('operationMode', 'g')
@@ -2071,9 +2077,18 @@ def configure_hostapd(dev_id, configuration):
             if ap_mode == "g":
                 data['hw_mode']       = 'g'
             elif ap_mode == "n":
-                data['hw_mode']       = 'g'
+                if band == '5GHz':
+                    data['hw_mode']       = 'a'
+                else:
+                    data['hw_mode']       = 'g'
+
                 data['ieee80211n']    = 1
                 data['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
+            elif ap_mode == "a":
+                data['hw_mode']       = 'a'
+            elif ap_mode == "ac":
+                data['hw_mode']       = 'a'
+                data['ieee80211ac']   = 1
 
             security_mode = config.get('securityMode', 'wpa2-psk')
 
@@ -2141,6 +2156,7 @@ def wifi_ap_get_clients(interface_name):
         return response
 
     return response
+
 def start_hostapd():
     try:
 
@@ -2155,17 +2171,28 @@ def start_hostapd():
             proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
             time.sleep(3)
 
+            if 'UNINITIALIZED-' in proc:
+                time.sleep(7)
+
             pid = pid_of('hostapd')
             if pid:
                 return (True, None)
 
-        return (False, '')
+        return (False, 'Error in activating your access point. Your hardware may not support the selected settings')
     except subprocess.CalledProcessError as err:
+        stop_hostapd()
         return (False, str(err.output))
 
 def stop_hostapd():
     try:
         os.system('killall hostapd')
+
+        files = glob.glob("%s*fwrun.conf" % fwglobals.g.HOSTAPD_CONFIG_DIRECTORY)
+        for filePath in files:
+            try:
+                os.remove(filePath)
+            except:
+                print("Error while deleting file : ", filePath)
         return (True, None)
     except Exception as e:
         return (False, "Exception: %s" % str(e))
