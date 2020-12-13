@@ -52,6 +52,7 @@
       "Key": "add-tunnel:1", 
       "Params": {
         "dst": "20.0.0.4", 
+        "dev_id": "pci:0000:00:08.00", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -80,7 +81,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "dev_id": "pci:0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 1
       }
@@ -89,6 +89,7 @@
       "Key": "add-tunnel:2", 
       "Params": {
         "dst": "30.0.0.4", 
+        "dev_id": "pci:0000:00:08.00", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -116,7 +117,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "dev_id": "pci:0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 2
       }
@@ -125,6 +125,7 @@
       "Key": "add-tunnel:9", 
       "Params": {
         "dst": "90.0.0.9", 
+        "dev_id": "pci:0000:00:08.00", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -152,7 +153,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "dev_id": "pci:0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 9
       }

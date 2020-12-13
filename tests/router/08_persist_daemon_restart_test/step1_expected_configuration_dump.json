@@ -111,6 +111,7 @@
       "Key": "add-tunnel:7", 
       "Params": {
         "dst": "70.0.0.7", 
+        "dev_id": "pci:0000:00:08.00", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -138,7 +139,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "dev_id": "pci:0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 7
       }
