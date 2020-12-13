@@ -73,7 +73,7 @@
   ], 
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config 0000:00:09.00", 
+      "Key": "add-dhcp-config pci:0000:00:09.00", 
       "Params": {
         "dns": [
           "8.8.8.8"

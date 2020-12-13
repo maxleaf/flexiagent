@@ -88,8 +88,8 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
-        "dst": "30.0.0.4", 
         "dev_id": "pci:0000:00:08.00", 
+        "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
