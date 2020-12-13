@@ -410,14 +410,14 @@ def get_linux_interfaces(cached=True):
         if not dev_id:
             continue
 
-        addr_type, addr = fwutils.dev_id_parse(dev_id)
+        addr_type, addr = dev_id_parse(dev_id)
         if addr_type != 'pci':
             continue
 
         interface = {
             'name':             if_name,
             'devId':            dev_id,
-            'driver':           fwutils.get_interface_driver(nicname),
+            'driver':           get_interface_driver(nicname),
             'MAC':              '',
             'IPv4':             '',
             'IPv4Mask':         '',
