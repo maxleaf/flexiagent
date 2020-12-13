@@ -37,6 +37,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "20.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -66,7 +67,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "dev_id": "pci:0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 1
       }
@@ -74,6 +74,7 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -103,7 +104,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "dev_id": "pci:0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 2
       }
