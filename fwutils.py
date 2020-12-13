@@ -417,7 +417,7 @@ def get_linux_interfaces(cached=True):
         interface = {
             'name':             if_name,
             'devId':            dev_id,
-            'driver':           get_interface_driver(nicname),
+            'driver':           get_interface_driver(if_name),
             'MAC':              '',
             'IPv4':             '',
             'IPv4Mask':         '',
