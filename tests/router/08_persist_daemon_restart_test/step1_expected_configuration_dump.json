@@ -36,8 +36,8 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
-        "dst": "20.0.0.4", 
         "dev_id": "pci:0000:00:08.00", 
+        "dst": "20.0.0.4", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -73,8 +73,8 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
-        "dst": "30.0.0.4", 
         "dev_id": "pci:0000:00:08.00", 
+        "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
@@ -110,8 +110,8 @@
     {
       "Key": "add-tunnel:7", 
       "Params": {
-        "dst": "70.0.0.7", 
         "dev_id": "pci:0000:00:08.00", 
+        "dst": "70.0.0.7", 
         "ipsec": {
           "local-sa": {
             "crypto-alg": "aes-cbc-128", 
