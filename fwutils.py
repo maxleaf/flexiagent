@@ -471,21 +471,43 @@ def get_interface_dev_id(linuxif):
 
     :returns: dev_id.
     """
+    # in case of non-pci interface try to get from /sys/class/net
     try:
-        if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
+        if linuxif:
+            if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-        if re.search('pci', if_addr):
             if re.search('usb', if_addr):
                 address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
                 return dev_id_add_type(address)
-            else:
+            elif re.search('pci', if_addr):
                 address = if_addr.split('/net')[0].split('/')[-1]
                 address = dev_id_add_type(address)
                 return dev_id_to_full(address)
+
+        NETWORK_BASE_CLASS = "02"
+        vpp_run = vpp_does_run()
+        lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+        for line in lines:
+            vals = line.decode().split("\t", 1)
+            if len(vals) == 2:
+                # keep slot number
+                if vals[0] == 'Slot:':
+                    slot = vals[1]
+                if vals[0] == 'Class:':
+                    if vals[1][0:2] == NETWORK_BASE_CLASS:
+                        slot = dev_id_add_type(slot)
+                        interface = dev_id_to_linux_if(slot)
+                        if not interface and vpp_run:
+                            interface = dev_id_to_tap(slot)
+                        if not interface:
+                            continue
+                        if interface == linuxif:
+                            return dev_id_to_full(slot)
     except:
         return ""
 
     return ""
+
 
 def dev_id_to_linux_if(dev_id):
     """Convert device bus address into Linux interface name.
