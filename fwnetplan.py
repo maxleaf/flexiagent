@@ -261,10 +261,17 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
             if set_name in ethernets:
                 del ethernets[set_name]
 
-            ethernets[ifname] = config_section
+            if set_name:
+                ethernets[set_name] = config_section
+            else:
+                ethernets[ifname] = config_section
         else:
-            if ifname in ethernets:
-                del ethernets[ifname]
+            if set_name:
+                if set_name in ethernets:
+                    del ethernets[set_name]
+            else:
+                if ifname in ethernets:
+                    del ethernets[ifname]
             if old_ethernets:
                 if old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]
@@ -287,9 +294,16 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
             ifname = fwutils.dev_id_to_tap(dev_id)
 
         # make sure IP address is applied in Linux.
-        #
+        if is_add and set_name:
+            if set_name != ifname:
+                cmd = 'ip link set %s name %s' % (ifname, set_name)
+                fwglobals.log.debug(cmd)
+                os.system(cmd)
+                fwutils.netplan_apply('add_remove_netplan_interface')
+                ifname = set_name
+
         if is_add and not _has_ip(ifname, (dhcp=='yes'), wan_failover):
-            raise Exception("ip was not assigned")
+          raise Exception("ip was not assigned")
 
     except Exception as e:
         err_str = "add_remove_netplan_interface failed: dev_id: %s, file: %s, error: %s"\
@@ -332,19 +346,10 @@ def _has_ip(if_name, dhcp, wan_failover):
     #
     if not wan_failover:
         for i in range(50):
-            if fwutils.get_interface_address(if_name, log=False):
+            log = (i == 49) # Log only the last trial to avoid log spamming
+            if fwutils.get_interface_address(if_name, log_on_failure=log):
                 return True
-            if i % 30 == 0:   # Every X seconds try whatever might help, e.g. restart networkd
-                cmd = "systemctl restart systemd-networkd"
-                fwglobals.log.debug("fwnetplan: _has_ip: " + cmd)
-                os.system(cmd)
             time.sleep(1)
-
-    # Try one more time, this time - with log prints. This is to avoid spamming
-    # log with 50 identical prints in the waiting cycle above.
-    #
-    if fwutils.get_interface_address(if_name, log=True):
-        return True
 
     # At this point no IP was found on the interface.
     # If IP was not assigned to the interface, we still return OK if:

@@ -283,15 +283,19 @@ def get_all_interfaces():
 
     return dev_id_ip_gw
 
-def get_interface_address(if_name, log=True):
-    """Get interface IP address.
+def get_interface_address(if_name, log=True, log_on_failure=None):
+    """Gets IP address of interface by name found in OS.
 
     :param if_name:     Interface name.
-    :param log:         If True the found address will be logged.
+    :param log:         If True the found/not found address will be logged.
                         Errors or debug info is printed in any case.
+    :param log_on_failure: If provided, overrides the 'log' in case of not found address.
 
     :returns: IP address.
     """
+    if log_on_failure == None:
+        log_on_failure = log
+
     interfaces = psutil.net_if_addrs()
     if if_name not in interfaces:
         fwglobals.log.debug("get_interface_address(%s): interfaces: %s" % (if_name, str(interfaces)))
@@ -306,7 +310,7 @@ def get_interface_address(if_name, log=True):
                 fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addr)))
             return '%s/%s' % (ip, mask)
 
-    if log:
+    if log_on_failure:
         fwglobals.log.debug("get_interface_address(%s): %s" % (if_name, str(addresses)))
     return None
 
@@ -544,6 +548,7 @@ def get_interface_dev_id(linuxif):
         return ""
 
     return ""
+
 
 def dev_id_to_linux_if(dev_id):
     """Convert device bus address into Linux interface name.
@@ -2925,7 +2930,7 @@ def get_reconfig_hash():
             if tap_name:
                 name = tap_name
 
-        addr = get_interface_address(name)
+        addr = get_interface_address(name, log=False)
         addr = addr.split('/')[0] if addr else ''
         gw, metric = get_interface_gateway(name)
 
