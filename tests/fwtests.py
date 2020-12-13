@@ -110,7 +110,7 @@ class TestFwagent:
                                     ],
                                     "======== INTERFACES ========": [
                                         {
-                                        "Key": "add-interface:0000:00:08.00",
+                                        "Key": "add-interface:pci:0000:00:08.00",
                                         "Params": {
                                             "addr": "10.0.0.4/24",
                                             "gateway": "10.0.0.10",

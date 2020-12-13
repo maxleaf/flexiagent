@@ -7,7 +7,7 @@
 		  "entity": "agent",
 		  "message": "add-dhcp-config",
 		  "params": {
-			"interface": "0000:00:09.00",
+			"interface": "pci:0000:00:09.00",
 		    "range_start": "20.20.20.150",
 		    "range_end": "20.20.20.200",
 		    "dns": [
@@ -299,7 +299,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
-            "pci":"0000:00:08.00",
+            "dev_id":"pci:0000:00:08.00",
 			"dst": "20.0.0.4",
 			"tunnel-id": 1,
 			"ipsec": {
@@ -335,7 +335,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
-            "pci":"0000:00:08.00",
+            "dev_id":"pci:0000:00:08.00",
 			"dst": "30.0.0.4",
 			"tunnel-id": 2,
 			"ipsec": {
@@ -371,7 +371,7 @@
 		  "message": "add-tunnel",
 		  "params": {
 			"src": "10.0.0.4",
-            "pci":"0000:00:08.00",
+            "dev_id":"pci:0000:00:08.00",
 			"dst": "70.0.0.7",
 			"tunnel-id": 7,
 			"ipsec": {
@@ -406,7 +406,7 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "pci":"0000:00:03.00",
+			  "dev_id":"pci:0000:00:03.00",
 			  "addr":"1.0.0.4/24",
 			  "gateway": "1.0.0.1",
 			  "type":"wan",
@@ -420,7 +420,7 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "pci":"0000:00:08.00",
+			  "dev_id":"pci:0000:00:08.00",
 			  "addr":"10.0.0.4/24",
 			  "gateway": "10.0.0.10",
 			  "type":"wan",
@@ -434,7 +434,7 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "pci":"0000:00:09.00",
+			  "dev_id":"pci:0000:00:09.00",
 			  "addr":"192.168.56.100/24",
 			  "routing":"ospf",
 			  "type":"lan"
