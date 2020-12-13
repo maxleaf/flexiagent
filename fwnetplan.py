@@ -346,15 +346,10 @@ def _has_ip(if_name, dhcp, wan_failover):
     #
     if not wan_failover:
         for i in range(50):
-            if fwutils.get_interface_address(if_name, log=True):
+            log = (i == 49) # Log only the last trial to avoid log spamming
+            if fwutils.get_interface_address(if_name, log_on_failure=log):
                 return True
             time.sleep(1)
-
-    # Try one more time, this time - with log prints. This is to avoid spamming
-    # log with 50 identical prints in the waiting cycle above.
-    #
-    if fwutils.get_interface_address(if_name, log=True):
-        return True
 
     # At this point no IP was found on the interface.
     # If IP was not assigned to the interface, we still return OK if:
