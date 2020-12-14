@@ -42,7 +42,8 @@ fwagent_api = {
     'get-router-config':        '_get_router_config',
     'upgrade-device-sw':        '_upgrade_device_sw',
     'reset-device':             '_reset_device_soft',
-    'sync-device':              '_sync_device'
+    'sync-device':              '_sync_device',
+    'create-ikev2':             '_create_ikev2'
 }
 
 class FWAGENT_API:
@@ -322,4 +323,13 @@ class FWAGENT_API:
 
         fwglobals.g.router_cfg.reset_signature()
         fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+        return {'ok': 1}
+
+    def _create_ikev2(self, params=None):
+        """IKEv2 certificate generation.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
         return {'ok': 1}
