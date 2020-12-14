@@ -96,7 +96,6 @@ class FWROUTER_API:
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
-        self.lock            = threading.RLock()   # Enable only one concurrent request handling  - either request received by the main connection thread or request injected from other thread, e.g. the FwWanMonitor thread
 
         # Initialize global data that persists device reboot / daemon restart.
         #
@@ -108,8 +107,6 @@ class FWROUTER_API:
         """
         self._stop_threads()  # IMPORTANT! Do that before rest of finalizations!
         self.vpp_api.finalize()
-        del self.lock
-        self.lock = None
 
     def watchdog(self):
         """Watchdog thread.
