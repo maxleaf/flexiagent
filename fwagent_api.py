@@ -368,4 +368,7 @@ class FWAGENT_API:
         os.remove(public_der)
         os.remove(private_der)
 
-        return {'ok': 1}
+        with open(public_pem) as public_pem_file:
+            certificate = public_pem_file.readlines()
+
+        return {'certificate': certificate, 'ok': 1}
