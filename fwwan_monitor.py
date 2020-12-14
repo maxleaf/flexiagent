@@ -362,6 +362,6 @@ def get_wan_failover_metric(pci, metric):
     :param metric:  the original metric configured by user
     '''
     route = fwglobals.g.cache.wan_monitor['enabled_routes'].get(pci)
-    if not route or route.ok or metric > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+    if not route or route.ok or metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
         return metric
     return (metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
