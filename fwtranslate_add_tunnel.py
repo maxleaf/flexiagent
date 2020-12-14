@@ -679,6 +679,8 @@ def add_tunnel(params):
     """
     cmd_list = []
 
+    encryption_mode = params.get("encryption-mode", "static")
+
     loop0_ip  = IPNetwork(params['loopback-iface']['addr'])     # 10.100.0.4 / 10.100.0.5
     loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
 
@@ -692,15 +694,16 @@ def add_tunnel(params):
     remote_loop1_mac        = copy.deepcopy(loop1_mac)
     remote_loop1_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fe:00:04 -> 02:00:27:fe:00:05 / 02:00:27:fe:00:05 -> 02:00:27:fe:00:04
 
-    # Add loop0-bridge-l2gre_ipsec
-    l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
-    _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
+    if encryption_mode == "static":
+        # Add loop0-bridge-l2gre_ipsec
+        l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
+        _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
 
-    # Add loop1-bridge-vxlan
-    vxlan_ips = {'src':params['src'], 'dst':params['dst']}
-    loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
-    remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
-    _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=(params['tunnel-id']*2+1))
+        # Add loop1-bridge-vxlan
+        vxlan_ips = {'src':params['src'], 'dst':params['dst']}
+        loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
+        remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
+        _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=(params['tunnel-id']*2+1))
 
     # --------------------------------------------------------------------------
     # Add following section to frr ospfd.conf
