@@ -824,7 +824,7 @@ class FwagentDaemon(object):
         fwglobals.g.load_configuration_from_file()
 
         # Ensure system compatibility with our soft
-        if check_system and fwglobals.g.router_api.router_started:
+        if check_system and fwglobals.g.router_api.state_is_started():
             check_system = False    # No need to check system if VPP runs, it is too late :)
         if check_system and self._check_system() == False:
             fwglobals.log.excep("FwagentDaemon: system checker failed")
@@ -864,7 +864,7 @@ class FwagentDaemon(object):
                 fwglobals.log.debug("FwagentDaemon: router stopped")
             except Exception as e:
                 fwglobals.log.excep("FwagentDaemon: failed to stop router: " + str(e))
-        elif fwglobals.g.router_api.router_started:
+        elif fwglobals.g.router_api.state_is_started():
             fwglobals.log.debug("FwagentDaemon: vpp alive, use 'fwagent stop' to stop it")
         # Stop main connection loop
         if self.thread_main:
