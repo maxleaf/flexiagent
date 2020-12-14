@@ -129,7 +129,7 @@ class FwWanMonitor:
 
             try: # Ensure thread doesn't exit on exception
 
-                while fwglobals.g.router_api.is_starting_stopping():
+                while fwglobals.g.router_api.state_is_starting_stopping():
                     fwglobals.log.debug("%s: vpp is being started/stopped" % str(self))
                     time.sleep(5)
 
@@ -308,7 +308,7 @@ class FwWanMonitor:
 
         # If vpp runs, go and adjust it configuration to the newer metric.
         #
-        if fwglobals.g.router_api.router_started:
+        if fwglobals.g.router_api.state_is_started():
 
             # Update netplan yaml-s in order to:
             # 1. Ensure that if 'netplan apply' is called due to some reason
