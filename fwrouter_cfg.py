@@ -112,7 +112,7 @@ class FwRouterCfg:
         # in order to fill the configuration database again with most updated
         # configuration.
         #
-        self.reset_signature("empty_router_cfg")
+        self.reset_signature("empty_router_cfg", log=False)
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
@@ -458,7 +458,7 @@ class FwRouterCfg:
             self.reset_signature()
         return self.db['signature']
 
-    def reset_signature(self, new_signature=None):
+    def reset_signature(self, new_signature=None, log=True):
         """Resets configuration signature to the empty sting.
 
         :param new_signature: string to be used as a signature of the configuration.
@@ -468,11 +468,14 @@ class FwRouterCfg:
                         the 'sync-device' request in order to apply the user
                         configuration onto device. On successfull sync the signature
                         is reset to the empty string on both sides.
+        :param log: if False the reset will be not logged.
         """
         old_signature = self.db.get('signature', '<none>')
         new_signature = "" if new_signature == None else new_signature
         self.db['signature'] = new_signature
-        fwglobals.log.debug("fwrouter_cfg: reset signature: '%s' -> '%s'" % (old_signature, new_signature))
+        if log:
+            fwglobals.log.debug("fwrouter_cfg: reset signature: '%s' -> '%s'" % \
+                                (old_signature, new_signature))
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against

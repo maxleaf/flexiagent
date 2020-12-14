@@ -164,15 +164,16 @@ class FWROUTER_API:
                         continue
 
                     name = fwutils.pci_to_tap(wan['pci'])
+                    set_name   = fwglobals.g.NETPLAN_FILES[wan['pci']].get('set-name', '')
+                    if set_name:
+                        name = set_name
                     addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
                         apply_netplan = True
 
                 if apply_netplan:
-                    default_route_changed = fwutils.netplan_apply('dhcpc_thread')
-                    if default_route_changed:
-                        fwglobals.g.fwagent.disconnect()
+                    fwutils.netplan_apply('dhcpc_thread')
                     time.sleep(10)
 
             except Exception as e:
@@ -198,12 +199,12 @@ class FWROUTER_API:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
             self.router_started = vpp_runs
-            fwnetplan.restore_linux_netplan_files()
             if self.router_started:
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
-                netplan_files = fwnetplan.get_netplan_filenames()
-                fwnetplan._set_netplan_filename(netplan_files)
+                fwnetplan.load_netplan_filenames()
+            else:
+                fwnetplan.restore_linux_netplan_files()
             return False
 
         self._restore_vpp()
@@ -251,95 +252,93 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
-        with self.lock:
+        dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
 
-            dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
+        # First of all strip out requests that have no impact on configuration,
+        # like 'remove-X' for not existing configuration items and 'add-X' for
+        # existing configuration items.
+        #
+        new_request = self._strip_noop_request(request)
+        if not new_request:
+            fwglobals.log.debug("FWROUTER_API::call: ignore no-op request: %s" % json.dumps(request))
+            return { 'ok': 1, 'message':'request has no impact' }
+        request = new_request
 
-            # First of all strip out requests that have no impact on configuration,
-            # like 'remove-X' for not existing configuration items and 'add-X' for
-            # existing configuration items.
-            #
-            new_request = self._strip_noop_request(request)
-            if not new_request:
-                fwglobals.log.debug("FWROUTER_API::call: ignore no-op request: %s" % json.dumps(request))
-                return { 'ok': 1, 'message':'request has no impact' }
-            request = new_request
+        # Now find out if:
+        # 1. VPP should be restarted as a result of request execution.
+        #    It should be restarted on addition/removal interfaces in order
+        #    to capture new interface /release old interface back to Linux.
+        # 2. Agent should reconnect proactively to flexiManage.
+        #    It should reconnect on add-/remove-/modify-interface, as they might
+        #    impact on connection under the connection legs. So it might take
+        #    a time for connection to detect the change, to report error and to
+        #    reconnect again by the agent infinite connection loop with random
+        #    sleep between retrials.
+        # 3. Gateway of WAN interfaces are going to be modified.
+        #    In this case we have to ping the GW-s after modification.
+        #    See explanations on that workaround later in this function.
+        #
+        (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
 
-            # Now find out if:
-            # 1. VPP should be restarted as a result of request execution.
-            #    It should be restarted on addition/removal interfaces in order
-            #    to capture new interface /release old interface back to Linux.
-            # 2. Agent should reconnect proactively to flexiManage.
-            #    It should reconnect on add-/remove-/modify-interface, as they might
-            #    impact on connection under the connection legs. So it might take
-            #    a time for connection to detect the change, to report error and to
-            #    reconnect again by the agent infinite connection loop with random
-            #    sleep between retrials.
-            # 3. Gateway of WAN interfaces are going to be modified.
-            #    In this case we have to ping the GW-s after modification.
-            #    See explanations on that workaround later in this function.
-            #
-            (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
+        # Some requests require preprocessing.
+        # For example before handling 'add-application' the currently configured
+        # applications should be removed. The simplest way to do that is just
+        # to simulate 'remove-application' receiving. Hence need in preprocessing.
+        # The preprocessing adds the simulated 'remove-application' request to the
+        # the real received 'add-application' forming thus new aggregation request.
+        #
+        request = self._preprocess_request(request)
 
-            # Some requests require preprocessing.
-            # For example before handling 'add-application' the currently configured
-            # applications should be removed. The simplest way to do that is just
-            # to simulate 'remove-application' receiving. Hence need in preprocessing.
-            # The preprocessing adds the simulated 'remove-application' request to the
-            # the real received 'add-application' forming thus new aggregation request.
-            #
-            request = self._preprocess_request(request)
+        # Stop vpp if it should be restarted.
+        #
+        if restart_router:
+            fwglobals.g.router_api._call_simple({'message':'stop-router'})
 
-            # Stop vpp if it should be restarted.
-            #
-            if restart_router:
-                fwglobals.g.router_api._call_simple({'message':'stop-router'})
+        # Finally handle the request
+        #
+        if request['message'] == 'aggregated':
+            reply = self._call_aggregated(request['params']['requests'], dont_revert_on_failure)
+        else:
+            reply = self._call_simple(request)
 
-            # Finally handle the request
-            #
-            if request['message'] == 'aggregated':
-                reply = self._call_aggregated(request['params']['requests'], dont_revert_on_failure)
-            else:
-                reply = self._call_simple(request)
+        # Start vpp if it should be restarted
+        #
+        if restart_router:
+            fwglobals.g.router_api._call_simple({'message':'start-router'})
 
-            # Start vpp if it should be restarted
-            #
-            if restart_router:
-                fwglobals.g.router_api._call_simple({'message':'start-router'})
-
-            # Reconnect agent if needed
-            #
-            if reconnect_agent:
-                fwglobals.g.fwagent.reconnect()
+        # Reconnect agent if needed
+        #
+        if reconnect_agent:
+            fwglobals.g.fwagent.reconnect()
 
 
-            ########################################################################
-            # Workaround for following problem:
-            # Today 'modify-interface' request is replaced by pair of correspondent
-            # 'remove-interface' and 'add-interface' requests. if 'modify-interface'
-            # request changes IP or GW of WAN interface, the correspondent
-            # 'remove-interface' removes GW from the Linux neighbor table, but the
-            # consequent 'add-interface' does not add it back.
-            # As a result the VPP FIB is stuck with DROP rule for that interface,
-            # and traffic on that interface is dropped.
-            # The workaround below enforces Linux to update the neighbor table with
-            # the latest GW-s. That causes VPPSB to propagate the ARP information
-            # into VPP FIB.
-            # Note we do this even if 'modify-interface' failed, as before failure
-            # it might succeed to remove few interfaces from Linux.
-            ########################################################################
-            if gateways:
-                # Delay 5 seconds to make sure Linux interfaces were initialized
-                time.sleep(5)
-                for gw in gateways:
-                    try:
-                        cmd = 'ping -c 3 %s' % gw
-                        output = subprocess.check_output(cmd, shell=True)
-                        fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, output))
-                    except Exception as e:
-                        fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, str(e)))
+        ########################################################################
+        # Workaround for following problem:
+        # Today 'modify-interface' request is replaced by pair of correspondent
+        # 'remove-interface' and 'add-interface' requests. if 'modify-interface'
+        # request changes IP or GW of WAN interface, the correspondent
+        # 'remove-interface' removes GW from the Linux neighbor table, but the
+        # consequent 'add-interface' does not add it back.
+        # As a result the VPP FIB is stuck with DROP rule for that interface,
+        # and traffic on that interface is dropped.
+        # The workaround below enforces Linux to update the neighbor table with
+        # the latest GW-s. That causes VPPSB to propagate the ARP information
+        # into VPP FIB.
+        # Note we do this even if 'modify-interface' failed, as before failure
+        # it might succeed to remove few interfaces from Linux.
+        ########################################################################
+        if gateways:
+            # Delay 5 seconds to make sure Linux interfaces were initialized
+            time.sleep(5)
+            for gw in gateways:
+                try:
+                    cmd = 'ping -c 3 %s' % gw
+                    output = subprocess.check_output(cmd, shell=True)
+                    fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, output))
+                except Exception as e:
+                    fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, str(e)))
 
-            return reply
+        return reply
 
 
     def _call_aggregated(self, requests, dont_revert_on_failure=False):
@@ -676,21 +675,6 @@ class FWROUTER_API:
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
-                    # Preserve watermark that FwWanMonitor might put on metric in
-                    # router_cfg, flexiManage is not aware of it.
-                    # Note the 'modify-interface' might be injected by FwWanMonitor.
-                    # In that case we should not preserve the watermark.
-                    #
-                    if re.match('modify-interface', req) and \
-                       params.get('internals', {}).get('sender') == None:
-                        existing_params = fwglobals.g.router_cfg.get_request_params(__request)
-                        old_metric = existing_params.get('metric')
-                        new_metric = params.get('metric')
-                        if old_metric and new_metric and \
-                        int(old_metric) > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-                            params['metric'] = str(int(new_metric) + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
-
-
                     fwglobals.g.router_cfg.update(__request)
                     return True
             return False
@@ -836,18 +820,6 @@ class FWROUTER_API:
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
             new_params.update(_params.items())
-
-            # Preserve watermark that FwWanMonitor might put on metric in
-            # router_cfg, flexiManage is not aware of it.
-            # Note the 'modify-interface' might be injected by FwWanMonitor.
-            # In that case we should not preserve the watermark.
-            #
-            if _params.get('internals', {}).get('sender') == None:
-                old_metric = old_params.get('metric')
-                new_metric = new_params.get('metric')
-                if old_metric and new_metric and \
-                int(old_metric) > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
-                    new_params['metric'] = str(int(new_metric) + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
 
             # Don't store internal 'sender' to avoid unnecessary sync-s
             #
@@ -1158,6 +1130,9 @@ class FWROUTER_API:
         fwglobals.g.db['router_api'] = router_api_db
 
         fwutils.vmxnet3_unassigned_interfaces_up()
+
+        fwnetplan.load_netplan_filenames()
+
 
     def _on_start_router_after(self):
         """Handles post start VPP activities.

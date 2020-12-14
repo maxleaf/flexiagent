@@ -24,28 +24,34 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 import traceback
 
 import fwglobals
+import fwnetplan
 import fwutils
 
 class FwWanRoute:
     """The object that represents routing rule found in OS.
     In addition it keeps statistics about internet connectivity on this route.
     """
-    def __init__(self, prefix, via, dev, metric=0):
+    def __init__(self, prefix, via, dev, proto=None, metric=0):
         self.prefix     = prefix
         self.via        = via
         self.dev        = dev
+        self.proto      = proto
         self.metric     = metric
         self.pci,_      = fwutils.get_interface_pci(dev)
-        self.key        = prefix + '---' + self.pci
-        self.probes     = []      # List of ping results
+        self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
+        self.ok         = True      # If True there is connectivity to internet
+        self.default    = False     # If True the route is the default one - has lowest metric
 
     def __str__(self):
         route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.pci)
+        if self.proto:
+            route += (' proto ' + str(self.proto))
         if self.metric:
             route += (' metric ' + str(self.metric))
         return route
@@ -85,13 +91,6 @@ class FwWanMonitor:
         self.routes          = fwglobals.g.cache.wan_monitor['enabled_routes']
         self.disabled_routes = fwglobals.g.cache.wan_monitor['disabled_routes']
         self.route_rule_re   = re.compile(r"(\w+) via ([0-9.]+) dev (\w+)(.*)") #  'default via 20.20.20.22 dev enp0s9 proto dhcp metric 100'
-
-        # On initialization due to either device reboot or daemon restart
-        # if vpp does not run, apply metrics found in router configuration.
-        # This is to reduce period of 'no connection to flexiManage'.
-        #
-        if not fwglobals.g.router_api.router_started:
-            self._restore_metrics()
 
         self.active           = True
         self.thread_main_loop = threading.Thread(target=self.main_loop, name=str(self))
@@ -163,14 +162,18 @@ class FwWanMonitor:
     def _get_routes(self):
         '''Fetches routes from Linux and parses them into FwWanRoute objects.
         '''
-        os_routes = {}
+        os_routes  = {}
+        min_metric = sys.maxint
 
+        out = []
         cmd = 'ip route list match default | grep via'
-        try:
-            out = subprocess.check_output(cmd, shell=True).splitlines()
-        except Exception as e:
-            fwglobals.log.warning("%s: no default routes found: %s" % (str(self), str(e)))
-            out = []
+        for _ in range(5):
+            try:
+                out = subprocess.check_output(cmd, shell=True).splitlines()
+                break
+            except Exception as e:
+                fwglobals.log.warning("%s: no default routes found: %s" % (str(self), str(e)))
+                time.sleep(1)
 
         for line in out:
             m = self.route_rule_re.match(line)
@@ -179,8 +182,14 @@ class FwWanMonitor:
                 continue
 
             route = FwWanRoute(prefix=m.group(1), via=m.group(2), dev=m.group(3))
+            if m.group(4) and 'proto ' in m.group(4):
+                route.proto = m.group(4).split('proto ')[1].split(' ')[0]
             if m.group(4) and 'metric ' in m.group(4):
                 route.metric = int(m.group(4).split('metric ')[1].split(' ')[0])
+
+            if (route.metric % self.WATERMARK) < min_metric:
+                route.default = True
+                min_metric    = (route.metric % self.WATERMARK)
 
             # Filter out routes on interfaces where flexiManage disabled monitoring.
             # Note the 'monitorInternet' flag might not exist (in case of device
@@ -188,31 +197,34 @@ class FwWanMonitor:
             #
             interfaces = fwglobals.g.router_cfg.get_interfaces(pci=route.pci)
             if interfaces and (interfaces[0].get('monitorInternet', True) == False):
-                if not route.key in self.disabled_routes:
+                if not route.pci in self.disabled_routes:
                     fwglobals.log.debug("%s: disabled on %s(%s)" % (str(self), route.dev, route.pci))
-                    self.disabled_routes[route.key] = route
+                    self.disabled_routes[route.pci] = route
                 continue
-            # If monitoring was enables again, log this.
-            if interfaces and route.key in self.disabled_routes:
+            # If monitoring was enabled again, log this.
+            if interfaces and route.pci in self.disabled_routes:
                 fwglobals.log.debug("%s: enabled on %s(%s)" % (str(self), route.dev, route.pci))
-                del self.disabled_routes[route.key]
+                del self.disabled_routes[route.pci]
 
             # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
             #
             if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
-                if not route.key in self.disabled_routes:
+                if not route.pci in self.disabled_routes:
                     fwglobals.log.debug("%s: disabled on unassigned %s(%s)" % (str(self), route.dev, route.pci))
-                    self.disabled_routes[route.key] = route
+                    self.disabled_routes[route.pci] = route
                 continue
             # If interface was assigned again, log this.
-            if not interfaces and route.key in self.disabled_routes:
+            if not interfaces and route.pci in self.disabled_routes:
                 fwglobals.log.debug("%s: enabled on unassigned %s(%s)" % (str(self), route.dev, route.pci))
-                del self.disabled_routes[route.key]
+                del self.disabled_routes[route.pci]
 
             # if this route is known to us, update statistics from cache
             #
-            if route.key in self.routes:
-                route.probes = self.routes[route.key].probes
+            if route.pci in self.routes:
+                cached = self.routes[route.pci]
+                route.probes    = cached.probes
+                route.ok        = cached.ok
+                route.default   = cached.default
             else:
                 # Suppress RPF permanently to avoid Linux to filter out
                 # responses for ping-s on not default route interfaces.
@@ -221,12 +233,12 @@ class FwWanMonitor:
 
             # Finally store the route into cache.
             #
-            self.routes[route.key] = route
+            self.routes[route.pci] = route
 
             # Record keys of routes fetched from OS.
             # We will use them a bit later to remove stale routes from cache.
             #
-            os_routes[route.key] = None
+            os_routes[route.pci] = None
 
         # Remove stale routes from cache
         #
@@ -244,13 +256,9 @@ class FwWanMonitor:
         ok = not subprocess.call(cmd, shell=True)
 
         route.probes.append(ok)
-        if len(route.probes) > self.WND_SIZE:
-            del route.probes[0]
+        del route.probes[0]             # Keep WINDOWS SIZE
 
-        if len(route.probes) < self.WND_SIZE:
-            return ok
-
-        # At this point we reached WINDOW SIZE, update WAN connectivity.
+        # At this point we reached WINDOW SIZE, so update WAN connectivity.
         # We use hysteresis to track connectivity state:
         # if connected (metric < watermark), THRESHOLD failures is needed to deduce "no connectivity";
         # if not connected (metric >= watermark), THRESHOLD successes is needed to deduce "connectivity is back"
@@ -280,101 +288,80 @@ class FwWanMonitor:
         fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d" % \
             (str(self), str(route), route.metric, new_metric))
 
-        # Go and update Linux.
-        # Do this before update in router configuration database, as the last
-        # calls netplan apply that might cause  duplicated routes.
+        # Firsly update the route status, so if get_wan_failover_metric() is called
+        # from the other thread it will reflect the actual status.
         #
-        try:
-            cmd = "ip route show exact %s dev %s" % (route.prefix, route.dev)
-            os_route = subprocess.check_output(cmd, shell=True).strip()
-            if not os_route:
-                raise Exception("'%s' returned nothing" % cmd)
-            cmd = "ip route del " + os_route
-            ok = not subprocess.call(cmd, shell=True)
-            if not ok:
-                raise Exception("'%s' failed" % cmd)
-            if 'metric ' in os_route:  # Replace metric in os route string
-                os_route = re.sub('metric [0-9]+', 'metric %d' % new_metric, os_route)
-            else:
-                os_route += ' metric %d' % new_metric
-            cmd = "ip route add " + os_route
-            ok = not subprocess.call(cmd, shell=True)
-            if not ok:
-                raise Exception("'%s' failed" % cmd)
-        except Exception as e:
-            fwglobals.log.error("%s: failed to update metric: %s" % (str(self), str(e)))
+        prev_ok     = route.ok
+        prev_metric = route.metric
+        route.ok = True if new_metric < self.WATERMARK else False
+
+        # Go and update Linux.
+        # Note we do that directly by 'ip route del' & 'ip route add' commands
+        # and not relay on 'netplan apply', as in last case VPPSB does not handle
+        # properly kernel NETLINK messsages and does not update VPP FIB.
+        #
+        success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, new_metric)
+        if not success:
+            route.ok = prev_ok
+            fwglobals.log.error("%s: failed to update metric in OS: %s" % (str(self), err_str))
             return
 
-        # Now  update router configuration database, so the new metric will
-        # persist device reboot. To do that we inject 'modify-device' request
-        # with the new metric, as it would be received from flexiManage.
-        # Note actually we do not store new metric, but just add or remove
-        # watermark to the metric kept in database. So if meanwhile user updated
-        # interface metric on flexiManage, it will be not overrode by us.
+        # If vpp runs, go and adjust it configuration to the newer metric.
         #
-        try:
-            interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan', pci=route.pci)
-            if interfaces:
-                if_metric_str = interfaces[0].get('metric')
-                if_metric     = int(if_metric_str) if if_metric_str else 0
-                if if_metric >= self.WATERMARK and new_metric < self.WATERMARK:
-                    if_metric -= self.WATERMARK
-                elif if_metric < self.WATERMARK and new_metric >= self.WATERMARK:
-                    if_metric += self.WATERMARK
-                else:
-                    # If router configuration DB was already watermarked/un-watermarked
-                    # escape the update. Note that might happen on agent initialization,
-                    # when OS routes are updated according watermarksin DB.
-                    # Or on unexpected flow ;)
-                    raise UnboundLocalError(
-                            "monitor is out of sync (new metric: %d, stored metric: %d)" % \
-                            (new_metric, if_metric))
+        if fwglobals.g.router_api.router_started:
 
-                if if_metric != new_metric:
-                    fwglobals.log.debug("%s: user updated metric meanwhile, keep it: %d" % (str(self), if_metric))
+            # Update netplan yaml-s in order to:
+            # 1. Ensure that if 'netplan apply' is called due to some reason
+            #    like received 'modify-interface' for other interface the new
+            #    metric will be not overrode.
+            # 2. Keep interface rule in routing table in sync with metric in default route:
+            #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
+            #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
+            #
+            ip   = fwutils.get_interface_address(route.dev, log=False)
+            dhcp = 'yes' if route.proto == 'dhcp' else 'no'
+            (success, err_str) = fwnetplan.add_remove_netplan_interface(\
+                                    True, route.pci, ip, route.via, new_metric, dhcp, 'WAN',
+                                    if_name=route.dev, wan_failover=True)
+            if not success:
+                route.ok = prev_ok
+                fwglobals.log.error("%s: failed to update metric in netplan: %s" % (str(self), err_str))
+                fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
+                return
 
-                request = {
-                    'message': 'modify-interface',
-                    'params': {
-                        'pci':       route.pci,
-                        'metric':    unicode(str(if_metric)),   # DB keeps strings in 'unicode' as this is what json.loads() uses
-                        'internals': { 'sender': str(self) }
-                    }
-                }
-                ret = fwglobals.g.router_api.call(request)
-                if ret.get('ok', 1) == 0:
-                    raise Exception(ret.get('message', 'failed to inject modify-interface'))
+            # Update VPP NAT with the new default route interface.
+            #
+            if route.default:
+                success = fwutils.vpp_nat_add_remove_interface(False, route.pci, new_metric)
+                if not success:
+                    route.ok = prev_ok
+                    fwglobals.log.error("%s: failed to update metric in VPP NAT" % (str(self)))
+                    fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
+                    fwnetplan.add_remove_netplan_interface(\
+                        True, route.pci, ip, route.via, prev_metric, dhcp, 'WAN',
+                        if_name=route.dev, wan_failover=True)
+                    return
 
-        except UnboundLocalError as e:
-            fwglobals.log.debug("%s: skip router configuration update: %s" % (str(self), str(e)))
-            pass
-        except Exception as e:
-            fwglobals.log.error("%s: failed to update router configuration: %s" % (str(self), str(e)))
-            # Don't return here, as metrics were updated already in Linux and we do not rollback them for now
-
-        # Ensure that connection to flexiManage was revived after metric update.
-        # Note if vpp runs, the reconnection will be made during execution of
-        # the injected 'modify-interface', so there is no need to reconnect here.
+        # If defult route was changes as a result of metric update,
+        # reconnect agent to flexiManage.
         #
-        if not fwglobals.g.router_api.router_started:
+        if route.default:
             fwglobals.g.fwagent.reconnect()
 
         fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d - done" % \
             (str(self), str(route), route.metric, new_metric))
 
 
-    def _restore_metrics(self):
-        '''On FwWanMonitor/agent initialization updates Linux with 'bad' routes,
-        based on the watermarked metrics found in router configuration database.
-        This is needed to reduce failover time on agent start, when vpp does not run.
-        '''
-        routes     = self._get_routes()
-        interfaces = fwglobals.g.router_cfg.get_interfaces(type='wan')
-        for interface in interfaces:
-            metric_in_db = interface.get('metric')
-            metric_in_db = 0 if not metric_in_db else int(metric_in_db)
-            if metric_in_db >= self.WATERMARK:
-                for r in routes:
-                    if r.pci == interface['pci']:
-                        fwglobals.log.debug("%s: restore DOWN state of '%s'" % (str(self), str(r)))
-                        r.probes = [ False ] * self.WND_SIZE
+def get_wan_failover_metric(pci, metric):
+    '''Fetches the metric of the default route on the device with specified PCI.
+    The metric might be the real one configured by user on flexiManage
+    if internet is reachable via this device, or it can be the watermarked metric
+    (the configured by user + WATERMARK) if internet is not reachable.
+
+    :param pci:     PCI of the device, default route of which is required for metric
+    :param metric:  the original metric configured by user
+    '''
+    route = fwglobals.g.cache.wan_monitor['enabled_routes'].get(pci)
+    if not route or route.ok or metric > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+        return metric
+    return (metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)

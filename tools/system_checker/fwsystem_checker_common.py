@@ -457,7 +457,7 @@ class Checker:
         if metric is None:
             return True
 
-        files = fwnetplan.get_netplan_filenames()
+        files = fwnetplan.load_netplan_filenames(get_only=True)
         metric = 100
         for fname, devices in files.items():
             os.system('cp %s %s.fworig' % (fname, fname))
