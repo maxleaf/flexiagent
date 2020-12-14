@@ -43,7 +43,8 @@ fwagent_api = {
     'upgrade-device-sw':        '_upgrade_device_sw',
     'reset-device':             '_reset_device_soft',
     'sync-device':              '_sync_device',
-    'create-ikev2':             '_create_ikev2'
+    'create-ikev2':             '_create_ikev2',
+    'update-ikev2':             '_update_ikev2'
 }
 
 class FWAGENT_API:
@@ -335,8 +336,8 @@ class FWAGENT_API:
         machine_id = fwutils.get_machine_id()
         public_der = fwglobals.g.IKEV2_FOLDER + "public-cert.der"
         private_der = fwglobals.g.IKEV2_FOLDER + "private-key.der"
-        public_pem = fwglobals.g.IKEV2_FOLDER + "certificate_" + machine_id + ".pem"
-        private_pem = fwglobals.g.IKEV2_FOLDER + "key_" + machine_id + ".pem"
+        public_pem = fwglobals.g.IKEV2_FOLDER + "local_certificate_" + machine_id + ".pem"
+        private_pem = fwglobals.g.IKEV2_FOLDER + "local_key_" + machine_id + ".pem"
 
         if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
             os.makedirs(fwglobals.g.IKEV2_FOLDER)
@@ -372,3 +373,23 @@ class FWAGENT_API:
             certificate = public_pem_file.readlines()
 
         return {'certificate': certificate, 'ok': 1}
+
+    def _update_ikev2(self, params=None):
+        """IKEv2 remote certificate update.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
+        remote_device_id = params["device-id"]
+        certificate = params["certificate"]
+        public_pem = fwglobals.g.IKEV2_FOLDER + "remote_certificate_" + remote_device_id + ".pem"
+
+        if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
+            os.makedirs(fwglobals.g.IKEV2_FOLDER)
+
+        with open(public_pem, 'w') as public_pem_file:
+            for line in certificate:
+                public_pem_file.write(line)
+
+        return {'ok': 1}
