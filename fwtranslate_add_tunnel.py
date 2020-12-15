@@ -561,6 +561,25 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
+def _add_ikev2_tunnel(cmd_list, name):
+    """Add IKEv2 tunnel command into the list.
+
+    :param cmd_list:            List of commands.
+    :param name:                Profile name.
+
+    :returns: None.
+    """
+    # ikev2.api.json: ikev2_profile_add_del (...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_add_del"
+    cmd['cmd']['params']    = { 'name':name , 'is_add':1 }
+    cmd['cmd']['descr']     = "create IKEv2 profile %s" % name
+    cmd['revert'] = {}
+    cmd['revert']['name']   = 'ikev2_profile_add_del'
+    cmd['revert']['params'] = { 'name':name , 'is_add':0 }
+    cmd['revert']['descr']  = "delete IKEv2 profile %s" % name
+    cmd_list.append(cmd)
 
 def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id):
     """Add GRE tunnel, loopback and bridge commands into the list.
@@ -630,6 +649,9 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 bvi=1,
                 shg=0,
                 cache_key='loop0_sw_if_index')
+
+    _add_ikev2_tunnel(
+                      cmd_list, 'profile_' + str(bridge_id))
 
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
     """Add VxLAN tunnel, loopback and bridge commands into the list.
