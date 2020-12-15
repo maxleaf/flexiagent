@@ -119,6 +119,7 @@ request_handlers = {
     'delete_loopback':              {'name': '_call_vpp_api'},
     'gre_tunnel_add_del':           {'name': '_call_vpp_api'},
     'ikev2_profile_add_del':        {'name': '_call_vpp_api'},
+    'ikev2_profile_set_auth':       {'name': '_call_vpp_api'},
     'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
     'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
@@ -229,6 +230,8 @@ class Fwglobals:
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
+        self.IKEV2_CERTIFICATE   = ''
+        self.IKEV2_KEY           = ''
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'

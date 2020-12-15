@@ -581,6 +581,15 @@ def _add_ikev2_tunnel(cmd_list, name):
     cmd['revert']['descr']  = "delete IKEv2 profile %s" % name
     cmd_list.append(cmd)
 
+    # ikev2.api.json: ikev2_profile_set_auth (..., auth_method: IKEV2_AUTH_METHOD_RSA_SIG)
+    data = fwglobals.g.IKEV2_CERTIFICATE
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_auth"
+    cmd['cmd']['params']    = { 'name':name , 'auth_method':1, 'data': data, 'data_len': len(data)}
+    cmd['cmd']['descr']     = "set IKEv2 auth method, profile %s" % name
+    cmd_list.append(cmd)
+
 def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id):
     """Add GRE tunnel, loopback and bridge commands into the list.
 

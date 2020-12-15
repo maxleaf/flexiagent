@@ -337,7 +337,9 @@ class FWAGENT_API:
         public_der = fwglobals.g.IKEV2_FOLDER + "public-cert.der"
         private_der = fwglobals.g.IKEV2_FOLDER + "private-key.der"
         public_pem = fwglobals.g.IKEV2_FOLDER + "local_certificate_" + machine_id + ".pem"
+        fwglobals.g.IKEV2_CERTIFICATE = public_pem
         private_pem = fwglobals.g.IKEV2_FOLDER + "local_key_" + machine_id + ".pem"
+        fwglobals.g.IKEV2_KEY = private_pem
 
         if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
             os.makedirs(fwglobals.g.IKEV2_FOLDER)
