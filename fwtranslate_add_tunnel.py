@@ -583,11 +583,21 @@ def _add_ikev2_tunnel(cmd_list, name):
 
     # ikev2.api.json: ikev2_profile_set_auth (..., auth_method: IKEV2_AUTH_METHOD_RSA_SIG)
     data = fwglobals.g.IKEV2_CERTIFICATE
+    auth_method = 1 # IKEV2_AUTH_METHOD_RSA_SIG
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_auth"
-    cmd['cmd']['params']    = { 'name':name , 'auth_method':1, 'data': data, 'data_len': len(data)}
+    cmd['cmd']['params']    = { 'name':name, 'auth_method': auth_method, 'data': data, 'data_len': len(data)}
     cmd['cmd']['descr']     = "set IKEv2 auth method, profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_set_local_key (...)
+    key_file = fwglobals.g.IKEV2_KEY
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_set_local_key"
+    cmd['cmd']['params']    = { 'key_file': str(key_file)}
+    cmd['cmd']['descr']     = "set IKEv2 local key, profile %s" % name
     cmd_list.append(cmd)
 
 def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id):
