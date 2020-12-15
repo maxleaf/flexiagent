@@ -239,7 +239,7 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
-        if fwglobals.g.router_api.router_started:
+        if fwglobals.g.router_api.state_is_started():
             fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_router_config()
         return {'ok': 1}
@@ -304,7 +304,7 @@ class FWAGENT_API:
         #
         fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
         restart_router = False
-        if fwglobals.g.router_api.router_started:
+        if fwglobals.g.router_api.state_is_started():
             restart_router = True
             fwglobals.g.router_api.call({'message': 'stop-router'})
 

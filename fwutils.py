@@ -209,11 +209,19 @@ def get_default_route():
     (pci, _) = get_interface_pci(dev)
     return (via, dev, pci)
 
-def get_interface_gateway(if_name):
+def get_interface_gateway(if_name, if_pci=None):
     """Get gateway.
+
+    :param if_name:  name of the interface, gateway for which is returned
+    :param if_pci:   PCI of the interface, gateway for which is returned.
+                     If provided, the 'if_name' is ignored. The name is fetched
+                     from system by PCI.
 
     :returns: Gateway ip address.
     """
+    if if_pci:
+        if_name = pci_to_tap(if_pci)
+
     try:
         cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
         route = os.popen(cmd).read()
@@ -225,6 +233,12 @@ def get_interface_gateway(if_name):
     rip    = route.split('via ')[1].split(' ')[0]
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
+
+
+def get_binary_interface_gateway_by_pci(pci):
+    gw_ip, _ = get_interface_gateway('', if_pci=pci)
+    return ip_str_to_bytes(gw_ip)[0]
+
 
 def get_all_interfaces():
     """ Get all interfaces from linux. For PCI with address family of AF_INET,
@@ -1348,24 +1362,6 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
-def get_interface_sw_if_index(ip):
-    """Convert interface src IP address into gateway VPP sw_if_index.
-
-    :param ip: IP address.
-
-    :returns: sw_if_index.
-    """
-    pci, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    if not pci:
-        # If interface was configured with dhcp, router_cfg has no IP-s.
-        # In this case try to fetch GW from Linux.
-        if_name = get_interface_name(ip)
-        if if_name:
-            pci, _ = get_interface_pci(if_name)
-    if not pci:
-        return None
-    return pci_to_vpp_sw_if_index(pci)
-
 def get_interface_vpp_names(type=None):
     res = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
@@ -1385,24 +1381,7 @@ def get_tunnel_interface_vpp_names():
         res.append(if_vpp_name)
     return res
 
-def get_interface_gateway_from_router_db(ip):
-    """Convert interface src IP address into gateway IP address.
-
-    :param ip: IP address.
-
-    :returns: IP address.
-    """
-    _, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    if not gw_ip:
-        # If interface was configured with dhcp, router_cfg has no IP-s.
-        # In this case try to fetch GW from Linux.
-        if_name = get_interface_name(ip)
-        if if_name:
-            gw_ip, _ = get_interface_gateway(if_name)
-    if not gw_ip:
-        return None
     return ipaddress.ip_address(gw_ip)
-
 def add_static_route(addr, via, metric, remove, pci=None):
     """Add static route.
 

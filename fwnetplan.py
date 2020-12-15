@@ -287,7 +287,7 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
         # interface name (see 'set-name' netplan option).
         # As well re-initialize the interface name by pci.
         #
-        if fwglobals.g.router_api.router_started:
+        if fwglobals.g.router_api.state_is_started():
             cache = fwglobals.g.cache.pci_to_vpp_tap_name
             pci_full = fwutils.pci_to_full(pci)
             if pci_full in cache:
