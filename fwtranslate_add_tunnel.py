@@ -606,6 +606,31 @@ def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 shg=1,
                 cache_key='gre_tunnel_sw_if_index')
 
+def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id):
+    """Add IKEv2 tunnel, loopback and bridge commands into the list.
+
+    :param cmd_list:            List of commands.
+    :param params:              Parameters from flexiManage.
+    :param l2gre_tunnel_ips:    GRE tunnel src and dst ip addresses.
+    :param bridge_id:           Bridge identifier.
+
+    :returns: None.
+    """
+    _add_loopback(
+                cmd_list,
+                'loop0_sw_if_index',
+                params['loopback-iface'],
+                id=bridge_id)
+    _add_bridge(
+                cmd_list, bridge_id)
+    _add_interface_to_bridge(
+                cmd_list,
+                iface_description='loop0_' + params['loopback-iface']['addr'],
+                bridge_id=bridge_id,
+                bvi=1,
+                shg=0,
+                cache_key='loop0_sw_if_index')
+
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
     """Add VxLAN tunnel, loopback and bridge commands into the list.
 
@@ -694,16 +719,20 @@ def add_tunnel(params):
     remote_loop1_mac        = copy.deepcopy(loop1_mac)
     remote_loop1_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fe:00:04 -> 02:00:27:fe:00:05 / 02:00:27:fe:00:05 -> 02:00:27:fe:00:04
 
+    # Add loop1-bridge-vxlan
+    vxlan_ips = {'src':params['src'], 'dst':params['dst']}
+    loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
+    remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
+    _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=(params['tunnel-id']*2+1))
+
     if encryption_mode == "static":
-        # Add loop0-bridge-l2gre_ipsec
+        # Add loop0-bridge-l2gre-ipsec
         l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
         _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
-
-        # Add loop1-bridge-vxlan
-        vxlan_ips = {'src':params['src'], 'dst':params['dst']}
-        loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
-        remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
-        _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=(params['tunnel-id']*2+1))
+    elif encryption_mode == "ikev2":
+        # Add loop0-bridge-l2gre-ikev2
+        l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
+        _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
 
     # --------------------------------------------------------------------------
     # Add following section to frr ospfd.conf
@@ -780,25 +809,26 @@ def add_tunnel(params):
         cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "preprocess tunnel add"
-    cmd['cmd']['params']  = {
-                    'module': 'fwutils',
-                    'func'  : 'tunnel_change_postprocess',
-                    'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
-    }
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "preprocess tunnel remove"
-    cmd['revert']['params'] = {
-                    'module': 'fwutils',
-                    'func'  : 'tunnel_change_postprocess',
-                    'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
-    }
-    cmd_list.append(cmd)
-
+    ''' TBD
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "preprocess tunnel add"
+        cmd['cmd']['params']  = {
+                        'module': 'fwutils',
+                        'func'  : 'tunnel_change_postprocess',
+                        'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "preprocess tunnel remove"
+        cmd['revert']['params'] = {
+                        'module': 'fwutils',
+                        'func'  : 'tunnel_change_postprocess',
+                        'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
+        }
+        cmd_list.append(cmd)
+    '''
     return cmd_list
 
 def get_request_key(params):
