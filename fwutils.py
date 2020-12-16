@@ -1236,7 +1236,7 @@ def modify_dhcpd(is_add, params):
 
     return True
 
-def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_index=None):
+def vpp_multilink_update_labels(labels, remove, next_hop=None, pci=None, sw_if_index=None, result_cache=None):
     """Updates VPP with flexiwan multilink labels.
     These labels are used for Multi-Link feature: user can mark interfaces
     or tunnels with labels and than add policy to choose interface/tunnel by
@@ -1246,11 +1246,13 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     configure lables. Remove it, when correspondent Python API will be added.
     In last case the API should be called directly from translation.
 
-    :param params: labels      - python list of labels
-                   is_dia      - type of labels (DIA - Direct Internet Access)
-                   remove      - True to remove labels, False to add.
-                   dev         - PCI if device to apply labels to.
-                   next_hop_ip - IP address of next hop.
+    :param labels:      python list of labels
+    :param is_dia:      type of labels (DIA - Direct Internet Access)
+    :param remove:      True to remove labels, False to add.
+    :param pci:         PCI if device to apply labels to.
+    :param next_hop:    IP address of next hop.
+    :param result_cache: cache, key and variable, that this function should store in the cache:
+                            {'result_attr': 'next_hop', 'cache': <dict>, 'key': <key>}
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1258,12 +1260,12 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels, remove)
     ids = ','.join(map(str, ids_list))
 
-    if dev:
-        vpp_if_name = pci_to_vpp_if_name(dev)
+    if pci:
+        vpp_if_name = pci_to_vpp_if_name(pci)
     elif sw_if_index:
         vpp_if_name = vpp_sw_if_index_to_name(sw_if_index)
     else:
-        return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
+        return (False, "Neither 'pci' nor 'sw_if_index' was found in params")
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1278,6 +1280,12 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    # Store 'next_hope' in cache if provided by caller.
+    #
+    if result_cache and result_cache['result_attr'] == 'next_hop':
+        key = result_cache['key']
+        result_cache['cache'][key] = next_hop
 
     return (True, None)
 
@@ -1505,7 +1513,7 @@ def tunnel_change_postprocess(add, addr):
 # between device and server. Once the protocol is fixed, there will be no more
 # need in this proprietary format.
 #
-# 2. Nov-2020 - the 'add-/modify-interface' message migh include both 'dhcp': 'yes'
+# 2. Nov-2020 - the 'add-/modify-interface' message might include both 'dhcp': 'yes'
 # and 'ip' and 'gw' fields. These IP and GW are not used by the agent, but
 # change in their values causes unnecessary removal and adding back interface
 # and, as a result of this,  restart of network daemon and reconnection to
@@ -1513,7 +1521,7 @@ def tunnel_change_postprocess(add, addr):
 # 'gw' fields if 'dhcp' is 'yes'. Than if the fixed message includes no other
 # modified parameters, it will be ignored by the agent.
 #
-def fix_recieved_message(msg):
+def fix_received_message(msg):
 
     def _fix_aggregation_format(msg):
         requests = []

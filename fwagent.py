@@ -554,7 +554,7 @@ class FwAgent:
         self.received_request = True
         self.handling_request = True
 
-        msg = fwutils.fix_recieved_message(received_msg)
+        msg = fwutils.fix_received_message(received_msg)
 
         print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
         print_message = False if msg['message'] == 'add-application' else print_message
