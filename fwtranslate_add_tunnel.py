@@ -588,7 +588,7 @@ def _add_ikev2_tunnel(cmd_list, name, remote_device_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_auth"
-    cmd['cmd']['params']    = { 'name':name, 'auth_method': auth_method, 'data': data, 'data_len': len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'auth_method':auth_method, 'data':data, 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 auth method, profile %s" % name
     cmd_list.append(cmd)
 
@@ -597,7 +597,7 @@ def _add_ikev2_tunnel(cmd_list, name, remote_device_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_local_key"
-    cmd['cmd']['params']    = { 'key_file': str(key_file) }
+    cmd['cmd']['params']    = { 'key_file':str(key_file) }
     cmd['cmd']['descr']     = "set IKEv2 local key, profile %s" % name
     cmd_list.append(cmd)
 
@@ -607,7 +607,7 @@ def _add_ikev2_tunnel(cmd_list, name, remote_device_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type': id_type, 'data': data, 'data_len': len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type':id_type, 'data': data, 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
     cmd_list.append(cmd)
 
@@ -617,8 +617,36 @@ def _add_ikev2_tunnel(cmd_list, name, remote_device_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'id_type': id_type, 'data': data, 'data_len': len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'id_type':id_type, 'data':data, 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':1)
+    data = fwutils.get_machine_id()
+    proto = 0
+    start_port = 0
+    end_port = 65535
+    start_addr = IPAddress('0.0.0.0').value
+    end_addr = IPAddress('255.255.255.255').value
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_ts"
+    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'proto':proto, 'start_port':start_port, 'end_port':end_port, 'start_addr':start_addr, 'end_addr':end_addr }
+    cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':0)
+    data = fwutils.get_machine_id()
+    proto = 0
+    start_port = 0
+    end_port = 65535
+    start_addr = IPAddress('0.0.0.0').value
+    end_addr = IPAddress('255.255.255.255').value
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_ts"
+    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'proto':proto, 'start_port':start_port, 'end_port':end_port, 'start_addr':start_addr, 'end_addr':end_addr }
+    cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
     cmd_list.append(cmd)
 
 def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id):
