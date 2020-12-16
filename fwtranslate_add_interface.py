@@ -155,7 +155,7 @@ def add_interface(params):
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
-    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
+    if 'multilink' in params and 'labels' in params['multilink']:
         labels = params['multilink']['labels']
         if len(labels) > 0:
             cmd = {}
