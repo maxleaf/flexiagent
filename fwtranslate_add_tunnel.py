@@ -561,11 +561,12 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
-def _add_ikev2_tunnel(cmd_list, name):
+def _add_ikev2_tunnel(cmd_list, name, remote_device_id):
     """Add IKEv2 tunnel command into the list.
 
     :param cmd_list:            List of commands.
     :param name:                Profile name.
+    :param remote_device_id:    Remote device id.
 
     :returns: None.
     """
@@ -600,13 +601,23 @@ def _add_ikev2_tunnel(cmd_list, name):
     cmd['cmd']['descr']     = "set IKEv2 local key, profile %s" % name
     cmd_list.append(cmd)
 
-    # ikev2.api.json: ikev2_profile_set_id (...)
+    # ikev2.api.json: ikev2_profile_set_id (..., 'is_local':1)
     data = fwutils.get_machine_id()
     id_type = 2 # IKEV2_ID_TYPE_ID_FQDN
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
     cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type': id_type, 'data': data, 'data_len': len(data) }
+    cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_profile_set_id (..., 'is_local':0)
+    data = remote_device_id
+    id_type = 2 # IKEV2_ID_TYPE_ID_FQDN
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_id"
+    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'id_type': id_type, 'data': data, 'data_len': len(data) }
     cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
     cmd_list.append(cmd)
 
@@ -680,7 +691,7 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 cache_key='loop0_sw_if_index')
 
     _add_ikev2_tunnel(
-                      cmd_list, 'profile_' + str(bridge_id))
+                      cmd_list, 'profile_' + str(bridge_id), params['ikev2']['remote-device-id'])
 
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
     """Add VxLAN tunnel, loopback and bridge commands into the list.
