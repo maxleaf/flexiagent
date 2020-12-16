@@ -658,7 +658,6 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime):
 
     :returns: None.
     """
-
     # ikev2.api.json: ikev2_set_ike_transforms (...)
     crypto_alg = 12 # IKEV2_TRANSFORM_ENCR_TYPE_AES_CBC
     integ_alg = 2 # IKEV2_TRANSFORM_INTEG_TYPE_AUTH_HMAC_SHA1_96
@@ -667,7 +666,18 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime):
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_ike_transforms"
     cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':256, 'integ_alg':integ_alg, 'dh_group':dh_group }
-    cmd['cmd']['descr']     = "set IKEv2 transforms profile %s" % name
+    cmd['cmd']['descr']     = "set IKEv2 crypto algorithms, profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_set_esp_transforms (...)
+    crypto_alg = 12 # IKEV2_TRANSFORM_ENCR_TYPE_AES_CBC
+    integ_alg = 2 # IKEV2_TRANSFORM_INTEG_TYPE_AUTH_HMAC_SHA1_96
+    dh_group =  19 # IKEV2_TRANSFORM_DH_TYPE_ECP_256
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_set_esp_transforms"
+    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':256, 'integ_alg':integ_alg, 'dh_group':dh_group }
+    cmd['cmd']['descr']     = "set IKEv2 ESP crypto algorithms, profile %s" % name
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_set_sa_lifetime (...)
