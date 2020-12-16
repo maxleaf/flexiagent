@@ -1081,8 +1081,10 @@ class FWROUTER_API:
         # - the original request does not have 'remove-multilink-policy'
         #
         if multilink_policy_params:
-            # Firstly find the right place to insert the 'remove-multilink-policy'.
+            # Firstly find the right place to insert the 'remove-multilink-policy' - idx.
             # It should be the first appearance of one of the preprocessing requests.
+            # As well find the right place to insert the 'add-multilink-policy' - idx_last.
+            # It should be the last appearance of one of the preprocessing requests.
             #
             idx = 10000
             idx_last = -1
@@ -1090,7 +1092,8 @@ class FWROUTER_API:
                 if indexes[req_name] > -1:
                     if indexes[req_name] < idx:
                         idx = indexes[req_name]
-                    idx_last = indexes[req_name]
+                    if indexes[req_name] > idx_last:
+                        idx_last = indexes[req_name]
             if idx == 10000:
                 # No requests to preprocess were found, return
                 return request
@@ -1111,6 +1114,7 @@ class FWROUTER_API:
                 del requests[idx_policy]
             if indexes['remove-multilink-policy'] == -1:
                 _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
+                idx_last += 1
             if indexes['add-multilink-policy'] == -1 and reinstall_multilink_policy:
                 _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
 
