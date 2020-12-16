@@ -48,7 +48,8 @@
     },
     "ikev2": {
       "role": "initiator",
-      "remote-device-id": "DF3B2590-4134-411B-B826-EA38B1A30A48"
+      "remote-device-id": "DF3B2590-4134-411B-B826-EA38B1A30A48",
+      "lifetime": 3600
     }
   }
 },

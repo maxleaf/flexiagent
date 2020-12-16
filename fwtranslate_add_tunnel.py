@@ -649,14 +649,23 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
     cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
     cmd_list.append(cmd)
 
-def _add_ikev2_initiator_profile(cmd_list, name):
+def _add_ikev2_initiator_profile(cmd_list, name, lifetime):
     """Add IKEv2 initiator profile commands into the list.
 
     :param cmd_list:            List of commands.
     :param name:                Profile name.
+    :param lifetime:            Connection life time.
 
     :returns: None.
     """
+    # ikev2.api.json: ikev2_set_sa_lifetime (...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_set_sa_lifetime"
+    cmd['cmd']['params']    = { 'name':name, 'lifetime':lifetime, 'lifetime_jitter':10, 'handover':5, 'lifetime_maxdata':0 }
+    cmd['cmd']['descr']     = "set IKEv2 connection lifetime, profile %s" % name
+    cmd_list.append(cmd)
+
     # ikev2.api.json: ikev2_initiate_sa_init (...)
     cmd = {}
     cmd['cmd'] = {}
@@ -740,7 +749,7 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
 
     if params['ikev2']['role'] == 'initiator':
         _add_ikev2_initiator_profile(
-                        cmd_list, ikev2_profile_name)
+                        cmd_list, ikev2_profile_name, params['ikev2']['lifetime'])
 
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
     """Add VxLAN tunnel, loopback and bridge commands into the list.

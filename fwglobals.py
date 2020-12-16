@@ -124,6 +124,7 @@ request_handlers = {
     'ikev2_profile_set_id':         {'name': '_call_vpp_api'},
     'ikev2_profile_set_ts':         {'name': '_call_vpp_api'},
     'ikev2_initiate_sa_init':       {'name': '_call_vpp_api'},
+    'ikev2_set_sa_lifetime':        {'name': '_call_vpp_api'},
     'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
     'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
