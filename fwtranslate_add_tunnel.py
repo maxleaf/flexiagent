@@ -587,7 +587,7 @@ def _add_ikev2_tunnel(cmd_list, name):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_auth"
-    cmd['cmd']['params']    = { 'name':name, 'auth_method': auth_method, 'data': data, 'data_len': len(data)}
+    cmd['cmd']['params']    = { 'name':name, 'auth_method': auth_method, 'data': data, 'data_len': len(data) }
     cmd['cmd']['descr']     = "set IKEv2 auth method, profile %s" % name
     cmd_list.append(cmd)
 
@@ -596,8 +596,18 @@ def _add_ikev2_tunnel(cmd_list, name):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_local_key"
-    cmd['cmd']['params']    = { 'key_file': str(key_file)}
+    cmd['cmd']['params']    = { 'key_file': str(key_file) }
     cmd['cmd']['descr']     = "set IKEv2 local key, profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_profile_set_id (...)
+    data = fwutils.get_machine_id()
+    id_type = 2 # IKEV2_ID_TYPE_ID_FQDN
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_id"
+    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type': id_type, 'data': data, 'data_len': len(data) }
+    cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
     cmd_list.append(cmd)
 
 def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id):
