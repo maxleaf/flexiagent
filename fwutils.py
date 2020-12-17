@@ -737,7 +737,10 @@ def vpp_ip_to_sw_if_index(ip):
     for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
         tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
         if tap:
-            int_address = IPNetwork(get_interface_address(tap))
+            int_address_str = get_interface_address(tap)
+            if not int_address_str:
+                continue
+            int_address = IPNetwork(int_address_str)
             if network == int_address:
                 return sw_if.sw_if_index
 
