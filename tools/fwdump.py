@@ -65,6 +65,12 @@ g_dumpers = {
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; ' +
                                                    'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
                                                    'ps -elf | grep vpp >> <dumper_out_file>' },
+    'linux_resolvconf':             { 'shell_cmd': 'mkdir -p <temp_folder>/linux_resolvconf/ && ' +
+                                                   'cp /etc/resolv.conf <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
+                                                   'cp /etc/resolvconf/resolv.conf.d/base   <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
+                                                   'cp /etc/resolvconf/resolv.conf.d/head   <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
+                                                   'cp /etc/resolvconf/resolv.conf.d/tail   <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_routes':                 { 'shell_cmd': 'ip route > <dumper_out_file>' },
     'linux_sys_class_net':          { 'shell_cmd': 'ls -l /sys/class/net/ > <dumper_out_file>' },
     'linux_syslog':                 { 'shell_cmd': 'cp /var/log/syslog <temp_folder>/linux_syslog.log 2>/dev/null ;' +
