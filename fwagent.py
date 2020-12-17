@@ -629,6 +629,9 @@ def version():
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
+def dump(filename, path, clean_log):
+    fwutils.dump(filename=filename, path=path, clean_log=clean_log)
+
 def reset(soft=False):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
@@ -1093,6 +1096,7 @@ if __name__ == '__main__':
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
+                    'dump': lambda args: dump(filename=args.filename, path=args.path, clean_log=args.clean_log),
                     'show': lambda args: show(
                         agent_info=args.agent,
                         router_info=args.router,
@@ -1150,6 +1154,13 @@ if __name__ == '__main__':
                         # If arguments include spaces escape them with slash, e.g. "--api inject_requests my\ request.json"
                         # or surround argument with single quotes, e.g. "--api inject_requests 'my request.json'"
                         # Note we don't use circle brackets, e.g. "--api inject_requests(request.json)" to avoid bash confuse
+    parser_dump = subparsers.add_parser('dump', help='Dump various system info into x.tar.gz file')
+    parser_dump.add_argument('-f', '--file', dest='filename', default=None,
+                        help="The name of the result archive file. Can be full path. The default is 'fwdump_<hostname>_<YYYYMMDD>_<HHMMSS>.tar.gz")
+    parser_dump.add_argument('-p', '--path', dest='path', default=None,
+                        help="The path to the final name. The default is %s" % fwglobals.g.DUMP_FOLDER)
+    parser_dump.add_argument('-c', '--clean_log', action='store_true',
+                        help="Clean agent log")
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 

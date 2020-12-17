@@ -187,12 +187,17 @@ class FwDump:
                     print(self.prompt + 'warning: dumper %s failed' % (dumper))
                     continue
 
-    def zip(self, filename=None, delete_temp_folder=True):
+    def zip(self, filename=None, path=None, delete_temp_folder=True):
         if not filename:
             filename = 'fwdump_%s_%s.tar.gz' % (self.hostname, self.now)
+        if path:
+            filename = os.path.join(path, filename)
         self.zip_file = filename
+
         cmd = 'tar -zcf %s -C %s .' % (self.zip_file, self.temp_folder)
         try:
+            if path and not os.path.exists(path):
+                os.system('mkdir -p %s > /dev/null 2>&1' % path)
             subprocess.check_call(cmd, shell=True)
         except Exception as e:
             print(self.prompt + 'ERROR: "%s" failed: %s' % (cmd, str(e)))
@@ -239,7 +244,7 @@ def main(args):
             dump.dump_all()
 
         if args.dont_zip == False:
-            dump.zip(filename=args.zip_file)
+            dump.zip(filename=args.zip_file, path=args.dest_folder)
             print(dump.prompt + 'done: %s' % dump.zip_file)
         else:
             print(dump.prompt + 'done: %s' % dump.temp_folder)
@@ -253,15 +258,17 @@ if __name__ == '__main__':
         sys.exit(1)
 
     parser = argparse.ArgumentParser(description='FlexiEdge dump utility')
-    parser.add_argument('--feature', choices=['multilink'], default=None,
-                        help="dump info related to this feature only")
-    parser.add_argument('--zip_file', default=None,
-                        help="filename to be used for the final archive, can be full/relative. If not specified, default name will be used and printed on exit.")
+    parser.add_argument('--dest_folder', default=None,
+                        help="folder where to put the resulted zip. If not specified, the current dir is used.")
     parser.add_argument('--dont_zip', action='store_true',
                         help="don't archive dumped data into single file. Path to folder with dumps will be printed on exit.")
-    parser.add_argument('--temp_folder', default=None,
-                        help="folder where to keep not zipped dumped info")
+    parser.add_argument('--feature', choices=['multilink'], default=None,
+                        help="dump info related to this feature only")
     parser.add_argument('-q', '--quiet', action='store_true',
                         help="silent mode, overrides existing temporary folder if was provided with --temp_folder")
+    parser.add_argument('--temp_folder', default=None,
+                        help="folder where to keep not zipped dumped info")
+    parser.add_argument('--zip_file', default=None,
+                        help="filename to be used for the final archive, can be full/relative. If not specified, default name will be used and printed on exit.")
     args = parser.parse_args()
     main(args)

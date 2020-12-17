@@ -253,6 +253,7 @@ class Fwglobals:
         self.WAN_FAILOVER_WND_SIZE         = 20         # 20 pings, every ping waits a second for response
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
+        self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
 
 
         # Load configuration from file

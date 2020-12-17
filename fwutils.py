@@ -1957,3 +1957,32 @@ def vpp_nat_add_remove_interface(remove, pci, metric):
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
+
+def dump(filename=None, path=None, clean_log=False):
+    '''This function invokes 'fwdump' utility while ensuring no DoS on disk space.
+
+    :param filename:  the name of the final file where to dump will be tar.gz-ed
+    :param clean_log: if True, /var/log/flexiwan/agent.log will be cleaned
+    '''
+    try:
+        cmd = 'fwdump'
+        if filename:
+            cmd += ' --zip_file ' + filename
+        if not path:
+            path = fwglobals.g.DUMP_FOLDER
+        cmd += ' --dest_folder ' + path
+
+        # Ensure no more than last 5 dumps are saved to avoid disk out of space
+        #
+        files = glob.glob("%s/*.tar.gz" % path)
+        if len(files) > 5:
+            files.sort()
+            os.remove(files[0])
+
+        subprocess.check_call(cmd + ' > /dev/null 2>&1', shell=True)
+
+        if clean_log:
+            os.system("echo '' > %s" % fwglobals.g.ROUTER_LOG_FILE)
+
+    except Exception as e:
+        fwglobals.log.error("failed to dump: %s" % (str(e)))
