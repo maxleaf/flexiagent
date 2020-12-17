@@ -283,17 +283,6 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # Remove pci-to-tap cached value for this pci, as netplan might change
-        # interface name (see 'set-name' netplan option).
-        # As well re-initialize the interface name by pci.
-        #
-        if fwglobals.g.router_api.state_is_started():
-            cache = fwglobals.g.cache.pci_to_vpp_tap_name
-            pci_full = fwutils.pci_to_full(pci)
-            if pci_full in cache:
-                del cache[pci_full]
-            ifname = fwutils.pci_to_tap(pci)
-
         # make sure IP address is applied in Linux.
         if is_add and set_name:
             if set_name != ifname:
@@ -302,6 +291,17 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
                 os.system(cmd)
                 fwutils.netplan_apply('add_remove_netplan_interface')
                 ifname = set_name
+
+        # Remove pci-to-tap cached value for this pci, as netplan might change
+        # interface name (see 'set-name' netplan option).
+        # As well re-initialize the interface name by pci.
+        #
+        cache = fwglobals.g.cache.pci_to_vpp_tap_name
+        pci_full = fwutils.pci_to_full(pci)
+        if pci_full in cache:
+            del cache[pci_full]
+        ifname = fwutils.pci_to_tap(pci)
+        fwglobals.log.debug("Interface name in cache is %s, pci %s" % (ifname, pci_full))
 
         if not wan_failover: # Failover might be easily caused by interface down so no need to validate IP
             if is_add and not _has_ip(ifname, (dhcp=='yes')):
