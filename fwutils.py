@@ -479,7 +479,7 @@ def get_linux_interfaces(cached=True):
         if is_lte_interface(dev_id):
             interface['deviceType'] = 'lte'
             interface['dhcp'] = 'yes'
-            interface['deviceParams'] = {'apn' : lte_get_default_apn() }
+            interface['deviceParams'] = {'apn' : lte_get_default_apn(dev_id) }
             tap = dev_id_to_tap(dev_id) if vpp_does_run() else None
             if tap:
                 # addrs = linux_inf[tap]
@@ -2026,7 +2026,7 @@ def lte_get_saved_apn():
 
 def lte_dev_id_to_iface_addr_bytes(dev_id):
     if is_lte_interface(dev_id):
-        info = lte_get_configuration_received_from_provider()
+        info = lte_get_configuration_received_from_provider(dev_id)
         return ip_str_to_bytes(info['IP'])[0]
 
     return None
@@ -2201,8 +2201,8 @@ def set_lte_info_on_linux_interface():
     for nicname, addrs in interfacaes.items():
         dev_id = get_interface_dev_id(nicname)
         if dev_id and is_lte_interface(dev_id):
-            ip_info = lte_get_configuration_received_from_provider()
-            if ip_info['STATUS'] and os.path.exists('/tmp/mbim_network'):
+            ip_info = lte_get_configuration_received_from_provider(dev_id)
+            if ip_info['STATUS'] and os.path.exists('/tmp/mbim_network_%s' % nicname):
                 os.system('ifconfig %s down' % nicname)
                 os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
 
@@ -2215,26 +2215,35 @@ def set_lte_info_on_linux_interface():
 
     return None
 
-def _run_qmicli_command(flag):
+def dev_id_to_mbim_device(dev_id):
     try:
-        output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --device-open-mbim --%s' % flag, shell=True, stderr=subprocess.STDOUT)
+        usb_addr = dev_id.split('/')[-1]
+        output = subprocess.check_output('ls /sys/bus/usb/drivers/cdc_mbim/%s/usbmisc/' % usb_addr, shell=True).strip()
         return output
     except subprocess.CalledProcessError as err:
         return None
 
-def qmi_get_simcard_status():
-    return _run_qmicli_command('uim-get-card-status')
+def _run_qmicli_command(dev_id, flag):
+    try:
+        device = dev_id_to_mbim_device(dev_id) if dev_id else 'cdc-wdm0'
+        output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --device-open-mbim --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
 
-def qmi_get_signals_state():
-    return _run_qmicli_command('nas-get-signal-strength')
+def qmi_get_simcard_status(dev_id):
+    return _run_qmicli_command(dev_id, 'uim-get-card-status')
 
-def qmi_get_connection_state():
+def qmi_get_signals_state(dev_id):
+    return _run_qmicli_command(dev_id, 'nas-get-signal-strength')
+
+def qmi_get_connection_state(dev_id):
     '''
     The function will return the connection status.
     This is not about existsin session to the modem. But connectivity between modem to the cellular provider
     '''
     try:
-        output = _run_qmicli_command('wds-get-packet-service-status')
+        output = _run_qmicli_command(dev_id, 'wds-get-packet-service-status')
         if output:
             data = output.splitlines()
             for line in data:
@@ -2244,63 +2253,49 @@ def qmi_get_connection_state():
     except subprocess.CalledProcessError as err:
         return False
 
-def qmi_get_ip_configuration():
+def qmi_get_ip_configuration(dev_id):
     '''
     The function will return the connection status.
     This is not about existsin session to the modem. But connectivity between modem to the cellular provider
     '''
-    return _run_qmicli_command('wds-get-current-settings')
+    return _run_qmicli_command(dev_id, 'wds-get-current-settings')
 
-def qmi_get_operator_name():
-    return _run_qmicli_command('nas-get-operator-name')
+def qmi_get_operator_name(dev_id):
+    return _run_qmicli_command(dev_id, 'nas-get-operator-name')
 
-def qmi_get_home_network():
-    return _run_qmicli_command('nas-get-home-network')
+def qmi_get_home_network(dev_id):
+    return _run_qmicli_command(dev_id, 'nas-get-home-network')
 
-def qmi_get_system_info():
-    return _run_qmicli_command('nas-get-system-info')
+def qmi_get_system_info(dev_id):
+    return _run_qmicli_command(dev_id, 'nas-get-system-info')
 
-def qmi_get_packet_service_state():
+def qmi_get_packet_service_state(dev_id):
     '''
     The function will return the connection status.
     This is not about existsin session to the modem. But connectivity between modem to the cellular provider
     '''
-    return _run_qmicli_command('wds-get-channel-rates')
+    return _run_qmicli_command(dev_id, 'wds-get-channel-rates')
 
-def qmi_get_manufacturer():
-    return _run_qmicli_command('dms-get-manufacturer')
+def qmi_get_manufacturer(dev_id):
+    return _run_qmicli_command(dev_id, 'dms-get-manufacturer')
 
-def qmi_get_model():
-    return _run_qmicli_command('dms-get-model')
+def qmi_get_model(dev_id):
+    return _run_qmicli_command(dev_id, 'dms-get-model')
 
-def qmi_get_imei():
-    return _run_qmicli_command('dms-get-ids')
+def qmi_get_imei(dev_id):
+    return _run_qmicli_command(dev_id, 'dms-get-ids')
 
-def qmi_get_default_settings():
-    return _run_qmicli_command('wds-get-default-settings=3gpp')
+def qmi_get_default_settings(dev_id):
+    return _run_qmicli_command(dev_id, 'wds-get-default-settings=3gpp')
 
-def qmi_sim_power_off():
-    return _run_qmicli_command('uim-sim-power-off=1')
+def qmi_sim_power_off(dev_id):
+    return _run_qmicli_command(dev_id, 'uim-sim-power-off=1')
 
-def qmi_sim_power_on():
-    return _run_qmicli_command('uim-sim-power-on=1')
+def qmi_sim_power_on(dev_id):
+    return _run_qmicli_command(dev_id, 'uim-sim-power-on=1')
 
-def qmi_reset_nas():
-    try:
-        output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-mbim --nas-reset', shell=True, stderr=subprocess.STDOUT)
-        return True
-    except subprocess.CalledProcessError as e:
-        return None
-
-def qmi_reset_wds():
-    try:
-        output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-mbim --wds-reset', shell=True, stderr=subprocess.STDOUT)
-        return True
-    except subprocess.CalledProcessError as e:
-        return None
-
-def lte_get_default_apn():
-    default_settings = qmi_get_default_settings()
+def lte_get_default_apn(dev_id):
+    default_settings = qmi_get_default_settings(dev_id)
     if default_settings:
         data = default_settings.splitlines()
         for line in data:
@@ -2309,8 +2304,8 @@ def lte_get_default_apn():
 
     return None
 
-def lte_sim_status():
-    status = qmi_get_simcard_status()
+def lte_sim_status(dev_id):
+    status = qmi_get_simcard_status(dev_id)
     if status:
         data = status.splitlines()
         for line in data:
@@ -2320,59 +2315,65 @@ def lte_sim_status():
 
     return False
 
-def lte_is_sim_inserted():
-    return lte_sim_status() == "present"
+def lte_is_sim_inserted(dev_id):
+    return lte_sim_status(dev_id) == "present"
 
-def lte_disconnect():
+def lte_disconnect(dev_id=None):
     try:
-        file_path = '/tmp/mbim_network'
-        if os.path.exists(file_path):
+        files = glob.glob("/tmp/mbim_network*")
+        for file_path in files:
             start_data = subprocess.check_output('cat %s' % file_path, shell=True).splitlines()
             pdh = start_data[0].split('=')[-1]
             cid = start_data[1].split('=')[-1]
-            output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-stop-network=%s --client-cid=%s' % (pdh, cid), shell=True, stderr=subprocess.STDOUT)
+
+            if_name = file_path.split('_')[-1]
+            inf_dev_id = get_interface_dev_id(if_name)
+
+            if dev_id and dev_id != inf_dev_id:
+                continue
+
+            output = _run_qmicli_command(inf_dev_id, 'wds-stop-network=%s --client-cid=%s' % (pdh, cid))
             os.system('rm %s' % file_path)
 
-        os.system('sudo ip link set dev wwan0 down && sudo ip addr flush dev wwan0')
+            os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
         return (True, None)
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))
 
 def lte_connect(apn, dev_id, reset=False):
 
-    if not lte_is_sim_inserted():
-        qmi_sim_power_off()
-        qmi_sim_power_on()
-        inserted = lte_is_sim_inserted()
+    if not lte_is_sim_inserted(dev_id):
+        qmi_sim_power_off(dev_id)
+        qmi_sim_power_on(dev_id)
+        inserted = lte_is_sim_inserted(dev_id)
         if not inserted:
             return (False, "Sim is not presented")
 
 
     if not apn:
         # try to fetch it from the sim
-        default_apn = lte_get_default_apn()
+        default_apn = lte_get_default_apn(dev_id)
         if default_apn:
             apn = sys_info['Operator_Name']
         else:
             return (False, "apn is not configured for %s" % dev_id)
 
     try:
-        if reset:
-            qmi_reset_wds()
-
-        current_connection_state = qmi_get_connection_state()
+        current_connection_state = qmi_get_connection_state(dev_id)
         if current_connection_state:
             return (True, None)
 
-        output = subprocess.check_output('qmicli --device=/dev/cdc-wdm0 --device-open-proxy --wds-start-network="ip-type=4,apn=%s" --client-no-release-cid' % apn, shell=True, stderr=subprocess.STDOUT)
+        output = _run_qmicli_command(dev_id, 'wds-start-network="ip-type=4,apn=%s" --client-no-release-cid' % apn)
         data = output.splitlines()
+
+        inf_name = dev_id_to_linux_if(dev_id)
 
         for line in data:
             if 'Packet data handle' in line:
-                ret = os.system('echo "PDH=%s" > /tmp/mbim_network' % line.split(':')[-1].strip().replace("'", ''))
+                ret = os.system('echo "PDH=%s" > /tmp/mbim_network_%s' % (line.split(':')[-1].strip().replace("'", ''), inf_name))
                 continue
             if 'CID' in line:
-                ret = os.system('echo "CID=%s" >> /tmp/mbim_network' % line.split(':')[-1].strip().replace("'", ''))
+                ret = os.system('echo "CID=%s" >> /tmp/mbim_network_%s' % (line.split(':')[-1].strip().replace("'", ''), inf_name))
                 break
 
         return (True, None)
@@ -2382,7 +2383,7 @@ def lte_connect(apn, dev_id, reset=False):
 
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
-def lte_get_system_info():
+def lte_get_system_info(dev_id):
     try:
         result = {
             'Cell_Id'        : '',
@@ -2391,7 +2392,7 @@ def lte_get_system_info():
             'MNC'            : ''
         }
 
-        system_info = qmi_get_system_info()
+        system_info = qmi_get_system_info(dev_id)
         if system_info:
             data = system_info.splitlines()
             for line in data:
@@ -2399,7 +2400,7 @@ def lte_get_system_info():
                     result['Cell_Id'] = line.split(':')[-1].strip().replace("'", '')
                     break
 
-        operator_name = qmi_get_operator_name()
+        operator_name = qmi_get_operator_name(dev_id)
         if operator_name:
             data = operator_name.splitlines()
             for line in data:
@@ -2423,7 +2424,7 @@ def lte_get_system_info():
     except Exception as e:
          return result
 
-def lte_get_hardware_info():
+def lte_get_hardware_info(dev_id):
     try:
         result = {
             'Vendor'   : '',
@@ -2431,7 +2432,7 @@ def lte_get_hardware_info():
             'Imei': '',
         }
 
-        manufacturer = qmi_get_manufacturer()
+        manufacturer = qmi_get_manufacturer(dev_id)
         if manufacturer:
             data = manufacturer.splitlines()
             for line in data:
@@ -2439,7 +2440,7 @@ def lte_get_hardware_info():
                     result['Vendor'] = line.split(':')[-1].strip().replace("'", '')
                     break
 
-        model = qmi_get_model()
+        model = qmi_get_model(dev_id)
         if model:
             data = model.splitlines()
             for line in data:
@@ -2447,7 +2448,7 @@ def lte_get_hardware_info():
                     result['Model'] = line.split(':')[-1].strip().replace("'", '')
                     break
 
-        imei = qmi_get_imei()
+        imei = qmi_get_imei(dev_id)
         if imei:
             data = imei.splitlines()
             for line in data:
@@ -2460,14 +2461,14 @@ def lte_get_hardware_info():
     except Exception as e:
         return result
 
-def lte_get_packets_state():
+def lte_get_packets_state(dev_id):
     try:
         result = {
             'Uplink_speed'  : 0,
             'Downlink_speed': 0
         }
 
-        modem_info = qmi_get_packet_service_state()
+        modem_info = qmi_get_packet_service_state(dev_id)
         if modem_info:
             data = modem_info.splitlines()
             for line in data:
@@ -2481,14 +2482,14 @@ def lte_get_packets_state():
     except Exception as e:
         return result
 
-def lte_get_connection_state():
+def lte_get_connection_state(dev_id):
     try:
         result = {
             'Activation_state' : 0,
             'IP_type'  : 0,
         }
 
-        modem_info = qmi_get_connection_state()
+        modem_info = qmi_get_connection_state(dev_id)
         if modem_info:
             data = modem_info.splitlines()
             for line in data:
@@ -2502,7 +2503,7 @@ def lte_get_connection_state():
     except Exception as e:
         return result
 
-def lte_get_radio_signals_state():
+def lte_get_radio_signals_state(dev_id):
     try:
         result = {
             'RSSI' : 0,
@@ -2511,7 +2512,7 @@ def lte_get_radio_signals_state():
             'SINR' : 0,
             'text' : ''
         }
-        modem_info = qmi_get_signals_state()
+        modem_info = qmi_get_signals_state(dev_id)
         if modem_info:
             data = modem_info.splitlines()
             for index, line in enumerate(data):
@@ -2544,7 +2545,7 @@ def lte_get_radio_signals_state():
     except Exception as e:
         return result
 
-def lte_get_configuration_received_from_provider():
+def lte_get_configuration_received_from_provider(dev_id):
     try:
         response = {
             'IP'      : '',
@@ -2552,7 +2553,7 @@ def lte_get_configuration_received_from_provider():
             'STATUS'  : ''
         }
 
-        ip_info = qmi_get_ip_configuration()
+        ip_info = qmi_get_ip_configuration(dev_id)
 
         if ip_info:
             response['STATUS'] = True
@@ -2572,14 +2573,14 @@ def lte_get_configuration_received_from_provider():
     except Exception as e:
         return response
 
-def lte_get_provider_config(key):
+def lte_get_provider_config(dev_id, key):
     """Get IP from LTE provider
 
     :param ket: Filter info by key
 
     :returns: ip address.
     """
-    info = lte_get_configuration_received_from_provider()
+    info = lte_get_configuration_received_from_provider(dev_id)
 
     if key:
         return info[key]

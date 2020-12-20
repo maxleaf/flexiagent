@@ -406,7 +406,9 @@ class FWAGENT_API:
                 return (False, 'Please unassigned this interface in order to stop the Access Point')
 
             is_success, error = fwutils.stop_hostapd()
-            os.system('ifconfig wlan0 0')
+
+            inf_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+            os.system('ifconfig %s 0' % inf_name)
 
             return is_success, error
         except Exception as e:
@@ -455,7 +457,7 @@ class FWAGENT_API:
             if fwutils.vpp_does_run() and is_assigned:
                 return (False, 'Please unassigned this interface in order to disconnect LTE ')
 
-            is_success, error = fwutils.lte_disconnect()
+            is_success, error = fwutils.lte_disconnect(params['dev_id'])
 
             return is_success, error
         except Exception as e:
@@ -478,12 +480,12 @@ class FWAGENT_API:
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
-            sim_status = fwutils.lte_sim_status()
-            signals = fwutils.lte_get_radio_signals_state()
-            hardware_info = fwutils.lte_get_hardware_info()
-            connection_state = fwutils.lte_get_connection_state()
-            packet_service_state = fwutils.lte_get_packets_state()
-            system_info = fwutils.lte_get_system_info()
+            sim_status = fwutils.lte_sim_status(params['dev_id'])
+            signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
+            hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
+            connection_state = fwutils.lte_get_connection_state(params['dev_id'])
+            packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
+            system_info = fwutils.lte_get_system_info(params['dev_id'])
 
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:

@@ -260,8 +260,8 @@ def add_interface(params):
 
     if is_lte:
         netplan_params['substs'] = [
-            { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
-            { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
+            { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'IP'] },
+            { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] }
         ]
 
     cmd = {}
@@ -457,7 +457,7 @@ def add_interface(params):
                             'gw'      : '',
                             'mac'     : '00:00:00:00:00:00',
                     },
-                    'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }]
+                    'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':[dev_id, 'GATEWAY'] }]
         }
         cmd['cmd']['descr']         = "create static arp entry for dev_id %s" % dev_id
         cmd_list.append(cmd)
@@ -465,13 +465,13 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name'] = "exec"
-        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
+        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] } ]},
                                 "sudo arp -s DEV-STUB 00:00:00:00:00:00" ]
         cmd['cmd']['descr'] = "set arp entry on linux for lte interface"
         cmd['revert'] = {}
         cmd['revert']['name']   = "exec"
         cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] } ]},
                                     "sudo arp -d DEV-STUB" ]
         cmd_list.append(cmd)
 

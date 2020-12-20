@@ -1305,7 +1305,7 @@ class FWROUTER_API:
                 func_name = s['val_by_func']
                 func = getattr(fwutils, func_name)
                 old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
-                new  = func(old)
+                new  = func(*old) if type(old) == list else func(old)
                 if new is None:
                     raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
             elif 'val_by_key' in s:
