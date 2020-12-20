@@ -158,7 +158,7 @@ def add(params):
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
-    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
+    if 'multilink' in params and 'labels' in params['multilink']:
         labels = params['multilink']['labels']
         if len(labels) > 0:
             cmd = {}
@@ -170,10 +170,17 @@ def add(params):
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
                                         'next_hop': gw,
-                                        'dev':      dev_id,
+                                        'dev_id':   dev_id,
                                         'remove':   False
                                       }
             }
+            # Cache 'next_hop' resolved by vpp_multilink_update_labels on 'add-interface',
+            # to be used on 'remove-interface'. This is needed for DHCP interfaces,
+            # where GW can be changed/removed under our legs
+            #
+            cache_key = 'next_hop-%s' % dev_id
+            cmd['cmd']['cache_ret_val'] = ('next_hop', cache_key)
+
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
             cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
@@ -181,10 +188,10 @@ def add(params):
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels':   labels,
-                                        'next_hop': gw,
-                                        'dev':      dev_id,
+                                        'dev_id':   dev_id,
                                         'remove':   True
-                                      }
+                                      },
+                            'substs': [ { 'add_param':'next_hop', 'val_by_key':cache_key} ],
             }
             cmd_list.append(cmd)
 
