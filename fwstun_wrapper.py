@@ -348,7 +348,7 @@ class FwStunWrap:
 
                 # Don't STUN if vpp is being initializing / shutting down,
                 # as quering vpp for interface names/ip-s might generate exception.
-                if not fwglobals.g.router_api.is_starting_stopping():
+                if not fwglobals.g.router_api.state_is_starting_stopping():
 
                     # send STUN requests for addresses that a request was not sent for
                     # them, or for ones that did not get reply previously
