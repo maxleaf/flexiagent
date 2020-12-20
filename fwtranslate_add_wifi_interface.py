@@ -75,146 +75,146 @@ def add(params):
 
      :returns: List of commands.
      """
-    cmd_list = []
+#     cmd_list = []
 
-    dev_id  = params['dev_id']
-    iface_addr = params.get('addr', '')
-    iface_name = fwutils.dev_id_to_linux_if(dev_id)
+#     dev_id  = params['dev_id']
+#     iface_addr = params.get('addr', '')
+#     iface_name = fwutils.dev_id_to_linux_if(dev_id)
 
 
-    # Add interface section into Netplan configuration file
-    gw        = params.get('gateway', None)
-    metric    = params.get('metric', 0)
-    dhcp      = params.get('dhcp', 'no')
-    int_type  = params.get('type', None)
-    configuration  = params.get('configuration', None)
+#     # Add interface section into Netplan configuration file
+#     gw        = params.get('gateway', None)
+#     metric    = params.get('metric', 0)
+#     dhcp      = params.get('dhcp', 'no')
+#     int_type  = params.get('type', None)
+#     configuration  = params.get('configuration', None)
 
-    # Configure hostapd with saved configuration
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-            'module': 'fwutils',
-            'func': 'configure_hostapd',
-            'args': { 'dev_id': dev_id, 'configuration': configuration }
-    }
-    cmd_list.append(cmd)
+#     # Configure hostapd with saved configuration
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "python"
+#     cmd['cmd']['params'] = {
+#             'module': 'fwutils',
+#             'func': 'configure_hostapd',
+#             'args': { 'dev_id': dev_id, 'configuration': configuration }
+#     }
+#     cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-            'module': 'fwutils',
-            'func': 'start_hostapd',
-    }
-    cmd['cmd']['descr']  = "start hostpad"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-            'module': 'fwutils',
-            'func': 'stop_hostapd'
-    }
-    cmd['revert']['descr']  = "stop hostpad"
-    cmd_list.append(cmd)
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "python"
+#     cmd['cmd']['params'] = {
+#             'module': 'fwutils',
+#             'func': 'start_hostapd',
+#     }
+#     cmd['cmd']['descr']  = "start hostpad"
+#     cmd['revert'] = {}
+#     cmd['revert']['name']   = "python"
+#     cmd['revert']['params'] = {
+#             'module': 'fwutils',
+#             'func': 'stop_hostapd'
+#     }
+#     cmd['revert']['descr']  = "stop hostpad"
+#     cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "exec"
-    cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  iface_name ]
-    cmd['cmd']['descr']  = "create linux bridge for interface %s" % iface_name
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "exec"
+#     cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  iface_name ]
+#     cmd['cmd']['descr']  = "create linux bridge for interface %s" % iface_name
 
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_name, iface_name) ]
-    cmd['revert']['descr']  = "remove linux bridge for interface %s" % iface_name
-    cmd_list.append(cmd)
+#     cmd['revert'] = {}
+#     cmd['revert']['name']   = "exec"
+#     cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_name, iface_name) ]
+#     cmd['revert']['descr']  = "remove linux bridge for interface %s" % iface_name
+#     cmd_list.append(cmd)
 
-    # create tap for this interface in vpp and linux
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'configure_tap_in_linux_and_vpp',
-                'args': { 'linux_if_name': iface_name }
-    }
-    cmd['cmd']['descr'] = "create tap interface in linux and vpp"
-    cmd_list.append(cmd)
+#     # create tap for this interface in vpp and linux
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "python"
+#     cmd['cmd']['params'] = {
+#                 'module': 'fwutils',
+#                 'func': 'configure_tap_in_linux_and_vpp',
+#                 'args': { 'linux_if_name': iface_name }
+#     }
+#     cmd['cmd']['descr'] = "create tap interface in linux and vpp"
+#     cmd_list.append(cmd)
 
-    # add tap into a bridge.
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "exec"
-    cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
-    cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge" % iface_name
+#     # add tap into a bridge.
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "exec"
+#     cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
+#                                 "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
+#     cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge" % iface_name
 
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
-    cmd['revert']['descr']  = "remove tap from a bridge"
-    cmd_list.append(cmd)
+#     cmd['revert'] = {}
+#     cmd['revert']['name']   = "exec"
+#     cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
+#                                 "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
+#     cmd['revert']['descr']  = "remove tap from a bridge"
+#     cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "exec"
-    cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
-    cmd['cmd']['descr']  = "add wifi interface into a bridge"
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "exec"
+#     cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
+#     cmd['cmd']['descr']  = "add wifi interface into a bridge"
 
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
-    cmd['revert']['descr']  = "remove wifi interface from a bridge"
-    cmd_list.append(cmd)
+#     cmd['revert'] = {}
+#     cmd['revert']['name']   = "exec"
+#     cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
+#     cmd['revert']['descr']  = "remove wifi interface from a bridge"
+#     cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
-    cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
-    cmd_list.append(cmd)
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']      = "exec"
+#     cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
+#     cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
+#     cmd_list.append(cmd)
 
     # add interface into netplan configuration
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-            'module': 'fwnetplan',
-            'func': 'add_remove_netplan_interface',
-            'args': { 'is_add'  : 1,
-                    'dev_id'    : dev_id,
-                    'ip'        : iface_addr,
-                    'gw'        : gw,
-                    'metric'    : metric,
-                    'dhcp'      : dhcp,
-                    'type'      : int_type
-                    }
-    }
-    cmd['cmd']['descr'] = "add interface into netplan config file"
-    cmd['revert'] = {}
-    cmd['revert']['params'] = {
-            'module': 'fwnetplan',
-            'func': 'add_remove_netplan_interface',
-            'args': { 'is_add'  : 0,
-                    'dev_id'    : dev_id,
-                    'ip'        : iface_addr,
-                    'gw'        : gw,
-                    'metric'    : metric,
-                    'dhcp'      : dhcp,
-                    'type'      : int_type
-                    }
-    }
-    cmd['revert']['name']   = "python"
-    cmd['revert']['descr'] = "remove interface from netplan config file"
-    cmd_list.append(cmd)
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "python"
+#     cmd['cmd']['params'] = {
+#             'module': 'fwnetplan',
+#             'func': 'add_remove_netplan_interface',
+#             'args': { 'is_add'  : 1,
+#                     'dev_id'    : dev_id,
+#                     'ip'        : iface_addr,
+#                     'gw'        : gw,
+#                     'metric'    : metric,
+#                     'dhcp'      : dhcp,
+#                     'type'      : int_type
+#                     }
+#     }
+#     cmd['cmd']['descr'] = "add interface into netplan config file"
+#     cmd['revert'] = {}
+#     cmd['revert']['params'] = {
+#             'module': 'fwnetplan',
+#             'func': 'add_remove_netplan_interface',
+#             'args': { 'is_add'  : 0,
+#                     'dev_id'    : dev_id,
+#                     'ip'        : iface_addr,
+#                     'gw'        : gw,
+#                     'metric'    : metric,
+#                     'dhcp'      : dhcp,
+#                     'type'      : int_type
+#                     }
+#     }
+#     cmd['revert']['name']   = "python"
+#     cmd['revert']['descr'] = "remove interface from netplan config file"
+#     cmd_list.append(cmd)
 
     # configure dhcp server for this interface
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "exec"
-    cmd['cmd']['params'] =  [ 'sudo systemctl start isc-dhcp-server' ]
-    cmd['cmd']['descr']  = "start hostpad"
-    cmd_list.append(cmd)
+#     cmd = {}
+#     cmd['cmd'] = {}
+#     cmd['cmd']['name']   = "exec"
+#     cmd['cmd']['params'] =  [ 'sudo systemctl start isc-dhcp-server' ]
+#     cmd['cmd']['descr']  = "restart dhcp server"
+#     cmd_list.append(cmd)
 
     return cmd_list

@@ -75,339 +75,339 @@ def add(params):
 
      :returns: List of commands.
      """
-    cmd_list = []
+    # cmd_list = []
 
-    dev_id  = params['dev_id']
-    iface_addr = params.get('addr', '')
-    iface_name = fwutils.dev_id_to_linux_if(dev_id)
+    # dev_id  = params['dev_id']
+    # iface_addr = params.get('addr', '')
+    # iface_name = fwutils.dev_id_to_linux_if(dev_id)
 
 
-    # Add interface section into Netplan configuration file
-    gw        = params.get('gateway', None)
-    metric    = params.get('metric', 0)
-    dhcp      = params.get('dhcp', 'no')
-    int_type  = params.get('type', None)
+    # # Add interface section into Netplan configuration file
+    # gw        = params.get('gateway', None)
+    # metric    = params.get('metric', 0)
+    # dhcp      = params.get('dhcp', 'no')
+    # int_type  = params.get('type', None)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP interface %s in Linux" % iface_name
-    cmd['cmd']['params']    = [ "sudo ip link set dev %s up" %  iface_name]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "Down interface %s in Linux" % iface_name
-    cmd['revert']['params'] = [ "sudo ip link set dev %s down" %  iface_name]
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']      = "exec"
+    # cmd['cmd']['descr']     = "UP interface %s in Linux" % iface_name
+    # cmd['cmd']['params']    = [ "sudo ip link set dev %s up" %  iface_name]
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "exec"
+    # cmd['revert']['descr']  = "Down interface %s in Linux" % iface_name
+    # cmd['revert']['params'] = [ "sudo ip link set dev %s down" %  iface_name]
+    # cmd_list.append(cmd)
 
-    # connect the modem to the cellular provider
-    apn = params['configuration']['apn'] if params['configuration'] else None
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'lte_connect',
-                'args': { 'apn': apn, 'dev_id': dev_id }
-    }
-    cmd['cmd']['descr'] = "connect modem to lte cellular network provider"
-    cmd_list.append(cmd)
+    # # connect the modem to the cellular provider
+    # apn = params['configuration']['apn'] if params['configuration'] else None
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']   = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'lte_connect',
+    #             'args': { 'apn': apn, 'dev_id': dev_id }
+    # }
+    # cmd['cmd']['descr'] = "connect modem to lte cellular network provider"
+    # cmd_list.append(cmd)
 
-    # create tap for this interface in vpp and linux
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'configure_tap_in_linux_and_vpp',
-                'args': { 'linux_if_name': iface_name }
-    }
-    cmd['cmd']['descr'] = "create tap interface in linux and vpp"
-    cmd_list.append(cmd)
+    # # create tap for this interface in vpp and linux
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']   = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'configure_tap_in_linux_and_vpp',
+    #             'args': { 'linux_if_name': iface_name }
+    # }
+    # cmd['cmd']['descr'] = "create tap interface in linux and vpp"
+    # cmd_list.append(cmd)
 
     # add interface into netplan configuration
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-            'module': 'fwnetplan',
-            'func': 'add_remove_netplan_interface',
-            'args': { 'is_add'  : 1,
-                    'dev_id'    : dev_id,
-                    'ip'        : iface_addr,
-                    'gw'        : gw,
-                    'metric'    : metric,
-                    'dhcp'      : 'no',
-                    'type'      : int_type
-                    },
-            'substs':  [
-                { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
-                { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
-            ]
-    }
-    cmd['cmd']['descr'] = "add interface into netplan config file"
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']   = "python"
+    # cmd['cmd']['params'] = {
+    #         'module': 'fwnetplan',
+    #         'func': 'add_remove_netplan_interface',
+    #         'args': { 'is_add'  : 1,
+    #                 'dev_id'    : dev_id,
+    #                 'ip'        : iface_addr,
+    #                 'gw'        : gw,
+    #                 'metric'    : metric,
+    #                 'dhcp'      : 'no',
+    #                 'type'      : int_type
+    #                 },
+    #         'substs':  [
+    #             { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
+    #             { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
+    #         ]
+    # }
+    # cmd['cmd']['descr'] = "add interface into netplan config file"
 
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-            'module': 'fwnetplan',
-            'func': 'add_remove_netplan_interface',
-            'args': { 'is_add'  : 0,
-                    'dev_id'    : dev_id,
-                    'ip'        : iface_addr,
-                    'gw'        : gw,
-                    'metric'    : metric,
-                    'dhcp'      : 'no',
-                    'type'      : int_type
-                    },
-            'substs':  [
-                { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
-                { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
-            ]
-    }
-    cmd['revert']['descr'] = "remove interface from netplan config file"
-    cmd_list.append(cmd)
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "python"
+    # cmd['revert']['params'] = {
+    #         'module': 'fwnetplan',
+    #         'func': 'add_remove_netplan_interface',
+    #         'args': { 'is_add'  : 0,
+    #                 'dev_id'    : dev_id,
+    #                 'ip'        : iface_addr,
+    #                 'gw'        : gw,
+    #                 'metric'    : metric,
+    #                 'dhcp'      : 'no',
+    #                 'type'      : int_type
+    #                 },
+    #         'substs':  [
+    #             { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg':'IP' },
+    #             { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }
+    #         ]
+    # }
+    # cmd['revert']['descr'] = "remove interface from netplan config file"
+    # cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
-    if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
-        labels = params['multilink']['labels']
-        if len(labels) > 0:
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "python"
-            cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
-            cmd['cmd']['params']  = {
-                            'module': 'fwutils',
-                            'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels':   labels,
-                                        'next_hop': gw,
-                                        'dev':      dev_id,
-                                        'remove':   False
-                                      }
-            }
-            cmd['revert'] = {}
-            cmd['revert']['name']   = "python"
-            cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
-            cmd['revert']['params'] = {
-                            'module': 'fwutils',
-                            'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels':   labels,
-                                        'next_hop': gw,
-                                        'dev':      dev_id,
-                                        'remove':   True
-                                      }
-            }
-            cmd_list.append(cmd)
+    # # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
+    # if 'multilink' in params and 'labels' in params['multilink'] and gw is not None and gw:
+    #     labels = params['multilink']['labels']
+    #     if len(labels) > 0:
+    #         cmd = {}
+    #         cmd['cmd'] = {}
+    #         cmd['cmd']['name']    = "python"
+    #         cmd['cmd']['descr']   = "add multilink labels into interface %s %s: %s" % (iface_addr, dev_id, labels)
+    #         cmd['cmd']['params']  = {
+    #                         'module': 'fwutils',
+    #                         'func'  : 'vpp_multilink_update_labels',
+    #                         'args'  : { 'labels':   labels,
+    #                                     'next_hop': gw,
+    #                                     'dev':      dev_id,
+    #                                     'remove':   False
+    #                                   }
+    #         }
+    #         cmd['revert'] = {}
+    #         cmd['revert']['name']   = "python"
+    #         cmd['revert']['descr']  = "remove multilink labels from interface %s %s: %s" % (iface_addr, dev_id, labels)
+    #         cmd['revert']['params'] = {
+    #                         'module': 'fwutils',
+    #                         'func'  : 'vpp_multilink_update_labels',
+    #                         'args'  : { 'labels':   labels,
+    #                                     'next_hop': gw,
+    #                                     'dev':      dev_id,
+    #                                     'remove':   True
+    #                                   }
+    #         }
+    #         cmd_list.append(cmd)
 
     # Enable NAT.
     # On WAN interfaces run
     #   'nat44 add interface address GigabitEthernet0/9/0'
     #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
     # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
-    cmd['cmd']['params']    = {
-                                'module': 'fwutils',
-                                'func':   'vpp_nat_add_remove_interface',
-                                'args':   {
-                                    'remove': False,
-                                    'dev_id': dev_id,
-                                    'metric': metric
-                                }
-                                }
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
-    cmd['revert']['params'] = {
-                                'module': 'fwutils',
-                                'func':   'vpp_nat_add_remove_interface',
-                                'args':   {
-                                    'remove': True,
-                                    'dev_id': dev_id,
-                                    'metric': metric
-                                }
-                                }
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']      = "python"
+    # cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
+    # cmd['cmd']['params']    = {
+    #                             'module': 'fwutils',
+    #                             'func':   'vpp_nat_add_remove_interface',
+    #                             'args':   {
+    #                                 'remove': False,
+    #                                 'dev_id': dev_id,
+    #                                 'metric': metric
+    #                             }
+    #                             }
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "python"
+    # cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
+    # cmd['revert']['params'] = {
+    #                             'module': 'fwutils',
+    #                             'func':   'vpp_nat_add_remove_interface',
+    #                             'args':   {
+    #                                 'remove': True,
+    #                                 'dev_id': dev_id,
+    #                                 'metric': metric
+    #                             }
+    #                             }
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-    cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
-    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                'is_add':1, 'is_inside':0 }
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-    cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
-    cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                'is_add':0, 'is_inside':0 }
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
+    # cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
+    # cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+    #                             'is_add':1, 'is_inside':0 }
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
+    # cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
+    # cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+    #                             'is_add':0, 'is_inside':0 }
+    # cmd_list.append(cmd)
 
-    vxlan_port = 4789
-    udp_proto = 17
+    # vxlan_port = 4789
+    # udp_proto = 17
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-    cmd['cmd']['params']        = { 'substs': [
-                                        { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                                        { 'add_param':'ip_address', 'val_by_func':'lte_dev_id_to_iface_addr_bytes', 'arg':dev_id }
-                                    ],
-                                    'ip_address':'', 'port':vxlan_port, 'protocol':udp_proto, 'is_add':1, 'addr_only':0 }
-    cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
-    cmd['revert'] = {}
-    cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-    cmd['revert']['params']     = { 'substs': [
-                                        { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                                        { 'add_param':'ip_address', 'val_by_func':'lte_dev_id_to_iface_addr_bytes', 'arg':dev_id }
-                                    ],
-                                    'ip_address':'', 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
-    cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
+    # cmd['cmd']['params']        = { 'substs': [
+    #                                     { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
+    #                                     { 'add_param':'ip_address', 'val_by_func':'lte_dev_id_to_iface_addr_bytes', 'arg':dev_id }
+    #                                 ],
+    #                                 port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
+    # cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
+    # cmd['revert'] = {}
+    # cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
+    # cmd['revert']['params']     = { 'substs': [
+    #                                     { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
+    #                                     { 'add_param':'ip_address', 'val_by_func':'lte_dev_id_to_iface_addr_bytes', 'arg':dev_id }
+    #                                 ],
+    #                                 'ip_address':'', 'port':vxlan_port, 'protocol':udp_proto, 'is_add':0, 'addr_only':0 }
+    # cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (params['addr'], vxlan_port)
 
-    cmd_list.append(cmd)
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'vpp_add_static_arp',
-                'args': {
-                        'dev_id'  : dev_id,
-                        'gw'      : '',
-                        'mac'     : '00:00:00:00:00:00',
-                },
-                'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }]
-    }
-    cmd['cmd']['descr']         = "create static arp entry for dev_id %s" % dev_id
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']   = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'vpp_add_static_arp',
+    #             'args': {
+    #                     'dev_id'  : dev_id,
+    #                     'gw'      : '',
+    #                     'mac'     : '00:00:00:00:00:00',
+    #             },
+    #             'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' }]
+    # }
+    # cmd['cmd']['descr']         = "create static arp entry for dev_id %s" % dev_id
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
-                            "sudo arp -s DEV-STUB 00:00:00:00:00:00" ]
-    cmd['cmd']['descr'] = "set arp entry on linux for lte interface"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
-                                "sudo arp -d DEV-STUB" ]
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "exec"
+    # cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
+    #                         "sudo arp -s DEV-STUB 00:00:00:00:00:00" ]
+    # cmd['cmd']['descr'] = "set arp entry on linux for lte interface"
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "exec"
+    # cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
+    # cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg':'GATEWAY' } ]},
+    #                             "sudo arp -d DEV-STUB" ]
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_add_del_dev_ingress',
-                'args': { 'dev_name': '', 'is_add': 1 },
-                'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
-    }
-    cmd['cmd']['descr'] = "add traffic control command for linux tap interface"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_add_del_dev_ingress',
-                'args': { 'dev_name'  : '', 'is_add': 0 },
-                'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
-    }
-    cmd['revert']['descr']  = "remove traffic control command for linux tap interface"
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_add_del_dev_ingress',
+    #             'args': { 'dev_name': '', 'is_add': 1 },
+    #             'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
+    # }
+    # cmd['cmd']['descr'] = "add traffic control command for linux tap interface"
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "python"
+    # cmd['revert']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_add_del_dev_ingress',
+    #             'args': { 'dev_name'  : '', 'is_add': 0 },
+    #             'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
+    # }
+    # cmd['revert']['descr']  = "remove traffic control command for linux tap interface"
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_replace_dev_root',
-                'args': { 'dev_name'  : '' },
-                'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
-    }
-    cmd['cmd']['descr'] = "replace traffic control command for linux tap interface"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_remove_dev_root',
-                'args': { 'dev_name'  : '' },
-                'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
-    }
-    cmd['revert']['descr']  = "remove replaced tc command for linux tap interface"
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_replace_dev_root',
+    #             'args': { 'dev_name'  : '' },
+    #             'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
+    # }
+    # cmd['cmd']['descr'] = "replace traffic control command for linux tap interface"
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "python"
+    # cmd['revert']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_remove_dev_root',
+    #             'args': { 'dev_name'  : '' },
+    #             'substs': [ { 'add_param':'dev_name', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]
+    # }
+    # cmd['revert']['descr']  = "remove replaced tc command for linux tap interface"
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_add_del_dev_ingress',
-                'args': { 'dev_name'  : iface_name, 'is_add': 1 }
-    }
-    cmd['cmd']['descr'] = "add traffic control command for lte interface"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_add_del_dev_ingress',
-                'args': { 'dev_name'  : iface_name, 'is_add': 0 }
-    }
-    cmd['revert']['descr']  = "remove traffic control command for lte interface"
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_add_del_dev_ingress',
+    #             'args': { 'dev_name'  : iface_name, 'is_add': 1 }
+    # }
+    # cmd['cmd']['descr'] = "add traffic control command for lte interface"
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "python"
+    # cmd['revert']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_add_del_dev_ingress',
+    #             'args': { 'dev_name'  : iface_name, 'is_add': 0 }
+    # }
+    # cmd['revert']['descr']  = "remove traffic control command for lte interface"
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_replace_dev_root',
-                'args': { 'dev_name'  : iface_name }
-    }
-    cmd['cmd']['descr'] = "replace traffic control command for lte interface"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-                'module': 'fwutils',
-                'func': 'traffic_control_remove_dev_root',
-                'args': { 'dev_name'  : iface_name }
-    }
-    cmd['revert']['descr']  = "remove replaced tc command for lte interface"
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "python"
+    # cmd['cmd']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_replace_dev_root',
+    #             'args': { 'dev_name'  : iface_name }
+    # }
+    # cmd['cmd']['descr'] = "replace traffic control command for lte interface"
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = "python"
+    # cmd['revert']['params'] = {
+    #             'module': 'fwutils',
+    #             'func': 'traffic_control_remove_dev_root',
+    #             'args': { 'dev_name'  : iface_name }
+    # }
+    # cmd['revert']['descr']  = "remove replaced tc command for lte interface"
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = [
-        "tc filter add dev DEV-STUB parent ffff: \
-        protocol all prio 2 u32 \
-        match u32 0 0 flowid 1:1 \
-        action pedit ex munge eth dst set LTE-MAC \
-        pipe action mirred egress mirror dev %s" % iface_name,
-        { 'substs': [
-            {'replace':'DEV-STUB', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name },
-            {'replace':'LTE-MAC', 'val_by_func':'get_interface_mac_addr', 'arg':iface_name }
-        ] }
-    ]
-    cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "exec"
+    # cmd['cmd']['params'] = [
+    #     "tc filter add dev DEV-STUB parent ffff: \
+    #     protocol all prio 2 u32 \
+    #     match u32 0 0 flowid 1:1 \
+    #     action pedit ex munge eth dst set LTE-MAC \
+    #     pipe action mirred egress mirror dev %s" % iface_name,
+    #     { 'substs': [
+    #         {'replace':'DEV-STUB', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name },
+    #         {'replace':'LTE-MAC', 'val_by_func':'get_interface_mac_addr', 'arg':iface_name }
+    #     ] }
+    # ]
+    # cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
+    # cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = [
-        "tc -force filter add dev %s parent ffff: \
-        protocol all prio 2 u32 \
-        match u32 0 0 flowid 1:1 \
-        action pedit ex munge eth dst set VPP-MAC \
-        pipe action mirred egress mirror dev DEV-STUB" % iface_name,
-        { 'substs': [
-            {'replace':'VPP-MAC', 'val_by_func':'get_vpp_tap_interface_mac_addr', 'arg':dev_id },
-            {'replace':'DEV-STUB', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name }
-        ] }
-    ]
-    cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
-    cmd_list.append(cmd)
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name'] = "exec"
+    # cmd['cmd']['params'] = [
+    #     "tc -force filter add dev %s parent ffff: \
+    #     protocol all prio 2 u32 \
+    #     match u32 0 0 flowid 1:1 \
+    #     action pedit ex munge eth dst set VPP-MAC \
+    #     pipe action mirred egress mirror dev DEV-STUB" % iface_name,
+    #     { 'substs': [
+    #         {'replace':'VPP-MAC', 'val_by_func':'get_vpp_tap_interface_mac_addr', 'arg':dev_id },
+    #         {'replace':'DEV-STUB', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name }
+    #     ] }
+    # ]
+    # cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
+    # cmd_list.append(cmd)
 
     # cmd = {}
     # cmd['cmd'] = {}
