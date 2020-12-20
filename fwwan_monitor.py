@@ -129,7 +129,7 @@ class FwWanMonitor:
 
             try: # Ensure thread doesn't exit on exception
 
-                while fwglobals.g.router_api.is_starting_stopping():
+                while fwglobals.g.router_api.state_is_starting_stopping():
                     fwglobals.log.debug("%s: vpp is being started/stopped" % str(self))
                     time.sleep(5)
 
@@ -308,7 +308,7 @@ class FwWanMonitor:
 
         # If vpp runs, go and adjust it configuration to the newer metric.
         #
-        if fwglobals.g.router_api.router_started:
+        if fwglobals.g.router_api.state_is_started():
 
             # Update netplan yaml-s in order to:
             # 1. Ensure that if 'netplan apply' is called due to some reason
@@ -362,6 +362,6 @@ def get_wan_failover_metric(dev_id, metric):
     :param metric:  the original metric configured by user
     '''
     route = fwglobals.g.cache.wan_monitor['enabled_routes'].get(dev_id)
-    if not route or route.ok or metric > fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+    if not route or route.ok or metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
         return metric
     return (metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)

@@ -235,11 +235,19 @@ def get_default_route():
     dev_id = get_interface_dev_id(dev)
     return (via, dev, dev_id)
 
-def get_interface_gateway(if_name):
+def get_interface_gateway(if_name, if_pci=None):
     """Get gateway.
+
+    :param if_name:  name of the interface, gateway for which is returned
+    :param if_pci:   PCI of the interface, gateway for which is returned.
+                     If provided, the 'if_name' is ignored. The name is fetched
+                     from system by PCI.
 
     :returns: Gateway ip address.
     """
+    if if_pci:
+        if_name = pci_to_tap(if_pci)
+
     try:
         cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
         route = os.popen(cmd).read()
@@ -251,6 +259,12 @@ def get_interface_gateway(if_name):
     rip    = route.split('via ')[1].split(' ')[0]
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
+
+
+def get_binary_interface_gateway_by_pci(pci):
+    gw_ip, _ = get_interface_gateway('', if_pci=pci)
+    return ip_str_to_bytes(gw_ip)[0]
+
 
 def get_all_interfaces():
     """ Get all interfaces from linux. For dev id with address family of AF_INET,
@@ -923,11 +937,12 @@ def vpp_ip_to_sw_if_index(ip):
     for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
         tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
         if tap:
-            addr = get_interface_address(tap)
-            if addr:
-                int_address = IPNetwork(addr)
-                if network == int_address:
-                    return sw_if.sw_if_index
+            int_address_str = get_interface_address(tap)
+            if not int_address_str:
+                continue
+            int_address = IPNetwork(int_address_str)
+            if network == int_address:
+                return sw_if.sw_if_index
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
@@ -1506,7 +1521,7 @@ def modify_dhcpd(is_add, params):
 
     return True
 
-def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_index=None):
+def vpp_multilink_update_labels(labels, remove, next_hop=None, dev_id=None, sw_if_index=None, result_cache=None):
     """Updates VPP with flexiwan multilink labels.
     These labels are used for Multi-Link feature: user can mark interfaces
     or tunnels with labels and than add policy to choose interface/tunnel by
@@ -1516,11 +1531,13 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     configure lables. Remove it, when correspondent Python API will be added.
     In last case the API should be called directly from translation.
 
-    :param params: labels      - python list of labels
-                   is_dia      - type of labels (DIA - Direct Internet Access)
-                   remove      - True to remove labels, False to add.
-                   dev         - Bus address of Device to apply labels to.
-                   next_hop_ip - IP address of next hop.
+    :param labels:      python list of labels
+    :param is_dia:      type of labels (DIA - Direct Internet Access)
+    :param remove:      True to remove labels, False to add.
+    :param dev_id:      Interface bus address if device to apply labels to.
+    :param next_hop:    IP address of next hop.
+    :param result_cache: cache, key and variable, that this function should store in the cache:
+                            {'result_attr': 'next_hop', 'cache': <dict>, 'key': <key>}
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
@@ -1528,15 +1545,15 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels, remove)
     ids = ','.join(map(str, ids_list))
 
-    if dev:
-        vpp_if_name = dev_id_to_vpp_if_name(dev)
+    if dev_id:
+        vpp_if_name = dev_id_to_vpp_if_name(dev_id)
     elif sw_if_index:
         vpp_if_name = vpp_sw_if_index_to_name(sw_if_index)
     else:
-        return (False, "Neither 'dev' nor 'sw_if_index' was found in params")
+        return (False, "Neither 'dev_id' nor 'sw_if_index' was found in params")
 
     if not vpp_if_name:
-        return (False, "'vpp_if_name' was not found for %s" % dev)
+        return (False, "'vpp_if_name' was not found for %s" % dev_id)
 
     if not next_hop:
         tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1551,6 +1568,12 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev=None, sw_if_i
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    # Store 'next_hope' in cache if provided by caller.
+    #
+    if result_cache and result_cache['result_attr'] == 'next_hop':
+        key = result_cache['key']
+        result_cache['cache'][key] = next_hop
 
     return (True, None)
 
@@ -1634,29 +1657,6 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
-def get_interface_sw_if_index(ip):
-    """Convert interface src IP address into gateway VPP sw_if_index.
-
-    :param ip: IP address.
-
-    :returns: sw_if_index.
-    """
-    dev_id, _ = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    if not dev_id:
-        # If interface was configured with dhcp, router_cfg has no IP-s.
-        # In this case try to fetch GW from Linux.
-        if_name = get_interface_name(ip)
-        if if_name:
-            dev_id = get_interface_dev_id(if_name)
-            if not dev_id:
-                cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
-                for dev in cache:
-                    if cache[dev] == if_name:
-                        dev_id = dev
-    if not dev_id:
-        return None
-    return dev_id_to_vpp_sw_if_index(dev_id)
-
 def get_interface_vpp_names(type=None):
     res = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
@@ -1675,24 +1675,6 @@ def get_tunnel_interface_vpp_names():
         if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
         res.append(if_vpp_name)
     return res
-
-def get_interface_gateway_from_router_db(ip):
-    """Convert interface src IP address into gateway IP address.
-
-    :param ip: IP address.
-
-    :returns: IP address.
-    """
-    _, gw_ip = fwglobals.g.router_cfg.get_wan_interface_gw(ip)
-    if not gw_ip:
-        # If interface was configured with dhcp, router_cfg has no IP-s.
-        # In this case try to fetch GW from Linux.
-        if_name = get_interface_name(ip)
-        if if_name:
-            gw_ip, _ = get_interface_gateway(if_name)
-    if not gw_ip:
-        return None
-    return ip_str_to_bytes(gw_ip)[0]
 
 def add_static_route(addr, via, metric, remove, dev_id=None):
     """Add static route.
@@ -1823,7 +1805,7 @@ def tunnel_change_postprocess(add, addr):
 # between device and server. Once the protocol is fixed, there will be no more
 # need in this proprietary format.
 #
-# 2. Nov-2020 - the 'add-/modify-interface' message migh include both 'dhcp': 'yes'
+# 2. Nov-2020 - the 'add-/modify-interface' message might include both 'dhcp': 'yes'
 # and 'ip' and 'gw' fields. These IP and GW are not used by the agent, but
 # change in their values causes unnecessary removal and adding back interface
 # and, as a result of this,  restart of network daemon and reconnection to
@@ -1831,7 +1813,7 @@ def tunnel_change_postprocess(add, addr):
 # 'gw' fields if 'dhcp' is 'yes'. Than if the fixed message includes no other
 # modified parameters, it will be ignored by the agent.
 #
-def fix_recieved_message(msg):
+def fix_received_message(msg):
 
     def _fix_aggregation_format(msg):
         requests = []
@@ -3030,7 +3012,6 @@ def wifi_get_capabilities(dev_id):
         return ""
 
     def _parse_key_data(text, output, negative_look_count = 1):
-        regex = text + r'.*?(\\n\\t(?!' + (r'\\t' * negative_look_count) + '))'
         match = re.search(regex, output,  re.MULTILINE | re.IGNORECASE)
 
         res = list()
@@ -3075,3 +3056,31 @@ def wifi_get_capabilities(dev_id):
         return result
     except Exception as e:
         return result
+
+def dump(filename=None, path=None, clean_log=False):
+    '''This function invokes 'fwdump' utility while ensuring no DoS on disk space.
+
+    :param filename:  the name of the final file where to dump will be tar.gz-ed
+    :param clean_log: if True, /var/log/flexiwan/agent.log will be cleaned
+    '''
+    try:
+        cmd = 'fwdump'
+        if filename:
+            cmd += ' --zip_file ' + filename
+        if not path:
+            path = fwglobals.g.DUMP_FOLDER
+        cmd += ' --dest_folder ' + path
+
+        # Ensure no more than last 5 dumps are saved to avoid disk out of space
+        #
+        files = glob.glob("%s/*.tar.gz" % path)
+        if len(files) > 5:
+            files.sort()
+            os.remove(files[0])
+
+        subprocess.check_call(cmd + ' > /dev/null 2>&1', shell=True)
+
+        if clean_log:
+            os.system("echo '' > %s" % fwglobals.g.ROUTER_LOG_FILE)
+    except Exception as e:
+        fwglobals.log.error("failed to dump: %s" % (str(e)))

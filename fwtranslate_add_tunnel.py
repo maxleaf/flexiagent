@@ -411,7 +411,7 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
                               'admin_up_down':1 }
     cmd_list.append(cmd)
 
-def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, dest_port):
+def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     """Add VxLAN tunnel command into the list.
 
     :param cmd_list:             List of commands.
@@ -429,7 +429,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, dest_por
     src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
     dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
 
-    # for lte interface, we need to get the current source IP, and not the one stored in DB, because its change by last 'add-interface'
+    # for lte interface, we need to get the current source IP, and not the one stored in DB. The IP may have changed due last 'add-interface' job.
     if fwutils.is_lte_interface(dev_id):
         tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
         if tap:
@@ -443,9 +443,9 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, dest_por
             'src_address'          : src_addr_bytes,
             'dst_address'          : dst_addr_bytes,
             'vni'                  : bridge_id,
-            'dest_port'            : dest_port,
-            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'get_interface_sw_if_index', 'arg': src},
-                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_interface_gateway_from_router_db', 'arg': src}],
+            'dest_port'            : int(params.get('dstPort', 4789)),
+            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'pci_to_vpp_sw_if_index', 'arg': params['pci']},
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_binary_interface_gateway_by_pci', 'arg': params['pci']}],
             'instance'             : bridge_id,
             'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }
@@ -613,7 +613,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
                 bridge_id,
                 l2gre_tunnel_ips['src'],
                 l2gre_tunnel_ips['dst'],
-                int(params.get('dstPort', 4789)))
+                params)
     _add_interface_to_bridge(
                 cmd_list,
                 iface_description='loop1_' + loop1_cfg['addr'],

@@ -554,7 +554,7 @@ class FwAgent:
         self.received_request = True
         self.handling_request = True
 
-        msg = fwutils.fix_recieved_message(received_msg)
+        msg = fwutils.fix_received_message(received_msg)
 
         print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
         print_message = False if msg['message'] == 'add-application' else print_message
@@ -628,6 +628,9 @@ def version():
         for component in sorted(versions['components'].keys()):
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
+
+def dump(filename, path, clean_log):
+    fwutils.dump(filename=filename, path=path, clean_log=clean_log)
 
 def reset(soft=False):
     """Handles 'fwagent reset' command.
@@ -827,7 +830,7 @@ class FwagentDaemon(object):
         fwglobals.g.load_configuration_from_file()
 
         # Ensure system compatibility with our soft
-        if check_system and fwglobals.g.router_api.router_started:
+        if check_system and fwglobals.g.router_api.state_is_started():
             check_system = False    # No need to check system if VPP runs, it is too late :)
         if check_system and self._check_system() == False:
             fwglobals.log.excep("FwagentDaemon: system checker failed")
@@ -867,7 +870,7 @@ class FwagentDaemon(object):
                 fwglobals.log.debug("FwagentDaemon: router stopped")
             except Exception as e:
                 fwglobals.log.excep("FwagentDaemon: failed to stop router: " + str(e))
-        elif fwglobals.g.router_api.router_started:
+        elif fwglobals.g.router_api.state_is_started():
             fwglobals.log.debug("FwagentDaemon: vpp alive, use 'fwagent stop' to stop it")
         # Stop main connection loop
         if self.thread_main:
@@ -1096,6 +1099,7 @@ if __name__ == '__main__':
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
+                    'dump': lambda args: dump(filename=args.filename, path=args.path, clean_log=args.clean_log),
                     'show': lambda args: show(
                         agent_info=args.agent,
                         router_info=args.router,
@@ -1153,6 +1157,13 @@ if __name__ == '__main__':
                         # If arguments include spaces escape them with slash, e.g. "--api inject_requests my\ request.json"
                         # or surround argument with single quotes, e.g. "--api inject_requests 'my request.json'"
                         # Note we don't use circle brackets, e.g. "--api inject_requests(request.json)" to avoid bash confuse
+    parser_dump = subparsers.add_parser('dump', help='Dump various system info into x.tar.gz file')
+    parser_dump.add_argument('-f', '--file', dest='filename', default=None,
+                        help="The name of the result archive file. Can be full path. The default is 'fwdump_<hostname>_<YYYYMMDD>_<HHMMSS>.tar.gz")
+    parser_dump.add_argument('-p', '--path', dest='path', default=None,
+                        help="The path to the final name. The default is %s" % fwglobals.g.DUMP_FOLDER)
+    parser_dump.add_argument('-c', '--clean_log', action='store_true',
+                        help="Clean agent log")
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
