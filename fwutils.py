@@ -235,7 +235,7 @@ def get_default_route():
     dev_id = get_interface_dev_id(dev)
     return (via, dev, dev_id)
 
-def get_interface_gateway(if_name, if_pci=None):
+def get_interface_gateway(if_name, if_dev_id=None):
     """Get gateway.
 
     :param if_name:  name of the interface, gateway for which is returned
@@ -245,8 +245,8 @@ def get_interface_gateway(if_name, if_pci=None):
 
     :returns: Gateway ip address.
     """
-    if if_pci:
-        if_name = pci_to_tap(if_pci)
+    if if_dev_id:
+        if_name = dev_id_to_tap(if_dev_id)
 
     try:
         cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
@@ -261,8 +261,8 @@ def get_interface_gateway(if_name, if_pci=None):
     return rip, metric
 
 
-def get_binary_interface_gateway_by_pci(pci):
-    gw_ip, _ = get_interface_gateway('', if_pci=pci)
+def get_binary_interface_gateway_by_dev_id(dev_id):
+    gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
     return ip_str_to_bytes(gw_ip)[0]
 
 
