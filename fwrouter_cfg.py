@@ -82,7 +82,7 @@ class FwRouterCfg:
                            notified for, e.g.:
                             ['add-interface', 'remove-interface', 'stop-router']
         """
-        fwglobals.log.debug("FwRouterCfg: register_callback: %s.%s(%s)"\
+        fwglobals.log.debug("register_callback: %s.%s(%s)"\
             %(listener, callback.__name__, str(requests)))
         elem = {'listener':listener, 'callback': callback, 'requests':requests}
         self.callbacks.append(elem)
@@ -145,17 +145,17 @@ class FwRouterCfg:
         """
         for elem in listeners:
             if req_name in elem['requests']:
-                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - before"\
+                fwglobals.log.debug("%s.%s(%s) - before"\
                         %(elem['listener'], elem['callback'].__name__, req_name))
 
                 try:
                     elem['callback'](req_name, params)
                 except Exception as e:
-                    fwglobals.log.error("FwRouterCfg: %s.%s(%s): %s"\
+                    fwglobals.log.error("%s.%s(%s): %s"\
                             %(elem['listener'], elem['callback'].__name__, req_name, str(e)))
                     pass
 
-                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - after"\
+                fwglobals.log.debug("%s.%s(%s) - after"\
                         %(elem['listener'], elem['callback'].__name__, req_name))
 
     def update(self, request, cmd_list=None, executed=False):
@@ -193,7 +193,7 @@ class FwRouterCfg:
         except KeyError:
             pass
         except Exception as e:
-            fwglobals.log.error("FwRouterCfg.update(%s) failed: %s, %s" % \
+            fwglobals.log.error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
@@ -445,7 +445,7 @@ class FwRouterCfg:
         new         = hash_object.hexdigest()
 
         self.db['signature'] = new
-        fwglobals.log.debug("fwrouter_cfg: sha1: new=%s, current=%s, delta=%s" %
+        fwglobals.log.debug("sha1: new=%s, current=%s, delta=%s" %
                             (str(new), str(current), str(delta)))
 
     def get_signature(self):
@@ -474,7 +474,7 @@ class FwRouterCfg:
         new_signature = "" if new_signature == None else new_signature
         self.db['signature'] = new_signature
         if log:
-            fwglobals.log.debug("fwrouter_cfg: reset signature: '%s' -> '%s'" % \
+            fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
                                 (old_signature, new_signature))
 
     def get_sync_list(self, requests):

@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import inspect
 import os
 import syslog
 import sys
@@ -49,6 +50,17 @@ class Fwlog:
 
         :returns: None.
         """
+
+        # Find out name of class that invoked the log print and prepend it.
+        #
+        stack = inspect.stack()
+        frame = stack[2]        # obj.f() -> fwlog.debug() -> _log
+        obj = frame[0].f_locals.get('self')
+        if obj:
+            cls_name = obj.__class__.__name__
+            log_message = cls_name + ': ' + log_message
+
+
         if to_terminal and self.to_terminal_enabled:
             print(log_message)
 

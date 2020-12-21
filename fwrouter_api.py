@@ -234,22 +234,22 @@ class FWROUTER_API:
     def start_router(self):
         """Execute start router command.
         """
-        fwglobals.log.info("FWROUTER_API: start_router")
+        fwglobals.log.info("start_router")
         if self.router_state == FwRouterState.STOPPED or self.router_state == FwRouterState.STOPPING:
             self.call({'message':'start-router'})
-        fwglobals.log.info("FWROUTER_API: start_router: started")
+        fwglobals.log.info("start_router: started")
 
     def stop_router(self):
         """Execute stop router command.
         """
-        fwglobals.log.info("FWROUTER_API: stop_router")
+        fwglobals.log.info("stop_router")
         if self.router_state == FwRouterState.STARTED or self.router_state == FwRouterState.STARTING:
             self.call({'message':'stop-router'})
-        fwglobals.log.info("FWROUTER_API: stop_router: stopped")
+        fwglobals.log.info("stop_router: stopped")
 
     def state_change(self, new_state, reason=''):
         log_reason = '' if not reason else ' (%s)' % reason
-        fwglobals.log.debug("FWROUTER_API: %s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
+        fwglobals.log.debug("%s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
         if self.router_state == new_state:
             return
         old_state = self.router_state
@@ -297,7 +297,7 @@ class FWROUTER_API:
         #
         new_request = self._strip_noop_request(request)
         if not new_request:
-            fwglobals.log.debug("FWROUTER_API::call: ignore no-op request: %s" % json.dumps(request))
+            fwglobals.log.debug("call: ignore no-op request: %s" % json.dumps(request))
             return { 'ok': 1, 'message':'request has no impact' }
         request = new_request
 
@@ -371,9 +371,9 @@ class FWROUTER_API:
                 try:
                     cmd = 'ping -c 3 %s' % gw
                     output = subprocess.check_output(cmd, shell=True)
-                    fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, output))
+                    fwglobals.log.debug("call: %s: %s" % (cmd, output))
                 except Exception as e:
-                    fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, str(e)))
+                    fwglobals.log.debug("call: %s: %s" % (cmd, str(e)))
 
         return reply
 
@@ -392,7 +392,7 @@ class FWROUTER_API:
 
         :returns: Status codes dictionary.
         """
-        fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
+        fwglobals.log.debug("=== start handling aggregated request ===")
 
         for (idx, request) in enumerate(requests):
 
@@ -424,7 +424,7 @@ class FWROUTER_API:
                         pass
                 raise e
 
-        fwglobals.log.debug("FWROUTER_API: === end handling aggregated request ===")
+        fwglobals.log.debug("=== end handling aggregated request ===")
         return {'ok':1}
 
     def _fill_tunnel_stats_dict(self):
@@ -575,7 +575,7 @@ class FWROUTER_API:
 
         req = request['message']
 
-        fwglobals.log.debug("FWROUTER_API: === start execution of %s ===" % (req))
+        fwglobals.log.debug("=== start execution of %s ===" % (req))
 
         for idx, t in enumerate(cmd_list):      # 't' stands for command Tuple, though it is Python Dictionary :)
             cmd = t['cmd']
@@ -583,7 +583,7 @@ class FWROUTER_API:
             # If filter was provided, execute only commands that have the provided filter
             if filter:
                 if not 'filter' in cmd or cmd['filter'] != filter:
-                    fwglobals.log.debug("FWROUTER_API:_execute: filter out command by filter=%s (req=%s, cmd=%s, cmd['filter']=%s, params=%s)" %
+                    fwglobals.log.debug("_execute: filter out command by filter=%s (req=%s, cmd=%s, cmd['filter']=%s, params=%s)" %
                                         (filter, req, cmd['name'], str(cmd.get('filter')), str(cmd.get('params'))))
                     continue
 
@@ -598,25 +598,25 @@ class FWROUTER_API:
                     params = format(cmd['params'])
                 else:
                     params = ''
-                fwglobals.log.debug("FWROUTER_API:_execute: %s(%s)" % (cmd['name'], params))
+                fwglobals.log.debug("_execute: %s(%s)" % (cmd['name'], params))
 
                 # Now execute command
                 result = None if not 'cache_ret_val' in cmd else \
                     { 'result_attr' : cmd['cache_ret_val'][0] , 'cache' : cmd_cache , 'key' :  cmd['cache_ret_val'][1] }
                 reply = fwglobals.g.handle_request({ 'message': cmd['name'], 'params':  cmd.get('params')}, result)
                 if reply['ok'] == 0:        # On failure go back revert already executed commands
-                    fwglobals.log.debug("FWROUTER_API: %s failed ('ok' is 0)" % cmd['name'])
+                    fwglobals.log.debug("%s failed ('ok' is 0)" % cmd['name'])
                     raise Exception("API failed: %s" % reply['message'])
 
             except Exception as e:
                 err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), str(traceback.format_exc()))
                 fwglobals.log.error(err_str)
-                fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
+                fwglobals.log.debug("=== failed execution of %s ===" % (req))
                 if self.state_is_starting_stopping:
                     fwutils.dump()
                 # On failure go back to the begining of list and revert executed commands.
                 self._revert(cmd_list, idx)
-                fwglobals.log.debug("FWROUTER_API: === finished revert of %s ===" % (req))
+                fwglobals.log.debug("=== finished revert of %s ===" % (req))
                 raise Exception('failed to ' + cmd['descr'])
 
             # At this point the execution succeeded.
@@ -627,11 +627,11 @@ class FWROUTER_API:
                 except Exception as e:
                     fwglobals.log.excep("_execute: failed to substitute revert command: %s\n%s, %s" % \
                                 (str(t), str(e), str(traceback.format_exc())))
-                    fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
+                    fwglobals.log.debug("=== failed execution of %s ===" % (req))
                     self._revert(cmd_list, idx)
                     raise e
 
-        fwglobals.log.debug("FWROUTER_API: === end execution of %s ===" % (req))
+        fwglobals.log.debug("=== end execution of %s ===" % (req))
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
         """Revert list commands that are previous to the failed command with

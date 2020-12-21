@@ -93,11 +93,8 @@ class FwWanMonitor:
         self.route_rule_re   = re.compile(r"(\w+) via ([0-9.]+) dev (\w+)(.*)") #  'default via 20.20.20.22 dev enp0s9 proto dhcp metric 100'
 
         self.active           = True
-        self.thread_main_loop = threading.Thread(target=self.main_loop, name=str(self))
+        self.thread_main_loop = threading.Thread(target=self.main_loop, name="FwWanMonitor")
         self.thread_main_loop.start()
-
-    def __str__(self):  # Make str(self) prints the class name
-        return self.__class__.__name__
 
     def __enter__(self):
         return self
@@ -121,7 +118,7 @@ class FwWanMonitor:
 
 
     def main_loop(self):
-        fwglobals.log.debug("%s: loop started" % str(self))
+        fwglobals.log.debug("loop started")
 
         prev_time = time.time()
 
@@ -130,7 +127,7 @@ class FwWanMonitor:
             try: # Ensure thread doesn't exit on exception
 
                 while fwglobals.g.router_api.state_is_starting_stopping():
-                    fwglobals.log.debug("%s: vpp is being started/stopped" % str(self))
+                    fwglobals.log.debug("vpp is being started/stopped")
                     time.sleep(5)
 
                 server = self._get_server()
@@ -152,7 +149,7 @@ class FwWanMonitor:
             else:
                 prev_time = current_time
 
-        fwglobals.log.debug("%s: loop stopped" % str(self))
+        fwglobals.log.debug("loop stopped")
 
 
     def _get_server(self):
@@ -172,13 +169,13 @@ class FwWanMonitor:
                 out = subprocess.check_output(cmd, shell=True).splitlines()
                 break
             except Exception as e:
-                fwglobals.log.warning("%s: no default routes found: %s" % (str(self), str(e)))
+                fwglobals.log.warning("no default routes found: %s" % str(e))
                 time.sleep(1)
 
         for line in out:
             m = self.route_rule_re.match(line)
             if not m:
-                fwglobals.log.debug("%s: not expected format: '%s'" % (str(self), line))
+                fwglobals.log.debug("not expected format: '%s'" % line)
                 continue
 
             route = FwWanRoute(prefix=m.group(1), via=m.group(2), dev=m.group(3))
@@ -198,24 +195,24 @@ class FwWanMonitor:
             interfaces = fwglobals.g.router_cfg.get_interfaces(pci=route.pci)
             if interfaces and (interfaces[0].get('monitorInternet', True) == False):
                 if not route.pci in self.disabled_routes:
-                    fwglobals.log.debug("%s: disabled on %s(%s)" % (str(self), route.dev, route.pci))
+                    fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.pci))
                     self.disabled_routes[route.pci] = route
                 continue
             # If monitoring was enabled again, log this.
             if interfaces and route.pci in self.disabled_routes:
-                fwglobals.log.debug("%s: enabled on %s(%s)" % (str(self), route.dev, route.pci))
+                fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.pci))
                 del self.disabled_routes[route.pci]
 
             # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
             #
             if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
                 if not route.pci in self.disabled_routes:
-                    fwglobals.log.debug("%s: disabled on unassigned %s(%s)" % (str(self), route.dev, route.pci))
+                    fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.pci))
                     self.disabled_routes[route.pci] = route
                 continue
             # If interface was assigned again, log this.
             if not interfaces and route.pci in self.disabled_routes:
-                fwglobals.log.debug("%s: enabled on unassigned %s(%s)" % (str(self), route.dev, route.pci))
+                fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.pci))
                 del self.disabled_routes[route.pci]
 
             # if this route is known to us, update statistics from cache
@@ -229,7 +226,7 @@ class FwWanMonitor:
                 # Suppress RPF permanently to avoid Linux to filter out
                 # responses for ping-s on not default route interfaces.
                 fwutils.set_linux_reverse_path_filter(route.dev, on=False)
-                fwglobals.log.debug("%s: start on '%s'" % (str(self), str(route)))
+                fwglobals.log.debug("start on '%s'" % str(route))
 
             # Finally store the route into cache.
             #
@@ -244,7 +241,7 @@ class FwWanMonitor:
         #
         stale_keys = list(set(self.routes.keys()) - set(os_routes.keys()))
         for key in stale_keys:
-            fwglobals.log.debug("%s: stop on '%s'" % (str(self), str(self.routes[key])))
+            fwglobals.log.debug("stop on '%s'" % str(self.routes[key]))
             del self.routes[key]
 
         return self.routes.values()
@@ -274,7 +271,7 @@ class FwWanMonitor:
 
         if new_metric != None:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
-            fwglobals.log.debug("%s: connectivity %s on %s" % (str(self), state, route.dev))
+            fwglobals.log.debug("connectivity %s on %s" % (state, route.dev))
             self._update_metric(route, new_metric)
 
 
@@ -285,8 +282,8 @@ class FwWanMonitor:
         :param route:   the route to be updated with new metric
         :param new_metric:  the new metric
         '''
-        fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d" % \
-            (str(self), str(route), route.metric, new_metric))
+        fwglobals.log.debug("'%s' update metric in OS: %d -> %d" % \
+            (str(route), route.metric, new_metric))
 
         # Firsly update the route status, so if get_wan_failover_metric() is called
         # from the other thread it will reflect the actual status.
@@ -303,7 +300,7 @@ class FwWanMonitor:
         success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, new_metric)
         if not success:
             route.ok = prev_ok
-            fwglobals.log.error("%s: failed to update metric in OS: %s" % (str(self), err_str))
+            fwglobals.log.error("failed to update metric in OS: %s" % err_str)
             return
 
         # If vpp runs, go and adjust it configuration to the newer metric.
@@ -325,7 +322,7 @@ class FwWanMonitor:
                                     if_name=route.dev, wan_failover=True)
             if not success:
                 route.ok = prev_ok
-                fwglobals.log.error("%s: failed to update metric in netplan: %s" % (str(self), err_str))
+                fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
                 fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                 return
 
@@ -335,7 +332,7 @@ class FwWanMonitor:
                 success = fwutils.vpp_nat_add_remove_interface(False, route.pci, new_metric)
                 if not success:
                     route.ok = prev_ok
-                    fwglobals.log.error("%s: failed to update metric in VPP NAT" % (str(self)))
+                    fwglobals.log.error("failed to update metric in VPP NAT")
                     fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.pci, ip, route.via, prev_metric, dhcp, 'WAN',
@@ -348,8 +345,8 @@ class FwWanMonitor:
         if route.default:
             fwglobals.g.fwagent.reconnect()
 
-        fwglobals.log.debug("%s: '%s' update metric in OS: %d -> %d - done" % \
-            (str(self), str(route), route.metric, new_metric))
+        fwglobals.log.debug("'%s' update metric in OS: %d -> %d - done" % \
+            (str(route), route.metric, new_metric))
 
 
 def get_wan_failover_metric(pci, metric):
