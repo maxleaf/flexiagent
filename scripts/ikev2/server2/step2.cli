@@ -42,9 +42,8 @@
       "routing":"ospf"
     },
     "ikev2": {
-      "role": "initiator",
-      "remote-device-id": "CB3B2590-4134-411B-B826-EA38B1A30A37",
-      "lifetime": 3600
+      "role": "responder",
+      "remote-device-id": "CB3B2590-4134-411B-B826-EA38B1A30A37"
     }
   }
 },
