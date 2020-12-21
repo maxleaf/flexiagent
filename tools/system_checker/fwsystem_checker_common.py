@@ -31,6 +31,8 @@ import sys
 import uuid
 import yaml
 import shutil
+import serial
+import time
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -1330,3 +1332,59 @@ class Checker:
         if add_grub_line == True:
             os.system ("sudo update-grub")
         return
+
+    def lte_interfaces_exists(self):
+        for nicname, addrs in psutil.net_if_addrs().items():
+            dev_id = fwutils.get_interface_dev_id(nicname)
+            if dev_id:
+                driver = fwutils.get_interface_driver(dev_id)
+
+                if driver and driver in ['cdc_mbim', 'qmi_wwan']:
+                    return True
+
+        return False
+
+    def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
+        drivers = []
+        for nicname, addrs in psutil.net_if_addrs().items():
+            dev_id = fwutils.get_interface_dev_id(nicname)
+            if dev_id:
+                driver = fwutils.get_interface_driver(dev_id)
+                if driver and driver in ['cdc_mbim', 'qmi_wwan']:
+                    drivers.append({'driver': driver, 'dev_id': dev_id})
+
+        if len(drivers) > 0:
+            for inf in drivers:
+                if inf['driver'] == 'qmi_wwan':
+                    if not fix:
+                        return False
+
+                    try:
+                        usb_addr = inf['dev_id'].split('/')[-1]
+                        device = subprocess.check_output('ls /sys/bus/usb/drivers/qmi_wwan/%s/usbmisc/' % usb_addr, shell=True).strip()
+                        try:
+                            output_vendor = subprocess.check_output('qmicli --device=/dev/%s --dms-get-manufacturer' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
+                        except:
+                            time.sleep(2)
+                            output_vendor = subprocess.check_output('qmicli --device=/dev/%s --dms-get-manufacturer' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
+
+                        output_model = subprocess.check_output('qmicli --device=/dev/%s --dms-get-model' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
+                        vendor = output_vendor[-1].strip()
+                        model = output_model[-1].strip()
+
+                        at_commands = []
+                        if 'Quectel' in vendor and 'EM06-E' in model:
+                            at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
+                        elif 'Sierra Wireless' in vendor and 'EM7455' in model:
+                            at_commands = ['at!entercnd="A710"', 'at!usbcomp=1,1,1009', 'at!reset']
+                        else:
+                            return False
+
+                        ser = serial.Serial('/dev/ttyUSB3')
+                        for at in at_commands:
+                            ser.write(at + '\r')
+                            time.sleep(0.5)
+                        ser.close()
+                    except:
+                        return False
+        return True
