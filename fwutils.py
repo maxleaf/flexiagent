@@ -1961,3 +1961,7 @@ def ikev2_private_key_filename_get():
     machine_id = get_machine_id()
     private_pem = fwglobals.g.IKEV2_FOLDER + "local_key_" + machine_id + ".pem"
     return private_pem
+
+def ikev2_remote_certificate_filename_get(machine_id):
+    public_pem = fwglobals.g.IKEV2_FOLDER + "remote_certificate_" + machine_id + ".pem"
+    return public_pem

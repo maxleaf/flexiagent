@@ -383,7 +383,7 @@ class FWAGENT_API:
         """
         remote_device_id = params["device-id"]
         certificate = params["certificate"]
-        public_pem = fwglobals.g.IKEV2_FOLDER + "remote_certificate_" + remote_device_id + ".pem"
+        public_pem = fwutils.ikev2_remote_certificate_filename_get(remote_device_id)
 
         if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
             os.makedirs(fwglobals.g.IKEV2_FOLDER)
