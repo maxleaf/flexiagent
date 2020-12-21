@@ -1,14 +1,9 @@
 [
 {
   "entity":  "agent",
-  "message": "create-ikev2",
-  "params": {}
-},
-{
-  "entity":  "agent",
   "message": "update-ikev2",
   "params": {
-	"device-id": "CB3B2590-4134-411B-B826-EA38B1A30A37",
+	"device-id": "AFF9E8C5-D02A-4AF9-96E6-B8E3F6A12A75",
 	"certificate": [
   "-----BEGIN CERTIFICATE-----\n", 
   "MIIC3jCCAcagAwIBAgIIQu9egwYUOFcwDQYJKoZIhvcNAQELBQAwLzEtMCsGA1UE\n", 
@@ -35,20 +30,20 @@
   "message": "add-tunnel",
   "params": {
     "encryption-mode": "ikev2",
-    "src": "192.168.0.104",
-    "dst": "192.168.0.105",
+    "src": "192.168.0.105",
+    "dst": "192.168.0.104",
     "dstPort": "4789",
     "pci": "0000:00:03.00",
     "tunnel-id": 1,
     "loopback-iface": {
-      "addr":"10.100.0.6/31",
-      "mac":"02:00:27:fd:00:05",
+      "addr":"10.100.0.7/31",
+      "mac":"02:00:27:fd:00:04",
       "mtu":1350,
       "routing":"ospf"
     },
     "ikev2": {
       "role": "initiator",
-      "remote-device-id": "CB3B2590-4134-411B-B826-EA38B1A30A37",
+      "remote-device-id": "AFF9E8C5-D02A-4AF9-96E6-B8E3F6A12A75",
       "lifetime": 3600
     }
   }
@@ -60,13 +55,13 @@
     "interfaces": [
      {
 	"pci": "0000:00:03.00",
-	"addr": "192.168.0.104/24",
+	"addr": "192.168.0.105/24",
 	"gateway": "192.168.0.1",
 	"type":"WAN"
      },
      {
 	"pci": "0000:00:08.00",
-	"addr": "20.20.20.1/24",
+	"addr": "10.10.10.1/24",
 	"routing":"ospf",
 	"type":"LAN"
      }
