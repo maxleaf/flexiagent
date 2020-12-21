@@ -2510,6 +2510,7 @@ def lte_get_radio_signals_state(dev_id):
             'RSRP' : 0,
             'RSRQ' : 0,
             'SINR' : 0,
+            'SNR'  : 0,
             'text' : ''
         }
         modem_info = qmi_get_signals_state(dev_id)
@@ -2537,6 +2538,9 @@ def lte_get_radio_signals_state(dev_id):
                     continue
                 if 'RSRQ' in line:
                     result['RSRQ'] = data[index + 1].split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'SNR' in line:
+                    result['SNR'] = data[index + 1].split(':')[-1].strip().replace("'", '')
                     continue
                 if 'RSRP' in line:
                     result['RSRP'] = data[index + 1].split(':')[-1].strip().replace("'", '')
