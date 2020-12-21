@@ -333,6 +333,7 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
+        machine_id = fwutils.get_machine_id()
         public_der = fwglobals.g.IKEV2_FOLDER + "public-cert.der"
         private_der = fwglobals.g.IKEV2_FOLDER + "private-key.der"
         public_pem = fwutils.ikev2_certificate_filename_get()
