@@ -37,6 +37,18 @@
             "env": {
                 "PYTHONPATH": "${workspaceRoot}/flexiagent"
             }
+        },
+        {
+            "name": "system_checker",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/system_checker/fwsystem_checker.py",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/"
+            },
+            "sudo": true,
         }
     ]
 }
