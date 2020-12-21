@@ -1951,3 +1951,13 @@ def vpp_nat_add_remove_interface(remove, pci, metric):
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
+
+def ikev2_certificate_filename_get():
+    machine_id = get_machine_id()
+    public_pem = fwglobals.g.IKEV2_FOLDER + "local_certificate_" + machine_id + ".pem"
+    return public_pem
+
+def ikev2_private_key_filename_get():
+    machine_id = get_machine_id()
+    private_pem = fwglobals.g.IKEV2_FOLDER + "local_key_" + machine_id + ".pem"
+    return private_pem

@@ -333,13 +333,10 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
-        machine_id = fwutils.get_machine_id()
         public_der = fwglobals.g.IKEV2_FOLDER + "public-cert.der"
         private_der = fwglobals.g.IKEV2_FOLDER + "private-key.der"
-        public_pem = fwglobals.g.IKEV2_FOLDER + "local_certificate_" + machine_id + ".pem"
-        fwglobals.g.IKEV2_CERTIFICATE = public_pem
-        private_pem = fwglobals.g.IKEV2_FOLDER + "local_key_" + machine_id + ".pem"
-        fwglobals.g.IKEV2_KEY = private_pem
+        public_pem = fwutils.ikev2_certificate_filename_get()
+        private_pem = fwutils.ikev2_private_key_filename_get()
 
         if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
             os.makedirs(fwglobals.g.IKEV2_FOLDER)

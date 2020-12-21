@@ -583,7 +583,7 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_auth (..., auth_method: IKEV2_AUTH_METHOD_RSA_SIG)
-    data = fwglobals.g.IKEV2_CERTIFICATE
+    data = fwutils.ikev2_certificate_filename_get()
     auth_method = 1 # IKEV2_AUTH_METHOD_RSA_SIG
     cmd = {}
     cmd['cmd'] = {}
@@ -593,7 +593,7 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_set_local_key (...)
-    key_file = fwglobals.g.IKEV2_KEY
+    key_file = fwutils.ikev2_private_key_filename_get()
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_local_key"
