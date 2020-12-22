@@ -268,6 +268,7 @@ class Fwglobals:
         self.WAN_FAILOVER_WND_SIZE         = 20         # 20 pings, every ping waits a second for response
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
+        self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
 
 
         # Load configuration from file
@@ -387,13 +388,46 @@ class Fwglobals:
     def _call_vpp_api(self, request, result=None):
         return self.router_api.vpp_api.call_simple(request, result)
 
-    def _call_python_api(self, request):
+    def _call_python_api(self, request, result=None):
+        '''Handle request that describe python function.
+
+        :param request: the request like:
+            {
+                'name':   "python"
+                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_pci, labels)
+                'params': {
+                    'module': 'fwutils',
+                    'func'  : 'vpp_multilink_update_labels',
+                    'args'  : {
+                        'labels':   labels,
+                        'next_hop': gw,
+                        'pci':      iface_pci,
+                        'remove':   False
+                    }
+                }
+            }
+
+        :param result: the cache where the python function should store data,
+                       required by the request sender. Today this cache is
+                       managed by the router_api executor and it is used
+                       to fulfill substitutions in function arguments,
+                       specified by the 'substs' parameter of the request.
+                       The format of the 'result' is as follows:
+            {
+                'result_attr': <name of variable inside python function,
+                                value of which the function should set into cache>
+                'cache':       <the python dict used as a cache>
+                'key':         <the key for the value to be cached>
+            }
+        '''
         func = self._call_python_api_get_func(request['params'])
         args = request['params'].get('args')
-        if args:
-            ret = func(**args)
-        else:
-            ret = func()
+
+        if result:
+            args = copy.deepcopy(args) if args else {}
+            args.update({ 'result_cache': result })
+
+        ret = func(**args) if args else func()
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
             func_str = request['params'].get('func')
@@ -453,7 +487,7 @@ class Fwglobals:
         """Handle request.
 
         :param request:      The request received from flexiManage after
-                             transformation by fwutils.fix_recieved_message().
+                             transformation by fwutils.fix_received_message().
         :param result:       Place for result.
         :param received_msg: The original message received from flexiManage.
 

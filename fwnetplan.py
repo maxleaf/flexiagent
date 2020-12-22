@@ -283,17 +283,6 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # Remove pci-to-tap cached value for this pci, as netplan might change
-        # interface name (see 'set-name' netplan option).
-        # As well re-initialize the interface name by pci.
-        #
-        if fwglobals.g.router_api.state_is_started():
-            cache = fwglobals.g.cache.pci_to_vpp_tap_name
-            pci_full = fwutils.pci_to_full(pci)
-            if pci_full in cache:
-                del cache[pci_full]
-            ifname = fwutils.pci_to_tap(pci)
-
         # make sure IP address is applied in Linux.
         if is_add and set_name:
             if set_name != ifname:
@@ -303,8 +292,20 @@ def add_remove_netplan_interface(is_add, pci, ip, gw, metric, dhcp, type, if_nam
                 fwutils.netplan_apply('add_remove_netplan_interface')
                 ifname = set_name
 
-        if is_add and not _has_ip(ifname, (dhcp=='yes'), wan_failover):
-          raise Exception("ip was not assigned")
+        # Remove pci-to-tap cached value for this pci, as netplan might change
+        # interface name (see 'set-name' netplan option).
+        # As well re-initialize the interface name by pci.
+        #
+        cache = fwglobals.g.cache.pci_to_vpp_tap_name
+        pci_full = fwutils.pci_to_full(pci)
+        if pci_full in cache:
+            del cache[pci_full]
+        ifname = fwutils.pci_to_tap(pci)
+        fwglobals.log.debug("Interface name in cache is %s, pci %s" % (ifname, pci_full))
+
+        if not wan_failover: # Failover might be easily caused by interface down so no need to validate IP
+            if is_add and not _has_ip(ifname, (dhcp=='yes')):
+                raise Exception("ip was not assigned")
 
     except Exception as e:
         err_str = "add_remove_netplan_interface failed: pci: %s, file: %s, error: %s"\
@@ -340,17 +341,13 @@ def get_dhcp_netplan_interface(if_name):
                             return 'yes'
     return 'no'
 
-def _has_ip(if_name, dhcp, wan_failover):
+def _has_ip(if_name, dhcp):
 
-    # On WAN failover the interface might be down, so skip waiting 50 seconds
-    # and unnecessary network restart.
-    #
-    if not wan_failover:
-        for i in range(50):
-            log = (i == 49) # Log only the last trial to avoid log spamming
-            if fwutils.get_interface_address(if_name, log_on_failure=log):
-                return True
-            time.sleep(1)
+    for i in range(50):
+        log = (i == 49) # Log only the last trial to avoid log spamming
+        if fwutils.get_interface_address(if_name, log_on_failure=log):
+            return True
+        time.sleep(1)
 
     # At this point no IP was found on the interface.
     # If IP was not assigned to the interface, we still return OK if:
