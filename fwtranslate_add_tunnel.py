@@ -984,7 +984,6 @@ def add_tunnel(params):
         cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
-    ''' TBD
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "python"
@@ -1003,7 +1002,7 @@ def add_tunnel(params):
                         'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
         }
         cmd_list.append(cmd)
-    '''
+
     return cmd_list
 
 def get_request_key(params):
