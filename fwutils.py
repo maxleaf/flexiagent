@@ -2398,7 +2398,13 @@ def lte_get_system_info(dev_id):
             for line in data:
                 if 'Cell ID' in line:
                     result['Cell_Id'] = line.split(':')[-1].strip().replace("'", '')
-                    break
+                    continue
+                if 'MCC' in line:
+                    result['MCC'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'MNC' in line:
+                    result['MNC'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
 
         operator_name = qmi_get_operator_name(dev_id)
         if operator_name:
@@ -2406,19 +2412,19 @@ def lte_get_system_info(dev_id):
             for line in data:
                 if '\tName' in line:
                     name = line.split(':')[-1].strip().replace("'", '')
-                    result['Operator_Name'] = name if name.isalnum() else ''
+                    result['Operator_Name'] = name if bool(re.match("^[a-zA-Z0-9_ ]*$", name)) else ''
                     break
 
-        home_network = qmi_get_home_network()
-        if home_network:
-            data = home_network.splitlines()
-            for line in data:
-                if 'MCC' in line:
-                    result['MCC'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
-                if 'MNC' in line:
-                    result['MNC'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
+        # home_network = qmi_get_home_network()
+        # if home_network:
+        #     data = home_network.splitlines()
+        #     for line in data:
+        #         # if 'MCC' in line:
+        #         #     result['MCC'] = line.split(':')[-1].strip().replace("'", '')
+        #         #     continue
+        #         # if 'MNC' in line:
+        #         #     result['MNC'] = line.split(':')[-1].strip().replace("'", '')
+        #         #     continue
 
         return result
     except Exception as e:

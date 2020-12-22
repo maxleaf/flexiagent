@@ -443,12 +443,29 @@ class FWAGENT_API:
                 is_success, error = self._connect_to_lte(params)
             elif operation == 'disconnect':
                 is_success, error = self._disconnect_from_lte(params)
+            elif operation == 'reset':
+                is_success, error = self._reset_lte(params)
             else:
                 is_success, error = (False, 'No supported operation was requested')
 
             return {'message': error, 'ok': is_success}
         except Exception as e:
             raise Exception("_lte_perform_operation: failed. %s" % str(e))
+
+    def _reset_lte(self, params):
+        try:
+            # don't perform disconnect if this interface is already assigned to vpp and vpp is run
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+            if fwutils.vpp_does_run() and is_assigned:
+                return (False, 'Please unassigned this interface in order to reset the LTE card')
+
+            is_success, error = fwutils.lte_disconnect(params['dev_id'])
+            fwutils.qmi_sim_power_off(params['dev_id'])
+            fwutils.qmi_sim_power_on(params['dev_id'])
+
+            return True, None
+        except Exception as e:
+            raise Exception("_reset_lte: failed to reset lte card: %s" % str(e))
 
     def _disconnect_from_lte(self, params):
         try:
