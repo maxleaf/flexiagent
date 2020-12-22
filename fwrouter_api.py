@@ -266,7 +266,7 @@ class FWROUTER_API:
                     if fwutils.valid_message_string(reason):
                         fwutils.file_write_and_flush(f, reason + '\n')
                     else:
-                        fwglobals.log.excep("Not valid router failure reason string: '%s'" % err_str)
+                        fwglobals.log.excep("Not valid router failure reason string: '%s'" % reason)
             fwutils.stop_vpp()
         elif old_state == FwRouterState.FAILED:
             if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
@@ -612,6 +612,8 @@ class FWROUTER_API:
                 err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), str(traceback.format_exc()))
                 fwglobals.log.error(err_str)
                 fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
+                if self.state_is_starting_stopping:
+                    fwutils.dump()
                 # On failure go back to the begining of list and revert executed commands.
                 self._revert(cmd_list, idx)
                 fwglobals.log.debug("FWROUTER_API: === finished revert of %s ===" % (req))
@@ -656,7 +658,7 @@ class FWROUTER_API:
                     err_str = "_revert: exception while '%s': %s(%s): %s" % \
                                 (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
                     fwglobals.log.excep(err_str)
-                    self.state_change(FwRouterState.FAILED, "_revert: failed to revert '%s'" % t['cmd']['descr'])
+                    self.state_change(FwRouterState.FAILED, "revert failed: %s" % t['cmd']['name'])
 
     def _strip_noop_request(self, request):
         """Checks if the request has no impact on configuration.
@@ -1081,8 +1083,10 @@ class FWROUTER_API:
         # - the original request does not have 'remove-multilink-policy'
         #
         if multilink_policy_params:
-            # Firstly find the right place to insert the 'remove-multilink-policy'.
+            # Firstly find the right place to insert the 'remove-multilink-policy' - idx.
             # It should be the first appearance of one of the preprocessing requests.
+            # As well find the right place to insert the 'add-multilink-policy' - idx_last.
+            # It should be the last appearance of one of the preprocessing requests.
             #
             idx = 10000
             idx_last = -1
@@ -1090,7 +1094,8 @@ class FWROUTER_API:
                 if indexes[req_name] > -1:
                     if indexes[req_name] < idx:
                         idx = indexes[req_name]
-                    idx_last = indexes[req_name]
+                    if indexes[req_name] > idx_last:
+                        idx_last = indexes[req_name]
             if idx == 10000:
                 # No requests to preprocess were found, return
                 return request
@@ -1111,6 +1116,7 @@ class FWROUTER_API:
                 del requests[idx_policy]
             if indexes['remove-multilink-policy'] == -1:
                 _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
+                idx_last += 1
             if indexes['add-multilink-policy'] == -1 and reinstall_multilink_policy:
                 _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
 
