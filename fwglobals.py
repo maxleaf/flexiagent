@@ -38,6 +38,7 @@ from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications import FwApps
+from fwikev2 import FwIKEv2Tunnels
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
@@ -250,6 +251,7 @@ class Fwglobals:
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
+        self.IKEV2_DB_FILE       = self.DATA_PATH + '.ikev2.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
@@ -325,6 +327,7 @@ class Fwglobals:
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.ikev2tunnels = FwIKEv2Tunnels(self.IKEV2_DB_FILE)
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 

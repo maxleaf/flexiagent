@@ -38,6 +38,7 @@ import fwnetplan
 import fwtranslate_add_tunnel
 
 from fwapplications import FwApps
+from fwikev2 import FwIKEv2Tunnels
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
@@ -101,6 +102,7 @@ class FWROUTER_API:
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
+        self.thread_ikev2    = None
 
         # Initialize global data that persists device reboot / daemon restart.
         #
@@ -180,6 +182,23 @@ class FWROUTER_API:
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
+    def ikev2_thread(self):
+        """IKEv2 client thread.
+        Its function is to monitor state of IKEv2 GRE tunnels.
+        """
+        while self.state_is_started():
+            time.sleep(1)  # 1 sec
+
+            tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
+
+            for gre in tunnels:
+                tunnel = gre.tunnel
+                bridge_id = fwglobals.g.ikev2tunnels.get_tunnel(tunnel.src, tunnel.dst)
+                if (bridge_id):
+                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index, bd_id=bridge_id, enable=1, shg=1)
+                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+                    return
+
     def restore_vpp_if_needed(self):
         """Restore VPP.
         If vpp doesn't run because of crash or device reboot,
@@ -220,6 +239,8 @@ class FWROUTER_API:
         try:
             with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
                 db_app_rec.clean()
+            with FwIKEv2Tunnels(fwglobals.g.IKEV2_DB_FILE) as db_ikev2:
+                db_ikev2.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
@@ -1136,6 +1157,9 @@ class FWROUTER_API:
         if self.thread_dhcpc is None:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
+        if self.thread_ikev2 is None:
+            self.thread_ikev2 = threading.Thread(target=self.ikev2_thread, name='IKEv2 Thread')
+            self.thread_ikev2.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -1154,6 +1178,10 @@ class FWROUTER_API:
         if self.thread_dhcpc:
             self.thread_dhcpc.join()
             self.thread_dhcpc = None
+
+        if self.thread_ikev2:
+            self.thread_ikev2.join()
+            self.thread_ikev2 = None
 
     def _on_start_router_before(self):
         """Handles pre start VPP activities.

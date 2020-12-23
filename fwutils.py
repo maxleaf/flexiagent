@@ -46,6 +46,7 @@ sys.path.append(common_tools)
 from fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
+from fwikev2        import FwIKEv2Tunnels
 from fwrouter_cfg   import FwRouterCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
@@ -854,6 +855,8 @@ def reset_router_config():
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
     with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
         db_app_rec.clean()
+    with FwIKEv2Tunnels(fwglobals.g.IKEV2_DB_FILE) as db_ikev2:
+        db_ikev2.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
@@ -2007,18 +2010,5 @@ def ikev2_remote_certificate_filename_get(machine_id):
     public_pem = fwglobals.g.IKEV2_FOLDER + "remote_certificate_" + machine_id + ".pem"
     return public_pem
 
-def ikev2_thread(src, dst, bridge_id):
-    while(1):
-        time.sleep(1)
-        tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
-
-        for gre in tunnels:
-            tunnel = gre.tunnel
-            if (tunnel.src == src and tunnel.dst == dst):
-                fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index, bd_id=bridge_id, enable=1, shg=1)
-                fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
-                return
-
 def ikev2_gre_bridge_add(src, dst, bridge_id):
-    thread = threading.Thread(target=ikev2_thread, name='IKEv2 Thread ' + str(bridge_id), args=(src, dst, bridge_id))
-    thread.start()
+    fwglobals.g.ikev2tunnels.add_tunnel(src, dst, bridge_id)
