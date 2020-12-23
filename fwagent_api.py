@@ -48,7 +48,8 @@ fwagent_api = {
     'lte-perform-operation':            '_lte_perform_operation',
     'wifi-perform-operation':           '_wifi_perform_operation',
     'get-lte-interface-info':           '_get_lte_interface_info',
-    'get-wifi-interface-info':          '_get_wifi_interface_info'
+    'get-wifi-interface-info':          '_get_wifi_interface_info',
+    'get-default-apn':                  '_get_default_apn'
 }
 
 class FWAGENT_API:
@@ -429,6 +430,21 @@ class FWAGENT_API:
             return {'message': response, 'ok': 1}
         except Exception as e:
             raise Exception("_get_wifi_interface_info: %s" % str(e))
+
+    def _get_default_apn(self, params):
+        try:
+            system_info = fwutils.lte_get_system_info(params['dev_id'])
+            apn = fwutils.lte_get_default_apn(params['dev_id'])
+
+            response = {
+                'apn'             : apn,
+                'mcc'             : system_info['MCC'],
+                'mnc'             : system_info['MNC'],
+            }
+
+            return {'message': response, 'ok': 1}
+        except Exception as e:
+            return {'message': str(e), 'ok': 0}
 
     def _lte_perform_operation(self, params):
         try:

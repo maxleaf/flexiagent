@@ -479,7 +479,6 @@ def get_linux_interfaces(cached=True):
         if is_lte_interface(dev_id):
             interface['deviceType'] = 'lte'
             interface['dhcp'] = 'yes'
-            interface['deviceParams'] = {'apn' : lte_get_default_apn(dev_id) }
             tap = dev_id_to_tap(dev_id) if vpp_does_run() else None
             if tap:
                 # addrs = linux_inf[tap]
@@ -2349,21 +2348,17 @@ def lte_connect(apn, dev_id, reset=False):
         if not inserted:
             return (False, "Sim is not presented")
 
-
-    if not apn:
-        # try to fetch it from the sim
-        default_apn = lte_get_default_apn(dev_id)
-        if default_apn:
-            apn = sys_info['Operator_Name']
-        else:
-            return (False, "apn is not configured for %s" % dev_id)
-
     try:
         current_connection_state = qmi_get_connection_state(dev_id)
         if current_connection_state:
             return (True, None)
 
-        output = _run_qmicli_command(dev_id, 'wds-start-network="ip-type=4,apn=%s" --client-no-release-cid' % apn)
+        connection_params = ['ip-type=4']
+        if apn:
+            connection_params.append('apn=%s' % apn)
+
+        output = _run_qmicli_command(dev_id, 'wds-start-network="%s" --client-no-release-cid' % ",".join(connection_params)
+)
         data = output.splitlines()
 
         inf_name = dev_id_to_linux_if(dev_id)

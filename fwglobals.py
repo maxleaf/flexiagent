@@ -76,6 +76,7 @@ request_handlers = {
     'wifi-perform-operation':            {'name': '_call_agent_api'},
     'get-lte-interface-info':            {'name': '_call_agent_api'},
     'get-wifi-interface-info':           {'name': '_call_agent_api'},
+    'get-default-apn':                   {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
