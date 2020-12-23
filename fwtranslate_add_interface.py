@@ -563,7 +563,8 @@ def add_interface(params):
             protocol all prio 2 u32 \
             match u32 0 0 flowid 1:1 \
             action pedit ex munge eth dst set LTE-MAC \
-            pipe action mirred egress mirror dev %s" % iface_name,
+            pipe action mirred egress mirror dev %s \
+            pipe action drop" % iface_name,
             { 'substs': [
                 {'replace':'DEV-STUB', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name },
                 {'replace':'LTE-MAC', 'val_by_func':'get_interface_mac_addr', 'arg':iface_name }
@@ -580,7 +581,8 @@ def add_interface(params):
             protocol all prio 2 u32 \
             match u32 0 0 flowid 1:1 \
             action pedit ex munge eth dst set VPP-MAC \
-            pipe action mirred egress mirror dev DEV-STUB" % iface_name,
+            pipe action mirred egress mirror dev DEV-STUB \
+            pipe action drop" % iface_name,
             { 'substs': [
                 {'replace':'VPP-MAC', 'val_by_func':'get_vpp_tap_interface_mac_addr', 'arg':dev_id },
                 {'replace':'DEV-STUB', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name }
