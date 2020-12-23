@@ -794,7 +794,7 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
     _add_ikev2_common_profile(
                       cmd_list, ikev2_profile_name, params['ikev2']['remote-device-id'])
 
-    src = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['src']).ip)
+    src = str(IPNetwork(l2gre_tunnel_ips['src']).ip)
     dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)
 
     if params['ikev2']['role'] == 'initiator':

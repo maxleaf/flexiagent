@@ -63,26 +63,26 @@ class FwIKEv2Tunnels:
         """
         self.db.clear()
 
-    def add_tunnel(self, src, dst, bd_id):
+    def add_tunnel(self, src, bd_id):
         """Stores tunnel into database.
 
         :returns: None.
         """
-        self.db[(src, dst)] = bd_id
+        fwglobals.log.debug("add_tunnel: %s" % src)
+        self.db[src] = bd_id
 
-    def remove_tunnel(self, src, dst):
+    def remove_tunnel(self, src):
         """Removes tunnel from database.
 
         :returns: None.
         """
-        del self.db[(src, dst)]
+        fwglobals.log.debug("remove_tunnel: %s" % src)
+        del self.db[src]
 
-    def get_tunnel(self, src, dst):
+    def get_tunnel(self, src):
         """Get tunnel from database.
 
         :returns: Dictionary.
         """
-        if (src, dst) in self.db:
-            return self.db[(src, dst)]
-        else:
-            return None
+        fwglobals.log.debug("get_tunnel: %s" % src)
+        return self.db[src]

@@ -2011,4 +2011,4 @@ def ikev2_remote_certificate_filename_get(machine_id):
     return public_pem
 
 def ikev2_gre_bridge_add(src, dst, bridge_id):
-    fwglobals.g.ikev2tunnels.add_tunnel(src, dst, bridge_id)
+    fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id)
