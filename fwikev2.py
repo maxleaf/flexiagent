@@ -68,7 +68,6 @@ class FwIKEv2Tunnels:
 
         :returns: None.
         """
-        fwglobals.log.debug("add_tunnel: %s" % src)
         self.db[src] = bd_id
 
     def remove_tunnel(self, src):
@@ -76,7 +75,6 @@ class FwIKEv2Tunnels:
 
         :returns: None.
         """
-        fwglobals.log.debug("remove_tunnel: %s" % src)
         del self.db[src]
 
     def get_tunnel(self, src):
@@ -84,5 +82,4 @@ class FwIKEv2Tunnels:
 
         :returns: Dictionary.
         """
-        fwglobals.log.debug("get_tunnel: %s" % src)
         return self.db[src]
