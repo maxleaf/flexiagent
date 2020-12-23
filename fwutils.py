@@ -1707,7 +1707,8 @@ def netplan_apply(caller_name=None):
             fwglobals.log.debug(
                 "%s: netplan_apply: default route changed (%s->%s) - reconnect" % \
                 (caller_name, dr_pci_before, dr_pci_after))
-            fwglobals.g.fwagent.reconnect()
+            if fwglobals.g.fwagent:
+                fwglobals.g.fwagent.reconnect()
 
     except Exception as e:
         fwglobals.log.debug("%s: netplan_apply failed: %s" % (caller_name, str(e)))
