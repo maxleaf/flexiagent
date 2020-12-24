@@ -372,7 +372,7 @@ class FWAGENT_API:
         with open(public_pem) as public_pem_file:
             certificate = public_pem_file.readlines()
 
-        return {'certificate': certificate, 'ok': 1}
+        return {'message': {'certificate': certificate}, 'ok': 1}
 
     def _update_ikev2(self, params=None):
         """IKEv2 remote certificate update.
