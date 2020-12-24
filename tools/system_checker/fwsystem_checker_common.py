@@ -1375,16 +1375,57 @@ class Checker:
                         at_commands = []
                         if 'Quectel' in vendor and 'EM06-E' in model:
                             at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
+                            at_serial_port = self.get_at_port(inf['dev_id'])
+                            if at_serial_port and len(at_serial_port) > 0:
+                                ser = serial.Serial(at_serial_port[0])
+                                for at in at_commands:
+                                    ser.write(at + '\r')
+                                    time.sleep(0.5)
+                                ser.close()
                         elif 'Sierra Wireless' in vendor and 'EM7455' in model:
-                            at_commands = ['at!entercnd="A710"', 'at!usbcomp=1,1,1009', 'at!reset']
+                            current_usb_cop = subprocess.check_output('qmicli --device=/dev/%s --dms-swi-get-usb-composition' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
+                            subprocess.check_output('qmicli --device=/dev/%s --dms-swi-set-usb-composition=8' % device, shell=True, stderr=subprocess.STDOUT)
+                            subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=offline' % device, shell=True, stderr=subprocess.STDOUT)
+                            subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=reset' % device, shell=True, stderr=subprocess.STDOUT)
+                            # at_commands = ['at!entercnd="A710"', 'at!usbcomp=1,1,1009', 'at!reset']
                         else:
                             return False
 
-                        ser = serial.Serial('/dev/ttyUSB3')
-                        for at in at_commands:
-                            ser.write(at + '\r')
-                            time.sleep(0.5)
-                        ser.close()
                     except:
                         return False
         return True
+
+    def get_at_port(self, dev_id):
+        at_ports = []
+        try:
+            addr_type, addr = fwutils.dev_id_parse(dev_id)
+            search_dev = '/'.join(addr.split('/')[:-1])
+            output = subprocess.check_output('find /sys/bus/usb/devices/%s*/ -name dev' % search_dev, shell=True).splitlines()
+            pattern = '(ttyUSB[0-9])'
+            tty_devices = []
+
+            if output:
+                for line in output:
+                    match = re.search(pattern, line)
+                    if match:
+                        tty_devices.append(match.group(1))
+
+            if len(tty_devices) > 0:
+                for usb_port in tty_devices:
+                    try:
+                        with serial.Serial('/dev/%s' % usb_port, 115200, timeout=1) as ser:
+                            ser.write('AT\r')
+                            t_end = time.time() + 1
+                            while time.time() < t_end:
+                                response = ser.readline()
+                                if "OK" in response:
+                                    at_ports.append(ser.name)
+                                    break
+
+                            ser.close()
+                    except Exception as e:
+                        pass
+
+            return at_ports
+        except Exception as e:
+            return at_ports
