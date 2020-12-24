@@ -499,8 +499,7 @@ class FWAGENT_API:
 
     def _connect_to_lte(self, params):
         try:
-            apn = params['apn'] if 'apn' in params else ''
-            is_success, error =  fwutils.lte_connect(apn, params['dev_id'])
+            is_success, error =  fwutils.lte_connect(params)
 
             if is_success:
                 fwutils.set_lte_info_on_linux_interface()

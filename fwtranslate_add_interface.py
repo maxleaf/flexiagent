@@ -211,14 +211,15 @@ def add_interface(params):
             cmd_list.append(cmd)
 
             # connect the modem to the cellular provider
-            apn = params['configuration']['apn'] if params['configuration'] else None
+            configs = params['configuration'] if params['configuration'] else {}
+            configs['dev_id'] = dev_id
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "python"
             cmd['cmd']['params'] = {
                         'module': 'fwutils',
                         'func': 'lte_connect',
-                        'args': { 'apn': apn, 'dev_id': dev_id }
+                        'args': { 'params': configs }
             }
             cmd['cmd']['descr'] = "connect modem to lte cellular network provider"
             cmd_list.append(cmd)

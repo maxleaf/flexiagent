@@ -2210,7 +2210,7 @@ def set_lte_info_on_linux_interface():
                 if is_assigned:
                     metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
 
-                os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric))
+                os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
 
     return None
 
@@ -2339,8 +2339,8 @@ def lte_disconnect(dev_id=None):
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))
 
-def lte_connect(apn, dev_id, reset=False):
-
+def lte_connect(params, reset=False):
+    dev_id = params['dev_id']
     if not lte_is_sim_inserted(dev_id):
         qmi_sim_power_off(dev_id)
         qmi_sim_power_on(dev_id)
@@ -2354,8 +2354,14 @@ def lte_connect(apn, dev_id, reset=False):
             return (True, None)
 
         connection_params = ['ip-type=4']
-        if apn:
-            connection_params.append('apn=%s' % apn)
+        if params['apn']:
+            connection_params.append('apn=%s' % params['apn'])
+        if params['user']:
+            connection_params.append('username=%s' % params['user'])
+        if params['password']:
+            connection_params.append('password=%s' % params['password'])
+        if params['auth']:
+            connection_params.append('auth=%s' % params['auth'])
 
         output = _run_qmicli_command(dev_id, 'wds-start-network="%s" --client-no-release-cid' % ",".join(connection_params)
 )
@@ -2374,7 +2380,7 @@ def lte_connect(apn, dev_id, reset=False):
         return (True, None)
     except subprocess.CalledProcessError as e:
         if not reset:
-            return lte_connect(apn, dev_id, True)
+            return lte_connect(params, True)
 
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
