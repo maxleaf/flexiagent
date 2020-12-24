@@ -239,9 +239,9 @@ def get_interface_gateway(if_name, if_dev_id=None):
     """Get gateway.
 
     :param if_name:  name of the interface, gateway for which is returned
-    :param if_pci:   PCI of the interface, gateway for which is returned.
+    :param if_dev_id: Bus address of the interface, gateway for which is returned.
                      If provided, the 'if_name' is ignored. The name is fetched
-                     from system by PCI.
+                     from system by a Bus address.
 
     :returns: Gateway ip address.
     """
@@ -2718,7 +2718,8 @@ def netplan_apply(caller_name=None):
         # Before netplan apply go and note the default route.
         # If it will be changed as a result of netplan apply, we return True.
         #
-        (_, _, dr_dev_id_before) = get_default_route()
+        if fwglobals.g.fwagent:
+            (_, _, dr_dev_id_before) = get_default_route()
 
         # Now go and apply the netplan
         #
@@ -2734,12 +2735,13 @@ def netplan_apply(caller_name=None):
 
         # Find out if the default route was changed. If it was - reconnect agent.
         #
-        (_, _, dr_dev_id_after) = get_default_route()
-        if dr_dev_id_before != dr_dev_id_after:
-            fwglobals.log.debug(
-                "%s: netplan_apply: default route changed (%s->%s) - reconnect" % \
-                (caller_name, dr_dev_id_before, dr_dev_id_after))
-            fwglobals.g.fwagent.reconnect()
+        if fwglobals.g.fwagent:
+            (_, _, dr_dev_id_after) = get_default_route()
+            if dr_dev_id_before != dr_dev_id_after:
+                fwglobals.log.debug(
+                    "%s: netplan_apply: default route changed (%s->%s) - reconnect" % \
+                    (caller_name, dr_dev_id_before, dr_dev_id_after))
+                fwglobals.g.fwagent.reconnect()
 
     except Exception as e:
         fwglobals.log.debug("%s: netplan_apply failed: %s" % (caller_name, str(e)))

@@ -387,14 +387,14 @@ class Fwglobals:
         :param request: the request like:
             {
                 'name':   "python"
-                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_pci, labels)
+                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_dev_id, labels)
                 'params': {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_labels',
                     'args'  : {
                         'labels':   labels,
                         'next_hop': gw,
-                        'pci':      iface_pci,
+                        'dev_id':   iface_dev_id,
                         'remove':   False
                     }
                 }
