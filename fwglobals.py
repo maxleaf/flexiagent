@@ -173,7 +173,7 @@ class Fwglobals:
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
                 self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERFACES)
             except Exception as e:
-                log.excep("FwConfiguration: %s, set defaults" % str(e))
+                log.excep("%s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
                 self.DEBUG          = DEFAULT_DEBUG
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
