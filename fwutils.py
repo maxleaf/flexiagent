@@ -214,7 +214,7 @@ def get_interface_gateway(if_name, if_dev_id=None):
     :param if_name:  name of the interface, gateway for which is returned
     :param if_dev_id: Bus address of the interface, gateway for which is returned.
                      If provided, the 'if_name' is ignored. The name is fetched
-                     from system by PCI.
+                     from system by a Bus address.
 
     :returns: Gateway ip address.
     """
