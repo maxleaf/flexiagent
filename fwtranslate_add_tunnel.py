@@ -433,8 +433,8 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, params):
             'dst_address'          : dst_addr_bytes,
             'vni'                  : bridge_id,
             'dest_port'            : int(params.get('dstPort', 4789)),
-            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'pci_to_vpp_sw_if_index', 'arg': params['pci']},
-                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_binary_interface_gateway_by_pci', 'arg': params['pci']}],
+            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg': params['dev_id']},
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_binary_interface_gateway_by_dev_id', 'arg': params['dev_id']}],
             'instance'             : bridge_id,
             'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }
