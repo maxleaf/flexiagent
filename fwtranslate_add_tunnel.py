@@ -561,11 +561,13 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
-def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
+def _add_ikev2_common_profile(cmd_list, name, role, tunnel_id, remote_device_id):
     """Add IKEv2 common profile commands into the list.
 
     :param cmd_list:            List of commands.
     :param name:                Profile name.
+    :param role:                IKEv2 role.
+    :param tunnel_id:           Tunnel id.
     :param remote_device_id:    Remote device id.
 
     :returns: None.
@@ -602,18 +604,19 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_id (..., 'is_local':1)
-    data = fwutils.get_machine_id()
     id_type = 2 # IKEV2_ID_TYPE_ID_FQDN
+    data = role + '_' + str(tunnel_id)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type':id_type, 'data': data, 'data_len':len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type':id_type, 'data':data, 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_id (..., 'is_local':0)
-    data = remote_device_id
     id_type = 2 # IKEV2_ID_TYPE_ID_FQDN
+    remote_role = 'initiator' if role == 'responder' else 'responder'
+    data = remote_role + '_' + str(tunnel_id)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
@@ -622,7 +625,6 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':1)
-    data = fwutils.get_machine_id()
     proto = 0
     start_port = 0
     end_port = 65535
@@ -636,7 +638,6 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id):
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':0)
-    data = fwutils.get_machine_id()
     proto = 0
     start_port = 0
     end_port = 65535
@@ -790,9 +791,9 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 shg=0,
                 cache_key='loop0_sw_if_index')
 
-    ikev2_profile_name = 'profile_' + str(bridge_id)
+    ikev2_profile_name = 'fw_' + str(params['tunnel-id'])
     _add_ikev2_common_profile(
-                      cmd_list, ikev2_profile_name, params['ikev2']['remote-device-id'])
+                      cmd_list, ikev2_profile_name, params['ikev2']['role'], params['tunnel-id'], params['ikev2']['remote-device-id'])
 
     src = str(IPNetwork(l2gre_tunnel_ips['src']).ip)
     dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)
