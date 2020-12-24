@@ -1387,7 +1387,7 @@ class Checker:
                             subprocess.check_output('qmicli --device=/dev/%s --dms-swi-set-usb-composition=8' % device, shell=True, stderr=subprocess.STDOUT)
                             subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=offline' % device, shell=True, stderr=subprocess.STDOUT)
                             subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=reset' % device, shell=True, stderr=subprocess.STDOUT)
-                            # at_commands = ['at!entercnd="A710"', 'at!usbcomp=1,1,1009', 'at!reset']
+                            time.sleep(5)
                         else:
                             return False
 
