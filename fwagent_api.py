@@ -268,7 +268,7 @@ class FWAGENT_API:
                         }
         :returns: Dictionary with status code.
         """
-        fwglobals.log.info("FWAGENT_API: _sync_device STARTED")
+        fwglobals.log.info("_sync_device STARTED")
 
         # Go over configuration requests received within sync-device request,
         # intersect them against the requests stored locally and generate new list
@@ -276,10 +276,10 @@ class FWAGENT_API:
         # received with the sync-device.
         #
         sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
-        fwglobals.log.debug("FWAGENT_API: _sync_device: sync-list: %s" % \
+        fwglobals.log.debug("_sync_device: sync-list: %s" % \
                             json.dumps(sync_list, indent=2, sort_keys=True))
         if not sync_list:
-            fwglobals.log.info("FWAGENT_API: _sync_device: sync_list is empty, no need to sync")
+            fwglobals.log.info("_sync_device: sync_list is empty, no need to sync")
             fwglobals.g.router_cfg.reset_signature()
             if params.get('type', '') != 'full-sync':
                 return {'ok': 1}   # Return if there is no full sync enforcement
@@ -289,7 +289,7 @@ class FWAGENT_API:
         # If that fails, go with full sync - reset configuration and apply sync-device list
         #
         if sync_list:
-            fwglobals.log.debug("FWAGENT_API: _sync_device: start smart sync")
+            fwglobals.log.debug("_sync_device: start smart sync")
             sync_request = {
                 'message':   'aggregated',
                 'params':    { 'requests': sync_list },
@@ -303,14 +303,14 @@ class FWAGENT_API:
             #
             if reply['ok'] == 1 and params.get('type', '') != 'full-sync':
                 fwglobals.g.router_cfg.reset_signature()
-                fwglobals.log.debug("FWAGENT_API: _sync_device: smart sync succeeded")
-                fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+                fwglobals.log.debug("_sync_device: smart sync succeeded")
+                fwglobals.log.info("_sync_device FINISHED")
                 return {'ok': 1}
 
         # At this point we have to perform full sync.
         # This is due to either smart sync failure or full sync enforcement.
         #
-        fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
+        fwglobals.log.debug("_sync_device: start full sync")
         restart_router = False
         if fwglobals.g.router_api.state_is_started():
             restart_router = True
@@ -328,10 +328,10 @@ class FWAGENT_API:
 
         if restart_router:
             fwglobals.g.router_api.call({'message': 'start-router'})
-        fwglobals.log.debug("FWAGENT_API: _sync_device: full sync succeeded")
+        fwglobals.log.debug("_sync_device: full sync succeeded")
 
         fwglobals.g.router_cfg.reset_signature()
-        fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+        fwglobals.log.info("_sync_device FINISHED")
         return {'ok': 1}
 
     def _get_wifi_interface_status(self, params):
