@@ -109,7 +109,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("Fwagent got %s" % fwglobals.g.signal_names[signum])
+        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
         self.__exit__(None, None, None)
         exit(1)
 
@@ -768,7 +768,7 @@ class FwagentDaemon(object):
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("FwagentDaemon: got %s" % fwglobals.g.signal_names[signum])
+        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
         exit(1)
 
     def __enter__(self):
@@ -780,11 +780,11 @@ class FwagentDaemon(object):
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
-        fwglobals.log.debug("FwagentDaemon: goes to exit")
+        fwglobals.log.debug("goes to exit")
         self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
         fwglobals.g.finalize_agent()
         self.agent = None
-        fwglobals.log.debug("FwagentDaemon: exited")
+        fwglobals.log.debug("exited")
 
     def _check_system(self):
         """Check system requirements.
@@ -805,7 +805,7 @@ class FwagentDaemon(object):
             return False
 
     def ping(self):
-        fwglobals.log.debug("FwagentDaemon: ping: alive")
+        fwglobals.log.debug("ping: alive")
 
     def start(self, start_vpp=False, check_system=True):
         """Starts the main daemon loop.
@@ -817,10 +817,10 @@ class FwagentDaemon(object):
 
         :returns: None.
         """
-        fwglobals.log.debug("FwagentDaemon: start (start_vpp=%s)" % str(start_vpp))
+        fwglobals.log.debug("start (start_vpp=%s)" % str(start_vpp))
 
         if self.active:
-            fwglobals.log.debug("FwagentDaemon: already started, ignore")
+            fwglobals.log.debug("already started, ignore")
             return
 
         # Reload configuration.
@@ -830,19 +830,19 @@ class FwagentDaemon(object):
         if check_system and fwglobals.g.router_api.state_is_started():
             check_system = False    # No need to check system if VPP runs, it is too late :)
         if check_system and self._check_system() == False:
-            fwglobals.log.excep("FwagentDaemon: system checker failed")
+            fwglobals.log.excep("system checker failed")
 
         if start_vpp:
             try:
                 fwglobals.g.router_api.start_router()
-                fwglobals.log.debug("FwagentDaemon: vpp started")
+                fwglobals.log.debug("vpp started")
             except Exception as e:
-                fwglobals.log.excep("FwagentDaemon: failed to start vpp: " + str(e))
+                fwglobals.log.excep("failed to start vpp: " + str(e))
                 return
         self.active  = True
         self.thread_main = threading.Thread(target=self.main, name='FwagentDaemon Main Thread')
         self.thread_main.start()
-        fwglobals.log.debug("FwagentDaemon: started")
+        fwglobals.log.debug("started")
 
     def stop(self, stop_router=True):
         """Stop main daemon loop.
@@ -853,34 +853,34 @@ class FwagentDaemon(object):
 
         :returns: None.
         """
-        fwglobals.log.debug("FwagentDaemon: stop")
+        fwglobals.log.debug("stop")
 
         # Initiate connection shutdown
         if self.active:
             self.active = False
             self.agent.disconnect()  # Break WebSocket connection event loop to get control back to main()
-            fwglobals.log.debug("FwagentDaemon: disconnect from server was initiated")
+            fwglobals.log.debug("disconnect from server was initiated")
         # Stop vpp ASAP, as no more requests can arrive on connection
         if stop_router:
             try:
                 fwglobals.g.router_api.call({'message':'stop-router'})
-                fwglobals.log.debug("FwagentDaemon: router stopped")
+                fwglobals.log.debug("router stopped")
             except Exception as e:
-                fwglobals.log.excep("FwagentDaemon: failed to stop router: " + str(e))
+                fwglobals.log.excep("failed to stop router: " + str(e))
         elif fwglobals.g.router_api.state_is_started():
-            fwglobals.log.debug("FwagentDaemon: vpp alive, use 'fwagent stop' to stop it")
+            fwglobals.log.debug("vpp alive, use 'fwagent stop' to stop it")
         # Stop main connection loop
         if self.thread_main:
             self.thread_main.join()
             self.thread_main = None
-        fwglobals.log.debug("FwagentDaemon: stopped")
+        fwglobals.log.debug("stopped")
 
     def reset(self):
         """Restart the main daemon loop.
 
         :returns: None.
         """
-        fwglobals.log.debug("FwagentDaemon: reset")
+        fwglobals.log.debug("reset")
         self.stop()
         self.start()
 
@@ -991,7 +991,7 @@ def daemon(standalone=False):
 
         # Register FwagentDaemon object with Pyro framework and start Pyro request loop:
         # listen for rpc that invoke FwagentDaemon methods
-        fwglobals.log.debug("FwagentDaemon is going to listen on " + fwglobals.g.FWAGENT_DAEMON_URI)
+        fwglobals.log.debug("going to listen on " + fwglobals.g.FWAGENT_DAEMON_URI)
         Pyro4.Daemon.serveSimple(
             {agent_daemon: fwglobals.g.FWAGENT_DAEMON_NAME},
             host=fwglobals.g.FWAGENT_DAEMON_HOST,

@@ -76,7 +76,7 @@ class FwStunWrap:
                 # print only WAN address
                 if self.stun_cache[pci].get('local_ip') != '' and \
                     self.stun_cache[pci].get('gateway') != '':
-                    fwglobals.log.debug("FwStunWrap: " + pci + ':' + str(self.stun_cache[pci]))
+                    fwglobals.log.debug(pci + ':' + str(self.stun_cache[pci]))
 
     def initialize(self):
         """ Initialize STUN cache by sending STUN requests on all WAN interfaces before the first
