@@ -70,8 +70,6 @@ request_handlers = {
     'upgrade-device-sw':                 {'name': '_call_agent_api'},
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
-    # 'get-wifi-interface-status':         {'name': '_call_agent_api'},
-    'connect-to-wifi':                   {'name': '_call_agent_api'},
     'lte-perform-operation':             {'name': '_call_agent_api'},
     'wifi-perform-operation':            {'name': '_call_agent_api'},
     'get-lte-interface-info':            {'name': '_call_agent_api'},

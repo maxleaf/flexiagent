@@ -43,8 +43,6 @@ fwagent_api = {
     'upgrade-device-sw':                '_upgrade_device_sw',
     'reset-device':                     '_reset_device_soft',
     'sync-device':                      '_sync_device',
-    'get-wifi-interface-status':        '_get_wifi_interface_status',
-    'connect-to-wifi':                  '_connect_to_wifi',
     'lte-perform-operation':            '_lte_perform_operation',
     'wifi-perform-operation':           '_wifi_perform_operation',
     'get-lte-interface-info':           '_get_lte_interface_info',
@@ -334,42 +332,6 @@ class FWAGENT_API:
         fwglobals.log.info("_sync_device FINISHED")
         return {'ok': 1}
 
-    def _get_wifi_interface_status(self, params):
-        fwglobals.log.info("FWAGENT_API: _get_wifi_interface_status STARTED")
-
-        if fwutils.is_wifi_interface(params['dev_id']):
-            try:
-                networks = fwutils.wifi_get_available_networks(params['dev_id'])
-
-                interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
-                addr = fwutils.get_interface_address(interface_name)
-                connectivity = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
-
-                response = {
-                    'address':      addr,
-                    'networks':     networks,
-                    'connectivity': connectivity
-                }
-
-                fwglobals.log.info("FWAGENT_API: _get_wifi_interface_status FINISHED")
-                return {'message': response, 'ok': 1}
-            except:
-                raise Exception("_get_wifi_interface_status: failed to get available access points: %s" % format(sys.exc_info()[1]))
-
-        return {'message': 'This interface is not WIFI', 'ok': 0}
-
-    def _connect_to_wifi(self, params):
-        try:
-            result = fwutils.connect_to_wifi(params)
-
-            if result:
-                fwglobals.log.info("FWAGENT_API: _connect_to_wifi FINISHED")
-                return {'message': result, 'ok': result}
-
-            return {'message': False, 'ok': 0}
-        except:
-            raise Exception("_connect_to_wifi: failed to connect to wifi: %s" % format(sys.exc_info()[1]))
-
     def _wifi_perform_operation(self, params):
         try:
             operation = params['operation'] if 'operation' in params else None
@@ -398,7 +360,6 @@ class FWAGENT_API:
             return is_success, error
         except Exception as e:
             raise Exception("_wifi_start_ap: failed to start wifi access point: %s" % str(e))
-
 
     def _wifi_stop_ap(self, params):
         try:
@@ -495,7 +456,6 @@ class FWAGENT_API:
             return is_success, error
         except Exception as e:
             raise Exception("_disconnect_from_lte: failed to disconnect from lte: %s" % str(e))
-
 
     def _connect_to_lte(self, params):
         try:
