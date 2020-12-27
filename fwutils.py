@@ -409,8 +409,9 @@ def dev_id_parse(dev_id):
 
     :returns: Tuple (type, address)
     """
+    fwglobals.log.debug("dev_id_parse: dev_id: %s" % dev_id)
     type_and_addr = dev_id.split(':', 1)
-    if type_and_addr:
+    if type_and_addr and len(type_and_addr) == 2:
         return (type_and_addr[0], type_and_addr[1])
 
     return ("", "")
@@ -422,13 +423,17 @@ def dev_id_add_type(dev_id):
 
     :returns: device bus address with type.
     """
-    if dev_id.startswith('pci:') or dev_id.startswith('usb:'):
-        return dev_id
 
-    if re.search('usb', dev_id):
-        return 'usb:%s' % dev_id
+    if dev_id:
+        if dev_id.startswith('pci:') or dev_id.startswith('usb:'):
+            return dev_id
 
-    return 'pci:%s' % dev_id
+        if re.search('usb', dev_id):
+            return 'usb:%s' % dev_id
+
+        return 'pci:%s' % dev_id
+    
+    return ''
 
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
