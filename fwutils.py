@@ -409,7 +409,6 @@ def dev_id_parse(dev_id):
 
     :returns: Tuple (type, address)
     """
-    fwglobals.log.debug("dev_id_parse: dev_id: %s" % dev_id)
     type_and_addr = dev_id.split(':', 1)
     if type_and_addr and len(type_and_addr) == 2:
         return (type_and_addr[0], type_and_addr[1])
@@ -2346,10 +2345,13 @@ def lte_disconnect(dev_id=None):
 
 def lte_connect(params, reset=False):
     dev_id = params['dev_id']
-    if not lte_is_sim_inserted(dev_id):
+    if not lte_is_sim_inserted(dev_id) or reset:
         qmi_sim_power_off(dev_id)
-        qmi_sim_power_on(dev_id)
+        qmi_sim_power_on(dev_id)        
         inserted = lte_is_sim_inserted(dev_id)
+
+        _run_qmicli_command(dev_id, 'wds-reset')
+
         if not inserted:
             return (False, "Sim is not presented")
 
@@ -2359,17 +2361,17 @@ def lte_connect(params, reset=False):
             return (True, None)
 
         connection_params = ['ip-type=4']
-        if params['apn']:
+        if 'apn' in params:
             connection_params.append('apn=%s' % params['apn'])
-        if params['user']:
+        if 'user' in params:
             connection_params.append('username=%s' % params['user'])
-        if params['password']:
+        if 'password' in params:
             connection_params.append('password=%s' % params['password'])
-        if params['auth']:
+        if 'auth' in params:
             connection_params.append('auth=%s' % params['auth'])
 
-        output = _run_qmicli_command(dev_id, 'wds-start-network="%s" --client-no-release-cid' % ",".join(connection_params)
-)
+        cmd = 'wds-start-network="%s" --client-no-release-cid' % ",".join(connection_params)
+        output = _run_qmicli_command(dev_id, cmd)
         data = output.splitlines()
 
         inf_name = dev_id_to_linux_if(dev_id)
@@ -2383,7 +2385,7 @@ def lte_connect(params, reset=False):
                 break
 
         return (True, None)
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         if not reset:
             return lte_connect(params, True)
 

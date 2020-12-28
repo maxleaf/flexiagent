@@ -47,7 +47,6 @@ fwagent_api = {
     'wifi-perform-operation':           '_wifi_perform_operation',
     'get-lte-interface-info':           '_get_lte_interface_info',
     'get-wifi-interface-info':          '_get_wifi_interface_info',
-    'get-default-apn':                  '_get_default_apn'
 }
 
 class FWAGENT_API:
@@ -392,20 +391,6 @@ class FWAGENT_API:
         except Exception as e:
             raise Exception("_get_wifi_interface_info: %s" % str(e))
 
-    def _get_default_apn(self, params):
-        try:
-            system_info = fwutils.lte_get_system_info(params['dev_id'])
-            apn = fwutils.lte_get_default_apn(params['dev_id'])
-
-            response = {
-                'apn'             : apn,
-                'mcc'             : system_info['MCC'],
-                'mnc'             : system_info['MNC'],
-            }
-
-            return {'message': response, 'ok': 1}
-        except Exception as e:
-            return {'message': str(e), 'ok': 0}
 
     def _lte_perform_operation(self, params):
         try:
@@ -478,6 +463,7 @@ class FWAGENT_API:
             connection_state = fwutils.lte_get_connection_state(params['dev_id'])
             packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
             system_info = fwutils.lte_get_system_info(params['dev_id'])
+            default_apn = fwutils.lte_get_default_apn(params['dev_id'])
 
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
@@ -494,7 +480,8 @@ class FWAGENT_API:
                 'packet_service_state': packet_service_state,
                 'hardware_info'       : hardware_info,
                 'system_info'         : system_info,
-                'sim_status'          : sim_status
+                'sim_status'          : sim_status,
+                'default_apn'         : default_apn
             }
 
             return {'message': response, 'ok': 1}
