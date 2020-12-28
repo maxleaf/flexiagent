@@ -663,6 +663,28 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
 
     :returns: None.
     """
+    #vpp/src/plugins/ikev2/ikev2.h
+    crypto_algs = {
+        "des-iv64":     1,
+        "des":          2,
+        "3des":         3,
+        "rc5":          4,
+        "idea":         5,
+        "cast":         6,
+        "blowfish":     7,
+        "3idea":        8,
+        "des-iv32":     9,
+        "null":         11,
+        "aes-cbc":      12,
+        "aes-ctr":      13,
+        "aes-gcm-16":   20
+    }
+
+    if not ike['crypto-alg'] in crypto_algs:
+        raise Exception("_add_ikev2_initiator_profile: ike crypto-alg %s is not supported" % ike['crypto-alg'])
+    if not esp['crypto-alg'] in crypto_algs:
+        raise Exception("_add_ikev2_initiator_profile: esp crypto-alg %s is not supported" % esp['crypto-alg'])
+
     # ikev2.api.json: ikev2_set_responder (...)
     cmd = {}
     cmd['cmd'] = {}
@@ -674,7 +696,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_set_ike_transforms (...)
-    crypto_alg = 12 # IKEV2_TRANSFORM_ENCR_TYPE_AES_CBC
+    crypto_alg = crypto_algs[ike['crypto-alg']]
     integ_alg = 2 # IKEV2_TRANSFORM_INTEG_TYPE_AUTH_HMAC_SHA1_96
     dh_group =  14 # IKEV2_TRANSFORM_DH_TYPE_MODP_2048
     cmd = {}
@@ -685,7 +707,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_set_esp_transforms (...)
-    crypto_alg = 12 # IKEV2_TRANSFORM_ENCR_TYPE_AES_CBC
+    crypto_alg = crypto_algs[esp['crypto-alg']]
     integ_alg = 2 # IKEV2_TRANSFORM_INTEG_TYPE_AUTH_HMAC_SHA1_96
     dh_group =  19 # IKEV2_TRANSFORM_DH_TYPE_ECP_256
     cmd = {}
