@@ -679,11 +679,32 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
         "aes-ctr":      13,
         "aes-gcm-16":   20
     }
+    integ_algs = {
+        "none":              0,
+        "md5-96":            1,
+        "sha1-96":           2,
+        "des-mac":           3,
+        "kpdk-md5":          4,
+        "aes-xcbc-96":       5,
+        "md5-128":           6,
+        "sha1-160":          7,
+        "cmac-96":           8,
+        "aes-128-gmac":      9,
+        "aes-192-gmac":      10,
+        "aes-256-gmac":      11,
+        "hmac-sha2-256-128": 12,
+        "hmac-sha2-384-192": 13,
+        "hmac-sha2-512-256": 14
+    }
 
     if not ike['crypto-alg'] in crypto_algs:
         raise Exception("_add_ikev2_initiator_profile: ike crypto-alg %s is not supported" % ike['crypto-alg'])
     if not esp['crypto-alg'] in crypto_algs:
         raise Exception("_add_ikev2_initiator_profile: esp crypto-alg %s is not supported" % esp['crypto-alg'])
+    if not ike['integ-alg'] in integ_algs:
+        raise Exception("_add_ikev2_initiator_profile: ike integ-alg %s is not supported" % ike['integ-alg'])
+    if not esp['integ-alg'] in integ_algs:
+        raise Exception("_add_ikev2_initiator_profile: esp integ-alg %s is not supported" % esp['integ-alg'])
 
     # ikev2.api.json: ikev2_set_responder (...)
     cmd = {}
@@ -697,7 +718,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
 
     # ikev2.api.json: ikev2_set_ike_transforms (...)
     crypto_alg = crypto_algs[ike['crypto-alg']]
-    integ_alg = 2 # IKEV2_TRANSFORM_INTEG_TYPE_AUTH_HMAC_SHA1_96
+    integ_alg = integ_algs[ike['integ-alg']]
     dh_group =  14 # IKEV2_TRANSFORM_DH_TYPE_MODP_2048
     cmd = {}
     cmd['cmd'] = {}
@@ -708,7 +729,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
 
     # ikev2.api.json: ikev2_set_esp_transforms (...)
     crypto_alg = crypto_algs[esp['crypto-alg']]
-    integ_alg = 2 # IKEV2_TRANSFORM_INTEG_TYPE_AUTH_HMAC_SHA1_96
+    integ_alg = integ_algs[esp['integ-alg']]
     dh_group =  19 # IKEV2_TRANSFORM_DH_TYPE_ECP_256
     cmd = {}
     cmd['cmd'] = {}
