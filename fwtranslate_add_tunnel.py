@@ -650,7 +650,7 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id):
     cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
     cmd_list.append(cmd)
 
-def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_address):
+def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_address, ike, esp):
     """Add IKEv2 initiator profile commands into the list.
 
     :param cmd_list:            List of commands.
@@ -658,6 +658,8 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     :param lifetime:            Connection life time.
     :param cache_key:           Interface with responder.
     :param responder_address:   Responder IP address.
+    :param ike:                 IKEv2 crypto params.
+    :param esp:                 ESP crypto params.
 
     :returns: None.
     """
@@ -678,7 +680,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_ike_transforms"
-    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':256, 'integ_alg':integ_alg, 'dh_group':dh_group }
+    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':ike['key-size'], 'integ_alg':integ_alg, 'dh_group':dh_group }
     cmd['cmd']['descr']     = "set IKEv2 crypto algorithms, profile %s" % name
     cmd_list.append(cmd)
 
@@ -689,7 +691,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_esp_transforms"
-    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':256, 'integ_alg':integ_alg, 'dh_group':dh_group }
+    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':esp['key-size'], 'integ_alg':integ_alg, 'dh_group':dh_group }
     cmd['cmd']['descr']     = "set IKEv2 ESP crypto algorithms, profile %s" % name
     cmd_list.append(cmd)
 
@@ -803,7 +805,9 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                         cmd_list,
                         ikev2_profile_name, params['ikev2']['lifetime'],
                         'loop1_sw_if_index',
-                        dst
+                        dst,
+                        params['ikev2']['ike'],
+                        params['ikev2']['esp']
                         )
 
     _add_ikev2_gre_to_bridge(cmd_list, src, dst, bridge_id)
