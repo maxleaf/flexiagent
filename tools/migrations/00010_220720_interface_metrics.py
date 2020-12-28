@@ -51,9 +51,9 @@ def _find_primary_ip():
 
     return ''
 
-def _find_gateway_ip(pci):
+def _find_gateway_ip(dev_id):
     ip = ''
-    ifname = fwutils.dev_id_to_linux_if(pci)
+    ifname = fwutils.dev_id_to_linux_if(dev_id)
     if ifname:
         ip, _ = fwutils.get_interface_gateway(ifname)
         return ip
@@ -72,7 +72,11 @@ def _update_metric():
         wan_list = router_cfg.get_interfaces(type='wan')
         for wan in wan_list:
             if not 'gateway' in wan:
-                gw_ip = _find_gateway_ip(wan['pci'])
+                dev_id = wan.get('pci', None)
+                if not dev_id:
+                    dev_id = wan.get('dev_id', None)
+                
+                gw_ip = _find_gateway_ip(dev_id)
                 wan['gateway'] = gw_ip
 
             if not 'metric' in wan:

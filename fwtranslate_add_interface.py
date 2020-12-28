@@ -28,10 +28,6 @@ import fwglobals
 import fwnetplan
 import fwtranslate_revert
 import fwutils
-import fwtranslate_add_non_dpdk_interface
-import fwtranslate_add_lte_interface
-import fwtranslate_add_dpdk_interface
-import fwtranslate_add_wifi_interface
 
 # add_interface
 # --------------------------------------
@@ -591,20 +587,6 @@ def add_interface(params):
         ]
         cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
         cmd_list.append(cmd)
-
-    # dev_id  = params['dev_id']
-
-    # if fwutils.is_dpdk_interface(dev_id):
-    #     return fwtranslate_add_dpdk_interface.add(params)
-
-    # if fwutils.is_lte_interface(dev_id):
-    #     return fwtranslate_add_lte_interface.add(params)
-
-    # if fwutils.is_wifi_interface(dev_id):
-    #     return fwtranslate_add_wifi_interface.add(params)
-
-    # if fwutils.is_non_dpdk_interface(dev_id):
-    #     return fwtranslate_add_non_dpdk_interface.add(params)
 
     return cmd_list
 
