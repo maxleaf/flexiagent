@@ -55,8 +55,7 @@ def _change_interface_identifier():
 
                 new_request = {
                     'message':   'add-interface',
-                    'params':    intf,
-                    'internals': {}
+                    'params':    intf
                 }
 
                 router_cfg.update(new_request, [], False)
