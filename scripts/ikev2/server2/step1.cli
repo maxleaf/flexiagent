@@ -1,7 +1,7 @@
 [
 {
   "entity":  "agent",
-  "message": "create-ikev2",
+  "message": "add-private-key",
   "params": {}
 }
 ]

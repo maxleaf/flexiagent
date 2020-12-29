@@ -1,7 +1,7 @@
 [
 {
   "entity":  "agent",
-  "message": "update-ikev2",
+  "message": "add-public-certificate",
   "params": {
 	"device-id": "AFF9E8C5-D02A-4AF9-96E6-B8E3F6A12A75",
 	"certificate": [

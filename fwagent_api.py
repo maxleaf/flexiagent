@@ -43,8 +43,8 @@ fwagent_api = {
     'upgrade-device-sw':        '_upgrade_device_sw',
     'reset-device':             '_reset_device_soft',
     'sync-device':              '_sync_device',
-    'create-ikev2':             '_create_ikev2',
-    'update-ikev2':             '_update_ikev2'
+    'add-private-key':          '_add_private_key',
+    'add-public-certificate':   '_add_public_certificate'
 }
 
 class FWAGENT_API:
@@ -326,7 +326,7 @@ class FWAGENT_API:
         fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
         return {'ok': 1}
 
-    def _create_ikev2(self, params=None):
+    def _add_private_key(self, params=None):
         """IKEv2 certificate generation.
 
         :param params: Parameters from flexiManage.
@@ -374,7 +374,7 @@ class FWAGENT_API:
 
         return {'message': {'certificate': certificate}, 'ok': 1}
 
-    def _update_ikev2(self, params=None):
+    def _add_public_certificate(self, params=None):
         """IKEv2 remote certificate update.
 
         :param params: Parameters from flexiManage.
