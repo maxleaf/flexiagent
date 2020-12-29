@@ -692,6 +692,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
         "aes-ctr":      13,
         "aes-gcm-16":   20
     }
+
     integ_algs = {
         "none":              0,
         "md5-96":            1,
@@ -710,6 +711,25 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
         "hmac-sha2-512-256": 14
     }
 
+    dh_type_algs = {
+        "none":              0,
+        "modp-768":          1,
+        "modp-1024":         2,
+        "modp-1536":         5,
+        "modp-2048":         14,
+        "modp-3072":         15,
+        "modp-4096":         16,
+        "modp-6144":         17,
+        "modp-8192":         18,
+        "ecp-256":           19,
+        "ecp-384":           20,
+        "ecp-521":           21,
+        "modp-1024-160":     22,
+        "modp-2048-224":     23,
+        "modp-2048-256":     24,
+        "ecp-192":           25
+    }
+
     if not ike['crypto-alg'] in crypto_algs:
         raise Exception("_add_ikev2_initiator_profile: ike crypto-alg %s is not supported" % ike['crypto-alg'])
     if not esp['crypto-alg'] in crypto_algs:
@@ -718,6 +738,10 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
         raise Exception("_add_ikev2_initiator_profile: ike integ-alg %s is not supported" % ike['integ-alg'])
     if not esp['integ-alg'] in integ_algs:
         raise Exception("_add_ikev2_initiator_profile: esp integ-alg %s is not supported" % esp['integ-alg'])
+    if not ike['dh-group'] in dh_type_algs:
+        raise Exception("_add_ikev2_initiator_profile: ike dh-group %s is not supported" % ike['dh-group'])
+    if not esp['dh-group'] in dh_type_algs:
+        raise Exception("_add_ikev2_initiator_profile: esp dh-group %s is not supported" % esp['dh-group'])
 
     # ikev2.api.json: ikev2_set_responder (...)
     cmd = {}
@@ -732,7 +756,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     # ikev2.api.json: ikev2_set_ike_transforms (...)
     crypto_alg = crypto_algs[ike['crypto-alg']]
     integ_alg = integ_algs[ike['integ-alg']]
-    dh_group =  14 # IKEV2_TRANSFORM_DH_TYPE_MODP_2048
+    dh_group = dh_type_algs[ike['dh-group']]
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_ike_transforms"
@@ -743,7 +767,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     # ikev2.api.json: ikev2_set_esp_transforms (...)
     crypto_alg = crypto_algs[esp['crypto-alg']]
     integ_alg = integ_algs[esp['integ-alg']]
-    dh_group =  19 # IKEV2_TRANSFORM_DH_TYPE_ECP_256
+    dh_group = dh_type_algs[esp['dh-group']]
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_esp_transforms"
