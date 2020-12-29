@@ -561,17 +561,30 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
-def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id):
+def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certificate):
     """Add IKEv2 common profile commands into the list.
 
     :param cmd_list:            List of commands.
     :param name:                Profile name.
     :param tunnel_id:           Tunnel id.
     :param remote_device_id:    Remote device id.
+    :param certificate:         Remote device public certificate.
 
     :returns: None.
     """
     machine_id = fwutils.get_machine_id()
+
+    # Add public certificate file
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "add IKEv2 public certificate for %s" % remote_device_id
+    cmd['cmd']['params']    = {
+                                'module': 'fwutils',
+                                'func'  : 'ikev2_add_public_certificate',
+                                'args'  : {'device_id': remote_device_id, 'certificate': certificate}
+                                }
+    cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_add_del (...)
     cmd = {}
@@ -838,7 +851,9 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
 
     ikev2_profile_name = 'pr' + str(params['tunnel-id'])
     _add_ikev2_common_profile(
-                      cmd_list, ikev2_profile_name, params['tunnel-id'], params['ikev2']['remote-device-id'])
+                      cmd_list, ikev2_profile_name, params['tunnel-id'],
+                      params['ikev2']['remote-device-id'],
+                      params['ikev2']['certificate'])
 
     src = str(IPNetwork(l2gre_tunnel_ips['src']).ip)
     dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)

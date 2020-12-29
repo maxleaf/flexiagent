@@ -381,15 +381,9 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
-        remote_device_id = params["device-id"]
+        device_id = params["device-id"]
         certificate = params["certificate"]
-        public_pem = fwutils.ikev2_remote_certificate_filename_get(remote_device_id)
 
-        if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
-            os.makedirs(fwglobals.g.IKEV2_FOLDER)
-
-        with open(public_pem, 'w') as public_pem_file:
-            for line in certificate:
-                public_pem_file.write(line)
+        fwutils.ikev2_add_public_certificate(device_id, certificate)
 
         return {'ok': 1}

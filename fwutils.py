@@ -2012,3 +2012,18 @@ def ikev2_remote_certificate_filename_get(machine_id):
 
 def ikev2_gre_bridge_add(src, dst, bridge_id):
     fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id)
+
+def ikev2_add_public_certificate(device_id, certificate):
+    '''This function saves public certificate as a file.
+
+    :param device_id:   Remote device id.
+    :param certificate: Certificate string.
+    '''
+    public_pem = ikev2_remote_certificate_filename_get(device_id)
+
+    if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
+        os.makedirs(fwglobals.g.IKEV2_FOLDER)
+
+    with open(public_pem, 'w') as public_pem_file:
+        for line in certificate:
+            public_pem_file.write(line)
