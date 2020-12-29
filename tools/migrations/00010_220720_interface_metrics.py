@@ -90,8 +90,7 @@ def _update_metric():
 
             new_request = {
                 'message':   'add-interface',
-                'params':    wan,
-                'internals': {}
+                'params':    wan                
             }
             router_cfg.update(new_request, [], False)
 
