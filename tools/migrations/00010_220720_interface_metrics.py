@@ -75,7 +75,7 @@ def _update_metric():
                 dev_id = wan.get('pci', None)
                 if not dev_id:
                     dev_id = wan.get('dev_id', None)
-                
+
                 gw_ip = _find_gateway_ip(dev_id)
                 wan['gateway'] = gw_ip
 
@@ -90,7 +90,7 @@ def _update_metric():
 
             new_request = {
                 'message':   'add-interface',
-                'params':    wan                
+                'params':    wan
             }
             router_cfg.update(new_request, [], False)
 

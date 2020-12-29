@@ -2343,11 +2343,24 @@ def lte_disconnect(dev_id=None):
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))
 
+def lte_prepare_connection_params(params):
+    connection_params = ['ip-type=4']
+    if 'apn' in params:
+        connection_params.append('apn=%s' % params['apn'])
+    if 'user' in params:
+        connection_params.append('username=%s' % params['user'])
+    if 'password' in params:
+        connection_params.append('password=%s' % params['password'])
+    if 'auth' in params:
+        connection_params.append('auth=%s' % params['auth'])
+
+    return ",".join(connection_params)
+
 def lte_connect(params, reset=False):
     dev_id = params['dev_id']
     if not lte_is_sim_inserted(dev_id) or reset:
         qmi_sim_power_off(dev_id)
-        qmi_sim_power_on(dev_id)        
+        qmi_sim_power_on(dev_id)
         inserted = lte_is_sim_inserted(dev_id)
 
         _run_qmicli_command(dev_id, 'wds-reset')
@@ -2360,17 +2373,9 @@ def lte_connect(params, reset=False):
         if current_connection_state:
             return (True, None)
 
-        connection_params = ['ip-type=4']
-        if 'apn' in params:
-            connection_params.append('apn=%s' % params['apn'])
-        if 'user' in params:
-            connection_params.append('username=%s' % params['user'])
-        if 'password' in params:
-            connection_params.append('password=%s' % params['password'])
-        if 'auth' in params:
-            connection_params.append('auth=%s' % params['auth'])
+        connection_params = lte_prepare_connection_params(params)
 
-        cmd = 'wds-start-network="%s" --client-no-release-cid' % ",".join(connection_params)
+        cmd = 'wds-start-network="%s" --client-no-release-cid' % connection_params
         output = _run_qmicli_command(dev_id, cmd)
         data = output.splitlines()
 

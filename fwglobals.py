@@ -70,10 +70,12 @@ request_handlers = {
     'upgrade-device-sw':                 {'name': '_call_agent_api'},
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
-    'lte-perform-operation':             {'name': '_call_agent_api'},
     'wifi-perform-operation':            {'name': '_call_agent_api'},
-    'get-lte-interface-info':            {'name': '_call_agent_api'},
-    'get-wifi-interface-info':           {'name': '_call_agent_api'},
+    'wifi-get-interface-info':           {'name': '_call_agent_api'},
+    'lte-get-interface-info':            {'name': '_call_agent_api'},
+    'lte-enable':                        {'name': '_call_agent_api'},
+    'lte-disable':                       {'name': '_call_agent_api'},
+    'lte-reset':                         {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
@@ -536,10 +538,6 @@ class Fwglobals:
             global log
             err_str = "%s(%s): %s" % (str(e), req, format(params))
             log.error(err_str + ': %s' % str(traceback.format_exc()))
-
-            if 'readable_errors' in params:
-                return {"message":str(e), 'ok':0}
-
             reply = {"message":err_str, 'ok':0}
             return reply
 
