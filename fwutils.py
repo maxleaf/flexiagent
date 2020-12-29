@@ -842,9 +842,15 @@ def vpp_if_name_to_tap(vpp_if_name):
     tap = match.group(1)
     return tap
 
+def generate_linux_tap_name(linux_if_name):
+    if len(linux_if_name) > 6:
+        return linux_if_name[-6:]
+    
+    return linux_if_name
+
 def linux_tap_by_interface_name(linux_if_name):
     try:
-        links = subprocess.check_output("sudo ip link | grep tap_%s" % linux_if_name, shell=True)
+        links = subprocess.check_output("sudo ip link | grep tap_%s" % generate_linux_tap_name(linux_if_name), shell=True)
         lines = links.splitlines()
 
         for line in lines:
@@ -866,7 +872,7 @@ def configure_tap_in_linux_and_vpp(linux_if_name):
     """
 
     # length = str(len(vpp_if_name_to_pci))
-    linux_tap_name = "tap_%s" % linux_if_name
+    linux_tap_name = "tap_%s" % generate_linux_tap_name(linux_if_name)
 
     try:
         vpp_tap_connect(linux_tap_name)
