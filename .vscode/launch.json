@@ -1,0 +1,63 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "fwagnet",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "daemon"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "fwkill",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/tools/common/fwkill",
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "reset",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "reset"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "system_checker",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/system_checker/fwsystem_checker.py",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/"
+            },
+            "sudo": true,
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        }
+    ]
+}

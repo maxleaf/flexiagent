@@ -1,7 +1,6 @@
 # Byte-compiled
 __pycache__/
 *.py[cod]
-.vscode/
 pytestdebug.log
 .cache
 *.DS_Store

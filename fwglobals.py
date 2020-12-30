@@ -61,15 +61,21 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'get-device-info':              {'name': '_call_agent_api'},
-    'get-device-stats':             {'name': '_call_agent_api'},
-    'get-device-logs':              {'name': '_call_agent_api'},
-    'get-device-packet-traces':     {'name': '_call_agent_api'},
-    'get-device-os-routes':         {'name': '_call_agent_api'},
-    'get-router-config':            {'name': '_call_agent_api'},
-    'upgrade-device-sw':            {'name': '_call_agent_api'},
-    'reset-device':                 {'name': '_call_agent_api'},
-    'sync-device':                  {'name': '_call_agent_api'},
+    'get-device-info':                   {'name': '_call_agent_api'},
+    'get-device-stats':                  {'name': '_call_agent_api'},
+    'get-device-logs':                   {'name': '_call_agent_api'},
+    'get-device-packet-traces':          {'name': '_call_agent_api'},
+    'get-device-os-routes':              {'name': '_call_agent_api'},
+    'get-router-config':                 {'name': '_call_agent_api'},
+    'upgrade-device-sw':                 {'name': '_call_agent_api'},
+    'reset-device':                      {'name': '_call_agent_api'},
+    'sync-device':                       {'name': '_call_agent_api'},
+    'wifi-perform-operation':            {'name': '_call_agent_api'},
+    'wifi-get-interface-info':           {'name': '_call_agent_api'},
+    'lte-get-interface-info':            {'name': '_call_agent_api'},
+    'lte-enable':                        {'name': '_call_agent_api'},
+    'lte-disable':                       {'name': '_call_agent_api'},
+    'lte-reset':                         {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
@@ -189,22 +195,22 @@ class Fwglobals:
         def __init__(self):
             self.db = {
                 'LINUX_INTERFACES': {},
-                'PCI_TO_VPP_IF_NAME': {},
-                'PCI_TO_VPP_TAP_NAME': {},
-                'PCIS': {},
+                'DEV_ID_TO_VPP_IF_NAME': {},
+                'DEV_ID_TO_VPP_TAP_NAME': {},
+                'DEV_IDS': {},
                 'STUN': {},
-                'VPP_IF_NAME_TO_PCI': {},
+                'VPP_IF_NAME_TO_DEV_ID': {},
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
                 }
             }
             self.linux_interfaces    = self.db['LINUX_INTERFACES']
-            self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
-            self.pci_to_vpp_tap_name = self.db['PCI_TO_VPP_TAP_NAME']
-            self.pcis                = self.db['PCIS']
+            self.dev_id_to_vpp_if_name  = self.db['DEV_ID_TO_VPP_IF_NAME']
+            self.dev_id_to_vpp_tap_name = self.db['DEV_ID_TO_VPP_TAP_NAME']
+            self.dev_ids                = self.db['DEV_IDS']
             self.stun_cache          = self.db['STUN']
-            self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
+            self.vpp_if_name_to_dev_id  = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.wan_monitor         = self.db['WAN_MONITOR']
 
 
@@ -239,6 +245,7 @@ class Fwglobals:
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
+        self.HOSTAPD_CONFIG_DIRECTORY = '/etc/hostapd/'
         self.NETPLAN_FILES       = {}
         self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
@@ -379,14 +386,14 @@ class Fwglobals:
         :param request: the request like:
             {
                 'name':   "python"
-                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_pci, labels)
+                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_dev_id, labels)
                 'params': {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_labels',
                     'args'  : {
                         'labels':   labels,
                         'next_hop': gw,
-                        'pci':      iface_pci,
+                        'dev_id':   iface_dev_id,
                         'remove':   False
                     }
                 }
@@ -502,6 +509,7 @@ class Fwglobals:
                 received_msg = copy.deepcopy(request)
 
             handler_func = getattr(self, handler.get('name'))
+
             if result is None:
                 reply = handler_func(request)
             else:

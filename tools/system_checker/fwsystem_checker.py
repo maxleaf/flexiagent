@@ -262,6 +262,10 @@ def main(args):
     module = importlib.import_module(module_name)
     with module.Checker(args.debug) as checker:
 
+        if checker.lte_interfaces_exists():
+            #  'soft_check_utc_timezone'       : { 'severity': 'critical' }},
+            soft_checkers.append({ 'soft_check_LTE_modem_configured_in_mbim_mode': { 'severity': 'critical' }})
+
         # Check hardware requirements
         # -----------------------------------------
         hard_status_code = FW_EXIT_CODE_OK

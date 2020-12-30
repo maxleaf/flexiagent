@@ -3,7 +3,7 @@
   "entity": "agent",
   "message": "remove-interface",
   "params": {
-      "pci":"0000:00:01.00",
+      "dev_id":"0000:00:01.00",
       "addr":"10.0.0.9/24"
   }
 }

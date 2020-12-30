@@ -165,7 +165,7 @@ class FWROUTER_API:
                     if dhcp == 'no':
                         continue
 
-                    name = fwutils.pci_to_tap(wan['pci'])
+                    name = fwutils.dev_id_to_tap(wan['dev_id'])
                     addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
@@ -224,7 +224,7 @@ class FWROUTER_API:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
-            fwglobals.g.cache.pci_to_vpp_tap_name = {}
+            fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -785,8 +785,8 @@ class FWROUTER_API:
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
-            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
-            if new_params.get('addr') != old_params.get('addr'):
+            old_params = fwglobals.g.router_cfg.get_interfaces(dev_id=new_params['dev_id'])[0]
+            if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
                 return True
             if new_params.get('gateway') != old_params.get('gateway'):
                 return True
@@ -897,7 +897,7 @@ class FWROUTER_API:
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
         # The remove-* request might have partial set of parameters only.
-        # For example, 'remove-interface' has 'pci' parameter only and
+        # For example, 'remove-interface' has 'dev_id' parameter only and
         # has no IP, LAN/WAN type, etc.
         # That makes it impossible to revert these partial remove-X requests
         # on aggregated message rollback that might happen due to failure in
@@ -1187,15 +1187,20 @@ class FWROUTER_API:
         self.state_change(FwRouterState.STOPPING)
         self._stop_threads()
         fwutils.reset_dhcpd()
-        fwglobals.g.cache.pci_to_vpp_tap_name = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_after(self):
         """Handles post-VPP stop activities.
         :returns: None.
         """
+        self.router_stopping = False
+        fwutils.reset_traffic_control()
+        fwutils.remove_linux_bridges()
+        fwutils.stop_hostapd()
+        fwutils.set_lte_info_on_linux_interface()
         self.state_change(FwRouterState.STOPPED)
-        fwglobals.g.cache.pci_to_vpp_tap_name = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
@@ -1300,7 +1305,7 @@ class FWROUTER_API:
                 func_name = s['val_by_func']
                 func = getattr(fwutils, func_name)
                 old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
-                new  = func(old)
+                new  = func(*old) if type(old) == list else func(old)
                 if new is None:
                     raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
             elif 'val_by_key' in s:
