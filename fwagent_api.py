@@ -334,40 +334,17 @@ class FWAGENT_API:
         :returns: Dictionary with status code.
         """
         machine_id = fwutils.get_machine_id()
-        public_der = fwglobals.g.IKEV2_FOLDER + "public-cert.der"
-        private_der = fwglobals.g.IKEV2_FOLDER + "private-key.der"
         public_pem = fwutils.ikev2_certificate_filename_get()
         private_pem = fwutils.ikev2_private_key_filename_get()
 
         if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
             os.makedirs(fwglobals.g.IKEV2_FOLDER)
 
-        cmd = "ipsec pki --gen  > " + private_der
+        cmd = "openssl req -new -newkey rsa:4096 -days %u -nodes -x509 -subj '/CN=%s' -keyout %s -out %s" % (params['days'], machine_id, private_pem, public_pem)
         fwglobals.log.debug(cmd)
         ok = not subprocess.call(cmd, shell=True)
         if not ok:
             return {'ok': 0}
-
-        cmd = "ipsec pki --self --in %s --dn 'CN=%s' > %s" % (private_der, machine_id, public_der)
-        fwglobals.log.debug(cmd)
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            return {'ok': 0}
-
-        cmd = "openssl x509 -inform DER -in %s -out %s" % (public_der, public_pem)
-        fwglobals.log.debug(cmd)
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            return {'ok': 0}
-
-        cmd = "openssl rsa -inform DER -in %s -out %s" % (private_der, private_pem)
-        fwglobals.log.debug(cmd)
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            return {'ok': 0}
-
-        os.remove(public_der)
-        os.remove(private_der)
 
         with open(public_pem) as public_pem_file:
             certificate = public_pem_file.readlines()
