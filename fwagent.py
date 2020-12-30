@@ -23,6 +23,7 @@
 import json
 import loadsimulator
 import os
+import shutil
 
 
 # Try with PY3 else, use PY2
@@ -645,6 +646,9 @@ def reset(soft=False):
     if soft:
         fwutils.reset_router_config()
         return
+
+    if os.path.exists(fwglobals.g.IKEV2_FOLDER):
+        shutil.rmtree(fwglobals.g.IKEV2_FOLDER, ignore_errors=True)
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
 
