@@ -279,10 +279,12 @@ def get_all_interfaces():
             continue
 
         if is_lte_interface(dev_id) and vpp_does_run():
-            tap_name = dev_id_to_tap(dev_id)
-            if tap_name:
-                nicname = tap_name
-                addrs = interfaces.get(nicname)
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+            if is_assigned:
+                tap_name = dev_id_to_tap(dev_id)
+                if tap_name:
+                    nicname = tap_name
+                    addrs = interfaces.get(nicname)
 
         dev_id_ip_gw[dev_id] = {}
         dev_id_ip_gw[dev_id]['addr'] = ''
@@ -483,7 +485,8 @@ def get_linux_interfaces(cached=True):
         if is_lte_interface(dev_id):
             interface['deviceType'] = 'lte'
             interface['dhcp'] = 'yes'
-            tap = dev_id_to_tap(dev_id) if vpp_does_run() else None
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+            tap = dev_id_to_tap(dev_id) if vpp_does_run() and is_assigned else None
             if tap:
                 # addrs = linux_inf[tap]
                 interface['gateway'], interface['metric'] = get_interface_gateway(tap)
@@ -2940,9 +2943,11 @@ def get_reconfig_hash():
         name = linux_interfaces[dev_id]['name']
 
         if is_lte_interface(dev_id) and vpp_does_run():
-            tap_name = dev_id_to_tap(dev_id)
-            if tap_name:
-                name = tap_name
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+            if is_assigned:
+                tap_name = dev_id_to_tap(dev_id)
+                if tap_name:
+                    name = tap_name
 
         addr = get_interface_address(name, log=False)
         addr = addr.split('/')[0] if addr else ''
