@@ -491,7 +491,7 @@ exit 0
             if is_success:
                 fwutils.set_lte_info_on_linux_interface()
 
-            reply = {'ok': is_success, 'message': error}
+            reply = {'ok': 1, 'message': ''}
         except Exception as e:
             reply = {'ok': 0, 'message': str(e)}
 
@@ -511,7 +511,7 @@ exit 0
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to disconnect LTE'}
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'])
-            reply = {'ok': is_success, 'message': error}
+            reply = {'ok': 1, 'message': ''}
         except Exception as e:
             reply = {'ok': 0, 'message': str(e)}
 

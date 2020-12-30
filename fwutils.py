@@ -3049,7 +3049,7 @@ def wifi_get_capabilities(dev_id):
         return ""
 
     def _parse_key_data(text, output, negative_look_count = 1):
-        match = re.search(regex, output,  re.MULTILINE | re.IGNORECASE)
+        match = re.search(text, output,  re.MULTILINE | re.IGNORECASE)
 
         res = list()
 
