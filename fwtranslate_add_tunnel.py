@@ -561,7 +561,7 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
-def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certificate):
+def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certificate, bridge_id, src):
     """Add IKEv2 common profile commands into the list.
 
     :param cmd_list:            List of commands.
@@ -569,6 +569,8 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     :param tunnel_id:           Tunnel id.
     :param remote_device_id:    Remote device id.
     :param certificate:         Remote device public certificate.
+    :param bridge_id:           Bridge id to add GRE tunnel to.
+    :param src:                 GRE tunnel source ip.
 
     :returns: None.
     """
@@ -661,6 +663,18 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd['cmd']['name']      = "ikev2_profile_set_ts"
     cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'proto':proto, 'start_port':start_port, 'end_port':end_port, 'start_addr':start_addr, 'end_addr':end_addr }
     cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
+    cmd_list.append(cmd)
+
+    # Asynchronously add IKEv2 GRE tunnel into bridge
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "add IKEv2 GRE tunnel into bridge"
+    cmd['cmd']['params']    = {
+                                'module': 'fwutils',
+                                'func'  : 'ikev2_gre_bridge_add',
+                                'args'  : {'src': src, 'bridge_id': bridge_id}
+                                }
     cmd_list.append(cmd)
 
 def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_address, ike, esp):
@@ -791,19 +805,6 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     cmd['cmd']['descr']     = "initialize IKEv2 connection, profile %s" % name
     cmd_list.append(cmd)
 
-def _add_ikev2_gre_to_bridge(cmd_list, src, dst, bridge_id):
-    # Asynchronously add IKEv2 GRE tunnel into bridge
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "add IKEv2 GRE tunnel into bridge"
-    cmd['cmd']['params']    = {
-                                'module': 'fwutils',
-                                'func'  : 'ikev2_gre_bridge_add',
-                                'args'  : {'src': src, 'dst': dst, 'bridge_id': bridge_id}
-                                }
-    cmd_list.append(cmd)
-
 def _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id):
     """Add GRE tunnel, loopback and bridge commands into the list.
 
@@ -873,16 +874,16 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 shg=0,
                 cache_key='loop0_sw_if_index')
 
+    src = str(IPNetwork(l2gre_tunnel_ips['src']).ip)
     ikev2_profile_name = 'pr' + str(params['tunnel-id'])
     _add_ikev2_common_profile(
                       cmd_list, ikev2_profile_name, params['tunnel-id'],
                       params['ikev2']['remote-device-id'],
-                      params['ikev2']['certificate'])
-
-    src = str(IPNetwork(l2gre_tunnel_ips['src']).ip)
-    dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)
+                      params['ikev2']['certificate'],
+                      bridge_id, src)
 
     if params['ikev2']['role'] == 'initiator':
+        dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)
         _add_ikev2_initiator_profile(
                         cmd_list,
                         ikev2_profile_name, params['ikev2']['lifetime'],
@@ -891,8 +892,6 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                         params['ikev2']['ike'],
                         params['ikev2']['esp']
                         )
-
-    _add_ikev2_gre_to_bridge(cmd_list, src, dst, bridge_id)
 
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
     """Add VxLAN tunnel, loopback and bridge commands into the list.

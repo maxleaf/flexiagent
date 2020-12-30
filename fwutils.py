@@ -2010,7 +2010,7 @@ def ikev2_remote_certificate_filename_get(machine_id):
     public_pem = fwglobals.g.IKEV2_FOLDER + "remote_certificate_" + machine_id + ".pem"
     return public_pem
 
-def ikev2_gre_bridge_add(src, dst, bridge_id):
+def ikev2_gre_bridge_add(src, bridge_id):
     fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id)
 
 def ikev2_add_public_certificate(device_id, certificate):
