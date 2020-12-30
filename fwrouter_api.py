@@ -190,13 +190,33 @@ class FWROUTER_API:
             time.sleep(1)  # 1 sec
 
             tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
+            fwglobals.log.debug("Tunnels:")
+            fwglobals.log.debug(str(tunnels))
+            tunnels_db = fwglobals.g.ikev2tunnels.get_tunnels()
 
-            for gre in tunnels:
-                tunnel = gre.tunnel
-                bridge_id = fwglobals.g.ikev2tunnels.get_tunnel(str(tunnel.src))
-                if (bridge_id):
-                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index, bd_id=bridge_id, enable=1, shg=1)
-                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+            # Iterate through GRE tunnel DB and add new tunnels into bridges
+            for tunnel_src, values in tunnels_db.items():
+                is_found = False
+                bridge_id = values['bridge_id']
+                state = values['state']
+                sw_if_index=None
+                fwglobals.log.debug("tunnel_src %s, bridge_id %s, state %s" % (tunnel_src, bridge_id, state))
+                for gre in tunnels:
+                    fwglobals.log.debug("gre.tunnel.src %s, tunnel_src %s" % (gre.tunnel.src, tunnel_src))
+                    if str(gre.tunnel.src) == str(tunnel_src):
+                        sw_if_index = gre.tunnel.sw_if_index
+                        is_found = True
+                        fwglobals.log.debug("Found!")
+                        break
+                if state == 'down' and is_found:
+                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=sw_if_index,
+                                                                                    bd_id=bridge_id, enable=1, shg=1)
+                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=sw_if_index, flags=1)
+                    fwglobals.g.ikev2tunnels.set_state(tunnel_src, 'up')
+                    fwglobals.log.debug("tunnel_src %s was down and found" % str(tunnel_src))
+                if state == 'up' and not is_found:
+                    fwglobals.g.ikev2tunnels.set_state(tunnel_src, 'down')
+                    fwglobals.log.debug("tunnel_src %s was up and not found" % str(tunnel_src))
 
     def restore_vpp_if_needed(self):
         """Restore VPP.
