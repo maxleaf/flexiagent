@@ -97,6 +97,8 @@ def get_request_key(params):
      """
     if 'dev_id' in params:
         key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['dev_id'])
+    elif 'pci' in params: # Used for pci_to_dev_id migration only to compute the right key
+        key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['pci'])
     else:
         key = 'add-route:%s:%s' % (params['addr'], params['via'])
 

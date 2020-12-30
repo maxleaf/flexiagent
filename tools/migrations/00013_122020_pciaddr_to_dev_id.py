@@ -69,7 +69,7 @@ def _change_interface_identifier():
         routes_requests = router_cfg.dump(types=['add-route'])
         for request in routes_requests:
             if 'pci' in request['params']:
-                key = 'add-route:%s:%s:%s' % (request['params']['addr'], request['params']['via'], request['params']['pci'])
+                key = router_cfg._get_request_key(request)
                 del router_cfg.db[key]
 
                 request['params']['dev_id'] = fwutils.dev_id_add_type(request['params']['pci'])
