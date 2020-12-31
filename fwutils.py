@@ -831,31 +831,25 @@ def dev_id_to_tap(dev_id):
 #       GigabitEthernet0/9/0 -> vpp1
 #       loop0 -> vpp2
 def tap_to_vpp_if_name(tap):
-    """Convert VPP interface name into Linux TAP interface name.
+    """Convert Linux interface created by tap-inject into VPP interface name.
 
-     :param vpp_if_name:  interface name.
+     :param tap:  Interface created in linux by tap-inject.
 
-     :returns: Linux TAP interface name.
+     :returns: Vpp interface name.
      """
-    # vpp_api.cli() throw exception in vpp 19.01 (and works in vpp 19.04)
-    # taps = fwglobals.g.router_api.vpp_api.cli("show tap-inject")
     taps = _vppctl_read("show tap-inject")
     if taps is None:
-        raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
+        raise Exception("tap_to_vpp_if_name: failed to fetch tap info from VPP")
 
     taps = taps.splitlines()
     pattern = '([a-zA-Z0-9_]+) -> %s' % tap
     for line in taps:
         if tap in line:
             vpp_if_name = line.split(' ->')[0]
-            # match = re.search(pattern, line)
-            # if match:
-            #     vpp_if_name = match.group(1)
             return vpp_if_name
 
     return None
-    # vpp_if_name = match.group(1)
-    # return vpp_if_name
+
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
