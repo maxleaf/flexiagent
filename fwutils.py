@@ -535,35 +535,40 @@ def get_interface_dev_id(linuxif):
     # in case of non-pci interface try to get from /sys/class/net
     try:
         if linuxif:
-            if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
+            if linuxif.startswith('vpp'):
+                vpp_if_name = tap_to_vpp_if_name(linuxif)
+                dev_id = vpp_if_name_to_dev_id(vpp_if_name)
+                return dev_id
+            else:
+                if_addr = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % linuxif, shell=True)
 
-            if re.search('usb', if_addr):
-                address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
-                return dev_id_add_type(address)
-            elif re.search('pci', if_addr):
-                address = if_addr.split('/net')[0].split('/')[-1]
-                address = dev_id_add_type(address)
-                return dev_id_to_full(address)
+                if re.search('usb', if_addr):
+                    address = 'usb%s' % re.search('usb(.+?)/net', if_addr).group(1)
+                    return dev_id_add_type(address)
+                elif re.search('pci', if_addr):
+                    address = if_addr.split('/net')[0].split('/')[-1]
+                    address = dev_id_add_type(address)
+                    return dev_id_to_full(address)
 
-        NETWORK_BASE_CLASS = "02"
-        vpp_run = vpp_does_run()
-        lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-        for line in lines:
-            vals = line.decode().split("\t", 1)
-            if len(vals) == 2:
-                # keep slot number
-                if vals[0] == 'Slot:':
-                    slot = vals[1]
-                if vals[0] == 'Class:':
-                    if vals[1][0:2] == NETWORK_BASE_CLASS:
-                        slot = dev_id_add_type(slot)
-                        interface = dev_id_to_linux_if(slot)
-                        if not interface and vpp_run:
-                            interface = dev_id_to_tap(slot)
-                        if not interface:
-                            continue
-                        if interface == linuxif:
-                            return dev_id_to_full(slot)
+        # NETWORK_BASE_CLASS = "02"
+        # vpp_run = vpp_does_run()
+        # lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+        # for line in lines:
+        #     vals = line.decode().split("\t", 1)
+        #     if len(vals) == 2:
+        #         # keep slot number
+        #         if vals[0] == 'Slot:':
+        #             slot = vals[1]
+        #         if vals[0] == 'Class:':
+        #             if vals[1][0:2] == NETWORK_BASE_CLASS:
+        #                 slot = dev_id_add_type(slot)
+        #                 interface = dev_id_to_linux_if(slot)
+        #                 if not interface and vpp_run:
+        #                     interface = dev_id_to_tap(slot)
+        #                 if not interface:
+        #                     continue
+        #                 if interface == linuxif:
+        #                     return dev_id_to_full(slot)
     except:
         return ""
 
@@ -818,6 +823,40 @@ def dev_id_to_tap(dev_id):
         cache[dev_id_full] = tap
     return tap
 
+# 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
+# into name of injected vpp interface in Linux.
+# To do that it greps output of 'vppctl sh tap-inject' by the interface name:
+#   root@ubuntu-server-1:/# vppctl sh tap-inject
+#       GigabitEthernet0/8/0 -> vpp0
+#       GigabitEthernet0/9/0 -> vpp1
+#       loop0 -> vpp2
+def tap_to_vpp_if_name(tap):
+    """Convert VPP interface name into Linux TAP interface name.
+
+     :param vpp_if_name:  interface name.
+
+     :returns: Linux TAP interface name.
+     """
+    # vpp_api.cli() throw exception in vpp 19.01 (and works in vpp 19.04)
+    # taps = fwglobals.g.router_api.vpp_api.cli("show tap-inject")
+    taps = _vppctl_read("show tap-inject")
+    if taps is None:
+        raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
+
+    taps = taps.splitlines()
+    pattern = '([a-zA-Z0-9_]+) -> %s' % tap
+    for line in taps:
+        if tap in line:
+            vpp_if_name = line.split(' ->')[0]
+            # match = re.search(pattern, line)
+            # if match:
+            #     vpp_if_name = match.group(1)
+            return vpp_if_name
+
+    return None
+    # vpp_if_name = match.group(1)
+    # return vpp_if_name
+
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
 # To do that it greps output of 'vppctl sh tap-inject' by the interface name:
@@ -848,7 +887,7 @@ def vpp_if_name_to_tap(vpp_if_name):
 def generate_linux_tap_name(linux_if_name):
     if len(linux_if_name) > 6:
         return linux_if_name[-6:]
-    
+
     return linux_if_name
 
 def linux_tap_by_interface_name(linux_if_name):
@@ -2627,12 +2666,12 @@ def is_wifi_interface(dev_id):
     :returns: Boolean.
     """
     linux_if = dev_id_to_linux_if(dev_id)
-
     if linux_if:
-        cmd = 'cat /proc/net/wireless | grep %s' % linux_if
         try:
-            out = subprocess.check_output(cmd, shell=True).strip()
-            return True
+            lines = subprocess.check_output('iwconfig', shell=True).splitlines()
+            for line in lines:
+                if linux_if in line and not 'no wireless extensions' in line:
+                    return True
         except subprocess.CalledProcessError:
             return False
 
