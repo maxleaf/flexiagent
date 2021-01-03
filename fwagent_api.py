@@ -49,6 +49,7 @@ fwagent_api = {
     # LTE jobs
     'lte-get-interface-info':           '_lte_get_interface_info',
     'lte-enable':                       '_lte_enable',
+    'lte-connect':                      '_lte_connect',
     'lte-disable':                      '_lte_disable',
     'lte-reset':                        '_lte_reset',
 }
@@ -427,69 +428,42 @@ class FWAGENT_API:
         except Exception as e:
             raise Exception("_get_lte_interface_status: %s" % str(e))
 
+    def _lte_connect(self, params):
+        try:
+            is_success, error = fwutils.lte_connect(params)
+
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+            if is_assigned and fwutils.vpp_does_run() or fwglobals.g.router_api.state_is_starting_stopping():
+                reply = {'ok': 1, 'message': ''}
+
+            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+            connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+
+            if is_success and not connectivity:
+                fwutils.set_lte_info_on_linux_interface(params['dev_id'])
+
+            reply = {'ok': 1, 'message': ''}
+        except Exception as e:
+            reply = {'ok': 0, 'message': str(e)}
+
+        return reply
+
     def _lte_enable(self, params):
-        file_path = '/etc/flexiwan/start_lte_startup.sh'
-        interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
-        connection_params = fwutils.lte_prepare_connection_params(params)
-        device = fwutils.dev_id_to_mbim_device(params['dev_id'])
-
-        with open (file_path, 'w') as rsh:
-            rsh.write('''\
-#!/bin/bash
-
-{ # try
-
-echo "starting...." > /tmp/lte_start
-
-qmicli --device=/dev/''' + device + ''' --device-open-proxy --device-open-mbim --wds-start-network="''' + connection_params + '''" --client-no-release-cid >> /tmp/lte_start
-
-echo "network started..." >> /tmp/lte_start
-
-qmicli --device=/dev/''' + device + ''' --device-open-proxy --device-open-mbim --wds-get-current-settings > /tmp/lte
-
-IP=`cat /tmp/lte | grep "IPv4 address" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | head -1`
-GATEWAY=`cat /tmp/lte |grep "IPv4 gateway" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
-SUBNET=`cat /tmp/lte |grep "IPv4 subnet" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
-
-PDH=`cat /tmp/lte_start |grep "Packet data handle" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
-CID=`cat /tmp/lte_start |grep "CID" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
-
-echo "PDH=$PDH" > /tmp/mbim_network_''' + interface_name + '''
-echo "CID=$CID" >> /tmp/mbim_network_''' + interface_name + '''
-
-echo $IP >> /tmp/lte_start
-echo $GATEWAY >> /tmp/lte_start
-echo $SUBNET >> /tmp/lte_start
-
-/sbin/ifconfig ''' + interface_name + ''' $IP netmask $SUBNET up
-/sbin/route add -net 0.0.0.0 gw $GATEWAY
-
-echo "done!" >> /tmp/lte_start
-
-} || { # catch
-echo "ERROR" >> /tmp/lte_start
-# save log for exception
-}
-
-exit 0
-''')
-
-        # grant execution permission to this file
-        os.system('chmod +x %s' % file_path)
-
-        # check if already exists in crontab
         try:
-            output = subprocess.check_output('sudo crontab -l', shell=True, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            output = ''
+            updated = False
+            requests = []
 
-        if not file_path in output:
-            os.system('crontab -l > file; echo "@reboot %s" >> file; crontab file; rm file' % file_path)
+            lte_requests = fwglobals.g.db['lte'] if 'lte' in fwglobals.g.db else {}
 
-        try:
-            is_success, error =  fwutils.lte_connect(params)
-            if is_success:
-                fwutils.set_lte_info_on_linux_interface()
+            lte_requests[params['dev_id']] = {
+                'entitiy' : 'agent',
+                'message': 'lte-connect',
+                'params' : params
+            }
+
+            fwglobals.g.db['lte'] = lte_requests
+
+            self._lte_connect(params)
 
             reply = {'ok': 1, 'message': ''}
         except Exception as e:
@@ -498,17 +472,19 @@ exit 0
         return reply
 
     def _lte_disable(self, params):
-        file_path = '/etc/flexiwan/start_lte_startup.sh'
-        try:
-            output = subprocess.check_output('crontab -l | grep -v "%s"  | crontab -' % file_path, shell=True, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            pass
-
         try:
             # don't perform disconnect if this interface is already assigned to vpp and vpp is run
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to disconnect LTE'}
+
+            lte_requests = fwglobals.g.db['lte'] if 'lte' in fwglobals.g.db else {}
+
+            exists = lte_requests.get(params['dev_id'], None)
+            if exists:
+                del lte_requests[params['dev_id']]
+
+            fwglobals.g.db['lte'] = lte_requests
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'])
             reply = {'ok': 1, 'message': ''}

@@ -2241,18 +2241,22 @@ def get_inet6_by_linux_name(inf_name):
 
     return None
 
-def set_lte_info_on_linux_interface():
+def set_lte_info_on_linux_interface(dev_id=None):
     interfacaes = psutil.net_if_addrs()
     for nicname, addrs in interfacaes.items():
-        dev_id = get_interface_dev_id(nicname)
-        if dev_id and is_lte_interface(dev_id):
-            ip_info = lte_get_configuration_received_from_provider(dev_id)
+        currernt_dev_id = get_interface_dev_id(nicname)
+
+        if currernt_dev_id and is_lte_interface(currernt_dev_id):
+            if dev_id and currernt_dev_id != dev_id:
+                continue
+
+            ip_info = lte_get_configuration_received_from_provider(currernt_dev_id)
             if ip_info['STATUS'] and os.path.exists('/tmp/mbim_network_%s' % nicname):
                 os.system('ifconfig %s down' % nicname)
                 os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
 
                 metric = 0
-                is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+                is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=currernt_dev_id)
                 if is_assigned:
                     metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
 
@@ -2662,7 +2666,7 @@ def is_wifi_interface(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
     if linux_if:
         try:
-            lines = subprocess.check_output('iwconfig', shell=True).splitlines()
+            lines = subprocess.check_output('iwconfig', shell=True, stderr=subprocess.STDOUT).splitlines()
             for line in lines:
                 if linux_if in line and not 'no wireless extensions' in line:
                     return True

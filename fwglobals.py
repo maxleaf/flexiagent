@@ -74,6 +74,7 @@ request_handlers = {
     'wifi-get-interface-info':           {'name': '_call_agent_api'},
     'lte-get-interface-info':            {'name': '_call_agent_api'},
     'lte-enable':                        {'name': '_call_agent_api'},
+    'lte-connect':                       {'name': '_call_agent_api'},
     'lte-disable':                       {'name': '_call_agent_api'},
     'lte-reset':                         {'name': '_call_agent_api'},
 

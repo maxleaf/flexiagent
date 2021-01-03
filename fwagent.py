@@ -892,11 +892,37 @@ class FwagentDaemon(object):
             return fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version']
         if what == 'cache':
             return json.dumps(fwglobals.g.cache.db, indent=2, sort_keys=True, default=lambda x: x.__dict__)
+        if what == 'linux_configuration':
+            linux_configs = []
+            for key in fwglobals.g.db:
+                linux_configs.append(fwglobals.g.db[key])
+            return json.dumps(linux_configs, indent=2, sort_keys=True)
         if what == 'threads':
             thread_list = []
             for thd in threading.enumerate():
                 thread_list.append(thd.name)
             return json.dumps(sorted(thread_list), indent=2, sort_keys=True)
+
+    def linux_configuration_thread(self):
+
+        def run(*args):
+            slept = 0
+
+            while self.active:
+                # Every 20 seconds ensure that linux configuration is working properly
+                timeout = 20
+                if (slept % timeout) == 0:
+                    lte_requests = fwglobals.g.db['lte']
+                    for dev_id in lte_requests:
+                        fwglobals.g.handle_request(lte_requests[dev_id])
+
+                # Sleep 1 second and make another iteration
+                time.sleep(1)
+                slept += 1
+
+
+        self.linux_configuration = threading.Thread(target=run, name='Linux Configuration Thread')
+        self.linux_configuration.start()
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -942,6 +968,9 @@ class FwagentDaemon(object):
         # That start infinite receive-send loop in Fwagent::connect().
         # -------------------------------------
         while self.active:
+            # monitor linux configuration, even if don't connected to flexiManage
+            self.linux_configuration_thread()
+
             closed_gracefully = self.agent.connect()
             if not closed_gracefully and self.active:
                 # If connection was closed by flexiManage because of not approved
@@ -1143,7 +1172,7 @@ if __name__ == '__main__':
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
     parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
                         help="show various router parameters")
-    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
+    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads', 'linux_configuration'],
                         help="show various agent parameters")
     parser_show.add_argument('--daemon', choices=['status'],
                         help="show various daemon parameters")
