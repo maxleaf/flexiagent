@@ -140,20 +140,6 @@ def start_router(params=None):
             cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
             cmd_list.append(cmd)
 
-        # Detect 'vmxnet3' interfaces as they need special care:
-        #   1. They should not appear in /etc/vpp/startup.conf.
-        #      If they appear in /etc/vpp/startup.conf, vpp will capture
-        #      them with vfio-pci driver, and 'create interface vmxnet3'
-        #      command will fail with 'device in use'.
-        #   2. They require additional VPP call vmxnet3_create on start
-        #      and complement vmxnet3_delete on stop
-        #
-        if fwutils.dev_id_is_vmxnet3(params['dev_id']):
-            pci_list_vmxnet3.append(params['dev_id'])
-        else:
-            dev_id_list.append(params['dev_id'])
-
-
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
     # Add interfaces to the vpp configuration file, thus creating whitelist.
