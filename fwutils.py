@@ -711,7 +711,7 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
     vmxnet3hw = fwglobals.g.router_api.vpp_api.vpp.api.vmxnet3_dump()
     for hw_if in vmxnet3hw:
         vpp_if_name = hw_if.if_name.rstrip(' \t\r\n\0')
-        pci_addr = pci_bytes_to_str(hw_if.pci_addr)
+        pci_addr = 'pci:%s' % pci_bytes_to_str(hw_if.pci_addr)
         fwglobals.g.cache.dev_id_to_vpp_if_name[pci_addr] = vpp_if_name
         fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_if_name] = pci_addr
 
