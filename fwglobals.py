@@ -72,7 +72,6 @@ request_handlers = {
     'reset-device':                 {'name': '_call_agent_api'},
     'sync-device':                  {'name': '_call_agent_api'},
     'add-private-key':              {'name': '_call_agent_api'},
-    'add-public-certificate':       {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
