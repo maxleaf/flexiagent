@@ -245,6 +245,7 @@ class Fwglobals:
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
+        self.LINUX_CONFIGURATION_DB_FILE        = self.DATA_PATH + '.linux_configs.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.HOSTAPD_CONFIG_DIRECTORY = '/etc/hostapd/'
         self.NETPLAN_FILES       = {}
@@ -311,6 +312,7 @@ class Fwglobals:
             return self.fwagent
 
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
+        self.linux_configs_db = SqliteDict(self.LINUX_CONFIGURATION_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.agent_api    = FWAGENT_API()

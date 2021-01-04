@@ -1078,6 +1078,11 @@ def stop_vpp():
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
 
+def reset_fw_linux_config():
+    if os.path.exists(fwglobals.g.LINUX_CONFIGURATION_DB_FILE):
+        os.remove(fwglobals.g.LINUX_CONFIGURATION_DB_FILE)
+        # fwglobals.g.linux_configs_db.clear()
+
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.
 
@@ -2241,26 +2246,49 @@ def get_inet6_by_linux_name(inf_name):
 
     return None
 
-def set_lte_info_on_linux_interface(dev_id=None):
+def get_lte_interfaces_dev_ids():
+    out = {}
     interfacaes = psutil.net_if_addrs()
     for nicname, addrs in interfacaes.items():
         currernt_dev_id = get_interface_dev_id(nicname)
-
         if currernt_dev_id and is_lte_interface(currernt_dev_id):
-            if dev_id and currernt_dev_id != dev_id:
-                continue
+            out[currernt_dev_id] = nicname
 
-            ip_info = lte_get_configuration_received_from_provider(currernt_dev_id)
-            if ip_info['STATUS'] and os.path.exists('/tmp/mbim_network_%s' % nicname):
-                os.system('ifconfig %s down' % nicname)
-                os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
+    return out
 
-                metric = 0
-                is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=currernt_dev_id)
-                if is_assigned:
-                    metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
+def set_lte_info_on_linux_interface(dev_id):
+    lte_interfacaes = get_lte_interfaces_dev_ids()
 
-                os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
+    if dev_id in lte_interfacaes:
+        ip_info = lte_get_configuration_received_from_provider(dev_id)
+
+        if ip_info['STATUS']:
+            nicname = lte_interfacaes[dev_id]
+            os.system('ifconfig %s down' % nicname)
+            os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
+
+            metric = 0
+            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+            if is_assigned:
+                metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
+
+            os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
+            return True
+    # for currernt_dev_id, interface in lte_interfacaes:
+    #     if dev_id and currernt_dev_id != dev_id:
+    #         continue
+
+    #     ip_info = lte_get_configuration_received_from_provider(currernt_dev_id)
+    #     if ip_info['STATUS']:
+    #         os.system('ifconfig %s down' % nicname)
+    #         os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
+
+    #         metric = 0
+    #         is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=currernt_dev_id)
+    #         if is_assigned:
+    #             metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
+
+    #         os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
 
     return None
 
@@ -2367,24 +2395,30 @@ def lte_sim_status(dev_id):
 def lte_is_sim_inserted(dev_id):
     return lte_sim_status(dev_id) == "present"
 
-def lte_disconnect(dev_id=None):
+def lte_disconnect(dev_id):
     try:
+        done = False
         files = glob.glob("/tmp/mbim_network*")
         for file_path in files:
-            start_data = subprocess.check_output('cat %s' % file_path, shell=True).splitlines()
-            pdh = start_data[0].split('=')[-1]
-            cid = start_data[1].split('=')[-1]
-
             if_name = file_path.split('_')[-1]
             inf_dev_id = get_interface_dev_id(if_name)
 
-            if dev_id and dev_id != inf_dev_id:
+            if dev_id != inf_dev_id:
                 continue
+
+            start_data = subprocess.check_output('cat %s' % file_path, shell=True).splitlines()
+            pdh = start_data[0].split('=')[-1]
+            cid = start_data[1].split('=')[-1]
 
             output = _run_qmicli_command(inf_dev_id, 'wds-stop-network=%s --client-cid=%s' % (pdh, cid))
             os.system('rm %s' % file_path)
 
             os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
+            done = True
+
+        if not done:
+            _run_qmicli_command(dev_id, 'wds-reset --device-open-sync')
+
         return (True, None)
     except subprocess.CalledProcessError as e:
         return (False, "Exception: %s" % (str(e)))

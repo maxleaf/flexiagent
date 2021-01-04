@@ -1198,7 +1198,11 @@ class FWROUTER_API:
         fwutils.reset_traffic_control()
         fwutils.remove_linux_bridges()
         fwutils.stop_hostapd()
-        fwutils.set_lte_info_on_linux_interface()
+
+        lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
+        for lte_dev_id in lte_interfaces:
+            fwutils.set_lte_info_on_linux_interface(lte_dev_id)
+
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
 

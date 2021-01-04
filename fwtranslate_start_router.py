@@ -270,7 +270,8 @@ def start_router(params=None):
     # into 'remove-interface' and 'add-interface', so we want to avoid deletion
     # and creation interface on every 'modify-interface'. There is no sense to do
     # that and it causes problems in FIB, when default route interface is deleted.
-    for pci in pci_list_vmxnet3:
+    for dev_id in pci_list_vmxnet3:
+        _, pci = fwutils.dev_id_parse(dev_id)
         pci_bytes = fwutils.pci_str_to_bytes(pci)
         cmd = {}
         cmd['cmd'] = {}
@@ -280,7 +281,7 @@ def start_router(params=None):
         cmd['revert'] = {}
         cmd['revert']['name']   = "vmxnet3_delete"
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':pci } ] }
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ] }
         cmd_list.append(cmd)
 
     # Once VPP started, apply configuration to it.

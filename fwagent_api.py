@@ -249,6 +249,7 @@ class FWAGENT_API:
         if fwglobals.g.router_api.state_is_started():
             fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_router_config()
+        fwutils.reset_fw_linux_config()
         return {'ok': 1}
 
     def _sync_device(self, params):
@@ -269,12 +270,20 @@ class FWAGENT_API:
         """
         fwglobals.log.info("_sync_device STARTED")
 
+        # First check agent related configuration. e.g. lte-enable job
+        router_requests = []
+        for request in params['requests']:
+            if request['message'] in fwagent_api:
+                self.call(request)
+            else:
+                router_requests.append(request)
+
         # Go over configuration requests received within sync-device request,
         # intersect them against the requests stored locally and generate new list
         # of remove-X and add-X requests that should take device to configuration
         # received with the sync-device.
         #
-        sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
+        sync_list = fwglobals.g.router_cfg.get_sync_list(router_requests)
         fwglobals.log.debug("_sync_device: sync-list: %s" % \
                             json.dumps(sync_list, indent=2, sort_keys=True))
         if not sync_list:
@@ -430,12 +439,14 @@ class FWAGENT_API:
 
     def _lte_connect(self, params):
         try:
-            is_success, error = fwutils.lte_connect(params)
+            if fwglobals.g.router_api.state_is_starting_stopping():
+                return {'ok': 1, 'message': ''}
 
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if is_assigned and fwutils.vpp_does_run() or fwglobals.g.router_api.state_is_starting_stopping():
-                reply = {'ok': 1, 'message': ''}
+            if is_assigned and fwutils.vpp_does_run():
+                return {'ok': 1, 'message': ''}
 
+            is_success, error = fwutils.lte_connect(params)
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
             connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
@@ -453,7 +464,7 @@ class FWAGENT_API:
             updated = False
             requests = []
 
-            lte_requests = fwglobals.g.db['lte'] if 'lte' in fwglobals.g.db else {}
+            lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
 
             lte_requests[params['dev_id']] = {
                 'entitiy' : 'agent',
@@ -461,7 +472,7 @@ class FWAGENT_API:
                 'params' : params
             }
 
-            fwglobals.g.db['lte'] = lte_requests
+            fwglobals.g.linux_configs_db['lte'] = lte_requests
 
             self._lte_connect(params)
 
@@ -478,13 +489,13 @@ class FWAGENT_API:
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to disconnect LTE'}
 
-            lte_requests = fwglobals.g.db['lte'] if 'lte' in fwglobals.g.db else {}
+            lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
 
             exists = lte_requests.get(params['dev_id'], None)
             if exists:
                 del lte_requests[params['dev_id']]
 
-            fwglobals.g.db['lte'] = lte_requests
+            fwglobals.g.linux_configs_db['lte'] = lte_requests
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'])
             reply = {'ok': 1, 'message': ''}

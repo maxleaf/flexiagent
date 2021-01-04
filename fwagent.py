@@ -643,10 +643,13 @@ def reset(soft=False):
     :returns: None.
     """
     # stop LTE connection on reset the connection is open
-    fwutils.lte_disconnect()
+    lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
+    for dev_id in lte_interfaces:
+        fwutils.lte_disconnect(dev_id)
 
     if soft:
         fwutils.reset_router_config()
+        fwutils.reset_fw_linux_config()
         return
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
@@ -684,6 +687,7 @@ def stop(reset_router_config, stop_router):
 
     if reset_router_config:
         fwutils.reset_router_config()
+        fwutils.reset_fw_linux_config()
     fwglobals.log.info("done")
 
 def start(start_router):
@@ -876,6 +880,11 @@ class FwagentDaemon(object):
         if self.thread_main:
             self.thread_main.join()
             self.thread_main = None
+
+        # Stop linux configuration thread
+        if self.self.linux_configuration:
+            self.linux_configuration.join()
+            self.linux_configuration = None
         fwglobals.log.debug("stopped")
 
     def reset(self):
@@ -894,8 +903,8 @@ class FwagentDaemon(object):
             return json.dumps(fwglobals.g.cache.db, indent=2, sort_keys=True, default=lambda x: x.__dict__)
         if what == 'linux_configuration':
             linux_configs = []
-            for key in fwglobals.g.db:
-                linux_configs.append(fwglobals.g.db[key])
+            for key in fwglobals.g.linux_configs_db:
+                linux_configs.append(fwglobals.g.linux_configs_db[key])
             return json.dumps(linux_configs, indent=2, sort_keys=True)
         if what == 'threads':
             thread_list = []
@@ -912,7 +921,7 @@ class FwagentDaemon(object):
                 # Every 20 seconds ensure that linux configuration is working properly
                 timeout = 20
                 if (slept % timeout) == 0:
-                    lte_requests = fwglobals.g.db['lte']
+                    lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
                     for dev_id in lte_requests:
                         fwglobals.g.handle_request(lte_requests[dev_id])
 

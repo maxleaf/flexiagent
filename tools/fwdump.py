@@ -95,6 +95,7 @@ g_dumpers = {
     'fwagent_cache':                { 'shell_cmd': 'fwagent show --agent cache > <dumper_out_file>' },
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
                                                    'cp /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
+    'fwagent_Linux_configuration':  { 'shell_cmd': 'fwagent show --agent linux_configuration > <dumper_out_file>' },
     'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'fwagent_log.1':                { 'shell_cmd': 'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent_1.log 2>/dev/null ;' +
