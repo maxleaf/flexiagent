@@ -769,6 +769,7 @@ class FwagentDaemon(object):
         self.agent          = None
         self.active         = False
         self.thread_main    = None
+        self.linux_configuration    = None
         self.standalone     = standalone
 
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -882,7 +883,7 @@ class FwagentDaemon(object):
             self.thread_main = None
 
         # Stop linux configuration thread
-        if self.self.linux_configuration:
+        if self.linux_configuration:
             self.linux_configuration.join()
             self.linux_configuration = None
         fwglobals.log.debug("stopped")
