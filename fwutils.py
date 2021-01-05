@@ -2069,6 +2069,6 @@ def ikev2_restart_all_initiator_tunnels():
     '''
     tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
 
-    for tunnel in tunnels:
+    for tunnel in tunnels.values():
         if tunnel['role'] == 'initiator':
             fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tunnel['profile'])
