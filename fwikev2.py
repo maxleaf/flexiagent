@@ -68,7 +68,7 @@ class FwIKEv2Tunnels:
 
         :returns: None.
         """
-        self.db[src] = bd_id
+        self.db[src] = {'bridge_id': bd_id}
 
     def remove_tunnel(self, src):
         """Removes tunnel from database.
@@ -83,3 +83,11 @@ class FwIKEv2Tunnels:
         :returns: Dictionary.
         """
         return self.db[src]
+
+    def get_tunnels(self):
+        """Get tunnels from database.
+
+         :returns: Dictionary.
+         """
+        return self.db
+
