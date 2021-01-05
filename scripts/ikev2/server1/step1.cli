@@ -1,7 +1,7 @@
 [
 {
   "entity":  "agent",
-  "message": "add-private-key",
+  "message": "get-device-certificate",
   "params": {"days": 30}
 }
 ]
