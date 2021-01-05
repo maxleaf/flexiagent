@@ -82,7 +82,7 @@ class FwRouterCfg:
                            notified for, e.g.:
                             ['add-interface', 'remove-interface', 'stop-router']
         """
-        fwglobals.log.debug("FwRouterCfg: register_callback: %s.%s(%s)"\
+        fwglobals.log.debug("register_callback: %s.%s(%s)"\
             %(listener, callback.__name__, str(requests)))
         elem = {'listener':listener, 'callback': callback, 'requests':requests}
         self.callbacks.append(elem)
@@ -106,7 +106,13 @@ class FwRouterCfg:
         """
         for req_key in self.db:
             del self.db[req_key]
-        self.reset_signature()
+
+        # Reset configuration to the value, that differs from one calculated
+        # by the flexiManage. This is to enforce flexiManage to issue 'sync-device'
+        # in order to fill the configuration database again with most updated
+        # configuration.
+        #
+        self.reset_signature("empty_router_cfg", log=False)
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
@@ -139,17 +145,17 @@ class FwRouterCfg:
         """
         for elem in listeners:
             if req_name in elem['requests']:
-                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - before"\
+                fwglobals.log.debug("%s.%s(%s) - before"\
                         %(elem['listener'], elem['callback'].__name__, req_name))
 
                 try:
                     elem['callback'](req_name, params)
                 except Exception as e:
-                    fwglobals.log.error("FwRouterCfg: %s.%s(%s): %s"\
+                    fwglobals.log.error("%s.%s(%s): %s"\
                             %(elem['listener'], elem['callback'].__name__, req_name, str(e)))
                     pass
 
-                fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - after"\
+                fwglobals.log.debug("%s.%s(%s) - after"\
                         %(elem['listener'], elem['callback'].__name__, req_name))
 
     def update(self, request, cmd_list=None, executed=False):
@@ -187,7 +193,7 @@ class FwRouterCfg:
         except KeyError:
             pass
         except Exception as e:
-            fwglobals.log.error("FwRouterCfg.update(%s) failed: %s, %s" % \
+            fwglobals.log.error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
@@ -367,15 +373,15 @@ class FwRouterCfg:
                 requests.append(self.db[key]['params'])
         return requests
 
-    def get_interfaces(self, type=None, pci=None, ip=None):
+    def get_interfaces(self, type=None, dev_id=None, ip=None):
         interfaces = self._get_requests('add-interface')
-        if not type and not pci and not ip:
+        if not type and not dev_id and not ip:
             return interfaces
         result = []
         for params in interfaces:
             if type and not re.match(type, params['type'], re.IGNORECASE):
                 continue
-            elif pci and pci != params['pci']:
+            elif dev_id and dev_id != params['dev_id']:
                 continue
             elif ip and not re.match(ip, params['addr']):
                 continue
@@ -406,16 +412,16 @@ class FwRouterCfg:
         interfaces = self.get_interfaces(type='wan', ip=ip)
         if not interfaces:
             return (None, None)
-        pci = interfaces[0]['pci']
+        dev_id = interfaces[0]['dev_id']
         gw  = interfaces[0].get('gateway')
         # If gateway not exist in interface configuration, use default
         # This is needed when upgrading from version 1.1.52 to 1.2.X
         if not gw:
-            tap = fwutils.pci_to_tap(pci)
+            tap = fwutils.dev_id_to_tap(dev_id)
             rip, _ = fwutils.get_interface_gateway(tap)
-            return pci, rip
+            return dev_id, rip
         else:
-            return pci, gw
+            return dev_id, gw
 
     def update_signature(self, request):
         """Updates the database signature.
@@ -439,7 +445,7 @@ class FwRouterCfg:
         new         = hash_object.hexdigest()
 
         self.db['signature'] = new
-        fwglobals.log.debug("fwrouter_cfg: sha1: new=%s, current=%s, delta=%s" %
+        fwglobals.log.debug("sha1: new=%s, current=%s, delta=%s" %
                             (str(new), str(current), str(delta)))
 
     def get_signature(self):
@@ -452,14 +458,24 @@ class FwRouterCfg:
             self.reset_signature()
         return self.db['signature']
 
-    def reset_signature(self):
+    def reset_signature(self, new_signature=None, log=True):
         """Resets configuration signature to the empty sting.
+
+        :param new_signature: string to be used as a signature of the configuration.
+                        If not provided, the empty string will be used.
+                        When flexiManage detects discrepancy between this signature
+                        and between signature that it calculated, it sends
+                        the 'sync-device' request in order to apply the user
+                        configuration onto device. On successfull sync the signature
+                        is reset to the empty string on both sides.
+        :param log: if False the reset will be not logged.
         """
-        if not 'signature' in self.db:
-            self.db['signature'] = ""
-        if self.db['signature']:
-            fwglobals.log.debug("fwrouter_cfg: reset signature")
-            self.db['signature'] = ""
+        old_signature = self.db.get('signature', '<none>')
+        new_signature = "" if new_signature == None else new_signature
+        self.db['signature'] = new_signature
+        if log:
+            fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
+                                (old_signature, new_signature))
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against

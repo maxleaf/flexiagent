@@ -91,10 +91,10 @@ def update_stats():
                         if t_stats:
                             t_stats.update(calc_stats)
                     else:
-                        # For other interfaces try to get pci index
-                        pci = fwutils.vpp_if_name_to_pci(intf)
-                        if pci:
-                            if_bytes[pci] = calc_stats
+                        # For other interfaces try to get interface id
+                        dev_id = fwutils.vpp_if_name_to_dev_id(intf)
+                        if dev_id:
+                            if_bytes[dev_id] = calc_stats
 
             stats['bytes'] = if_bytes
             stats['tunnel_stats'] = tunnel_stats

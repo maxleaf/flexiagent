@@ -56,7 +56,7 @@ class FwagentCli:
             self.daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
             self.daemon.ping()   # Check if daemon runs. If it does not, create local instance of Fwagent
         except Pyro4.errors.CommunicationError:
-            fwglobals.log.warning("FwagentCli: no daemon Fwagent was found, use local instance")
+            fwglobals.log.warning("no daemon Fwagent was found, use local instance")
             self.daemon = None
 
     def __enter__(self):
@@ -84,10 +84,7 @@ class FwagentCli:
                 elif api_str == 'q' or api_str == 'quit' or api_str == 'exit':
                     break
                 elif api_str == 'h' or api_str == 'help':
-                    print(self.prompt + "enter 'quit' or one of API-s listed below:")
-                    for api_name in sorted(supported_apis.keys()):
-                        print('----------------------------------------------------')
-                        print(supported_apis[api_name])
+                    print(self.prompt + "enter 'quit' or one of supported API-s")
                 elif api_str == '\x1b[A' or api_str == '\x1b[B':
                     print('ARROWS ARE NOT SUPPORTED YET ;)')
                 else:

@@ -64,12 +64,12 @@ class VPP:
         """Constructor method
         """
         self.api = _VPP_API()
-        fwglobals.log.debug("VPP Init: " + str(jlist))
+        fwglobals.log.debug("Init: " + str(jlist))
     def connect(self, name="default-conn"):
         """Connect to dummy VPP.
         """
-        fwglobals.log.debug("VPP Connect: " + name)
+        fwglobals.log.debug("Connect: " + name)
     def disconnect(self):
         """Disconnect from dummy VPP.
         """
-        fwglobals.log.debug("VPP Disconnect")
+        fwglobals.log.debug("Disconnect")

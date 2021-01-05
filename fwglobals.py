@@ -41,6 +41,7 @@ from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwstun_wrapper import FwStunWrap
+from fwwan_monitor import FwWanMonitor
 
 modules = {
     'fwagent_api':      __import__('fwagent_api'),
@@ -60,15 +61,21 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'get-device-info':              {'name': '_call_agent_api'},
-    'get-device-stats':             {'name': '_call_agent_api'},
-    'get-device-logs':              {'name': '_call_agent_api'},
-    'get-device-packet-traces':     {'name': '_call_agent_api'},
-    'get-device-os-routes':         {'name': '_call_agent_api'},
-    'get-router-config':            {'name': '_call_agent_api'},
-    'upgrade-device-sw':            {'name': '_call_agent_api'},
-    'reset-device':                 {'name': '_call_agent_api'},
-    'sync-device':                  {'name': '_call_agent_api'},
+    'get-device-info':                   {'name': '_call_agent_api'},
+    'get-device-stats':                  {'name': '_call_agent_api'},
+    'get-device-logs':                   {'name': '_call_agent_api'},
+    'get-device-packet-traces':          {'name': '_call_agent_api'},
+    'get-device-os-routes':              {'name': '_call_agent_api'},
+    'get-router-config':                 {'name': '_call_agent_api'},
+    'upgrade-device-sw':                 {'name': '_call_agent_api'},
+    'reset-device':                      {'name': '_call_agent_api'},
+    'sync-device':                       {'name': '_call_agent_api'},
+    'wifi-perform-operation':            {'name': '_call_agent_api'},
+    'wifi-get-interface-info':           {'name': '_call_agent_api'},
+    'lte-get-interface-info':            {'name': '_call_agent_api'},
+    'lte-enable':                        {'name': '_call_agent_api'},
+    'lte-disable':                       {'name': '_call_agent_api'},
+    'lte-reset':                         {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
@@ -101,7 +108,6 @@ request_handlers = {
     ##############################################################
 
     # OS API
-    'interfaces':                   {'name': '_call_os_api'},
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
     'ifcount':                      {'name': '_call_os_api'},
@@ -161,6 +167,7 @@ class Fwglobals:
             DEFAULT_MANAGEMENT_URL = 'https://app.flexiwan.com:443'
             DEFAULT_TOKEN_FILE     = data_path + 'token.txt'
             DEFAULT_UUID           = None
+            DEFAULT_MONITOR_UNASSIGNED_INTERFACES = True
             try:
                 with open(filename, 'r') as conf_file:
                     conf = yaml.load(conf_file, Loader=yaml.SafeLoader)
@@ -170,13 +177,15 @@ class Fwglobals:
                 self.MANAGEMENT_URL = agent_conf.get('server', DEFAULT_MANAGEMENT_URL)
                 self.TOKEN_FILE     = agent_conf.get('token',  DEFAULT_TOKEN_FILE)
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
+                self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERFACES)
             except Exception as e:
-                log.excep("FwConfiguration: %s, set defaults" % str(e))
+                log.excep("%s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
                 self.DEBUG          = DEFAULT_DEBUG
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
                 self.TOKEN_FILE     = DEFAULT_TOKEN_FILE
                 self.UUID           = DEFAULT_UUID
+                self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERFACES
             if self.DEBUG:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 
@@ -186,25 +195,29 @@ class Fwglobals:
         def __init__(self):
             self.db = {
                 'LINUX_INTERFACES': {},
-                'PCI_TO_VPP_IF_NAME': {},
-                'PCI_TO_VPP_TAP_NAME': {},
-                'PCIS': {},
+                'DEV_ID_TO_VPP_IF_NAME': {},
+                'DEV_ID_TO_VPP_TAP_NAME': {},
+                'DEV_IDS': {},
                 'STUN': {},
-                'VPP_IF_NAME_TO_PCI': {},
+                'VPP_IF_NAME_TO_DEV_ID': {},
+                'WAN_MONITOR': {
+                    'enabled_routes':  {},
+                    'disabled_routes': {},
+                }
             }
             self.linux_interfaces    = self.db['LINUX_INTERFACES']
-            self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
-            self.pci_to_vpp_tap_name = self.db['PCI_TO_VPP_TAP_NAME']
-            self.pcis                = self.db['PCIS']
+            self.dev_id_to_vpp_if_name  = self.db['DEV_ID_TO_VPP_IF_NAME']
+            self.dev_id_to_vpp_tap_name = self.db['DEV_ID_TO_VPP_TAP_NAME']
+            self.dev_ids                = self.db['DEV_IDS']
             self.stun_cache          = self.db['STUN']
-            self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
+            self.vpp_if_name_to_dev_id  = self.db['VPP_IF_NAME_TO_DEV_ID']
+            self.wan_monitor         = self.db['WAN_MONITOR']
 
 
     def __init__(self):
         """Constructor method
         """
         # Set default configuration
-        self.NUM_RETRIES_ALLOWED = 3
         self.RETRY_INTERVAL_MIN  = 5 # seconds - is used for both registration and main connection
         self.RETRY_INTERVAL_MAX  = 15
         self.RETRY_INTERVAL_LONG_MIN = 50
@@ -232,6 +245,7 @@ class Fwglobals:
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
+        self.HOSTAPD_CONFIG_DIRECTORY = '/etc/hostapd/'
         self.NETPLAN_FILES       = {}
         self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
@@ -240,10 +254,14 @@ class Fwglobals:
         self.FWAGENT_DAEMON_URI  = 'PYRO:%s@%s:%d' % (self.FWAGENT_DAEMON_NAME, self.FWAGENT_DAEMON_HOST, self.FWAGENT_DAEMON_PORT)
         self.WS_STATUS_ERROR_NOT_APPROVED = 403
         self.WS_STATUS_ERROR_LOCAL_ERROR  = 800 # Should be over maximal HTTP STATUS CODE - 699
-        self.WS_STATUS_OK                 = 1000
-        self.WS_STATUS_OK_DEVICE_CHANGE   = 1001
         self.fwagent = None
         self.cache   = self.FwCache()
+        self.WAN_FAILOVER_SERVERS          = [ '1.1.1.1' , '8.8.8.8' ]
+        self.WAN_FAILOVER_WND_SIZE         = 20         # 20 pings, every ping waits a second for response
+        self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
+        self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
+        self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
+
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -304,6 +322,8 @@ class Fwglobals:
 
         self.router_api.restore_vpp_if_needed()
 
+        self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
+
         return self.fwagent
 
     def finalize_agent(self):
@@ -312,13 +332,15 @@ class Fwglobals:
         if not self.fwagent:
             global log
             log.warning('Fwglobals.finalize_agent: agent does not exists')
-            return None
+            return
 
+        self.wan_monitor.finalize()
         self.stun_wrapper.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
 
+        del self.wan_monitor
         del self.stun_wrapper
         del self.apps
         del self.policies
@@ -328,7 +350,7 @@ class Fwglobals:
         del self.fwagent
         self.fwagent = None
         self.db.close()
-        return None
+        return
 
     def __str__(self):
         """Get string representation of configuration.
@@ -342,7 +364,6 @@ class Fwglobals:
             'DEBUG':                self.cfg.DEBUG,
             'UUID':                 self.cfg.UUID,
             'FWAGENT_CONF_FILE':    self.FWAGENT_CONF_FILE,
-            'NUM_RETRIES_ALLOWED':  self.NUM_RETRIES_ALLOWED,
             'RETRY_INTERVAL_MIN':   self.RETRY_INTERVAL_MIN,
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)
@@ -359,13 +380,46 @@ class Fwglobals:
     def _call_vpp_api(self, request, result=None):
         return self.router_api.vpp_api.call_simple(request, result)
 
-    def _call_python_api(self, request):
+    def _call_python_api(self, request, result=None):
+        '''Handle request that describe python function.
+
+        :param request: the request like:
+            {
+                'name':   "python"
+                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_dev_id, labels)
+                'params': {
+                    'module': 'fwutils',
+                    'func'  : 'vpp_multilink_update_labels',
+                    'args'  : {
+                        'labels':   labels,
+                        'next_hop': gw,
+                        'dev_id':   iface_dev_id,
+                        'remove':   False
+                    }
+                }
+            }
+
+        :param result: the cache where the python function should store data,
+                       required by the request sender. Today this cache is
+                       managed by the router_api executor and it is used
+                       to fulfill substitutions in function arguments,
+                       specified by the 'substs' parameter of the request.
+                       The format of the 'result' is as follows:
+            {
+                'result_attr': <name of variable inside python function,
+                                value of which the function should set into cache>
+                'cache':       <the python dict used as a cache>
+                'key':         <the key for the value to be cached>
+            }
+        '''
         func = self._call_python_api_get_func(request['params'])
         args = request['params'].get('args')
-        if args:
-            ret = func(**args)
-        else:
-            ret = func()
+
+        if result:
+            args = copy.deepcopy(args) if args else {}
+            args.update({ 'result_cache': result })
+
+        ret = func(**args) if args else func()
         (ok, val) = self._call_python_api_parse_result(ret)
         if not ok:
             func_str = request['params'].get('func')
@@ -425,7 +479,7 @@ class Fwglobals:
         """Handle request.
 
         :param request:      The request received from flexiManage after
-                             transformation by fwutils.fix_aggregated_message_format().
+                             transformation by fwutils.fix_received_message().
         :param result:       Place for result.
         :param received_msg: The original message received from flexiManage.
 
@@ -455,6 +509,7 @@ class Fwglobals:
                 received_msg = copy.deepcopy(request)
 
             handler_func = getattr(self, handler.get('name'))
+
             if result is None:
                 reply = handler_func(request)
             else:
