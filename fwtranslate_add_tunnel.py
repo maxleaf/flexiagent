@@ -673,7 +673,7 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
                                 'func'  : 'ikev2_gre_bridge_add',
-                                'args'  : {'src': src, 'bridge_id': bridge_id}
+                                'args'  : {'src': src, 'bridge_id': bridge_id, 'profile': name}
                                 }
     cmd_list.append(cmd)
 
@@ -1094,18 +1094,29 @@ def add_tunnel(params):
 def modify_tunnel(params):
     remote_device_id = str(params['ikev2']['remote-device-id']),
     certificate = params['ikev2']['certificate']
+    role = params['ikev2']['role']
     cmd_list = []
+
+    loop0_ip  = IPNetwork(params['loopback-iface']['addr'])
+    loop1_ip  = copy.deepcopy(loop0_ip)
+    loop1_ip.value  += IPAddress('0.1.0.0').value
+    src = str(loop1_ip.ip)
+
     # Add public certificate file
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "add IKEv2 public certificate for %s" % remote_device_id
+    cmd['cmd']['descr']     = "modify IKEv2 public certificate for %s" % remote_device_id
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
-                                'func'  : 'ikev2_add_public_certificate',
-                                'args'  : {'device_id': 'test', 'certificate': certificate}
+                                'func'  : 'ikev2_modify_certificate',
+                                'args'  : {'device_id'   : remote_device_id,
+                                           'certificate' : certificate,
+                                           'role'        : role,
+                                           'src'         : src}
                                 }
     cmd_list.append(cmd)
+
     return cmd_list
 
 def get_request_key(params):
