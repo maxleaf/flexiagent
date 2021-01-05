@@ -270,7 +270,7 @@ class FWAGENT_API:
         """
         fwglobals.log.info("_sync_device STARTED")
 
-        # First check agent related configuration. e.g. lte-enable job
+        # Go through all the requests and check which ones belong to the router and which ones belong to the agent_api
         router_requests = []
         for request in params['requests']:
             if request['message'] in fwagent_api:
@@ -438,10 +438,19 @@ class FWAGENT_API:
             raise Exception("_get_lte_interface_status: %s" % str(e))
 
     def _lte_connect(self, params):
+        """Establish LTE connection.
+        This function is called from the thread of linux configuration
+
+        :param params: Parameters to use.
+
+        :returns: Dictionary status code.
+        """
         try:
+            # Don't connect lte if vpp is being initializing / shutting down. 
             if fwglobals.g.router_api.state_is_starting_stopping():
                 return {'ok': 1, 'message': ''}
 
+            # Don't connect lte if interface is alreadt assgined and vpp is running.
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if is_assigned and fwutils.vpp_does_run():
                 return {'ok': 1, 'message': ''}
@@ -453,13 +462,20 @@ class FWAGENT_API:
             if is_success and not connectivity:
                 fwutils.set_lte_info_on_linux_interface(params['dev_id'])
 
-            reply = {'ok': 1, 'message': ''}
+            return {'ok': 1, 'message': ''}
         except Exception as e:
-            reply = {'ok': 0, 'message': str(e)}
-
-        return reply
+            return {'ok': 0, 'message': str(e)}
 
     def _lte_enable(self, params):
+        """Enable LTE connection on the device.
+        
+        Enable LTE connection by adding the job to the linux configuration DB.
+        Then, Linux configuration thread will monitor it.
+
+        :param params: Parameters to use.
+
+        :returns: Dictionary status code.
+        """
         try:
             updated = False
             requests = []
@@ -483,18 +499,23 @@ class FWAGENT_API:
         return reply
 
     def _lte_disable(self, params):
+        """Disable LTE connection on the device.
+
+        :param params: Parameters to use.
+
+        :returns: Dictionary status code.
+        """
         try:
             # don't perform disconnect if this interface is already assigned to vpp and vpp is run
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to disconnect LTE'}
 
+            # remove the enable job from linux db configuration
             lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
-
             exists = lte_requests.get(params['dev_id'], None)
             if exists:
                 del lte_requests[params['dev_id']]
-
             fwglobals.g.linux_configs_db['lte'] = lte_requests
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'])
@@ -505,6 +526,12 @@ class FWAGENT_API:
         return reply
 
     def _lte_reset(self, params):
+         """Rest LTE modem card.
+        
+        :param params: Parameters to use.
+
+        :returns: Dictionary status code.
+        """
         try:
             # don't perform reset if interface is already assigned to vpp and vpp is run
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])

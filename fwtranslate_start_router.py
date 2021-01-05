@@ -108,17 +108,18 @@ def start_router(params=None):
     for params in interfaces:
         linux_if  = fwutils.dev_id_to_linux_if(params['dev_id'])
         if linux_if:
-            # Firstly, Mark non-dpdk interfaces as they need special care:
-            #   1. They should not appear in /etc/vpp/startup.conf because they don't have a pci address.
-            #   2. They should not be removed from linux
-            # Additional logic for these interfaces is at add_interface translator
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
+            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
+            cmd_list.append(cmd)
+
+        
+            # Non-dpdk interface should not appear in /etc/vpp/startup.conf because they don't have a pci address.
+            # Additional spaciel logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "exec"
-                cmd['cmd']['params']  = [ "sudo ip addr flush dev %s" % linux_if ]
-                cmd['cmd']['descr']   = "remove ip addr from dev %s in Linux" % linux_if
-                cmd_list.append(cmd)
                 continue
 
             # Mark 'vmxnet3' interfaces as they need special care:
@@ -132,13 +133,6 @@ def start_router(params=None):
                 pci_list_vmxnet3.append(params['dev_id'])
             else:
                 dev_id_list.append(params['dev_id'])
-
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
-            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
-            cmd_list.append(cmd)
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 

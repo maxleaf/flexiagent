@@ -532,7 +532,9 @@ def get_interface_dev_id(linuxif):
 
     :returns: dev_id.
     """
-    # in case of non-pci interface try to get from /sys/class/net
+    # linuxif could be either an interface which created by vpp tap inject, e.g., vpp0, vpp1, 
+    # or a normal kernel interface.
+    # Note, that linuxif could be an interface created by vpp tap-inject for a non-dpdk interface. 
     try:
         if linuxif:
             if linuxif.startswith('vpp'):
@@ -550,25 +552,6 @@ def get_interface_dev_id(linuxif):
                     address = dev_id_add_type(address)
                     return dev_id_to_full(address)
 
-        # NETWORK_BASE_CLASS = "02"
-        # vpp_run = vpp_does_run()
-        # lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
-        # for line in lines:
-        #     vals = line.decode().split("\t", 1)
-        #     if len(vals) == 2:
-        #         # keep slot number
-        #         if vals[0] == 'Slot:':
-        #             slot = vals[1]
-        #         if vals[0] == 'Class:':
-        #             if vals[1][0:2] == NETWORK_BASE_CLASS:
-        #                 slot = dev_id_add_type(slot)
-        #                 interface = dev_id_to_linux_if(slot)
-        #                 if not interface and vpp_run:
-        #                     interface = dev_id_to_tap(slot)
-        #                 if not interface:
-        #                     continue
-        #                 if interface == linuxif:
-        #                     return dev_id_to_full(slot)
     except:
         return ""
 
@@ -824,12 +807,11 @@ def dev_id_to_tap(dev_id):
     return tap
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
-# into name of injected vpp interface in Linux.
-# To do that it greps output of 'vppctl sh tap-inject' by the interface name:
+# into name of the vpp interface.
+# To do that it greps output of 'vppctl sh tap-inject' by the tap interface name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-#       loop0 -> vpp2
 def tap_to_vpp_if_name(tap):
     """Convert Linux interface created by tap-inject into VPP interface name.
 
@@ -2273,21 +2255,6 @@ def set_lte_info_on_linux_interface(dev_id):
 
             os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
             return True
-    # for currernt_dev_id, interface in lte_interfacaes:
-    #     if dev_id and currernt_dev_id != dev_id:
-    #         continue
-
-    #     ip_info = lte_get_configuration_received_from_provider(currernt_dev_id)
-    #     if ip_info['STATUS']:
-    #         os.system('ifconfig %s down' % nicname)
-    #         os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
-
-    #         metric = 0
-    #         is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=currernt_dev_id)
-    #         if is_assigned:
-    #             metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
-
-    #         os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
 
     return None
 
@@ -2416,7 +2383,6 @@ def lte_disconnect(dev_id, hard_reset_service=False):
             done = True
 
         if not done or hard_reset_service:
-            # _run_qmicli_command(dev_id, 'wds-reset --device-open-sync')
             _run_qmicli_command(dev_id, 'wds-reset')
             _run_qmicli_command(dev_id, 'nas-reset')
             _run_qmicli_command(dev_id, 'uim-reset')
