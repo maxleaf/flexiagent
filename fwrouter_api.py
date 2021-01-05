@@ -66,6 +66,7 @@ fwrouter_translators = {
     'remove-route':             {'module':'fwtranslate_revert',          'api':'revert'},
     'add-tunnel':               {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel'},
     'remove-tunnel':            {'module':'fwtranslate_revert',          'api':'revert'},
+    'modify-tunnel':            {'module':'fwtranslate_add_tunnel',      'api':'modify_tunnel'},
     'add-dhcp-config':          {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config'},
     'remove-dhcp-config':       {'module':'fwtranslate_revert',          'api':'revert'},
     'add-application':          {'module':'fwtranslate_add_app',         'api':'add_app'},

@@ -84,6 +84,7 @@ request_handlers = {
     'remove-route':                 {'name': '_call_router_api', 'sign': True},
     'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
     'remove-tunnel':                {'name': '_call_router_api', 'sign': True},
+    'modify-tunnel':                {'name': '_call_router_api', 'sign': True},
     'add-dhcp-config':              {'name': '_call_router_api', 'sign': True},
     'remove-dhcp-config':           {'name': '_call_router_api', 'sign': True},
     'add-application':              {'name': '_call_router_api', 'sign': True},
