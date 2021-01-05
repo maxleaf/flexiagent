@@ -2034,6 +2034,12 @@ def ikev2_get_certificate_expiration():
     public_pem = ikev2_certificate_filename_get()
     private_pem = ikev2_private_key_filename_get()
 
+    if not os.path.exists(private_pem):
+        return {'certificateExpiration': '', 'error': 'Private key is missing'}
+
+    if not os.path.exists(public_pem):
+        return {'certificateExpiration': '', 'error': 'Public key is missing'}
+
     cmd = "openssl x509 -enddate -noout -in %s" % public_pem
     fwglobals.log.debug(cmd)
     res = subprocess.check_output(cmd, shell=True).strip()
