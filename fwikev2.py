@@ -63,12 +63,12 @@ class FwIKEv2Tunnels:
         """
         self.db.clear()
 
-    def add_tunnel(self, src, bd_id, profile):
+    def add_tunnel(self, src, bd_id, profile, role):
         """Stores tunnel into database.
 
         :returns: None.
         """
-        self.db[src] = {'bridge_id': bd_id, 'profile': profile}
+        self.db[src] = {'bridge_id': bd_id, 'profile': profile, 'role': role}
 
     def remove_tunnel(self, src):
         """Removes tunnel from database.
