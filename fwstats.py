@@ -185,14 +185,14 @@ def get_stats():
             'period': 0,
             'utc': time.time(),
             'reconfig': reconfig,
-            'ikev2-certificate-expiration': ikev2_certificate_expiration
+            'ikev2': ikev2_certificate_expiration
         })
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
-        res_update_list[-1]['ikev2-certificate-expiration'] = ikev2_certificate_expiration
+        res_update_list[-1]['ikev2'] = ikev2_certificate_expiration
         res_update_list[-1]['health'] = get_system_health()
 
     return {'message': res_update_list, 'ok': 1}
@@ -212,4 +212,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False, 'ikev2-certificate-expiration':''}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False, 'ikev2':''}

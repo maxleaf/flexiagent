@@ -2038,16 +2038,16 @@ def ikev2_get_certificate_expiration():
     fwglobals.log.debug(cmd)
     res = subprocess.check_output(cmd, shell=True).strip()
     if not res:
-        return "No enddate for public certificate"
+        return {'certificateExpiration': '', 'error': 'No enddate for public certificate'}
     end_date = res.split('=')[1]
 
     cmd = "openssl rsa -check -noout -in %s" % private_pem
     fwglobals.log.debug(cmd)
     res = subprocess.check_output(cmd, shell=True).strip()
     if res != "RSA key ok":
-        return "RSA key is not ok"
+        return {'certificateExpiration': '', 'error': 'RSA key is not ok'}
 
-    return end_date
+    return {'certificateExpiration': end_date, 'error': ''}
 
 def ikev2_modify_certificate(device_id, certificate, role, src):
     '''This function modifies public certificate.

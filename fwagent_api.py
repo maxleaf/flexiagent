@@ -112,7 +112,7 @@ class FWAGENT_API:
             info['network'] = {}
             info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
-            info['ikev2-certificate-expiration'] = '' if loadsimulator.g.enabled() else fwutils.ikev2_get_certificate_expiration()
+            info['ikev2'] = '' if loadsimulator.g.enabled() else fwutils.ikev2_get_certificate_expiration()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
