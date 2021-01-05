@@ -917,10 +917,10 @@ class FwagentDaemon(object):
 
         def run(*args):
             slept = 0
+            timeout = 30
 
             while self.active:
-                # Every 20 seconds ensure that linux configuration is working properly
-                timeout = 20
+                # Every 30 seconds ensure that linux configuration is working properly
                 if (slept % timeout) == 0:
                     lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
                     for dev_id in lte_requests:
@@ -931,8 +931,9 @@ class FwagentDaemon(object):
                 slept += 1
 
 
-        self.linux_configuration = threading.Thread(target=run, name='Linux Configuration Thread')
-        self.linux_configuration.start()
+        if not self.linux_configuration:
+            self.linux_configuration = threading.Thread(target=run, name='Linux Configuration Thread')
+            self.linux_configuration.start()
 
     def main(self):
         """Implementation of the main daemon loop.
@@ -978,7 +979,7 @@ class FwagentDaemon(object):
         # That start infinite receive-send loop in Fwagent::connect().
         # -------------------------------------
         while self.active:
-            # monitor linux configuration, even if don't connected to flexiManage
+            # monitor linux configuration, regardless the connection to flexiManage
             self.linux_configuration_thread()
 
             closed_gracefully = self.agent.connect()

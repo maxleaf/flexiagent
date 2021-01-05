@@ -511,9 +511,18 @@ class FWAGENT_API:
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to reset the LTE card'}
 
-            self._lte_disable(params)
+            # first prevent lte connection thread to monitor connection due the reset proccess
+            orig_lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
+            fwglobals.g.linux_configs_db['lte'] = {}
+
+
+            is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
             fwutils.qmi_sim_power_off(params['dev_id'])
             fwutils.qmi_sim_power_on(params['dev_id'])
+
+
+            # restore lte enable jobs
+            fwglobals.g.linux_configs_db['lte'] = orig_lte_requests
 
             reply = {'ok': 1, 'message': ''}
         except Exception as e:

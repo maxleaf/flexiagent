@@ -2395,7 +2395,7 @@ def lte_sim_status(dev_id):
 def lte_is_sim_inserted(dev_id):
     return lte_sim_status(dev_id) == "present"
 
-def lte_disconnect(dev_id):
+def lte_disconnect(dev_id, hard_reset_service=False):
     try:
         done = False
         files = glob.glob("/tmp/mbim_network*")
@@ -2416,8 +2416,11 @@ def lte_disconnect(dev_id):
             os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
             done = True
 
-        if not done:
-            _run_qmicli_command(dev_id, 'wds-reset --device-open-sync')
+        if not done or hard_reset_service:
+            # _run_qmicli_command(dev_id, 'wds-reset --device-open-sync')
+            _run_qmicli_command(dev_id, 'wds-reset')
+            _run_qmicli_command(dev_id, 'nas-reset')
+            _run_qmicli_command(dev_id, 'uim-reset')
 
         return (True, None)
     except subprocess.CalledProcessError as e:
