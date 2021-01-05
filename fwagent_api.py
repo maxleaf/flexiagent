@@ -526,7 +526,7 @@ class FWAGENT_API:
         return reply
 
     def _lte_reset(self, params):
-         """Rest LTE modem card.
+        """Rest LTE modem card.
         
         :param params: Parameters to use.
 
