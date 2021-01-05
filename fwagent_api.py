@@ -349,4 +349,6 @@ class FWAGENT_API:
         with open(public_pem) as public_pem_file:
             certificate = public_pem_file.readlines()
 
-        return {'message': {'certificate': certificate}, 'ok': 1}
+        expiration = fwutils.ikev2_get_certificate_expiration()
+
+        return {'message': {'certificate': certificate, 'expiration': expiration}, 'ok': 1}
