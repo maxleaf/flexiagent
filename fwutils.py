@@ -2027,3 +2027,24 @@ def ikev2_add_public_certificate(device_id, certificate):
     with open(public_pem, 'w') as public_pem_file:
         for line in certificate:
             public_pem_file.write(line)
+
+def ikev2_get_certificate_expiration():
+    '''This function retrieves local certificates expiration time.
+    '''
+    public_pem = ikev2_certificate_filename_get()
+    private_pem = ikev2_private_key_filename_get()
+
+    cmd = "openssl x509 -enddate -noout -in %s" % public_pem
+    fwglobals.log.debug(cmd)
+    res = subprocess.check_output(cmd, shell=True).strip()
+    if not res:
+        return "No enddate for public certificate"
+    end_date = res.split('=')[1]
+
+    cmd = "openssl rsa -check -noout -in %s" % private_pem
+    fwglobals.log.debug(cmd)
+    res = subprocess.check_output(cmd, shell=True).strip()
+    if res != "RSA key ok":
+        return "RSA key is not ok"
+
+    return end_date

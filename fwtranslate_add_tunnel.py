@@ -1091,6 +1091,23 @@ def add_tunnel(params):
 
     return cmd_list
 
+def modify_tunnel(params):
+    remote_device_id = str(params['ikev2']['remote-device-id']),
+    certificate = params['ikev2']['certificate']
+    cmd_list = []
+    # Add public certificate file
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "add IKEv2 public certificate for %s" % remote_device_id
+    cmd['cmd']['params']    = {
+                                'module': 'fwutils',
+                                'func'  : 'ikev2_add_public_certificate',
+                                'args'  : {'device_id': 'test', 'certificate': certificate}
+                                }
+    cmd_list.append(cmd)
+    return cmd_list
+
 def get_request_key(params):
     """Get add-tunnel command.
 

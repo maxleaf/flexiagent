@@ -43,8 +43,7 @@ fwagent_api = {
     'upgrade-device-sw':        '_upgrade_device_sw',
     'reset-device':             '_reset_device_soft',
     'sync-device':              '_sync_device',
-    'add-private-key':          '_add_private_key',
-    'add-public-certificate':   '_add_public_certificate'
+    'add-private-key':          '_add_private_key'
 }
 
 class FWAGENT_API:
@@ -113,6 +112,7 @@ class FWAGENT_API:
             info['network'] = {}
             info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
+            info['ikev2-certificate-expiration'] = '' if loadsimulator.g.enabled() else fwutils.ikev2_get_certificate_expiration()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
@@ -350,17 +350,3 @@ class FWAGENT_API:
             certificate = public_pem_file.readlines()
 
         return {'message': {'certificate': certificate}, 'ok': 1}
-
-    def _add_public_certificate(self, params=None):
-        """IKEv2 remote certificate update.
-
-        :param params: Parameters from flexiManage.
-
-        :returns: Dictionary with status code.
-        """
-        device_id = params["device-id"]
-        certificate = params["certificate"]
-
-        fwutils.ikev2_add_public_certificate(device_id, certificate)
-
-        return {'ok': 1}

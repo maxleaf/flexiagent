@@ -72,7 +72,6 @@ request_handlers = {
     'reset-device':                 {'name': '_call_agent_api'},
     'sync-device':                  {'name': '_call_agent_api'},
     'add-private-key':              {'name': '_call_agent_api'},
-    'add-public-certificate':       {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
@@ -85,6 +84,7 @@ request_handlers = {
     'remove-route':                 {'name': '_call_router_api', 'sign': True},
     'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
     'remove-tunnel':                {'name': '_call_router_api', 'sign': True},
+    'modify-tunnel':                {'name': '_call_router_api', 'sign': True},
     'add-dhcp-config':              {'name': '_call_router_api', 'sign': True},
     'remove-dhcp-config':           {'name': '_call_router_api', 'sign': True},
     'add-application':              {'name': '_call_router_api', 'sign': True},
