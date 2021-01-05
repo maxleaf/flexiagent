@@ -162,19 +162,21 @@ def _dump_netplan_file(fname):
             fwglobals.log.error(err_str)
 
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_name=None, wan_failover=False):
+    '''
+    :param metric:  integer (whole number)
+    '''
     config_section = {}
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s" % \
         (is_add, dev_id, ip, gw, metric, dhcp, type))
 
-    user_metric = 0 if not metric else int(metric)
-    fo_metric = get_wan_failover_metric(dev_id, user_metric)
-    if fo_metric != user_metric:
+    fo_metric = get_wan_failover_metric(dev_id, metric)
+    if fo_metric != metric:
         fwglobals.log.debug(
             "add_remove_netplan_interface: dev_id=%s, use wan failover metric %d" % (dev_id, fo_metric))
-        metric = str(fo_metric)
+        metric = fo_metric
 
     set_name = ''
     old_ifname = ''

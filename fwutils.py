@@ -2965,13 +2965,11 @@ def get_reconfig_hash():
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
-def vpp_nat_add_remove_interface(remove, dev_id, metric):
+def vpp_nat_add_remove_interface(remove, dev_id, dev_metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
     metric_min = sys.maxint
-
-    dev_metric = int(metric or 0)
 
     fo_metric = get_wan_failover_metric(dev_id, dev_metric)
     if fo_metric != dev_metric:
