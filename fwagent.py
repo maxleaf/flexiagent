@@ -642,15 +642,15 @@ def reset(soft=False):
 
     :returns: None.
     """
-    # stop LTE connection on reset the connection is open
-    lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
-    for dev_id in lte_interfaces:
-        fwutils.lte_disconnect(dev_id)
-
     if soft:
         fwutils.reset_router_config()
         fwutils.reset_fw_linux_config()
         return
+
+    # stop LTE connections
+    lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
+    for dev_id in lte_interfaces:
+        fwutils.lte_disconnect(dev_id)
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
 
