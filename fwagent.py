@@ -645,8 +645,9 @@ def reset(soft=False):
     # stop LTE connection on reset the connection is open
     fwutils.lte_disconnect()
 
+    fwutils.reset_router_config()
+
     if soft:
-        fwutils.reset_router_config()
         return
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive

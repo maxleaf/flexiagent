@@ -162,19 +162,21 @@ def _dump_netplan_file(fname):
             fwglobals.log.error(err_str)
 
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_name=None, wan_failover=False):
+    '''
+    :param metric:  integer (whole number)
+    '''
     config_section = {}
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%s, dhcp=%s, type=%s" % \
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s" % \
         (is_add, dev_id, ip, gw, metric, dhcp, type))
 
-    user_metric = 0 if not metric else int(metric)
-    fo_metric = get_wan_failover_metric(dev_id, user_metric)
-    if fo_metric != user_metric:
+    fo_metric = get_wan_failover_metric(dev_id, metric)
+    if fo_metric != metric:
         fwglobals.log.debug(
             "add_remove_netplan_interface: dev_id=%s, use wan failover metric %d" % (dev_id, fo_metric))
-        metric = str(fo_metric)
+        metric = fo_metric
 
     set_name = ''
     old_ifname = ''
@@ -239,21 +241,19 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
             config_section['addresses'] = [ip]
 
             if gw and type == 'WAN':
-                if 'routes' in config_section:
-                    def_route_existed = False
-                    routes = config_section['routes']
-                    for route in routes:
-                        if route['to'] == '0.0.0.0/0':
-                            route['metric'] = metric
-                            def_route_existed = True
-                    if not def_route_existed:
-                        routes.append({'to': '0.0.0.0/0',
-                                       'via': gw,
-                                       'metric': metric})
-                else:
-                    if 'gateway4' in config_section:
-                        del config_section['gateway4']
-                    config_section['routes'] = [{'to': '0.0.0.0/0', 'via': gw, 'metric': metric}]
+                default_route_found = False
+                routes = config_section.get('routes', [])
+                for route in routes:
+                    if route['to'] == '0.0.0.0/0':
+                        default_route_found = True
+                        route['metric']     = metric
+                        route['via']        = gw
+                        break
+                if not default_route_found:
+                    routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
+                    config_section['routes'] = routes   # Handle case where there is no 'routes' section
+                if 'gateway4' in config_section:
+                    del config_section['gateway4']
 
         if is_add == 1:
             if old_ifname in ethernets:
