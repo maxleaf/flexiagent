@@ -196,8 +196,13 @@ class FWROUTER_API:
                 tunnel = gre.tunnel
                 bridge_id = fwglobals.g.ikev2tunnels.get_tunnel(str(tunnel.src))['bridge_id']
                 if (bridge_id):
-                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index, bd_id=bridge_id, enable=1, shg=1)
-                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+                    try:  # Ensure thread doesn't exit on exception
+                        fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index, bd_id=bridge_id, enable=1, shg=1)
+                        fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+                    except Exception as e:
+                        fwglobals.log.debug("%s" % str(e))
+                        pass
+
 
     def restore_vpp_if_needed(self):
         """Restore VPP.

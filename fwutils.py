@@ -2062,7 +2062,11 @@ def ikev2_modify_certificate(device_id, certificate, role, src):
     profile = fwglobals.g.ikev2tunnels.get_tunnel(src)['profile']
 
     if role == 'initiator':
-        fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=profile)
+        try:
+            fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=profile)
+        except Exception as e:
+            fwglobals.log.error("%s" % str(e))
+            pass
 
 def ikev2_restart_all_initiator_tunnels():
     '''This function restarts tunnels that are in initiator role.
@@ -2071,4 +2075,8 @@ def ikev2_restart_all_initiator_tunnels():
 
     for tunnel in tunnels.values():
         if tunnel['role'] == 'initiator':
-            fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tunnel['profile'])
+            try:
+                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tunnel['profile'])
+            except Exception as e:
+                fwglobals.log.error("%s" % str(e))
+                continue
