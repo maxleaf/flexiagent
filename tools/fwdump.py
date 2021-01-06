@@ -120,6 +120,11 @@ g_dumpers = {
     'vpp_fwabf_links':              { 'shell_cmd': 'vppctl sh fwabf link > <dumper_out_file>' },
     'vpp_fwabf_policies':           { 'shell_cmd': 'vppctl sh fwabf policy > <dumper_out_file>' },
     'vpp_fwabf_attachments':        { 'shell_cmd': 'vppctl sh fwabf attach > <dumper_out_file>' },
+    'vpp_nat44_addresses':          { 'shell_cmd': 'vppctl show nat44 addresses > <dumper_out_file>' },
+    'vpp_nat44_hash_tables':        { 'shell_cmd': 'vppctl show nat44 hash tables > <dumper_out_file>' },
+    'vpp_nat44_interfaces':         { 'shell_cmd': 'vppctl show nat44 interfaces > <dumper_out_file>' },
+    'vpp_nat44_interface_address':  { 'shell_cmd': 'vppctl show nat44 interface address > <dumper_out_file>' },
+    'vpp_nat44_static_mappings':    { 'shell_cmd': 'vppctl show nat44 static mappings > <dumper_out_file>' },
 
 }
 
