@@ -303,9 +303,14 @@ class FwWanMonitor:
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
             return
 
-        # If vpp runs, go and adjust it configuration to the newer metric.
+        # If vpp runs and interface is under vpp control, i.e. assigned,
+        # go and adjust vpp configuration to the newer metric.
+        # Note the route does not have dev_id for virtual interfaces that are
+        # created in vpp/vvpsb by tap-inject for tapcli-X interfaces used for
+        # LTE/WiFi devices. These interfaces are assigned too.
         #
-        if fwglobals.g.router_api.state_is_started():
+        assigned = (not route.dev_id) or (fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id))
+        if fwglobals.g.router_api.state_is_started() and assigned:
 
             # Update netplan yaml-s in order to:
             # 1. Ensure that if 'netplan apply' is called due to some reason
