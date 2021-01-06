@@ -270,6 +270,9 @@ class Fwglobals:
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
 
+        # Linux configuration database
+        self.linux_configs_db = SqliteDict(self.LINUX_CONFIGURATION_DB_FILE, autocommit=True)
+
         # Load websocket status codes on which agent should reconnect into a list
         self.ws_reconnect_status_codes = []
         for a in dir(self):
@@ -314,7 +317,6 @@ class Fwglobals:
             return self.fwagent
 
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
-        self.linux_configs_db = SqliteDict(self.LINUX_CONFIGURATION_DB_FILE, autocommit=True)
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.agent_api    = FWAGENT_API()

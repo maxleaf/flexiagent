@@ -642,19 +642,11 @@ def reset(soft=False):
 
     :returns: None.
     """
-    # stop LTE connection on reset the connection is open
-    fwutils.lte_disconnect()
-
     fwutils.reset_router_config()
     fwutils.reset_fw_linux_config()
 
     if soft:
         return
-
-    # stop LTE connections
-    lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
-    for dev_id in lte_interfaces:
-        fwutils.lte_disconnect(dev_id)
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
 
@@ -665,6 +657,12 @@ def reset(soft=False):
     if choice == 'y' or choice == 'Y':
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)
+
+        # stop LTE connections
+        lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
+        for dev_id in lte_interfaces:
+            fwutils.lte_disconnect(dev_id, True)
+
         fwglobals.log.info("Done")
     else:
         fwglobals.log.info("Reset operation aborted")
