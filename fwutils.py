@@ -278,7 +278,7 @@ def get_all_interfaces():
         if dev_id == '':
             continue
 
-        if is_lte_interface(dev_id) and vpp_does_run():
+        if is_lte_interface(dev_id) and fwglobals.g.router_api.state_is_started():
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
             if is_assigned:
                 tap_name = dev_id_to_tap(dev_id)
@@ -819,7 +819,14 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
+
+    cache = fwglobals.g.cache.tap_name_to_vpp_if_name
+    vpp_if_name = cache.get(tap)
+    if vpp_if_name:
+        return vpp_if_name
+
     taps = _vppctl_read("show tap-inject")
+    
     if taps is None:
         raise Exception("tap_to_vpp_if_name: failed to fetch tap info from VPP")
 
@@ -828,6 +835,7 @@ def tap_to_vpp_if_name(tap):
     for line in taps:
         if tap in line:
             vpp_if_name = line.split(' ->')[0]
+            cache[tap] = vpp_if_name
             return vpp_if_name
 
     return None
@@ -2981,7 +2989,7 @@ def get_reconfig_hash():
     for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]['name']
 
-        if is_lte_interface(dev_id) and vpp_does_run():
+        if is_lte_interface(dev_id) and fwglobals.g.router_api.state_is_started():
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
             if is_assigned:
                 tap_name = dev_id_to_tap(dev_id)

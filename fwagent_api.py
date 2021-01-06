@@ -452,7 +452,7 @@ class FWAGENT_API:
 
             # Don't connect lte if interface is alreadt assgined and vpp is running.
             is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if is_assigned and fwutils.vpp_does_run():
+            if is_assigned and fwglobals.g.router_api.state_is_started():
                 return {'ok': 1, 'message': ''}
 
             is_success, error = fwutils.lte_connect(params)

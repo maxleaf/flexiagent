@@ -33,7 +33,7 @@
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
             "args": [
-                "reset"
+                "reset", "-s"
             ],
             "cwd": "${workspaceRoot}",
             "env": {

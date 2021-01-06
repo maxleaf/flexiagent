@@ -201,6 +201,7 @@ class Fwglobals:
                 'DEV_IDS': {},
                 'STUN': {},
                 'VPP_IF_NAME_TO_DEV_ID': {},
+                'TAP_NAME_TO_VPP_IF_NAME': {},
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
@@ -212,6 +213,7 @@ class Fwglobals:
             self.dev_ids                = self.db['DEV_IDS']
             self.stun_cache          = self.db['STUN']
             self.vpp_if_name_to_dev_id  = self.db['VPP_IF_NAME_TO_DEV_ID']
+            self.tap_name_to_vpp_if_name  = self.db['TAP_NAME_TO_VPP_IF_NAME']
             self.wan_monitor         = self.db['WAN_MONITOR']
 
 
@@ -312,7 +314,7 @@ class Fwglobals:
             return self.fwagent
 
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
-        self.linux_configs_db = SqliteDict(self.LINUX_CONFIGURATION_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
+        self.linux_configs_db = SqliteDict(self.LINUX_CONFIGURATION_DB_FILE, autocommit=True)
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.agent_api    = FWAGENT_API()

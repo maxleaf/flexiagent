@@ -225,6 +225,7 @@ class FWROUTER_API:
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
             fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
+            fwglobals.g.cache.tap_name_to_vpp_if_name = {}
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -1201,6 +1202,7 @@ class FWROUTER_API:
 
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
+        fwglobals.g.cache.tap_name_to_vpp_if_name = {}
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.

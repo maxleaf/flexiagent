@@ -574,7 +574,7 @@ def add_interface(params):
         cmd['cmd'] = {}
         cmd['cmd']['name'] = "exec"
         cmd['cmd']['params'] = [
-            "tc -force filter add dev %s parent ffff: \
+            "tc filter add dev %s parent ffff: \
             protocol all prio 2 u32 \
             match u32 0 0 flowid 1:1 \
             action pedit ex munge eth dst set VPP-MAC \
