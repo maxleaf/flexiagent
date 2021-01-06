@@ -1069,8 +1069,8 @@ def stop_vpp():
     netplan_apply('stop_vpp')
 
 def reset_fw_linux_config():
-    if os.path.exists(fwglobals.g.LINUX_CONFIGURATION_DB_FILE):
-        os.remove(fwglobals.g.LINUX_CONFIGURATION_DB_FILE)
+    for key in fwglobals.g.linux_configs_db:
+        fwglobals.g.linux_configs_db[key] = {}
 
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.

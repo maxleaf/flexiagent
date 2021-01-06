@@ -33,6 +33,19 @@
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
             "args": [
+                "reset"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "reset soft",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
                 "reset", "-s"
             ],
             "cwd": "${workspaceRoot}",
