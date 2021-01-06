@@ -282,7 +282,7 @@ class FwWanMonitor:
         :param route:   the route to be updated with new metric
         :param new_metric:  the new metric
         '''
-        fwglobals.log.debug("'%s' update metric in OS: %d -> %d" % \
+        fwglobals.log.debug("'%s' update metric: %d -> %d" % \
             (str(route), route.metric, new_metric))
 
         # Firsly update the route status, so if get_wan_failover_metric() is called
@@ -345,7 +345,7 @@ class FwWanMonitor:
         if route.default:
             fwglobals.g.fwagent.reconnect()
 
-        fwglobals.log.debug("'%s' update metric in OS: %d -> %d - done" % \
+        fwglobals.log.debug("'%s' update metric: %d -> %d - done" % \
             (str(route), route.metric, new_metric))
 
 
