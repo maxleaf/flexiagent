@@ -2965,17 +2965,17 @@ def get_reconfig_hash():
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
-def vpp_nat_add_remove_interface(remove, dev_id, dev_metric):
+def vpp_nat_add_remove_interface(remove, dev_id, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
     metric_min = sys.maxint
 
-    fo_metric = get_wan_failover_metric(dev_id, dev_metric)
-    if fo_metric != dev_metric:
+    fo_metric = get_wan_failover_metric(dev_id, metric)
+    if fo_metric != metric:
         fwglobals.log.debug(
             "vpp_nat_add_remove_interface: dev_id=%s, use wan failover metric %d" % (dev_id, fo_metric))
-        dev_metric = fo_metric
+        metric = fo_metric
 
     # Find interface with lowest metric.
     #
@@ -2993,15 +2993,15 @@ def vpp_nat_add_remove_interface(remove, dev_id, dev_metric):
             default_gw = wan['dev_id']
 
     if remove:
-        if dev_metric < metric_min or not default_gw:
+        if metric < metric_min or not default_gw:
             vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
-        if dev_metric < metric_min and default_gw:
+        if metric < metric_min and default_gw:
             vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
 
     if not remove:
-        if dev_metric < metric_min and default_gw:
+        if metric < metric_min and default_gw:
             vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
-        if dev_metric < metric_min or not default_gw:
+        if metric < metric_min or not default_gw:
             vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
     if vpp_if_name_remove:
