@@ -642,9 +642,13 @@ def reset(soft=False):
 
     :returns: None.
     """
+    # stop LTE connection on reset the connection is open
+    fwutils.lte_disconnect()
+
+    fwutils.reset_router_config()
+    fwutils.reset_fw_linux_config()
+
     if soft:
-        fwutils.reset_router_config()
-        fwutils.reset_fw_linux_config()
         return
 
     # stop LTE connections
