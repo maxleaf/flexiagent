@@ -347,11 +347,18 @@ class FWAGENT_API:
             return {'ok': 0}
 
         with open(public_pem) as public_pem_file:
-            certificate = public_pem_file.readlines()
+            certificate = public_pem_file.read().rstrip("\n")
 
-        ok = 1
+        fwglobals.log.debug(certificate)
+
         expiration = fwutils.ikev2_get_certificate_expiration()
         if expiration['error'] != '':
-            ok = 0
+            return {'ok': 0}
 
-        return {'message': {'certificate': certificate, 'expiration': expiration['certificateExpiration']}, 'ok': ok}
+        if fwutils.vpp_does_run():
+            try:
+                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_set_local_key(key_file=private_pem)
+            except:
+                return {'ok': 0}
+
+        return {'message': {'certificate': certificate, 'expiration': expiration['certificateExpiration']}, 'ok': 1}
