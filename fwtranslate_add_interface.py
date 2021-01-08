@@ -97,7 +97,7 @@ def add_interface(params):
 
     # Add interface section into Netplan configuration file
     gw        = params.get('gateway', None)
-    metric    = params.get('metric', 0)
+    metric    = 0 if not params.get('metric', '') else int(params.get('metric', '0'))
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
 
