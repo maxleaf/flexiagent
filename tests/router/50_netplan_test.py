@@ -86,25 +86,20 @@ def test_netplan(netplan_backup):
             os.system('netplan apply')
 
             with fwtests.TestFwagent() as agent:
-                #print "   " + os.path.basename(test)
                 (start_ok, out) = agent.cli('-f %s' % CLI_START_ROUTER)
                 assert start_ok, "Failed to start router"
-                #print "start_router: %s" % out
-
                 lines = agent.grep_log('Exception: API failed')
                 assert len(lines) == 0, "Error in start router: %s" % '\n'.join(lines)
+
                 # Load router configuration with spoiled lists
                 (cli_ok, out) = agent.cli('--api inject_requests filename=%s \
                     ignore_errors=False' % test)
-                assert cli_ok, "Failed to start router by %s" % test
-                #print "Inject cli '%s': %s" %(os.path.basename(test), out)
-
+                assert cli_ok, "Failed to inject request with %s file" % test
                 lines = agent.grep_log('Exception: API failed')
                 assert len(lines) == 0, "Errors in %s cli: %s" %(test, '\n'.join(lines))
+
                 (stop_ok, out) = agent.cli('-f %s' % CLI_STOP_ROUTER)
                 assert stop_ok, "Failed to stop router"
-                #print "stop_router: %s" % out
-
                 lines = agent.grep_log('Exception: API failed')
                 assert len(lines) == 0, "Error in stop router: %s" % '\n'.join(lines)
 
