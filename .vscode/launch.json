@@ -70,7 +70,7 @@
             "name": "Test: Run Specific Test",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/tests/router/13_netplan_test",
+            "module": "${workspaceFolder}/tests/router/01_cli_basic_requests_test",
             "cwd": "${workspaceRoot}",
             "env": {"PYTHONPATH": "${workspaceRoot}"}
         },
@@ -80,7 +80,7 @@
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
             "args": [
-                "cli", "-f", "/root/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
+                "cli", "-f", "/home/shneor/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
             ],
             "cwd": "${workspaceRoot}",
             "env": {"PYTHONPATH": "${workspaceRoot}"}
