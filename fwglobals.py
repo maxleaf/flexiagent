@@ -29,6 +29,7 @@ import signal
 import time
 import traceback
 import yaml
+import fwutils
 
 from sqlitedict import SqliteDict
 
@@ -45,12 +46,13 @@ from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
 
+# sync flag indicated if module implement sync logic
 modules = {
-    'fwagent_api':      __import__('fwagent_api'),
-    'fwapplications':   __import__('fwapplications'),
-    'fwrouter_api':     __import__('fwrouter_api'),
-    'fwsystem_api':     __import__('fwsystem_api'),
-    'os_api':           __import__('os_api'),
+    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False },
+    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False },
+    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True },
+    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True },
+    'os_api':           { 'module': __import__('os_api'),         'sync': False },
 }
 
 request_handlers = {
@@ -69,18 +71,14 @@ request_handlers = {
     'get-device-logs':                   {'name': '_call_agent_api'},
     'get-device-packet-traces':          {'name': '_call_agent_api'},
     'get-device-os-routes':              {'name': '_call_agent_api'},
-    'get-router-config':                 {'name': '_call_agent_api'},
+    'get-device-config':                 {'name': '_call_agent_api'},
     'upgrade-device-sw':                 {'name': '_call_agent_api'},
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
     'wifi-perform-operation':            {'name': '_call_agent_api'},
-    'wifi-get-interface-info':           {'name': '_call_agent_api'},
-    'lte-get-interface-info':            {'name': '_call_agent_api'},    
-    'lte-reset':                         {'name': '_call_agent_api'},
-
-    # System API
-    'add-lte':                        {'name': '_call_system_api'},
-    'remove-lte':                     {'name': '_call_system_api'},
+    'get-wifi-interface-info':           {'name': '_call_agent_api'},
+    'get-lte-interface-info':            {'name': '_call_agent_api'},    
+    'reset-lte':                         {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
@@ -99,6 +97,10 @@ request_handlers = {
     'remove-application':           {'name': '_call_router_api', 'sign': True},
     'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
+    
+    # System API
+    'add-lte':                        {'name': '_call_system_api'},
+    'remove-lte':                     {'name': '_call_system_api'},
 
     ##############################################################
     # INTERNAL API-s
@@ -234,7 +236,7 @@ class Fwglobals:
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'
         self.VERSIONS_FILE       = self.DATA_PATH + '.versions.yaml'
         self.ROUTER_CFG_FILE     = self.DATA_PATH + '.requests.sqlite'
-        self.SYSTEM_CFG_FILE     = self.DATA_PATH + '.systems.sqlite'
+        self.SYSTEM_CFG_FILE     = self.DATA_PATH + '.system.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
@@ -274,6 +276,7 @@ class Fwglobals:
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
 
+        self.db = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! set the db variable regardless of agent initialization
 
         # Load websocket status codes on which agent should reconnect into a list
         self.ws_reconnect_status_codes = []
@@ -323,15 +326,15 @@ class Fwglobals:
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.system_cfg   = FwSystemCfg(self.SYSTEM_CFG_FILE)
         self.agent_api    = FWAGENT_API()
-        self.system_api    = FWSYSTEM_API()
-        self.router_api   = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.system_api    = FWSYSTEM_API(self.system_cfg)
+        self.router_api   = FWROUTER_API(self.router_cfg, self.MULTILINK_DB_FILE)
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
-        self.system_api.restore_system_configuration()
+        self.system_api.restore_system_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
         self.router_api.restore_vpp_if_needed()
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
@@ -544,8 +547,8 @@ class Fwglobals:
             # flexiManage code.
             #
             if reply['ok'] == 1 and handler.get('sign', False) == True:
-                self.router_cfg.update_signature(received_msg)
-            reply['router-cfg-hash'] = self.router_cfg.get_signature()
+                fwutils.update_device_config_signature(received_msg)
+            reply['router-cfg-hash'] = fwutils.get_device_config_signature()
 
             return reply
 

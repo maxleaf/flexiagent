@@ -25,28 +25,22 @@ import re
 import traceback
 import copy
 
-from fwdatabase_cfg import FwDatabaseCfg
+from fwcfg_database import FwCfgDatabase
 
 import fwglobals
 import fwrouter_api
 import fwutils
 
 
-class FwRouterCfg:
+class FwRouterCfg(FwCfgDatabase):
     """This is requests DB class representation.
 
     :param db_file: SQLite DB file name.
     """
-    def __init__(self, db_file):
-        """Constructor method
-        """
-        self.db = FwDatabaseCfg(db_file)
-
-        if self.db.get_entry('signature') is None:
-            self.db.set_entry('signature', "")
-
-        self.callbacks = []
-
+    # def __init__(self, db_file):
+    #     """Constructor method
+    #     """
+    #     # FwCfgDatabase.__init__(self, db_file)
 
     def __enter__(self):
         return self
@@ -63,44 +57,12 @@ class FwRouterCfg:
         """
         self.db.close()
 
-    def register_callback(self, listener, callback, requests):
-        """Registers a listener for notifications about  requests stored in /
-        removed from the configuration database. The latest is done by the
-        FwRouterCfg::update() method. It invokes the 'callback' before
-        the request is saved in the database.
-        The callback signature should be (req, params) where 'req' is the
-        request name, e.g. 'add-tunnel', and the 'params' are the parameters of
-        the request as they would received from server in 'params' field.
-
-        :param: listener - name of the listener for logging propuses.
-        :param: callback - the function to be used to notify listener of request
-        :param: requests - list of requests the listener would like to be
-                           notified for, e.g.:
-                            ['add-interface', 'remove-interface', 'stop-router']
-        """
-        fwglobals.log.debug("register_callback: %s.%s(%s)"\
-            %(listener, callback.__name__, str(requests)))
-        elem = {'listener':listener, 'callback': callback, 'requests':requests}
-        self.callbacks.append(elem)
-
-    def unregister_callback(self, listener, callback):
-        """Unregisters a listener from listening on incoming requests
-        :param: listener - string representing the module. For logging.
-        :param: callback - the callback used to listen to requests.
-        """
-        for (idx, elem) in enumerate(self.callbacks):
-            if elem['callback'] == callback:
-                fwglobals.log.debug("unregister_callbacks_pre_update: %s::%s" \
-                    %(listener, callback.__name__))
-                del self.callbacks[idx]
-                return
-
     def clean(self):
         """Clean DB
 
         :returns: None.
         """
-        self.db.clean()
+        FwCfgDatabase.clean(self)
 
     def _get_request_key(self, request):
         """Generates uniq key for request out of request name and
@@ -126,26 +88,6 @@ class FwRouterCfg:
         key_func    = getattr(key_module, 'get_request_key')
         return key_func(params)
 
-    def _call_callback(self, listeners, req_name, params):
-        """
-        go over callback data base and check if callback should be called for each listener
-        based on the request name. This function is called from update().
-        """
-        for elem in listeners:
-            if req_name in elem['requests']:
-                fwglobals.log.debug("%s.%s(%s) - before"\
-                        %(elem['listener'], elem['callback'].__name__, req_name))
-
-                try:
-                    elem['callback'](req_name, params)
-                except Exception as e:
-                    fwglobals.log.error("%s.%s(%s): %s"\
-                            %(elem['listener'], elem['callback'].__name__, req_name, str(e)))
-                    pass
-
-                fwglobals.log.debug("%s.%s(%s) - after"\
-                        %(elem['listener'], elem['callback'].__name__, req_name))
-
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
@@ -166,17 +108,14 @@ class FwRouterCfg:
         req_key = self._get_request_key(request)
 
         try:
-            cb_params = params if re.match('(add-|start-router)', req) else self.db.get_entry(req_key)['params']
-            self._call_callback(self.callbacks, req, cb_params)
-
             if re.match('add-', req) or re.match('start-router', req):
-                self.db.set_entry(req_key, { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed })
+                self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
             elif re.match('modify-', req):
-                entry = self.db.get_entry(req_key)
+                entry = self.db[req_key]
                 entry.update({'params' : params})
-                self.db.set_entry(req_key, entry) 
+                self.db[req_key] = entry 
             else:
-                self.db.delete_entry(req_key)
+                del self.db[req_key]
 
         except KeyError:
             pass
@@ -187,19 +126,15 @@ class FwRouterCfg:
 
     def get_request_params(self, request):
         req_key = self._get_request_key(request)
-        return self.db.get_request_params(req_key)
+        return self.get_params(req_key)
 
     def get_request_cmd_list(self, request):
         req_key = self._get_request_key(request)
-        return self.db.get_request_cmd_list(req_key)
+        return self.get_cmd_list(req_key)
 
-    def exists(self, request):
+    def request_exists(self, request):
         req_key = self._get_request_key(request)        
-        return self.db.exists(req_key)
-
-    def get_params(self, request):
-        req_key = self._get_request_key(request)
-        return self.db.get_params(req_key)
+        return self.exists(req_key)
 
     def is_same_cfg_item(self, request1, request2):
         """Checks if provided requests stand for the same configuration item.
@@ -224,7 +159,7 @@ class FwRouterCfg:
                 'add-multilink-policy'
             ]
 
-        return self.db.dump(types, escape, full, keys)
+        return FwCfgDatabase.dump(self, types, escape, full, keys)
 
     def dumps(self, types=None, escape=None, full=False):
         """Dumps router configuration into printable string.
@@ -245,38 +180,11 @@ class FwRouterCfg:
             'add-multilink-policy': "============= POLICIES ============="
         }
 
-        out = {}
-        prev_msg = { 'message': 'undefined' }
-
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-        for msg in cfg:
-            # Add new section
-            if msg['message'] != prev_msg['message']:
-                prev_msg['message'] = msg['message']
-                section_name = sections[msg['message']]
-                out[section_name] = []
-
-            # Add configuration item to section
-            item = {
-                'Key':    msg['key'],
-                'Params': msg['params']
-            }
-            if full:
-                item.update({'Executed': str(msg['executed'])})
-                item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
-            out[section_name].append(item)
-        if not out:
-            return ''
-        return json.dumps(out, indent=2, sort_keys=True)
-
-    def _get_requests(self, req):
-        """Retrives list of configuration requests parameters for requests with
-        the 'req' name.
-        """
-        return self.db.get_requests(req)
+        return fwutils.dumps_config(cfg, sections)
 
     def get_interfaces(self, type=None, dev_id=None, ip=None):
-        interfaces = self._get_requests('add-interface')
+        interfaces = self.get_requests('add-interface')
         if not type and not dev_id and not ip:
             return interfaces
         result = []
@@ -291,23 +199,17 @@ class FwRouterCfg:
         return result
 
     def get_tunnels(self):
-        return self._get_requests('add-tunnel')
+        return self.get_requests('add-tunnel')
 
     def get_tunnel(self, tunnel_id):
         key = 'add-tunnel:%d' % (tunnel_id)
-        if self.db.get_entry(key):
-            return self.db.get_entry(key).get('params')
-        return None
+        return self.get_params(key)
 
     def get_multilink_policy(self):
-        if self.db.get_entry('add-multilink-policy'):
-            return self.db.get_entry('add-multilink-policy')['params']
-        return None
+        return self.get_params('add-multilink-policy')
 
     def get_applications(self):
-        if self.db.get_entry('add-application'):
-            return self.db.get_entry('add-application')['params']
-        return None
+        return self.get_params('add-application')
 
     def get_wan_interface_gw(self, ip):
         import fwutils
@@ -324,15 +226,6 @@ class FwRouterCfg:
             return dev_id, rip
         else:
             return dev_id, gw
-
-    def update_signature(self, request):
-        return self.db.update_signature(request)
-
-    def get_signature(self):
-        return self.db.get_signature()
-
-    def reset_signature(self, new_signature=None, log=True):
-        return self.db.reset_signature(new_signature, log)
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against
@@ -418,3 +311,37 @@ class FwRouterCfg:
         output_requests += input_requests.values()
 
         return output_requests
+
+    def sync(self, incoming_requests, full_sync=False):
+        incoming_requests = list(filter(lambda x: x['message'] in fwrouter_api.fwrouter_translators, incoming_requests))   
+
+        # get sync lists
+        sync_list = self.get_sync_list(incoming_requests)
+
+        if len(sync_list) == 0:
+            fwglobals.log.info("_sync_device: router sync_list is empty, no need to sync")
+            return True
+
+        if full_sync:
+            fwglobals.log.debug("_sync_device: start full sync")
+            restart_router = False
+            if self.state_is_started():
+                restart_router = True
+                fwglobals.g.router_api.call({'message': 'stop-router'})     
+            
+
+        sync_request = {
+            'message':   'aggregated',
+            'params':    { 'requests': sync_list },
+            'internals': { 'dont_revert_on_failure': True }
+        }
+
+        reply = fwglobals.g.router_api.call(sync_request)
+
+        if reply['ok'] == 0 and full_sync:
+            raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
+            
+        if full_sync and restart_router:
+            fwglobals.g.router_api.call({'message': 'start-router'})
+
+        return reply['ok'] == 1

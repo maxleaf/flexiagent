@@ -30,6 +30,7 @@ import fwglobals
 import fwstats
 import fwutils
 import fwsystem_api
+import fwrouter_api
 
 fwagent_api = {
     'get-device-info':                  '_get_device_info',
@@ -37,16 +38,16 @@ fwagent_api = {
     'get-device-logs':                  '_get_device_logs',
     'get-device-packet-traces':         '_get_device_packet_traces',
     'get-device-os-routes':             '_get_device_os_routes',
-    'get-router-config':                '_get_router_config',
+    'get-device-config':                '_get_device_config',
     'upgrade-device-sw':                '_upgrade_device_sw',
     'reset-device':                     '_reset_device_soft',
     'sync-device':                      '_sync_device',
     # WiFi jobs
     'wifi-perform-operation':           '_wifi_perform_operation',
-    'wifi-get-interface-info':          '_wifi_get_interface_info',
+    'get-wifi-interface-info':          '_get_wifi_interface_info',
     # LTE jobs
-    'lte-get-interface-info':           '_lte_get_interface_info',
-    'lte-reset':                        '_lte_reset'
+    'get-lte-interface-info':           '_get_lte_interface_info',
+    'reset-lte':                        '_reset_lte',
 }
 
 class FWAGENT_API:
@@ -223,8 +224,8 @@ class FWAGENT_API:
 
         return {'message': route_entries, 'ok': 1}
 
-    def _get_router_config(self, params):
-        """Get router configuration from DB.
+    def _get_device_config(self, params):
+        """Get device configuration from DB.
 
         :param params: Parameters from flexiManage.
 
@@ -245,46 +246,7 @@ class FWAGENT_API:
         """
         if fwglobals.g.router_api.state_is_started():
             fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
-        fwutils.reset_router_config()
-        return {'ok': 1}
-
-    def _full_sync(self, router_sync_list, system_sync_list):
-        fwglobals.log.debug("_sync_device: start full sync")
-        
-        if router_requests or system_sync_list:
-            self._reset_device_soft()
-
-        if system_sync_list:
-            for sys_request in system_sync_list:
-                reply = fwglobals.g.system_api.call(sys_request)
-                if reply['ok'] == 0:
-                    raise Exception(" _sync_device: system full sync failed: " + str(reply.get('message')))
-
-        if router_sync_list:
-            restart_router = False
-            if fwglobals.g.router_api.state_is_started():
-                restart_router = True
-                fwglobals.g.router_api.call({'message': 'stop-router'})
-
-            request = {     # Cast 'sync-device' to 'aggregated'
-                'message':   'aggregated',
-                'params':    { 'requests': router_requests },
-                'internals': { 'dont_revert_on_failure': True }
-            }
-
-            reply = fwglobals.g.router_api.call(request)    # Apply finally the received configuration
-            
-            if reply['ok'] == 0:
-                raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
-
-            if restart_router:
-                fwglobals.g.router_api.call({'message': 'start-router'})
-
-            fwglobals.log.debug("_sync_device: router full sync succeeded")
-            fwglobals.g.router_cfg.reset_signature()
-
-
-        fwglobals.log.info("_sync_device FINISHED")
+        fwutils.reset_device_config()
         return {'ok': 1}
 
     def _sync_device(self, params):
@@ -305,83 +267,30 @@ class FWAGENT_API:
         """
         fwglobals.log.info("_sync_device STARTED")
 
-        # Go through all the requests and check 
-        # which ones belong to the router and which ones belong to the agent_api
-        router_requests = []
-        system_requests = []
-        for request in params['requests']:
-            if request['message'] in fwsystem_api.fwsystem_translators:
-                system_requests.append(request)
-            else:
-                router_requests.append(request)
+        full_sync_enforced = params.get('type', '') == 'full-sync'
+        if full_sync_enforced:
+            self._reset_device_soft()
 
-        # Go over configuration requests received within sync-device request,
-        # intersect them against the requests stored locally and generate new list
-        # of remove-X and add-X requests that should take device to configuration
-        # received with the sync-device.
-        #
-        router_sync_list = fwglobals.g.router_cfg.get_sync_list(router_requests)
-        system_sync_list = fwglobals.g.system_cfg.get_sync_list(system_requests)
-        
-        fwglobals.log.debug("_sync_device: router-sync-list: %s" % \
-                            json.dumps(router_sync_list, indent=2, sort_keys=True))
-        fwglobals.log.debug("_sync_device: system-sync-list: %s" % \
-                            json.dumps(system_sync_list, indent=2, sort_keys=True))
-                            
-        if not system_sync_list and not router_sync_list:
-            fwglobals.log.info("_sync_device: sync_list is empty, no need to sync")
-            fwglobals.g.router_cfg.reset_signature()
-            fwglobals.g.system_cfg.reset_signature()
-            if params.get('type', '') != 'full-sync':
-                return {'ok': 1}   # Return if there is no full sync enforcement
+        all_succeeded = True
+        for module_name, module in fwglobals.modules.items():
+            if module.get('sync', False):           
+                # get api module. e.g router_api, system_api      
+                api_module = getattr(fwglobals.g, module_name.replace('fw', ''))
 
-        # Finally update configuration.
-        # Firstly try smart sync - apply sync-list modifications only.
-        # If that fails, go with full sync - reset configuration and apply sync-device list
-        # Note today the 'full-sync' enforcement is needed for testing only.
+                # run sync method  
+                sync_succeeded = api_module.cfg.sync(params['requests'], full_sync_enforced)
 
-        if params.get('type', '') == 'full-sync':
-            return self._full_sync(router_sync_list, system_sync_list)
+                if not sync_succeeded:
+                    all_succeeded = False
 
-        succeeded = True
-        if system_sync_list:
-            fwglobals.log.debug("_sync_device: start system smart sync")
-            
-            for sys_request in system_sync_list:
-                reply = fwglobals.g.system_api.call(sys_request)
-                if reply['ok'] == 0:
-                    succeeded = False
-                    break
-            
-            if succeeded:
-                fwglobals.g.system_cfg.reset_signature()
-                fwglobals.log.debug("_sync_device: system smart sync succeeded")
+                    # if smart failed, try to run full-sync if not full think enforcement.                 
+                    if not full_sync_enforced:
+                        full_sync_succeeded = api_module.cfg.sync(params['requests'], True)
 
-        if succeeded and router_sync_list:
-            fwglobals.log.debug("_sync_device: start router smart sync")
-            sync_request = {
-                'message':   'aggregated',
-                'params':    { 'requests': router_sync_list },
-                'internals': { 'dont_revert_on_failure': True }
-            }
-            reply = fwglobals.g.router_api.call(sync_request)
-
-            # If smart sync succeeded and there is no 'full-sync' enforcement
-            # in message, finish sync procedure and return.
-            # Note today the 'full-sync' enforcement is needed for testing only.
-            #
-            if reply['ok'] == 1 and params.get('type', '') != 'full-sync':
-                fwglobals.g.router_cfg.reset_signature()
-                fwglobals.log.debug("_sync_device: router smart sync succeeded")  
-            else:
-                succeeded = False
-
-        if succeeded:
-            fwglobals.log.info("_sync_device FINISHED")    
+        if all_succeeded:
+            fwutils.reset_device_config_signature()
+            fwglobals.log.info("_sync_device FINISHED")
             return {'ok': 1}
-
-        # At this point we have to perform full sync due mart sync failure.
-        return self._full_sync(router_sync_list, system_sync_list)
 
     def _wifi_perform_operation(self, params):
         try:
@@ -427,7 +336,7 @@ class FWAGENT_API:
         except Exception as e:
             raise Exception("_wifi_stop_ap: failed to stop wifi access point: %s" % str(e))
 
-    def _wifi_get_interface_info(self, params):
+    def _get_wifi_interface_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
             ap_status = fwutils.pid_of('hostapd')
@@ -441,9 +350,9 @@ class FWAGENT_API:
 
             return {'message': response, 'ok': 1}
         except Exception as e:
-            raise Exception("_wifi_get_interface_info: %s" % str(e))
+            raise Exception("_get_wifi_interface_info: %s" % str(e))
 
-    def _lte_get_interface_info(self, params):
+    def _get_lte_interface_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
@@ -476,10 +385,10 @@ class FWAGENT_API:
 
             return {'message': response, 'ok': 1}
         except Exception as e:
-            raise Exception("_get_lte_interface_status: %s" % str(e))
+            raise Exception("_get_lte_interface_info: %s" % str(e))
 
-    def _lte_reset(self, params):
-        """Rest LTE modem card.
+    def _reset_lte(self, params):
+        """Reset LTE modem card.
         
         :param params: Parameters to use.
 
