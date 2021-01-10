@@ -918,19 +918,14 @@ class FwagentDaemon(object):
     def linux_configuration_thread(self):
 
         def run(*args):
-            slept = 0
-            timeout = 30
-
             while self.active:
                 # Every 30 seconds ensure that linux configuration is working properly
-                if (slept % timeout) == 0:
-                    lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
-                    for dev_id in lte_requests:
-                        fwglobals.g.handle_request(lte_requests[dev_id])
+                lte_requests = fwglobals.g.linux_configs_db['lte'] if 'lte' in fwglobals.g.linux_configs_db else {}
+                for dev_id in lte_requests:
+                    fwglobals.g.handle_request(lte_requests[dev_id])
 
-                # Sleep 1 second and make another iteration
-                time.sleep(1)
-                slept += 1
+                # Sleep 30 second and make another iteration
+                time.sleep(30)
 
 
         if not self.linux_configuration:

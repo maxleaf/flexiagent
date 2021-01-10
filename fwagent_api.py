@@ -270,7 +270,8 @@ class FWAGENT_API:
         """
         fwglobals.log.info("_sync_device STARTED")
 
-        # Go through all the requests and check which ones belong to the router and which ones belong to the agent_api
+        # Go through all the requests and check 
+        # which ones belong to the router and which ones belong to the agent_api
         router_requests = []
         for request in params['requests']:
             if request['message'] in fwagent_api:
