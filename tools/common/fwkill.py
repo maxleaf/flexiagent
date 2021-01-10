@@ -76,7 +76,6 @@ def main():
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_BACKUP, fwglobals.g.VPP_CONFIG_FILE)
     if arg_clean_cfg:
         fwutils.reset_router_config()
-        fwutils.reset_fw_linux_config()
 
     if not arg_quiet:
         print ("Done")
