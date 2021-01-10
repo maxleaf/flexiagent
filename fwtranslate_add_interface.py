@@ -207,7 +207,7 @@ def add_interface(params):
             cmd_list.append(cmd)
 
             # connect the modem to the cellular provider
-            configs = params['configuration'] if params['configuration'] else {}
+            configs = copy.deepcopy(params['configuration'])
             configs['dev_id'] = dev_id
             cmd = {}
             cmd['cmd'] = {}

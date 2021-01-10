@@ -54,6 +54,19 @@
             }
         },
         {
+            "name": "Cache",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "show", "--agent", "cache"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
             "name": "system_checker",
             "type": "python",
             "request": "launch",
