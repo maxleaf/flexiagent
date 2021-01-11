@@ -191,14 +191,17 @@ class FWROUTER_API:
             time.sleep(1)  # 1 sec
 
             try:  # Ensure thread doesn't exit on exception
-                tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
+                tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
 
-                for gre in tunnels:
-                    tunnel = gre.tunnel
-                    bridge_id = fwglobals.g.ikev2tunnels.get_tunnel(str(tunnel.src))['bridge_id']
-                    if (bridge_id):
-                        fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index, bd_id=bridge_id, enable=1, shg=1)
-                        fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+                for src, tun in tunnels.items():
+                    tunnel = fwutils.ikev2_gre_tunnel_get(src)
+                    if not tunnel:
+                        continue
+
+                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index,
+                                                                                      bd_id=tun['bridge_id'],
+                                                                                      enable=1, shg=1)
+                    fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
 
             except Exception as e:
                 fwglobals.log.debug("%s" % str(e))

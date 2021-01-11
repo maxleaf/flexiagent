@@ -2080,3 +2080,13 @@ def ikev2_restart_all_initiator_tunnels():
             except Exception as e:
                 fwglobals.log.error("%s" % str(e))
                 continue
+
+def ikev2_gre_tunnel_get(src):
+    tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
+
+    for gre in tunnels:
+        tunnel = gre.tunnel
+        if (str(tunnel.src) == str(src)):
+            return tunnel
+
+    return None
