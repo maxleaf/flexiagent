@@ -642,7 +642,7 @@ def reset(soft=False):
 
     :returns: None.
     """
-    fwutils.reset_router_config()
+    fwutils.reset_device_config()
 
     if soft:
         return
@@ -667,12 +667,12 @@ def reset(soft=False):
         fwglobals.log.info("Reset operation aborted")
     daemon_rpc('start')     # Start daemon main loop if daemon is alive
 
-def stop(reset_router_config, stop_router):
+def stop(reset_device_config, stop_router):
     """Handles 'fwagent stop' command.
     Stops the infinite connection loop run by Fwagent in daemon mode.
     See documentation on FwagentDaemon class.
 
-    :param reset_router_config:  Reset router configuration.
+    :param reset_device_config:  Reset device configuration.
     :param stop_router:          Stop router, thus disabling packet routing.
 
     :returns: None.
@@ -686,8 +686,8 @@ def stop(reset_router_config, stop_router):
             fwglobals.log.excep("failed to stop vpp gracefully, kill it")
             fwutils.stop_vpp()
 
-    if reset_router_config:
-        fwutils.reset_router_config()
+    if reset_device_config:
+        fwutils.reset_device_config()
     fwglobals.log.info("done")
 
 def start(start_router):
@@ -725,9 +725,9 @@ def show(agent_info, router_info, daemon_info):
             fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
         elif router_info == 'configuration':
             fwutils.print_router_config()
-        elif router_info == 'cfg_db':
+        elif router_info == 'cfg-db':
             fwutils.print_router_config(full=True)
-        elif router_info == 'cfg_signature':
+        elif router_info == 'cfg-signature':
             fwutils.print_router_config(basic=False, signature=True)
         elif router_info == 'multilink-policy':
             fwutils.print_router_config(basic=False, multilink=True)
@@ -1104,7 +1104,7 @@ if __name__ == '__main__':
     command_functions = {
                     'version':lambda args: version(),
                     'reset': lambda args: reset(soft=args.soft),
-                    'stop': lambda args: stop(reset_router_config=args.reset_softly, stop_router=(not args.dont_stop_vpp)),
+                    'stop': lambda args: stop(reset_device_config=args.reset_softly, stop_router=(not args.dont_stop_vpp)),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
@@ -1150,7 +1150,7 @@ if __name__ == '__main__':
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg_db', 'cfg_signature', 'multilink-policy'],
+    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg-db', 'cfg-signature', 'multilink-policy'],
                         help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version', 'cache', 'threads', 'system-configuration'],
                         help="show various agent parameters")

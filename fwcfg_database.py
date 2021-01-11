@@ -28,10 +28,22 @@ import traceback
 from sqlitedict import SqliteDict
 
 import fwglobals
+import fwutils
 
-
-class FwDatabaseCfg:
+class FwCfgDatabase:
     """This is requests DB class representation.
+    Persistent database that is used to keep configuration requests received from flexiManage.
+    The requests are stored along with their translations into command list.
+    We used this class as a wrapper to Sqlite for our specific format:
+
+    [
+        {
+            "Executed": { Indicates if command are already executed }, 
+            "Key": { The unique key for each request from flexiManage. e.g. "add-interface:pci:0000:08:01" },
+            "Params": { Dictonery with params received from flexiManage },
+            "Commands": [ list of translated commands ]
+        }
+    ]
 
     :param db_file: SQLite DB file name.
     """
@@ -40,9 +52,6 @@ class FwDatabaseCfg:
         """
         self.db_filename = db_file
         self.db = SqliteDict(db_file, autocommit=True)
-
-        if self.db.get('signature') is None:
-            self.db['signature'] = ""
 
     def __enter__(self):
         return self
@@ -59,15 +68,6 @@ class FwDatabaseCfg:
         """
         self.db.close()
 
-    def get_entry(self,key):
-        return self.db.get(key)
-
-    def set_entry(self, key, value):
-        self.db[key] = value
-
-    def delete_entry(self, key):
-        del self.db[key]
-
     def close(self):
         self.db.close()
 
@@ -83,29 +83,9 @@ class FwDatabaseCfg:
         # by the flexiManage. This is to enforce flexiManage to issue 'sync-device'
         # in order to fill the configuration database again with most updated
         # configuration.
-        #
-        self.reset_signature("empty_cfg", log=False)
+        fwutils.reset_device_config_signature("empty_cfg", log=False)
 
-    def get_request_params(self, req_key):
-        """Retrives parameters of the request as they are stored in DB.
-        I know that it sounds weired, as request includes parameters in 'params'
-        field :) This is hack. We use this function to retrieve parameters
-        of the 'add-X' requests stored in DB, when the provided request is
-        correspondent 'remove-X'.
-        Note:
-            - the 'remove-X' requests are not stored in DB
-            - the 'remove-X' 'params' is a subset of the 'add-X' 'params',
-              which is sufficient to generate DB key.
-
-        :param req_key:     The Request key to get params for.
-
-        :returns: the parameters of the correspondent request key.
-        """
-        if not req_key in self.db:
-            return None
-        return self.db[req_key].get('params')
-
-    def get_request_cmd_list(self, req_key):
+    def get_cmd_list(self, req_key):
         """Retrives translation of the request to list of commands.
 
         :param request: The request as it would be received on network,
@@ -194,57 +174,3 @@ class FwDatabaseCfg:
             if re.match(req, key):
                 requests.append(self.db[key]['params'])
         return requests
-
-    def update_signature(self, request):
-        """Updates the database signature.
-        This function assists the database synchronization feature that keeps
-        the configuration set by user on the flexiManage in sync with the one
-        stored on the flexiEdge device.
-            The initial signature of the database is empty string. Than on every
-        successfully handled request it is updated according following formula:
-                signature = sha1(signature + request)
-        where both signature and delta are strings.
-
-        :param request: the last successfully handled router configuration
-                        request, e.g. add-interface, remove-tunnel, etc.
-                        As configuration database signature should reflect
-                        the latest configuration, it should be updated with this
-                        request.
-        """
-        current     = self.db['signature']
-        delta       = json.dumps(request, separators=(',', ':'), sort_keys=True)
-        hash_object = hashlib.sha1(current + delta)
-        new         = hash_object.hexdigest()
-
-        self.db['signature'] = new
-        fwglobals.log.debug("sha1: new=%s, current=%s, delta=%s" %
-                            (str(new), str(current), str(delta)))
-
-    def get_signature(self):
-        """Retrives signature of the current configuration.
-        The signature is SHA-1 based hash on requests store in local database.
-
-        :returns: the signature as a string.
-        """
-        if not 'signature' in self.db:
-            self.reset_signature()
-        return self.db['signature']
-
-    def reset_signature(self, new_signature=None, log=True):
-        """Resets configuration signature to the empty sting.
-
-        :param new_signature: string to be used as a signature of the configuration.
-                        If not provided, the empty string will be used.
-                        When flexiManage detects discrepancy between this signature
-                        and between signature that it calculated, it sends
-                        the 'sync-device' request in order to apply the user
-                        configuration onto device. On successfull sync the signature
-                        is reset to the empty string on both sides.
-        :param log: if False the reset will be not logged.
-        """
-        old_signature = self.db.get('signature', '<none>')
-        new_signature = "" if new_signature == None else new_signature
-        self.db['signature'] = new_signature
-        if log:
-            fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
-                                (old_signature, new_signature))

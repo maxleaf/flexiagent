@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "fwagnet",
+            "name": "fwagent daemon",
             "type": "python",
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",

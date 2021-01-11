@@ -25,23 +25,18 @@ import re
 import traceback
 import copy
 
-from fwdatabase_cfg import FwDatabaseCfg
+from fwcfg_database import FwCfgDatabase
 
 import fwglobals
 import fwsystem_api
 import fwutils
 
 
-class FwSystemCfg:
+class FwSystemCfg(FwCfgDatabase):
     """This is requests DB class representation.
-
+    
     :param db_file: SQLite DB file name.
     """
-    def __init__(self, db_file):
-        """Constructor method
-        """
-        self.db = FwDatabaseCfg(db_file)
-
     def __enter__(self):
         return self
 
@@ -100,13 +95,13 @@ class FwSystemCfg:
 
         try:
             if re.match('add-', req):
-                self.db.set_entry(req_key, { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed })
+                self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
             elif re.match('modify-', req):
-                entry = self.db.get_entry(req_key)
+                entry = self.db[req_key]
                 entry.update({'params' : params})
-                self.db.set_entry(req_key, entry) 
+                self.db[req_key] = entry 
             else:
-                self.db.delete_entry(req_key)
+                del self.db[req_key]
 
         except KeyError:
             pass
@@ -114,32 +109,11 @@ class FwSystemCfg:
             fwglobals.log.error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
-
-    def get_request_params(self, request):
-        req_key = self._get_request_key(request)
-        return self.db.get_request_params(req_key)
-
+    
     def get_request_cmd_list(self, request):
         req_key = self._get_request_key(request)
-        return self.db.get_request_cmd_list(req_key)
-
-    def exists(self, request):
-        req_key = self._get_request_key(request)
-        return self.db.exists(req_key)
-
-    def get_params(self, request):
-        req_key = self._get_request_key(request)
-        return self.db.get_params(req_key)
-
-    def is_same_cfg_item(self, request1, request2):
-        """Checks if provided requests stand for the same configuration item.
-        """
-        req_key1 = self._get_request_key(request1)
-        req_key2 = self._get_request_key(request2)
-        if req_key1 == req_key2:
-            return True
-        return False
-
+        return self.get_cmd_list(req_key)
+        
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps system configuration into list of requests.
         """
@@ -149,7 +123,7 @@ class FwSystemCfg:
                 'add-lte',
             ]
 
-        return self.db.dump(types, escape, full, keys)
+        return FwCfgDatabase.dump(self, types, escape, full, keys)
 
     def dumps(self, types=None, escape=None, full=False):
         """Dumps router configuration into printable string.
@@ -164,44 +138,9 @@ class FwSystemCfg:
             'add-lte':         "======= LTE =======",
         }
 
-        out = {}
-        prev_msg = { 'message': 'undefined' }
-
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-        for msg in cfg:
-            # Add new section
-            if msg['message'] != prev_msg['message']:
-                prev_msg['message'] = msg['message']
-                section_name = sections[msg['message']]
-                out[section_name] = []
 
-            # Add configuration item to section
-            item = {
-                'Key':    msg['key'],
-                'Params': msg['params']
-            }
-            if full:
-                item.update({'Executed': str(msg['executed'])})
-                item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
-            out[section_name].append(item)
-        if not out:
-            return ''
-        return json.dumps(out, indent=2, sort_keys=True)
-
-    def _get_requests(self, req):
-        """Retrives list of configuration requests parameters for requests with
-        the 'req' name.
-        """
-        return self.db.get_requests(req)
-
-    def update_signature(self, request):
-        return self.db.update_signature(request)
-
-    def get_signature(self):
-        return self.db.get_signature()
-
-    def reset_signature(self, new_signature=None, log=True):
-        return self.db.reset_signature(new_signature, log)
+        return fwutils.dumps_config(cfg, sections)
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against
@@ -274,3 +213,28 @@ class FwSystemCfg:
         output_requests += input_requests.values()
 
         return output_requests
+
+    def sync(self, incoming_requests, full_sync=False):
+        incoming_requests = list(filter(lambda x: x['message'] in fwsystem_api.fwsystem_translators, incoming_requests))        
+
+        # get sync lists
+        sync_list = self.get_sync_list(incoming_requests)
+
+        if len(sync_list) == 0:
+            fwglobals.log.info("_sync_device: system sync_list is empty, no need to sync")
+            return True
+
+        if full_sync:
+            fwglobals.log.debug("_sync_device: start full sync")
+
+        all_succeeded = True
+        for req in sync_list:
+            reply = fwglobals.g.system_api.call(req)
+            if reply['ok'] == 0:
+                all_succeeded = False
+                break
+
+        if reply['ok'] == 0 and full_sync:
+            raise Exception(" _sync_device: system full sync failed: " + str(reply.get('message')))
+
+        return all_succeeded

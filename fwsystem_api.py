@@ -21,7 +21,8 @@
 ################################################################################
 
 import fwglobals
-from fwrequest_executer import FwRequestExecuter
+from fwrequest_executor import FwRequestExecutor
+import traceback
 
 fwsystem_modules = {
     'fwtranslate_revert':       __import__('fwtranslate_revert') ,
@@ -34,34 +35,22 @@ fwsystem_translators = {
 }
 
 class FWSYSTEM_API:
-    """This class implements fwagent level APIs of flexiEdge device.
-       Typically these APIs are used to monitor various components of flexiEdge.
-       They are invoked by the flexiManage over secure WebSocket
-       connection using JSON requests.
-       For list of available APIs see the 'fwsystem_translators' variable.
+    """This is System API class representation.
+        These APIs are used to handle system configuration requests regardless of the vpp state.
+        e.g to enable lte connection even if the vpp is not running.
+        They are invoked by the flexiManage over secure WebSocket
+        connection using JSON requests.
+        For list of available APIs see the 'fwsystem_translators' variable.
     """
-    def __init__(self):
+    def __init__(self, cfg):
         """Constructor method
         """
-        self.request_executer = FwRequestExecuter(fwsystem_modules, fwsystem_translators, fwglobals.g.system_cfg)
+        self.cfg = cfg
+        self.request_executor = FwRequestExecutor(fwsystem_modules, fwsystem_translators, fwglobals.g.system_cfg)
 
     def call(self, request):
-        try:
-            req = request['message']      
-
-            # Translate request to list of commands to be executed
-            cmd_list = self.request_executer.translate(request)
-
-            self.request_executer.execute(request, cmd_list)
-            executed = True
-
-            # Save successfully handled configuration request into database.
-            try:
-                fwglobals.g.system_cfg.update(request, cmd_list, executed)
-            except Exception as e:
-                self.request_executer.revert(cmd_list)
-                raise e
-
+        try:             
+            self.request_executor.execute(request)
         except Exception as e:
             err_str = "FWSYSTEM_API::call: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
@@ -73,17 +62,4 @@ class FWSYSTEM_API:
         """Restore system configuration.
         Run all system configuration translated commands.
         """
-        try:
-            fwglobals.log.info("===restore system configuration: started===")
-
-            system_requests = fwglobals.g.system_cfg.dump(keys=True)
-            if system_requests:
-                for req in system_requests:
-                    reply = fwglobals.g.handle_request(req)
-                
-            return True
-        except Exception as e:
-            fwglobals.log.excep("restore_system_configuration: %s" % str(e))
-
-        fwglobals.log.info("====restore system configuration: finished===")
-        return True
+        self.request_executor.restore_configuration()

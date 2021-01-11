@@ -1069,7 +1069,7 @@ def stop_vpp():
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
 
-def reset_router_config():
+def reset_device_config():
     """Reset router config by cleaning DB and removing config files.
 
      :returns: None.
@@ -1098,6 +1098,15 @@ def reset_router_config():
 
     reset_dhcpd()
 
+def print_system_config(full=False):
+    """Print router configuration.
+
+     :returns: None.
+     """
+    with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
+        cfg = system_cfg.dumps(full=full)
+        print(cfg)
+
 def print_router_config(basic=True, full=False, multilink=False, signature=False):
     """Print router configuration.
 
@@ -1109,19 +1118,89 @@ def print_router_config(basic=True, full=False, multilink=False, signature=False
         elif multilink:
             cfg = router_cfg.dumps(full=full, types=['add-application','add-multilink-policy'])
         elif signature:
-            cfg = router_cfg.get_signature()
+            cfg = get_device_config_signature()
         else:
             cfg = ''
         print(cfg)
 
-def print_system_config(full=False):
-    """Print router configuration.
+def update_device_config_signature(request):
+    """Updates the database signature.
+    This function assists the database synchronization feature that keeps
+    the configuration set by user on the flexiManage in sync with the one
+    stored on the flexiEdge device.
+        The initial signature of the database is empty string. Than on every
+    successfully handled request it is updated according following formula:
+            signature = sha1(signature + request)
+    where both signature and delta are strings.
 
-     :returns: None.
-     """
-    with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
-        cfg = system_cfg.dumps(full=full)
-        print(cfg)
+    :param request: the last successfully handled router configuration
+                    request, e.g. add-interface, remove-tunnel, etc.
+                    As configuration database signature should reflect
+                    the latest configuration, it should be updated with this
+                    request.
+    """
+    current     = fwglobals.g.db['signature']
+    delta       = json.dumps(request, separators=(',', ':'), sort_keys=True)
+    hash_object = hashlib.sha1(current + delta)
+    new         = hash_object.hexdigest()
+
+    fwglobals.g.db['signature'] = new
+    fwglobals.log.debug("sha1: new=%s, current=%s, delta=%s" %
+                        (str(new), str(current), str(delta)))
+
+def get_device_config_signature():
+    if not 'signature' in fwglobals.g.db:
+        reset_device_config_signature()
+
+    return fwglobals.g.db['signature']
+
+def reset_device_config_signature(new_signature=None, log=True):
+    """Resets configuration signature to the empty sting.
+
+    :param new_signature: string to be used as a signature of the configuration.
+            If not provided, the empty string will be used.
+            When flexiManage detects discrepancy between this signature
+            and between signature that it calculated, it sends
+            the 'sync-device' request in order to apply the user
+            configuration onto device. On successfull sync the signature
+            is reset to the empty string on both sides.
+    :param log: if False the reset will be not logged.
+    """
+    old_signature = fwglobals.g.db.get('signature', '<none>')
+    new_signature = "" if new_signature == None else new_signature
+    fwglobals.g.db['signature'] = new_signature
+    if log:
+        fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
+                            (old_signature, new_signature))
+
+def dumps_config(cfg, sections):
+    """Dumps router configuration into printable string.
+
+    :param cfg:  list of types of configuration requests to be dumped, e.g. [ 'add-interface' , 'add-tunnel' ]
+    :param sections: list of sections to group request with same types. e.g. interfaces, tunnels 
+    """
+    out = {}
+    prev_msg = { 'message': 'undefined' }
+
+    for msg in cfg:
+        # Add new section
+        if msg['message'] != prev_msg['message']:
+            prev_msg['message'] = msg['message']
+            section_name = sections[msg['message']]
+            out[section_name] = []
+
+        # Add configuration item to section
+        item = {
+            'Key':    msg['key'],
+            'Params': msg['params']
+        }
+        if full:
+            item.update({'Executed': str(msg['executed'])})
+            item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
+        out[section_name].append(item)
+    if not out:
+        return ''
+    return json.dumps(out, indent=2, sort_keys=True)
 
 def dump_router_config(full=False):
     """Dumps router configuration into list of requests that look exactly
@@ -2398,7 +2477,7 @@ def lte_is_sim_inserted(dev_id):
 def lte_disconnect(dev_id, hard_reset_service=False):
     try:
         # don't perform disconnect if this interface is assigned to vpp and vpp is run
-        is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+        is_assigned = len(fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)) > 0
         if vpp_does_run() and is_assigned:
             return {'ok': 0, 'message': 'Don\'t disconnect LTE. the interface is assigned to vpp'}
 
