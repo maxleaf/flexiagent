@@ -158,7 +158,7 @@ class FwRouterCfg:
                 fwglobals.log.debug("FwRouterCfg: %s.%s(%s) - after"\
                         %(elem['listener'], elem['callback'].__name__, req_name))
 
-    def update(self, request, cmd_list=None, executed=False):
+    def update(self, request, cmd_list=None, executed=False, whitelist=None):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
         requests are not stored but remove the correspondent 'add-X' requests.
@@ -183,9 +183,19 @@ class FwRouterCfg:
 
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
-            elif re.match('modify-', req):
+            elif re.match('modify-interface', req):
                 entry = self.db[req_key]
                 entry.update({'params' : params})
+                self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
+            elif re.match('modify-tunnel', req):
+                modify_field = whitelist
+
+                entry = self.db[req_key]
+                for key, value in params.items():
+                    if isinstance(value, dict):
+                        for key2, value2 in value.items():
+                            if key2 == modify_field:
+                                entry['params'][key][key2] = value2
                 self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
             else:
                 del self.db[req_key]

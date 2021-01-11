@@ -1092,16 +1092,22 @@ def add_tunnel(params):
 
     return cmd_list
 
-def modify_tunnel(params):
-    remote_device_id = str(params['ikev2']['remote-device-id']),
-    certificate = params['ikev2']['certificate']
-    role = params['ikev2']['role']
+def modify_tunnel(new_params, old_params):
+    remote_device_id = str(old_params['ikev2']['remote-device-id'])
+    certificate = new_params['ikev2']['certificate']
+    role = old_params['ikev2']['role']
     cmd_list = []
 
-    loop0_ip  = IPNetwork(params['loopback-iface']['addr'])
+    loop0_ip  = IPNetwork(old_params['loopback-iface']['addr'])
     loop1_ip  = copy.deepcopy(loop0_ip)
     loop1_ip.value  += IPAddress('0.1.0.0').value
     src = str(loop1_ip.ip)
+
+    # Add modify white list
+    cmd = {}
+    cmd['modify'] = 'modify'
+    cmd['whitelist'] = 'certificate'
+    cmd_list.append(cmd)
 
     # Add public certificate file
     cmd = {}

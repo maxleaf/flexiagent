@@ -576,6 +576,7 @@ class FWROUTER_API:
 
         :returns: list of commands.
         """
+        whitelist   = None
         req         = request['message']
         params      = request.get('params')
         old_params  = fwglobals.g.router_cfg.get_params(request)
@@ -597,7 +598,10 @@ class FWROUTER_API:
         assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
-        return cmd_list
+        for cmd in cmd_list:
+            if 'modify' in cmd.keys():
+                whitelist = cmd['whitelist']
+        return (cmd_list, whitelist)
 
     def _execute(self, request, cmd_list, filter=None):
         """Execute request.
@@ -742,8 +746,8 @@ class FWROUTER_API:
                 # configuration item in Linux/VPP. If this list is empty,
                 # the request can be stripped out.
                 #
-                cmd_list = self._translate_modify(__request)
-                if not cmd_list:
+                cmd_list, whitelist = self._translate_modify(__request)
+                if whitelist:
                     # Save modify request into database, as it might contain parameters
                     # that don't impact on interface configuration in Linux or in VPP,
                     # like PublicPort, PublicIP, useStun, etc.
@@ -753,7 +757,7 @@ class FWROUTER_API:
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
-                    fwglobals.g.router_cfg.update(__request)
+                    fwglobals.g.router_cfg.update(__request, whitelist=whitelist)
                     return True
             return False
 
