@@ -485,6 +485,7 @@ class FWROUTER_API:
         :returns: Status codes dictionary.
         """
         try:
+            whitelist = None
             req = request['message']
 
             router_was_started = fwutils.vpp_does_run()
@@ -500,7 +501,10 @@ class FWROUTER_API:
                return {'ok':1}
 
             # Translate request to list of commands to be executed
-            cmd_list = self._translate(request)
+            if re.match('modify-', req):
+                cmd_list, whitelist = self._translate_modify(request)
+            else:
+                cmd_list = self._translate(request)
 
             # Execute list of commands. Do it only if vpp runs.
             # Some 'remove-XXX' requests must be executed
@@ -525,7 +529,7 @@ class FWROUTER_API:
             # crashed VPP by watchdog.
             #
             try:
-                fwglobals.g.router_cfg.update(request, cmd_list, executed)
+                fwglobals.g.router_cfg.update(request, cmd_list, executed, whitelist)
             except Exception as e:
                 self._revert(cmd_list)
                 raise e
@@ -598,10 +602,13 @@ class FWROUTER_API:
         assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
+        new_cmd_list = []
         for cmd in cmd_list:
             if 'modify' in cmd.keys():
                 whitelist = cmd['whitelist']
-        return (cmd_list, whitelist)
+            else:
+                new_cmd_list.append(cmd)
+        return (new_cmd_list, whitelist)
 
     def _execute(self, request, cmd_list, filter=None):
         """Execute request.
@@ -740,25 +747,6 @@ class FWROUTER_API:
                         return True
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 return True
-            elif re.match('modify-', req):
-                # For modification request ensure that it goes to modify indeed:
-                # translate request into commands to execute in order to modify
-                # configuration item in Linux/VPP. If this list is empty,
-                # the request can be stripped out.
-                #
-                cmd_list, whitelist = self._translate_modify(__request)
-                if whitelist:
-                    # Save modify request into database, as it might contain parameters
-                    # that don't impact on interface configuration in Linux or in VPP,
-                    # like PublicPort, PublicIP, useStun, etc.
-                    #
-                    # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
-                    # We assume the 'modify-X' request includes full set of
-                    # parameters and not only modified ones!
-                    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    #
-                    fwglobals.g.router_cfg.update(__request, whitelist=whitelist)
-                    return True
             return False
 
         def _exist(__request, requests):
@@ -917,25 +905,6 @@ class FWROUTER_API:
         req     = request['message']
         params  = request.get('params')
         updated = False
-
-        # 'modify-X' preprocessing:
-        #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
-        #     Implement real modification on demand :)
-        #
-        if re.match('modify-', req):
-            req     = 'aggregated'
-            params  = { 'requests' : _preprocess_modify_X(request) }
-            request = {'message': req, 'params': params}
-            updated = True
-            # DON'T RETURN HERE !!! FURTHER PREPROCESSING IS NEEDED !!!
-        elif req == 'aggregated':
-            new_requests = []
-            for _request in params['requests']:
-                if re.match('modify-', _request['message']):
-                    new_requests += _preprocess_modify_X(_request)
-                else:
-                    new_requests.append(_request)
-            params['requests'] = new_requests
 
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
