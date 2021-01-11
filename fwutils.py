@@ -2074,18 +2074,22 @@ def ikev2_modify_certificate(device_id, certificate, role, src):
         fwglobals.log.error("%s" % str(e))
         pass
 
-def ikev2_restart_all_initiator_tunnels():
-    '''This function restarts tunnels that are in initiator role.
+def ikev2_modify_private_key(private_pem):
+    '''This function modifies private key.
     '''
-    tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
+    try:
+        fwglobals.g.router_api.vpp_api.vpp.api.ikev2_set_local_key(key_file=private_pem)
+        tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
 
-    for tunnel in tunnels.values():
-        if tunnel['role'] == 'initiator':
-            try:
+        for tunnel in tunnels.values():
+            if tunnel['role'] == 'initiator':
                 fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tunnel['profile'])
-            except Exception as e:
-                fwglobals.log.error("%s" % str(e))
-                continue
+
+    except Exception as e:
+        fwglobals.log.error("%s" % str(e))
+        return False
+
+    return True
 
 def ikev2_gre_tunnel_get(src):
     tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
