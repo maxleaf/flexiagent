@@ -264,7 +264,7 @@ def get_interface_gateway(if_name, if_dev_id=None):
 
 def get_binary_interface_gateway_by_dev_id(dev_id):
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
-    return ip_str_to_bytes(gw_ip)[0]
+    return ip_str_to_bytes(gw_ip)[0] if gw_ip else ''
 
 
 def get_all_interfaces():
