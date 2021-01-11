@@ -73,6 +73,8 @@ class VPP_API:
                 self.vpp.connect('fwagent')
                 break
             except Exception as e:
+                if not fwutils.vpp_does_run():  # No need to retry if vpp crashed
+                    raise Exception("vpp process not found")
                 if i == num_retries-1:
                     raise e
                 else:
