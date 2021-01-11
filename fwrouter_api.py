@@ -194,6 +194,9 @@ class FWROUTER_API:
                 tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
 
                 for src, tun in tunnels.items():
+                    if tun['state'] == 'running':
+                        continue
+
                     tunnel = fwutils.ikev2_gre_tunnel_get(src)
                     if not tunnel:
                         continue
@@ -202,6 +205,10 @@ class FWROUTER_API:
                                                                                       bd_id=tun['bridge_id'],
                                                                                       enable=1, shg=1)
                     fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+
+                    tun['state'] = 'running'
+                    fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
+
 
             except Exception as e:
                 fwglobals.log.debug("%s" % str(e))
