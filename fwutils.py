@@ -2068,8 +2068,6 @@ def ikev2_modify_certificate(device_id, certificate, role, src):
                                                                       data=public_pem,
                                                                       data_len=len(public_pem))
 
-        if role == 'initiator':
-            fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=profile)
     except Exception as e:
         fwglobals.log.error("%s" % str(e))
         pass
@@ -2080,10 +2078,6 @@ def ikev2_modify_private_key(private_pem):
     try:
         fwglobals.g.router_api.vpp_api.vpp.api.ikev2_set_local_key(key_file=private_pem)
         tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
-
-        for tunnel in tunnels.values():
-            if tunnel['role'] == 'initiator':
-                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tunnel['profile'])
 
     except Exception as e:
         fwglobals.log.error("%s" % str(e))
