@@ -80,7 +80,7 @@ class FwRouterState(enum.Enum):
     STOPPED   = 4
     FAILED    = 666
 
-class FWROUTER_API:
+class FWROUTER_API(FwRequestExecutor):
     """This is Router API class representation.
     The Router API class provides control over vpp.
     That includes:
@@ -102,8 +102,8 @@ class FWROUTER_API:
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
         self.translators = fwrouter_translators
-        self.cfg = cfg
-        self.request_executor = FwRequestExecutor(fwrouter_modules, fwrouter_translators, self.cfg, self._on_revert_failed)
+        
+        FwRequestExecutor.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
@@ -336,10 +336,8 @@ class FWROUTER_API:
 
         # Finally handle the request
         #
-        if request['message'] == 'aggregated':
-            reply = self._call_aggregated(request['params']['requests'], dont_revert_on_failure)
-        else:
-            reply = self._call_simple(request)
+
+        reply = FwRequestExecutor.call(self, request)
 
         # Start vpp if it should be restarted
         #
@@ -381,55 +379,6 @@ class FWROUTER_API:
         return reply
 
 
-    def _call_aggregated(self, requests, dont_revert_on_failure=False):
-        """Execute multiple requests.
-        It do that as an atomic operation,
-        i.e. if one of requests fails, all the previous are reverted.
-
-        :param requests:    Request list.
-        :param dont_revert_on_failure:  If True the succeeded requests in list
-                            will not be reverted on failure of any request.
-                            This bizare logic is used for device sync feature,
-                            where there is no need to restore configuration,
-                            as it is out of sync with the flexiManage.
-
-        :returns: Status codes dictionary.
-        """
-        fwglobals.log.debug("=== start handling aggregated request ===")
-
-        for (idx, request) in enumerate(requests):
-
-            # Don't print too large requests, if needed check print on request receiving
-            #
-            if request['message'] == 'add-application' or request['message'] == 'remove-application':
-                str_request = request['message'] + '...'
-            else:
-                str_request = json.dumps(request)
-
-            try:
-                fwglobals.log.debug("_call_aggregated: handle request %s" % str_request)
-                self._call_simple(request)
-            except Exception as e:
-                if dont_revert_on_failure:
-                    raise e
-                # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
-                for request in reversed(requests[0:idx]):
-                    try:
-                        op = request['message']
-                        request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
-                        self._call_simple(request)
-                    except Exception as e:
-                        # on failure to revert move router into failed state
-                        err_str = "_call_aggregated: failed to revert request %s while running rollback on aggregated request" % op
-                        fwglobals.log.excep("%s: %s" % (err_str, format(e)))
-                        self.state_change(FwRouterState.FAILED, err_str)
-                        pass
-                raise e
-
-        fwglobals.log.debug("=== end handling aggregated request ===")
-        return {'ok':1}
-
     def _fill_tunnel_stats_dict(self):
         """Get tunnels their corresponding loopbacks ip addresses
         to be used by tunnel statistics thread.
@@ -460,7 +409,7 @@ class FWROUTER_API:
             #
             if router_was_started == False and \
                (req == 'add-application' or req == 'add-multilink-policy'):
-               self.request_executor.update_db(request)
+               self.update_db(request)
                return {'ok':1}
 
             execute = False
@@ -471,7 +420,7 @@ class FWROUTER_API:
                 filter = 'must'
                 execute = True
 
-            self.request_executor.execute(request, execute, filter)
+            FwRequestExecutor._call_simple(self, request, execute, filter)
  
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
@@ -485,8 +434,8 @@ class FWROUTER_API:
 
         return {'ok':1}
     
-    def _on_revert_failed(self, t):
-        self.state_change(FwRouterState.FAILED, "revert failed: %s" % t['cmd']['name'])
+    def _on_revert_failed(self, t, reason):
+        self.state_change(FwRouterState.FAILED, "revert failed: %s" % reason)
 
     def _translate_modify(self, request):
         """Translate modify request in a series of commands.
@@ -1078,4 +1027,31 @@ class FWROUTER_API:
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 
-        
+    def _full_sync(self, sync_list):
+        fwglobals.log.debug("_sync_device: start router full sync")
+
+        restart_router = False
+        if self.state_is_started():
+            fwglobals.log.debug("_sync_device: restart_router=True")
+            restart_router = True
+            self.call({'message': 'stop-router'})
+
+        fwglobals.g.agent_api._reset_device_soft()
+
+        sync_request = {
+            'message':   'aggregated',
+            'params':    { 'requests': sync_list },
+            'internals': { 'dont_revert_on_failure': True }
+        }
+
+        reply = self.call(sync_request)
+
+        if reply['ok'] == 0:
+            raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
+
+        if restart_router:
+            self.call({'message': 'start-router'})
+
+        fwglobals.log.debug("_sync_device: router full sync succeeded")
+
+        return True

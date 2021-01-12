@@ -48,11 +48,11 @@ from fwwan_monitor import FwWanMonitor
 
 # sync flag indicated if module implement sync logic
 modules = {
-    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False },
-    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False },
-    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True },
-    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True },
-    'os_api':           { 'module': __import__('os_api'),         'sync': False },
+    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },
+    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' },
+    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' },
+    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' },
+    'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' },
 }
 
 request_handlers = {

@@ -250,7 +250,7 @@ class FWAGENT_API:
         return {'ok': 1}
 
     def _sync_device(self, params):
-        """Handles the 'sync-device' request: synchronizes VPP state
+        """Handles the 'sync-device' request: synchronizes device configuration
         to the configuration stored on flexiManage. During synchronization
         all interfaces, tunnels, routes, etc, that do not appear
         in the received 'sync-device' request are removed, all entities
@@ -269,26 +269,21 @@ class FWAGENT_API:
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        all_succeeded = True
+        # all_succeeded = True
         for module_name, module in fwglobals.modules.items():
-            if module.get('sync', False):           
+            if module.get('sync', False):
                 # get api module. e.g router_api, system_api      
-                api_module = getattr(fwglobals.g, module_name.replace('fw', ''))
+                api_module = getattr(fwglobals.g, module.get('object'))
 
-                # run sync method  
-                sync_succeeded = api_module.cfg.sync(params['requests'], full_sync_enforced)
+                # run sync method
+                api_module.sync(params['requests'], full_sync_enforced)
 
-                if not sync_succeeded:
-                    all_succeeded = False
 
-                    # if smart failed, try to run full-sync if not full think enforcement.                 
-                    if not full_sync_enforced:
-                        full_sync_succeeded = api_module.cfg.sync(params['requests'], True)
-
-        if all_succeeded:
-            fwutils.reset_device_config_signature()
-            fwglobals.log.info("_sync_device FINISHED")
-            return {'ok': 1}
+        # At this point the sync succeeded. 
+        # In case of failure - error is throwed
+        fwutils.reset_device_config_signature()
+        fwglobals.log.info("_sync_device FINISHED")
+        return {'ok': 1}
 
     def _wifi_perform_operation(self, params):
         try:

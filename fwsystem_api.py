@@ -34,7 +34,7 @@ fwsystem_translators = {
     'remove-lte':            {'module':'fwtranslate_revert',     'api':'revert'},    
 }
 
-class FWSYSTEM_API:
+class FWSYSTEM_API(FwRequestExecutor):
     """This is System API class representation.
         These APIs are used to handle system configuration requests regardless of the vpp state.
         e.g to enable lte connection even if the vpp is not running.
@@ -45,21 +45,10 @@ class FWSYSTEM_API:
     def __init__(self, cfg):
         """Constructor method
         """
-        self.cfg = cfg
-        self.request_executor = FwRequestExecutor(fwsystem_modules, fwsystem_translators, fwglobals.g.system_cfg)
-
-    def call(self, request):
-        try:             
-            self.request_executor.execute(request)
-        except Exception as e:
-            err_str = "FWSYSTEM_API::call: %s" % str(traceback.format_exc())
-            fwglobals.log.error(err_str)
-            raise e
-
-        return {'ok':1}
+        FwRequestExecutor.__init__(self, fwsystem_modules, fwsystem_translators, cfg, fwglobals.g.system_cfg)
 
     def restore_system_configuration(self):
         """Restore system configuration.
         Run all system configuration translated commands.
         """
-        self.request_executor.restore_configuration()
+        self.restore_configuration()

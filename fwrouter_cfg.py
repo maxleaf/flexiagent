@@ -340,30 +340,3 @@ class FwRouterCfg(FwCfgDatabase):
         fwglobals.log.debug("_sync_device: router full sync succeeded")
 
         return True
-
-    def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in fwrouter_api.fwrouter_translators, incoming_requests))   
-
-        # get sync lists
-        sync_list = self.get_sync_list(incoming_requests)
-
-        if len(sync_list) == 0 and not full_sync:
-            fwglobals.log.info("_sync_device: router sync_list is empty, no need to sync")
-            return True
-        
-        fwglobals.log.debug("_sync_device: start router smart sync")
-
-        sync_request = {
-            'message':   'aggregated',
-            'params':    { 'requests': sync_list },
-            'internals': { 'dont_revert_on_failure': True }
-        }
-
-        reply = fwglobals.g.router_api.call(sync_request)
-
-        if reply['ok'] == 1 and not full_sync:
-            fwglobals.log.debug("_sync_device: router smart sync succeeded")
-            return True
-
-
-        return self._full_sync(incoming_requests)

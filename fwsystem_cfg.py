@@ -214,29 +214,3 @@ class FwSystemCfg(FwCfgDatabase):
 
         return output_requests
 
-    def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in fwsystem_api.fwsystem_translators, incoming_requests))        
-
-        fwglobals.log.debug("_sync_device: start system smart sync")
-        
-        # get sync lists
-        sync_list = self.get_sync_list(incoming_requests)
-
-        if len(sync_list) == 0:
-            fwglobals.log.info("_sync_device: system sync_list is empty, no need to sync")
-            return True
-
-        if full_sync:
-            fwglobals.log.debug("_sync_device: start system full sync")
-
-        all_succeeded = True
-        for req in sync_list:
-            reply = fwglobals.g.system_api.call(req)
-            if reply['ok'] == 0:
-                all_succeeded = False
-                break
-
-        if reply['ok'] == 0 and full_sync:
-            raise Exception(" _sync_device: system full sync failed: " + str(reply.get('message')))
-
-        return all_succeeded
