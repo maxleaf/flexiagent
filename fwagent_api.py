@@ -268,8 +268,6 @@ class FWAGENT_API:
         fwglobals.log.info("_sync_device STARTED")
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
-        if full_sync_enforced:
-            self._reset_device_soft()
 
         all_succeeded = True
         for module_name, module in fwglobals.modules.items():

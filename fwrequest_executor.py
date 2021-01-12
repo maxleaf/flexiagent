@@ -173,7 +173,7 @@ class FwRequestExecutor:
 
         fwglobals.log.debug("=== end execution of %s ===" % (req))
 
-    def update_db(self, request, cmd_list, executed):  
+    def update_db(self, request, cmd_list=None, executed=False):  
         """Update translation stuff into the database
 
         :param request:     The request received from flexiManage.

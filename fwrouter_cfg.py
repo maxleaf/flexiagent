@@ -181,7 +181,7 @@ class FwRouterCfg(FwCfgDatabase):
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-        return fwutils.dumps_config(cfg, sections)
+        return fwutils.dumps_config(cfg, sections, full)
 
     def get_interfaces(self, type=None, dev_id=None, ip=None):
         interfaces = self.get_requests('add-interface')
@@ -312,23 +312,16 @@ class FwRouterCfg(FwCfgDatabase):
 
         return output_requests
 
-    def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in fwrouter_api.fwrouter_translators, incoming_requests))   
+    def _full_sync(self, sync_list):
+        fwglobals.log.debug("_sync_device: start router full sync")
 
-        # get sync lists
-        sync_list = self.get_sync_list(incoming_requests)
+        restart_router = False
+        if fwglobals.g.router_api.state_is_started():
+            fwglobals.log.debug("_sync_device: restart_router=True")
+            restart_router = True
+            fwglobals.g.router_api.call({'message': 'stop-router'})
 
-        if len(sync_list) == 0:
-            fwglobals.log.info("_sync_device: router sync_list is empty, no need to sync")
-            return True
-
-        if full_sync:
-            fwglobals.log.debug("_sync_device: start full sync")
-            restart_router = False
-            if self.state_is_started():
-                restart_router = True
-                fwglobals.g.router_api.call({'message': 'stop-router'})     
-            
+        fwglobals.g.agent_api._reset_device_soft()
 
         sync_request = {
             'message':   'aggregated',
@@ -338,10 +331,39 @@ class FwRouterCfg(FwCfgDatabase):
 
         reply = fwglobals.g.router_api.call(sync_request)
 
-        if reply['ok'] == 0 and full_sync:
+        if reply['ok'] == 0:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
-            
-        if full_sync and restart_router:
+
+        if restart_router:
             fwglobals.g.router_api.call({'message': 'start-router'})
 
-        return reply['ok'] == 1
+        fwglobals.log.debug("_sync_device: router full sync succeeded")
+
+        return True
+
+    def sync(self, incoming_requests, full_sync=False):
+        incoming_requests = list(filter(lambda x: x['message'] in fwrouter_api.fwrouter_translators, incoming_requests))   
+
+        # get sync lists
+        sync_list = self.get_sync_list(incoming_requests)
+
+        if len(sync_list) == 0 and not full_sync:
+            fwglobals.log.info("_sync_device: router sync_list is empty, no need to sync")
+            return True
+        
+        fwglobals.log.debug("_sync_device: start router smart sync")
+
+        sync_request = {
+            'message':   'aggregated',
+            'params':    { 'requests': sync_list },
+            'internals': { 'dont_revert_on_failure': True }
+        }
+
+        reply = fwglobals.g.router_api.call(sync_request)
+
+        if reply['ok'] == 1 and not full_sync:
+            fwglobals.log.debug("_sync_device: router smart sync succeeded")
+            return True
+
+
+        return self._full_sync(incoming_requests)

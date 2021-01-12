@@ -276,7 +276,7 @@ def get_all_interfaces():
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         dev_id = get_interface_dev_id(nicname)
-        if dev_id == '':
+        if not dev_id:
             continue
 
         if is_lte_interface(dev_id) and fwglobals.g.router_api.state_is_started():
@@ -1173,7 +1173,7 @@ def reset_device_config_signature(new_signature=None, log=True):
         fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
                             (old_signature, new_signature))
 
-def dumps_config(cfg, sections):
+def dumps_config(cfg, sections, full):
     """Dumps router configuration into printable string.
 
     :param cfg:  list of types of configuration requests to be dumped, e.g. [ 'add-interface' , 'add-tunnel' ]
@@ -1196,7 +1196,7 @@ def dumps_config(cfg, sections):
         }
         if full:
             item.update({'Executed': str(msg['executed'])})
-            item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
+            item.update({'Commands': yaml_dump(msg['cmd_list']).split('\n')})
         out[section_name].append(item)
     if not out:
         return ''

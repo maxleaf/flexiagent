@@ -140,7 +140,7 @@ class FwSystemCfg(FwCfgDatabase):
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
 
-        return fwutils.dumps_config(cfg, sections)
+        return fwutils.dumps_config(cfg, sections, full)
 
     def get_sync_list(self, requests):
         """Intersects requests provided within 'requests' argument against
@@ -217,6 +217,8 @@ class FwSystemCfg(FwCfgDatabase):
     def sync(self, incoming_requests, full_sync=False):
         incoming_requests = list(filter(lambda x: x['message'] in fwsystem_api.fwsystem_translators, incoming_requests))        
 
+        fwglobals.log.debug("_sync_device: start system smart sync")
+        
         # get sync lists
         sync_list = self.get_sync_list(incoming_requests)
 
@@ -225,7 +227,7 @@ class FwSystemCfg(FwCfgDatabase):
             return True
 
         if full_sync:
-            fwglobals.log.debug("_sync_device: start full sync")
+            fwglobals.log.debug("_sync_device: start system full sync")
 
         all_succeeded = True
         for req in sync_list:
