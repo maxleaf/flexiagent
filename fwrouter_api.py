@@ -747,6 +747,25 @@ class FWROUTER_API:
                         return True
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 return True
+            elif re.match('modify-interface', req):
+                # For modification request ensure that it goes to modify indeed:
+                # translate request into commands to execute in order to modify
+                # configuration item in Linux/VPP. If this list is empty,
+                # the request can be stripped out.
+                #
+                cmd_list, whitelist = self._translate_modify(__request)
+                if not cmd_list:
+                    # Save modify request into database, as it might contain parameters
+                    # that don't impact on interface configuration in Linux or in VPP,
+                    # like PublicPort, PublicIP, useStun, etc.
+                    #
+                    # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
+                    # We assume the 'modify-interface' request includes full set of
+                    # parameters and not only modified ones!
+                    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    #
+                    fwglobals.g.router_cfg.update(__request)
+                    return True
             return False
 
         def _exist(__request, requests):
@@ -905,6 +924,25 @@ class FWROUTER_API:
         req     = request['message']
         params  = request.get('params')
         updated = False
+
+        # 'modify-X' preprocessing:
+        #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
+        #     Implement real modification on demand :)
+        #
+        if re.match('modify-interface', req):
+            req     = 'aggregated'
+            params  = { 'requests' : _preprocess_modify_X(request) }
+            request = {'message': req, 'params': params}
+            updated = True
+            # DON'T RETURN HERE !!! FURTHER PREPROCESSING IS NEEDED !!!
+        elif req == 'aggregated':
+            new_requests = []
+            for _request in params['requests']:
+                if re.match('modify-interface', _request['message']):
+                    new_requests += _preprocess_modify_X(_request)
+                else:
+                    new_requests.append(_request)
+            params['requests'] = new_requests
 
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
