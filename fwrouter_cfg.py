@@ -188,7 +188,7 @@ class FwRouterCfg:
                 entry = self.db[req_key]
                 entry.update({'params' : params})
                 self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
-            elif re.match('modify-tunnel', req):
+            elif re.match('modify-', req):
                 entry = self.db[req_key]
                 for key, value in params.items():
                     if isinstance(value, dict):
