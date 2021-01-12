@@ -21,7 +21,7 @@
 ################################################################################
 
 import fwglobals
-from fwrequest_executor import FwRequestExecutor
+from fwrequest_handler import FwRequestHandler
 import traceback
 
 fwsystem_modules = {
@@ -34,7 +34,7 @@ fwsystem_translators = {
     'remove-lte':            {'module':'fwtranslate_revert',     'api':'revert'},    
 }
 
-class FWSYSTEM_API(FwRequestExecutor):
+class FWSYSTEM_API(FwRequestHandler):
     """This is System API class representation.
         These APIs are used to handle system configuration requests regardless of the vpp state.
         e.g to enable lte connection even if the vpp is not running.
@@ -45,7 +45,7 @@ class FWSYSTEM_API(FwRequestExecutor):
     def __init__(self, cfg):
         """Constructor method
         """
-        FwRequestExecutor.__init__(self, fwsystem_modules, fwsystem_translators, cfg, fwglobals.g.system_cfg)
+        FwRequestHandler.__init__(self, fwsystem_modules, fwsystem_translators, cfg, fwglobals.g.system_cfg)
 
     def restore_system_configuration(self):
         """Restore system configuration.

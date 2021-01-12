@@ -40,7 +40,7 @@ from fwapplications import FwApps
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
-from fwrequest_executor import FwRequestExecutor
+from fwrequest_handler import FwRequestHandler
 
 import fwtunnel_stats
 
@@ -80,7 +80,7 @@ class FwRouterState(enum.Enum):
     STOPPED   = 4
     FAILED    = 666
 
-class FWROUTER_API(FwRequestExecutor):
+class FWROUTER_API(FwRequestHandler):
     """This is Router API class representation.
     The Router API class provides control over vpp.
     That includes:
@@ -103,7 +103,7 @@ class FWROUTER_API(FwRequestExecutor):
         self.thread_dhcpc    = None
         self.translators = fwrouter_translators
         
-        FwRequestExecutor.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
+        FwRequestHandler.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
@@ -337,7 +337,7 @@ class FWROUTER_API(FwRequestExecutor):
         # Finally handle the request
         #
 
-        reply = FwRequestExecutor.call(self, request)
+        reply = FwRequestHandler.call(self, request)
 
         # Start vpp if it should be restarted
         #
@@ -420,7 +420,7 @@ class FWROUTER_API(FwRequestExecutor):
                 filter = 'must'
                 execute = True
 
-            FwRequestExecutor._call_simple(self, request, execute, filter)
+            FwRequestHandler._call_simple(self, request, execute, filter)
  
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
@@ -1027,7 +1027,7 @@ class FWROUTER_API(FwRequestExecutor):
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 
-    def _full_sync(self, sync_list):
+    def sync_full(self, incoming_requests):
         fwglobals.log.debug("_sync_device: start router full sync")
 
         restart_router = False
@@ -1036,18 +1036,7 @@ class FWROUTER_API(FwRequestExecutor):
             restart_router = True
             self.call({'message': 'stop-router'})
 
-        fwglobals.g.agent_api._reset_device_soft()
-
-        sync_request = {
-            'message':   'aggregated',
-            'params':    { 'requests': sync_list },
-            'internals': { 'dont_revert_on_failure': True }
-        }
-
-        reply = self.call(sync_request)
-
-        if reply['ok'] == 0:
-            raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
+        reply = FwRequestHandler.sync_full(self, incoming_requests)
 
         if restart_router:
             self.call({'message': 'start-router'})

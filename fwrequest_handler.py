@@ -25,7 +25,7 @@ import fwutils
 import traceback
 import json
 
-class FwRequestExecutor:
+class FwRequestHandler:
     """This is Request Executer class representation.
     The Request-Executer class enables user to execute requests received from flexiManage.
     To do that it provides following steps:
@@ -90,7 +90,7 @@ class FwRequestExecutor:
                 self._revert(cmd_list)
                 raise e
         except Exception as e:
-            err_str = "FwRequestExecutor::_call_simple: %s" % str(traceback.format_exc())
+            err_str = "_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
             raise e
 
@@ -155,13 +155,13 @@ class FwRequestExecutor:
         params = request.get('params')
 
         api_defs = self.translators.get(req)
-        assert api_defs, 'FwRequestExecutor: there is no api for request "%s"' % req
+        assert api_defs, 'there is no api for request "%s"' % req
 
         module = self.modules.get(self.translators[req]['module'])
-        assert module, 'FwRequestExecutor: there is no module for request "%s"' % req
+        assert module, 'there is no module for request "%s"' % req
 
         func = getattr(module, self.translators[req]['api'])
-        assert func, 'FwRequestExecutor: there is no api function for request "%s"' % req
+        assert func, 'there is no api function for request "%s"' % req
 
         if self.translators[req]['api'] == 'revert':
             cmd_list = func(request, self.cfg_db)
@@ -421,6 +421,22 @@ class FwRequestExecutor:
         fwglobals.log.info("====restore configuration: finished===")
         return True
 
+    def sync_full(self, incoming_requests):
+        fwglobals.g.agent_api._reset_device_soft()
+
+        sync_request = {
+            'message':   'aggregated',
+            'params':    { 'requests': incoming_requests },
+            'internals': { 'dont_revert_on_failure': True }
+        }
+
+        reply = self.call(sync_request)
+
+        if reply['ok'] == 0:
+            raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
+
+        return True
+
     def sync(self, incoming_requests, full_sync=False):
         incoming_requests = list(filter(lambda x: x['message'] in self.translators, incoming_requests))   
 
@@ -428,10 +444,10 @@ class FwRequestExecutor:
         sync_list = self.cfg_db.get_sync_list(incoming_requests)
 
         if len(sync_list) == 0 and not full_sync:
-            fwglobals.log.info("_sync_device: router sync_list is empty, no need to sync")
+            fwglobals.log.info("_sync_device: sync_list is empty, no need to sync")
             return True
         
-        fwglobals.log.debug("_sync_device: start router smart sync")
+        fwglobals.log.debug("_sync_device: start smart sync")
 
         sync_request = {
             'message':   'aggregated',
@@ -442,10 +458,8 @@ class FwRequestExecutor:
         reply = self.call(sync_request)
 
         if reply['ok'] == 1 and not full_sync:
-            fwglobals.log.debug("_sync_device: router smart sync succeeded")
+            fwglobals.log.debug("_sync_device: smart sync succeeded")
             return True
 
-        if getattr(self, '_full_sync'):
-            return self._full_sync(incoming_requests)
-
-        return False
+        # Full sync
+        return self.sync_full(incoming_requests)
