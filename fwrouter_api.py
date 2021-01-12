@@ -434,7 +434,7 @@ class FWROUTER_API(FwRequestHandler):
 
         return {'ok':1}
     
-    def _on_revert_failed(self, t, reason):
+    def _on_revert_failed(self, reason):
         self.state_change(FwRouterState.FAILED, "revert failed: %s" % reason)
 
     def _translate_modify(self, request):

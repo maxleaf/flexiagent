@@ -24,6 +24,7 @@ import fwglobals
 import fwutils
 import traceback
 import json
+import re
 
 class FwRequestHandler:
     """This is Request Executer class representation.
@@ -137,7 +138,7 @@ class FwRequestHandler:
                         err_str = "_call_aggregated: failed to revert request %s while running rollback on aggregated request" % op
                         fwglobals.log.excep("%s: %s" % (err_str, format(e)))
                         if self.revert_callback:
-                            self.revert_callback(t, err_str)
+                            self.revert_callback(t)
                         pass
                 raise e
 
@@ -280,7 +281,7 @@ class FwRequestHandler:
                     fwglobals.log.excep(err_str)
 
                     if self.revert_callback:
-                        self.revert_callback(t, err_str)
+                        self.revert_callback(err_str)
 
     # 'substitute' takes parameters in form of list or dictionary and
     # performs substitutions found in params.
