@@ -1106,7 +1106,7 @@ def modify_tunnel(new_params, old_params):
     # Add modify white list
     cmd = {}
     cmd['modify'] = 'modify'
-    cmd['whitelist'] = 'certificate'
+    cmd['whitelist'] = {'certificate'}
     cmd_list.append(cmd)
 
     # Add public certificate file

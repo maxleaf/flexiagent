@@ -171,6 +171,7 @@ class FwRouterCfg:
         :param executed:    The 'executed' flag - True if the configuration
                             request was translated and executed, False if it was
                             translated but was not executed.
+        :param whitelist:   White list of parameters allowed to be modified.
         :returns: None.
         """
         req     = request['message']
@@ -188,13 +189,11 @@ class FwRouterCfg:
                 entry.update({'params' : params})
                 self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
             elif re.match('modify-tunnel', req):
-                modify_field = whitelist
-
                 entry = self.db[req_key]
                 for key, value in params.items():
                     if isinstance(value, dict):
                         for key2, value2 in value.items():
-                            if key2 == modify_field:
+                            if key2 in whitelist:
                                 entry['params'][key][key2] = value2
                 self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
             else:
