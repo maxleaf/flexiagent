@@ -27,8 +27,8 @@ import json
 import re
 
 class FwRequestHandler:
-    """This is Request Executer class representation.
-    The Request-Executer class enables user to execute requests received from flexiManage.
+    """This is Request Handler class representation.
+    The RequestHandler class enables user to execute requests received from flexiManage.
     To do that it provides following steps:
     1. Translates request into list of commands to be executed.
        This stage is called translation.
@@ -38,6 +38,8 @@ class FwRequestHandler:
     3. Updates the persistent database with request result:
        for 'add-X' and 'modify-X' requests stores the request and it's translation into database,
        for 'remove-X' request deletes the stored request and translation from the database.
+    4. Handle aggregated requests
+    4. Implement Sync and full sync logic 
     Note these stages are exposed as module API-s to enable user to override the default behavior.
     """
     

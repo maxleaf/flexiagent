@@ -1076,7 +1076,7 @@ def reset_device_config():
      """
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
         router_cfg.clean()
-    with FwRouterCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
+    with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
         system_cfg.clean()
     if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
         os.remove(fwglobals.g.ROUTER_STATE_FILE)

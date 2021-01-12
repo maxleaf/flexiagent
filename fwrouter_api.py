@@ -100,8 +100,7 @@ class FWROUTER_API(FwRequestHandler):
         self.router_state    = FwRouterState.STOPPED
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
-        self.thread_dhcpc    = None
-        self.translators = fwrouter_translators
+        self.thread_dhcpc    = None        
         
         FwRequestHandler.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
