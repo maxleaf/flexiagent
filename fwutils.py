@@ -2013,13 +2013,39 @@ def ikev2_remote_certificate_filename_get(machine_id):
 def ikev2_gre_bridge_add(src, bridge_id, profile, role):
     fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id, profile, role)
 
-def ikev2_add_public_certificate(device_id, certificate):
-    '''This function saves public certificate as a file.
+def ikev2_add_remove_public_certificate(device_id, certificate, is_add):
+    '''This function saves/removes public certificate file.
+
+    :param device_id:   Remote device id.
+    :param certificate: Certificate string.
+    :param is_add:      Add or remove file.
+    '''
+    public_pem = ikev2_remote_certificate_filename_get(device_id)
+
+    if is_add:
+        counter = fwglobals.g.ikev2tunnels.add_file(public_pem)
+        fwglobals.log.debug("ADD " + str(counter))
+        if counter == 1:
+            if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
+                os.makedirs(fwglobals.g.IKEV2_FOLDER)
+
+            with open(public_pem, 'w') as public_pem_file:
+                for line in certificate:
+                    public_pem_file.write(line)
+    else:
+        counter = fwglobals.g.ikev2tunnels.remove_file(public_pem)
+        fwglobals.log.debug("REMOVE " + str(counter))
+        if counter == 0:
+            os.remove(public_pem)
+
+def ikev2_replace_public_certificate(device_id, certificate):
+    '''This function replaces public certificate file.
 
     :param device_id:   Remote device id.
     :param certificate: Certificate string.
     '''
     public_pem = ikev2_remote_certificate_filename_get(device_id)
+    fwglobals.g.ikev2tunnels.reset_file(public_pem)
 
     if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
         os.makedirs(fwglobals.g.IKEV2_FOLDER)
@@ -2058,7 +2084,7 @@ def ikev2_get_certificate_expiration():
 def ikev2_modify_certificate(device_id, certificate, role, src):
     '''This function modifies public certificate.
     '''
-    ikev2_add_public_certificate(device_id, certificate)
+    ikev2_replace_public_certificate(device_id, certificate)
     profile = fwglobals.g.ikev2tunnels.get_tunnel(src)['profile']
     public_pem = ikev2_remote_certificate_filename_get(device_id)
 

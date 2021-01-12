@@ -584,9 +584,18 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd['cmd']['descr']     = "add IKEv2 public certificate for %s" % remote_device_id
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
-                                'func'  : 'ikev2_add_public_certificate',
-                                'args'  : {'device_id': remote_device_id, 'certificate': certificate}
+                                'func'  : 'ikev2_add_remove_public_certificate',
+                                'args'  : {'is_add': True, 'device_id': remote_device_id, 'certificate': certificate}
                                 }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "remove IKEv2 public certificate for %s" % remote_device_id
+    cmd['revert']['params'] = {
+                                'module': 'fwutils',
+                                'func'  : 'ikev2_add_remove_public_certificate',
+                                'args'  : {'is_add': False, 'device_id': remote_device_id}
+                                }
+
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_add_del (...)

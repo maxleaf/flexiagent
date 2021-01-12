@@ -40,6 +40,7 @@ class FwIKEv2Tunnels:
         """
         self.db_filename = db_file
         self.db = SqliteDict(db_file, 'ikev2tunnels', autocommit=True)
+        self.files = SqliteDict(db_file, 'files', autocommit=True)
 
     def __enter__(self):
         return self
@@ -55,6 +56,7 @@ class FwIKEv2Tunnels:
         """Destructor method
         """
         self.db.close()
+        self.files.close()
 
     def clean(self):
         """Clean DB
@@ -62,6 +64,7 @@ class FwIKEv2Tunnels:
         :returns: None.
         """
         self.db.clear()
+        self.files.clear()
 
     def add_tunnel(self, src, bd_id, profile, role):
         """Stores tunnel into database.
@@ -98,3 +101,35 @@ class FwIKEv2Tunnels:
          """
         return self.db
 
+    def add_file(self, name):
+        """Stores file name into database.
+
+        :returns: Reference counter.
+        """
+        if name in self.files:
+            self.files[name] = self.files[name] + 1
+        else:
+            self.files[name] = 1
+        return self.files[name]
+
+    def remove_file(self, name):
+        """Removes file name from database.
+
+        :returns: Reference counter.
+        """
+        if name not in self.files:
+            return 0
+
+        if self.files[name] > 0:
+            self.files[name] = self.files[name] - 1
+            return self.files[name]
+        else:
+            del self.files[name]
+        return 0
+
+    def reset_file(self, name):
+        """Resets reference counter in database.
+
+        :returns: None.
+        """
+        self.files[name] = 1
