@@ -1107,7 +1107,11 @@ def print_system_config(full=False):
         cfg = system_cfg.dumps(full=full)
         print(cfg)
 
-def print_router_config(basic=True, full=False, multilink=False, signature=False):
+def print_device_config_signature():
+    cfg = get_device_config_signature()
+    print(cfg)
+
+def print_router_config(basic=True, full=False, multilink=False):
     """Print router configuration.
 
      :returns: None.
@@ -1117,8 +1121,6 @@ def print_router_config(basic=True, full=False, multilink=False, signature=False
             cfg = router_cfg.dumps(full=full, escape=['add-application','add-multilink-policy'])
         elif multilink:
             cfg = router_cfg.dumps(full=full, types=['add-application','add-multilink-policy'])
-        elif signature:
-            cfg = get_device_config_signature()
         else:
             cfg = ''
         print(cfg)
@@ -1151,7 +1153,6 @@ def update_device_config_signature(request):
 def get_device_config_signature():
     if not 'signature' in fwglobals.g.db:
         reset_device_config_signature()
-
     return fwglobals.g.db['signature']
 
 def reset_device_config_signature(new_signature=None, log=True):

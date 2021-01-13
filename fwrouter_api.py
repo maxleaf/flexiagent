@@ -40,7 +40,7 @@ from fwapplications import FwApps
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
-from fwrequest_handler import FwRequestHandler
+from fwcfg_request_handler import FwCfgRequestHandler
 
 import fwtunnel_stats
 
@@ -80,7 +80,7 @@ class FwRouterState(enum.Enum):
     STOPPED   = 4
     FAILED    = 666
 
-class FWROUTER_API(FwRequestHandler):
+class FWROUTER_API(FwCfgRequestHandler):
     """This is Router API class representation.
     The Router API class provides control over vpp.
     That includes:
@@ -102,7 +102,7 @@ class FWROUTER_API(FwRequestHandler):
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None        
         
-        FwRequestHandler.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
+        FwCfgRequestHandler.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
@@ -159,7 +159,7 @@ class FWROUTER_API(FwRequestHandler):
 
             try:  # Ensure thread doesn't exit on exception
                 apply_netplan = False
-                wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+                wan_list = self.cfg_db.get_interfaces(type='wan')
 
                 for wan in wan_list:
                     dhcp = wan.get('dhcp', 'no')
@@ -199,7 +199,7 @@ class FWROUTER_API(FwRequestHandler):
 
         # If vpp runs already, or if management didn't request to start it, return.
         vpp_runs = fwutils.vpp_does_run()
-        vpp_should_be_started = fwglobals.g.router_cfg.request_exists({'message': 'start-router'})
+        vpp_should_be_started = self.cfg_db.exists({'message': 'start-router'})
         if vpp_runs or not vpp_should_be_started:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
@@ -336,7 +336,7 @@ class FWROUTER_API(FwRequestHandler):
         # Finally handle the request
         #
 
-        reply = FwRequestHandler.call(self, request)
+        reply = FwCfgRequestHandler.call(self, request)
 
         # Start vpp if it should be restarted
         #
@@ -383,7 +383,7 @@ class FWROUTER_API(FwRequestHandler):
         to be used by tunnel statistics thread.
         """
         fwtunnel_stats.tunnel_stats_clear()
-        tunnels = fwglobals.g.router_cfg.get_tunnels()
+        tunnels = self.cfg_db.get_tunnels()
         for params in tunnels:
             id   = params['tunnel-id']
             addr = params['loopback-iface']['addr']
@@ -408,7 +408,7 @@ class FWROUTER_API(FwRequestHandler):
             #
             if router_was_started == False and \
                (req == 'add-application' or req == 'add-multilink-policy'):
-               self.update_db(request)
+               self.cfg_db.update(request)
                return {'ok':1}
 
             execute = False
@@ -419,7 +419,7 @@ class FWROUTER_API(FwRequestHandler):
                 filter = 'must'
                 execute = True
 
-            FwRequestHandler._call_simple(self, request, execute, filter)
+            FwCfgRequestHandler._call_simple(self, request, execute, filter)
  
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
@@ -445,7 +445,7 @@ class FWROUTER_API(FwRequestHandler):
         """
         req         = request['message']
         params      = request.get('params')
-        old_params  = fwglobals.g.router_cfg.get_request_params(request)
+        old_params  = self.cfg_db.get_request_params(request)
 
         # First of all check if the received parameters differs from the existing ones
         same = fwutils.compare_request_params(params, old_params)
@@ -478,7 +478,7 @@ class FWROUTER_API(FwRequestHandler):
         def _should_be_stripped(__request, aggregated_requests=None):
             req    = __request['message']
             params = __request.get('params', {})
-            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.request_exists(__request):
+            if re.match('(modify-|remove-)', req) and not self.cfg_db.exists(__request):
                 # Ensure that the aggregated request does not include correspondent 'add-X' before.
                 noop = True
                 if aggregated_requests:
@@ -488,9 +488,9 @@ class FWROUTER_API(FwRequestHandler):
                         noop = False
                 if noop:
                     return True
-            elif re.match('add-', req) and fwglobals.g.router_cfg.request_exists(__request):
+            elif re.match('add-', req) and self.cfg_db.exists(__request):
                 # Ensure this is actually not modification request :)
-                existing_params = fwglobals.g.router_cfg.get_request_params(__request)
+                existing_params = self.cfg_db.get_request_params(__request)
                 if fwutils.compare_request_params(existing_params, __request.get('params')):
                     # Ensure that the aggregated request does not include correspondent 'remove-X' before.
                     noop = True
@@ -520,7 +520,7 @@ class FWROUTER_API(FwRequestHandler):
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
-                    fwglobals.g.router_cfg.update(__request)
+                    self.cfg_db.update(__request)
                     return True
             return False
 
@@ -530,7 +530,7 @@ class FWROUTER_API(FwRequestHandler):
             """
             for r in requests:
                 if (__request['message'] == r['message'] and
-                    fwglobals.g.router_cfg.is_same_cfg_item(__request, r)):
+                    self.cfg_db.is_same_cfg_item(__request, r)):
                     return True
             return False
 
@@ -591,7 +591,7 @@ class FWROUTER_API(FwRequestHandler):
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
-            old_params = fwglobals.g.router_cfg.get_interfaces(dev_id=new_params['dev_id'])[0]
+            old_params = self.cfg_db.get_interfaces(dev_id=new_params['dev_id'])[0]
             if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
                 return True
             if new_params.get('gateway') != old_params.get('gateway'):
@@ -661,7 +661,7 @@ class FWROUTER_API(FwRequestHandler):
             _req    = request['message']
             _params = request['params']
             remove_req = _req.replace("modify-", "remove-")
-            old_params = fwglobals.g.router_cfg.get_request_params(request)
+            old_params = self.cfg_db.get_request_params(request)
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
             new_params.update(_params.items())
@@ -712,7 +712,7 @@ class FWROUTER_API(FwRequestHandler):
         if req == 'aggregated':
             for _request in params['requests']:
                 if re.match('remove-', _request['message']):
-                    _request['params'] = fwglobals.g.router_cfg.get_request_params(_request)
+                    _request['params'] = self.cfg_db.get_request_params(_request)
 
         ########################################################################
         # The code below preprocesses 'add-application' and 'add-multilink-policy'
@@ -727,7 +727,7 @@ class FWROUTER_API(FwRequestHandler):
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
             return request
 
-        multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
+        multilink_policy_params = self.cfg_db.get_multilink_policy()
 
         # 'add-application' preprocessing:
         # 1. The currently configured applications should be removed firstly.
@@ -737,7 +737,7 @@ class FWROUTER_API(FwRequestHandler):
         #    should be removed before application removal/adding and should be
         #    added again after it.
         #
-        application_params = fwglobals.g.router_cfg.get_applications()
+        application_params = self.cfg_db.get_applications()
         if application_params:
             if req == 'add-application':
                 updated_requests = [
@@ -1020,7 +1020,7 @@ class FWROUTER_API(FwRequestHandler):
             'add-route',            # Routes should come after tunnels, as they might use them!
             'add-dhcp-config'
         ]
-        messages = fwglobals.g.router_cfg.dump(types=types)
+        messages = self.cfg_db.dump(types=types)
         for msg in messages:
             reply = fwglobals.g.router_api._call_simple(msg)
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
@@ -1035,11 +1035,9 @@ class FWROUTER_API(FwRequestHandler):
             restart_router = True
             self.call({'message': 'stop-router'})
 
-        reply = FwRequestHandler.sync_full(self, incoming_requests)
+        FwCfgRequestHandler.sync_full(self, incoming_requests)
 
         if restart_router:
             self.call({'message': 'start-router'})
 
         fwglobals.log.debug("_sync_device: router full sync succeeded")
-
-        return True

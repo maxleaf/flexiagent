@@ -26,7 +26,7 @@ import traceback
 import json
 import re
 
-class FwRequestHandler:
+class FwCfgRequestHandler:
     """This is Request Handler class representation.
     The RequestHandler class enables user to execute requests received from flexiManage.
     To do that it provides following steps:
@@ -34,20 +34,23 @@ class FwRequestHandler:
        This stage is called translation.
     2. Executes commands out of the translation list one by one.
        This stage is called execution.
-       On failure to execute any of commands, the previously executed commands are reverted in order to rollback system to the state where it was before request receiving.
+       On failure to execute any of commands, the previously executed commands are reverted 
+       in order to rollback system to the state where it was before request receiving.
     3. Updates the persistent database with request result:
        for 'add-X' and 'modify-X' requests stores the request and it's translation into database,
        for 'remove-X' request deletes the stored request and translation from the database.
-    4. Handle aggregated requests
-    4. Implement Sync and full sync logic 
     Note these stages are exposed as module API-s to enable user to override the default behavior.
+
+    In addition the Request Handler provides following functionality:
+    1. Handle aggregated requests
+    2. Implement Sync and full sync logic 
     """
     
-    def __init__(self, modules, translators, cfg_db, revert_callback = None):
+    def __init__(self, translate_modules, translate_funcs, cfg_db, revert_callback = None):
         """Constructor method.
         """
-        self.modules = modules
-        self.translators = translators
+        self.translate_modules = translate_modules
+        self.translate_funcs = translate_funcs
         self.cfg_db = cfg_db
         self.revert_callback = revert_callback
 
@@ -157,16 +160,16 @@ class FwRequestHandler:
         req    = request['message']
         params = request.get('params')
 
-        api_defs = self.translators.get(req)
+        api_defs = self.translate_funcs.get(req)
         assert api_defs, 'there is no api for request "%s"' % req
 
-        module = self.modules.get(self.translators[req]['module'])
+        module = self.translate_modules.get(self.translate_funcs[req]['module'])
         assert module, 'there is no module for request "%s"' % req
 
-        func = getattr(module, self.translators[req]['api'])
+        func = getattr(module, self.translate_funcs[req]['api'])
         assert func, 'there is no api function for request "%s"' % req
 
-        if self.translators[req]['api'] == 'revert':
+        if self.translate_funcs[req]['api'] == 'revert':
             cmd_list = func(request, self.cfg_db)
             return cmd_list
 
@@ -416,13 +419,10 @@ class FwRequestHandler:
             if requests:
                 for req in requests:
                     reply = fwglobals.g.handle_request(req)
-                
-            return True
         except Exception as e:
             fwglobals.log.excep("restore_configuration failed: %s" % str(e))
 
         fwglobals.log.info("====restore configuration: finished===")
-        return True
 
     def sync_full(self, incoming_requests):
         fwglobals.g.agent_api._reset_device_soft()
@@ -438,12 +438,9 @@ class FwRequestHandler:
         if reply['ok'] == 0:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
 
-        return True
-
     def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in self.translators, incoming_requests))   
+        incoming_requests = list(filter(lambda x: x['message'] in self.translate_funcs, incoming_requests))   
 
-        # get sync lists
         sync_list = self.cfg_db.get_sync_list(incoming_requests)
 
         if len(sync_list) == 0 and not full_sync:

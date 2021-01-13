@@ -703,7 +703,7 @@ def start(start_router):
     daemon_rpc('start', start_vpp=start_router) # if daemon runs, start connection loop and router if required
     fwglobals.log.info("done")
 
-def show(agent_info, router_info, daemon_info):
+def show(agent_info, router_info, device_info, system_info, daemon_info):
     """Handles 'fwagent show' command.
     This commands prints various information about device and it's components,
     like router configuration, software version, etc.
@@ -727,10 +727,18 @@ def show(agent_info, router_info, daemon_info):
             fwutils.print_router_config()
         elif router_info == 'cfg-db':
             fwutils.print_router_config(full=True)
-        elif router_info == 'cfg-signature':
-            fwutils.print_router_config(basic=False, signature=True)
         elif router_info == 'multilink-policy':
             fwutils.print_router_config(basic=False, multilink=True)
+
+    if device_info:
+        if device_info == 'cfg-signature':
+            fwutils.print_device_config_signature()
+
+    if system_info:
+        if system_info == 'configuration':
+            fwutils.print_system_config()
+        elif system_info == 'cfg-db':
+            fwutils.print_system_config(full=True)
 
     if daemon_info:
         if daemon_info == 'status':
@@ -897,8 +905,6 @@ class FwagentDaemon(object):
             return fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)['components']['agent']['version']
         if what == 'cache':
             return json.dumps(fwglobals.g.cache.db, indent=2, sort_keys=True, default=lambda x: x.__dict__)
-        if what == 'system-configuration':
-            fwutils.print_system_config()
         if what == 'threads':
             thread_list = []
             for thd in threading.enumerate():
@@ -1112,6 +1118,8 @@ if __name__ == '__main__':
                     'show': lambda args: show(
                         agent_info=args.agent,
                         router_info=args.router,
+                        device_info=args.device,
+                        system_info=args.system,
                         daemon_info=args.daemon),
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
@@ -1150,12 +1158,16 @@ if __name__ == '__main__':
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg-db', 'cfg-signature', 'multilink-policy'],
+    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg-db', 'multilink-policy'],
                         help="show various router parameters")
-    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads', 'system-configuration'],
+    parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
     parser_show.add_argument('--daemon', choices=['status'],
                         help="show various daemon parameters")
+    parser_show.add_argument('--device', choices=['cfg-signature'],
+                        help="show various device parameters")
+    parser_show.add_argument('--system', choices=['configuration', 'cfg-db'],
+                        help="show various system parameters")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read flexiManage requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")

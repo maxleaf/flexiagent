@@ -33,21 +33,18 @@ import fwsystem_api
 import fwrouter_api
 
 fwagent_api = {
-    'get-device-info':                  '_get_device_info',
-    'get-device-stats':                 '_get_device_stats',
-    'get-device-logs':                  '_get_device_logs',
-    'get-device-packet-traces':         '_get_device_packet_traces',
-    'get-device-os-routes':             '_get_device_os_routes',
-    'get-device-config':                '_get_device_config',
-    'upgrade-device-sw':                '_upgrade_device_sw',
-    'reset-device':                     '_reset_device_soft',
-    'sync-device':                      '_sync_device',
-    # WiFi jobs
-    'wifi-perform-operation':           '_wifi_perform_operation',
-    'get-wifi-interface-info':          '_get_wifi_interface_info',
-    # LTE jobs
-    'get-lte-interface-info':           '_get_lte_interface_info',
-    'reset-lte':                        '_reset_lte',
+    'get-device-info':               '_get_device_info',
+    'get-device-stats':              '_get_device_stats',
+    'get-device-logs':               '_get_device_logs',
+    'get-device-packet-traces':      '_get_device_packet_traces',
+    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-config':             '_get_device_config',
+    'upgrade-device-sw':             '_upgrade_device_sw',
+    'reset-device':                  '_reset_device_soft',
+    'sync-device':                   '_sync_device',
+    'get-wifi-info':                 '_get_wifi_info',
+    'get-lte-info':                  '_get_lte_info',
+    'reset-lte':                     '_reset_lte',
 }
 
 class FWAGENT_API:
@@ -231,10 +228,10 @@ class FWAGENT_API:
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwutils.dump_router_config()
-        system_configs = fwutils.dump_system_config()
-        configs += system_configs
-        reply = {'ok': 1, 'message': configs if configs else []}
+        router_config = fwutils.dump_router_config()
+        system_config = fwutils.dump_system_config()
+        config = router_config + system_config
+        reply = {'ok': 1, 'message': config if config else []}
         return reply
 
     def _reset_device_soft(self, params=None):
@@ -271,16 +268,13 @@ class FWAGENT_API:
 
         # all_succeeded = True
         for module_name, module in fwglobals.modules.items():
-            if module.get('sync', False):
-                # get api module. e.g router_api, system_api      
+            if module.get('sync', False) == True:
+                # get api module. e.g router_api, system_api    
                 api_module = getattr(fwglobals.g, module.get('object'))
-
-                # run sync method
                 api_module.sync(params['requests'], full_sync_enforced)
 
-
         # At this point the sync succeeded. 
-        # In case of failure - error is throwed
+        # In case of failure - exception is raised by sync()
         fwutils.reset_device_config_signature()
         fwglobals.log.info("_sync_device FINISHED")
         return {'ok': 1}
@@ -329,7 +323,7 @@ class FWAGENT_API:
         except Exception as e:
             raise Exception("_wifi_stop_ap: failed to stop wifi access point: %s" % str(e))
 
-    def _get_wifi_interface_info(self, params):
+    def _get_wifi_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
             ap_status = fwutils.pid_of('hostapd')
@@ -343,9 +337,9 @@ class FWAGENT_API:
 
             return {'message': response, 'ok': 1}
         except Exception as e:
-            raise Exception("_get_wifi_interface_info: %s" % str(e))
+            raise Exception("_get_wifi_info: %s" % str(e))
 
-    def _get_lte_interface_info(self, params):
+    def _get_lte_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
@@ -378,7 +372,7 @@ class FWAGENT_API:
 
             return {'message': response, 'ok': 1}
         except Exception as e:
-            raise Exception("_get_lte_interface_info: %s" % str(e))
+            raise Exception("_get_lte_info: %s" % str(e))
 
     def _reset_lte(self, params):
         """Reset LTE modem card.

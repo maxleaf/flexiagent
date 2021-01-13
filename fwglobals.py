@@ -75,9 +75,8 @@ request_handlers = {
     'upgrade-device-sw':                 {'name': '_call_agent_api'},
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
-    'wifi-perform-operation':            {'name': '_call_agent_api'},
-    'get-wifi-interface-info':           {'name': '_call_agent_api'},
-    'get-lte-interface-info':            {'name': '_call_agent_api'},    
+    'get-wifi-info':                     {'name': '_call_agent_api'},
+    'get-lte-info':                      {'name': '_call_agent_api'},    
     'reset-lte':                         {'name': '_call_agent_api'},
 
     # Router API
@@ -326,7 +325,7 @@ class Fwglobals:
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
         self.system_cfg   = FwSystemCfg(self.SYSTEM_CFG_FILE)
         self.agent_api    = FWAGENT_API()
-        self.system_api    = FWSYSTEM_API(self.system_cfg)
+        self.system_api   = FWSYSTEM_API(self.system_cfg)
         self.router_api   = FWROUTER_API(self.router_cfg, self.MULTILINK_DB_FILE)
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
@@ -334,7 +333,7 @@ class Fwglobals:
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
-        self.system_api.restore_system_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
+        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
         self.router_api.restore_vpp_if_needed()
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
