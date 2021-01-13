@@ -24,14 +24,9 @@ import fwglobals
 from fwcfg_request_handler import FwCfgRequestHandler
 import traceback
 
-fwsystem_modules = {
-    'fwtranslate_revert':       __import__('fwtranslate_revert') ,
-    'fwtranslate_add_lte':      __import__('fwtranslate_add_lte'),
-}
-
 fwsystem_translators = {
-    'add-lte':               {'module':'fwtranslate_add_lte',    'api':'add_lte'},
-    'remove-lte':            {'module':'fwtranslate_revert',     'api':'revert'},    
+    'add-lte':               {'module': __import__('fwtranslate_add_lte'),    'api':'add_lte'},
+    'remove-lte':            {'module': __import__('fwtranslate_revert'),    'api':'revert'},
 }
 
 class FWSYSTEM_API(FwCfgRequestHandler):
@@ -45,4 +40,4 @@ class FWSYSTEM_API(FwCfgRequestHandler):
     def __init__(self, cfg):
         """Constructor method
         """
-        FwCfgRequestHandler.__init__(self, fwsystem_modules, fwsystem_translators, cfg, fwglobals.g.system_cfg)
+        FwCfgRequestHandler.__init__(self, fwsystem_translators, cfg, fwglobals.g.system_cfg)

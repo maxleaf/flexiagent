@@ -38,33 +38,13 @@ class FwRouterCfg(FwCfgDatabase):
     :param db_file: SQLite DB file name.
     """
 
-    def _get_request_key(self, request):
-        """Generates uniq key for request out of request name and
-        request parameters. To do that uses the get_request_key() function
-        that MUST be defined in the correspondent translator file,
-        e.g. fwtranslate_add_tunnel.py.
-
-        !IMPORTANT!  keep this function internal! No one should be aware of
-                     database implementation. If you feel need to expose this
-                     function, please consider to add API to this class
-                     that encapsulates the needed functionality!
-        """
-        req     = request['message']
-        params  = request.get('params')
-
-        # add-/remove-/modify-X requests use key function defined for 'add-X'.
-        # start-router & stop-router break add-/remove-/modify- convention.
-        if req=='start-router' or req=='stop-router':
-            src_req = 'start-router'
-        else:
-            src_req = re.sub(r'^\w+', 'add', req)
-        key_module  = fwrouter_api.fwrouter_modules.get(fwrouter_api.fwrouter_translators[src_req]['module'])
-        key_func    = getattr(key_module, 'get_request_key')
-        return key_func(params)
-
     def update(self, request, cmd_list=None, executed=False):
-        req     = request['message']
+        # The `start-router` does not conform `add-X`, `remove-X`, `modify-X` format
+        # handled by the superclass update(), so we handle it here.
+        # All the rest are handled by FwCfgDatabase.update().
+        #
 
+        req     = request['message']
         try:
             if re.match('start-router', req):
                 params  = request.get('params')
@@ -124,7 +104,7 @@ class FwRouterCfg(FwCfgDatabase):
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-        return fwutils.dumps_config(cfg, sections, full)
+        return FwCfgDatabase.dumps(cfg, sections, full)
 
     def get_interfaces(self, type=None, dev_id=None, ip=None):
         interfaces = self.get_requests('add-interface')

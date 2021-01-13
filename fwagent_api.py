@@ -266,14 +266,13 @@ class FWAGENT_API:
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        # all_succeeded = True
         for module_name, module in fwglobals.modules.items():
             if module.get('sync', False) == True:
-                # get api module. e.g router_api, system_api    
+                # get api module. e.g router_api, system_api
                 api_module = getattr(fwglobals.g, module.get('object'))
                 api_module.sync(params['requests'], full_sync_enforced)
 
-        # At this point the sync succeeded. 
+        # At this point the sync succeeded.
         # In case of failure - exception is raised by sync()
         fwutils.reset_device_config_signature()
         fwglobals.log.info("_sync_device FINISHED")
@@ -340,43 +339,41 @@ class FWAGENT_API:
             raise Exception("_get_wifi_info: %s" % str(e))
 
     def _get_lte_info(self, params):
-        try:
-            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+        interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
-            sim_status = fwutils.lte_sim_status(params['dev_id'])
-            signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
-            hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
-            connection_state = fwutils.lte_get_connection_state(params['dev_id'])
-            packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
-            system_info = fwutils.lte_get_system_info(params['dev_id'])
-            default_apn = fwutils.lte_get_default_apn(params['dev_id'])
+        sim_status = fwutils.lte_sim_status(params['dev_id'])
+        signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
+        hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
+        connection_state = fwutils.lte_get_connection_state(params['dev_id'])
+        packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
+        system_info = fwutils.lte_get_system_info(params['dev_id'])
+        default_apn = fwutils.lte_get_default_apn(params['dev_id'])
 
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if fwutils.vpp_does_run() and is_assigned:
-                interface_name = fwutils.dev_id_to_tap(params['dev_id'])
+        is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+        if fwutils.vpp_does_run() and is_assigned:
+            interface_name = fwutils.dev_id_to_tap(params['dev_id'])
 
-            addr = fwutils.get_interface_address(interface_name)
-            connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+        addr = fwutils.get_interface_address(interface_name)
+        connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
-            response = {
-                'address'             : addr,
-                'signals'             : signals,
-                'connection_state'    : connection_state,
-                'connectivity'        : connectivity,
-                'packet_service_state': packet_service_state,
-                'hardware_info'       : hardware_info,
-                'system_info'         : system_info,
-                'sim_status'          : sim_status,
-                'default_apn'         : default_apn
-            }
+        response = {
+            'address'             : addr,
+            'signals'             : signals,
+            'connection_state'    : connection_state,
+            'connectivity'        : connectivity,
+            'packet_service_state': packet_service_state,
+            'hardware_info'       : hardware_info,
+            'system_info'         : system_info,
+            'sim_status'          : sim_status,
+            'default_apn'         : default_apn
+        }
 
-            return {'message': response, 'ok': 1}
-        except Exception as e:
-            raise Exception("_get_lte_info: %s" % str(e))
+        return {'message': response, 'ok': 1}
+
 
     def _reset_lte(self, params):
         """Reset LTE modem card.
-        
+
         :param params: Parameters to use.
 
         :returns: Dictionary status code.

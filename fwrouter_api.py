@@ -44,33 +44,23 @@ from fwcfg_request_handler import FwCfgRequestHandler
 
 import fwtunnel_stats
 
-fwrouter_modules = {
-    'fwtranslate_revert':          __import__('fwtranslate_revert') ,
-    'fwtranslate_start_router':    __import__('fwtranslate_start_router'),
-    'fwtranslate_add_interface':   __import__('fwtranslate_add_interface'),
-    'fwtranslate_add_route':       __import__('fwtranslate_add_route'),
-    'fwtranslate_add_tunnel':      __import__('fwtranslate_add_tunnel'),
-    'fwtranslate_add_dhcp_config': __import__('fwtranslate_add_dhcp_config'),
-    'fwtranslate_add_app':         __import__('fwtranslate_add_app'),
-    'fwtranslate_add_policy':      __import__('fwtranslate_add_policy')
-}
 
 fwrouter_translators = {
-    'start-router':             {'module':'fwtranslate_start_router',    'api':'start_router'},
-    'stop-router':              {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-interface':            {'module':'fwtranslate_add_interface',   'api':'add_interface'},
-    'remove-interface':         {'module':'fwtranslate_revert',          'api':'revert'},
-    'modify-interface':         {'module':'fwtranslate_add_interface',   'api':'modify_interface'},
-    'add-route':                {'module':'fwtranslate_add_route',       'api':'add_route'},
-    'remove-route':             {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-tunnel':               {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel'},
-    'remove-tunnel':            {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-dhcp-config':          {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config'},
-    'remove-dhcp-config':       {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-application':          {'module':'fwtranslate_add_app',         'api':'add_app'},
-    'remove-application':       {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-multilink-policy':     {'module':'fwtranslate_add_policy',      'api':'add_policy'},
-    'remove-multilink-policy':  {'module':'fwtranslate_revert',          'api':'revert'},
+    'start-router':             {'module': __import__('fwtranslate_start_router'),    'api':'start_router'},
+    'stop-router':              {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-interface':            {'module': __import__('fwtranslate_add_interface'),   'api':'add_interface'},
+    'remove-interface':         {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'modify-interface':         {'module': __import__('fwtranslate_add_interface'),   'api':'modify_interface'},
+    'add-route':                {'module': __import__('fwtranslate_add_route'),       'api':'add_route'},
+    'remove-route':             {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-tunnel':               {'module': __import__('fwtranslate_add_tunnel'),      'api':'add_tunnel'},
+    'remove-tunnel':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-dhcp-config':          {'module': __import__('fwtranslate_add_dhcp_config'), 'api':'add_dhcp_config'},
+    'remove-dhcp-config':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-application':          {'module': __import__('fwtranslate_add_app'),         'api':'add_app'},
+    'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
+    'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -100,9 +90,9 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.router_state    = FwRouterState.STOPPED
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
-        self.thread_dhcpc    = None        
-        
-        FwCfgRequestHandler.__init__(self, fwrouter_modules, fwrouter_translators, cfg, self._on_revert_failed)
+        self.thread_dhcpc    = None
+
+        FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
@@ -289,7 +279,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: dictionary with status code and optional error message.
         """
         dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
 
@@ -394,7 +384,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: dictionary with status code and optional error message.
         """
         try:
             req = request['message']
@@ -420,7 +410,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 execute = True
 
             FwCfgRequestHandler._call_simple(self, request, execute, filter)
- 
+
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
 
@@ -432,7 +422,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             raise e
 
         return {'ok':1}
-    
+
     def _on_revert_failed(self, reason):
         self.state_change(FwRouterState.FAILED, "revert failed: %s" % reason)
 
@@ -457,8 +447,8 @@ class FWROUTER_API(FwCfgRequestHandler):
             # This 'modify-X' is not supported (yet?)
             return []
 
-        module = fwrouter_modules.get(fwrouter_translators[req]['module'])
-        assert module, 'FWROUTER_API: there is no module for request "%s"' % req
+        module = api_defs.get('module')
+        assert module, 'there is no module for request "%s"' % req
 
         func = getattr(module, fwrouter_translators[req]['api'])
         assert func, 'FWROUTER_API: there is no api function for request "%s"' % req

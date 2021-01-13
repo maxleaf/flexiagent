@@ -34,29 +34,14 @@ import fwutils
 
 class FwSystemCfg(FwCfgDatabase):
     """This is requests DB class representation.
-    
+
     :param db_file: SQLite DB file name.
     """
 
-    def _get_request_key(self, request):
-        """Generates uniq key for request out of request name and
-        request parameters. To do that uses the get_request_key() function
-        that MUST be defined in the correspondent translator file,
-        """
-        req     = request['message']
-        params  = request.get('params')
-
-        # add-/remove-/modify-X requests use key function defined for 'add-X'.
-        src_req = re.sub(r'^\w+', 'add', req)
-        
-        key_module  = fwsystem_api.fwsystem_modules.get(fwsystem_api.fwsystem_translators[src_req]['module'])
-        key_func    = getattr(key_module, 'get_request_key')
-        return key_func(params)
-        
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps system configuration into list of requests.
         """
-        
+
         if not types:
             types = [
                 'add-lte',
@@ -78,5 +63,4 @@ class FwSystemCfg(FwCfgDatabase):
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-
-        return fwutils.dumps_config(cfg, sections, full)
+        return FwCfgDatabase.dumps(cfg, sections, full)

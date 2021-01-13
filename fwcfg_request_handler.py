@@ -34,7 +34,7 @@ class FwCfgRequestHandler:
        This stage is called translation.
     2. Executes commands out of the translation list one by one.
        This stage is called execution.
-       On failure to execute any of commands, the previously executed commands are reverted 
+       On failure to execute any of commands, the previously executed commands are reverted
        in order to rollback system to the state where it was before request receiving.
     3. Updates the persistent database with request result:
        for 'add-X' and 'modify-X' requests stores the request and it's translation into database,
@@ -43,16 +43,17 @@ class FwCfgRequestHandler:
 
     In addition the Request Handler provides following functionality:
     1. Handle aggregated requests
-    2. Implement Sync and full sync logic 
+    2. Implement Sync and full sync logic
     """
-    
-    def __init__(self, translate_modules, translate_funcs, cfg_db, revert_callback = None):
+
+    def __init__(self, translate_funcs, cfg_db, revert_callback = None):
         """Constructor method.
         """
-        self.translate_modules = translate_modules
         self.translate_funcs = translate_funcs
         self.cfg_db = cfg_db
         self.revert_callback = revert_callback
+
+        self.cfg_db.set_translators(translate_funcs)
 
     def __enter__(self):
         return self
@@ -62,7 +63,6 @@ class FwCfgRequestHandler:
             reply = self._call_aggregated(request['params']['requests'])
         else:
             reply = self._call_simple(request)
-
         return reply
 
     def _call_simple(self, request, execute=True, filter=None):
@@ -70,7 +70,7 @@ class FwCfgRequestHandler:
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: dictionary with status code and optional error message.
         """
         try:
             # Translate request to list of commands to be executed
@@ -91,7 +91,7 @@ class FwCfgRequestHandler:
             # needed to restore VPP configuration on device reboot or start of
             # crashed VPP by watchdog.
             try:
-                self.update_db(request, cmd_list, execute)
+                self.cfg_db.update(request, cmd_list, execute)
             except Exception as e:
                 self._revert(cmd_list)
                 raise e
@@ -114,7 +114,7 @@ class FwCfgRequestHandler:
                             where there is no need to restore configuration,
                             as it is out of sync with the flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: dictionary with status code and optional error message.
         """
         fwglobals.log.debug("=== start handling aggregated request ===")
 
@@ -163,10 +163,10 @@ class FwCfgRequestHandler:
         api_defs = self.translate_funcs.get(req)
         assert api_defs, 'there is no api for request "%s"' % req
 
-        module = self.translate_modules.get(self.translate_funcs[req]['module'])
+        module = api_defs.get('module')
         assert module, 'there is no module for request "%s"' % req
 
-        func = getattr(module, self.translate_funcs[req]['api'])
+        func = getattr(self.translate_funcs[req]['module'], self.translate_funcs[req]['api'])
         assert func, 'there is no api function for request "%s"' % req
 
         if self.translate_funcs[req]['api'] == 'revert':
@@ -248,16 +248,6 @@ class FwCfgRequestHandler:
                     raise e
 
         fwglobals.log.debug("=== end execution of %s ===" % (req))
-
-    def update_db(self, request, cmd_list=None, executed=False):  
-        """Update translation stuff into the database
-
-        :param request:     The request received from flexiManage.
-        :param cmd_list:    Commands list.
-        :param executed:    Indicates if cmd_list is executed.
-        :returns: None.
-        """      
-        self.cfg_db.update(request, cmd_list, executed)
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
         """Revert list commands that are previous to the failed command with
@@ -439,17 +429,17 @@ class FwCfgRequestHandler:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
 
     def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in self.translate_funcs, incoming_requests))   
+        incoming_requests = list(filter(lambda x: x['message'] in self.translate_funcs, incoming_requests))
 
         if len(incoming_requests) == 0:
             return True
-            
+
         sync_list = self.cfg_db.get_sync_list(incoming_requests)
 
         if len(sync_list) == 0 and not full_sync:
             fwglobals.log.info("_sync_device: sync_list is empty, no need to sync")
             return True
-        
+
         fwglobals.log.debug("_sync_device: start smart sync")
 
         sync_request = {

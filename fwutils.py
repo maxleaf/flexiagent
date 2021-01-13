@@ -1174,35 +1174,6 @@ def reset_device_config_signature(new_signature=None, log=True):
         fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
                             (old_signature, new_signature))
 
-def dumps_config(cfg, sections, full):
-    """Dumps router configuration into printable string.
-
-    :param cfg:  list of types of configuration requests to be dumped, e.g. [ 'add-interface' , 'add-tunnel' ]
-    :param sections: list of sections to group request with same types. e.g. interfaces, tunnels 
-    """
-    out = {}
-    prev_msg = { 'message': 'undefined' }
-
-    for msg in cfg:
-        # Add new section
-        if msg['message'] != prev_msg['message']:
-            prev_msg['message'] = msg['message']
-            section_name = sections[msg['message']]
-            out[section_name] = []
-
-        # Add configuration item to section
-        item = {
-            'Key':    msg['key'],
-            'Params': msg['params']
-        }
-        if full:
-            item.update({'Executed': str(msg['executed'])})
-            item.update({'Commands': yaml_dump(msg['cmd_list']).split('\n')})
-        out[section_name].append(item)
-    if not out:
-        return ''
-    return json.dumps(out, indent=2, sort_keys=True)
-
 def dump_router_config(full=False):
     """Dumps router configuration into list of requests that look exactly
     as they would look if were received from server.

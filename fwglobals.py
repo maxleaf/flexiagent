@@ -49,11 +49,11 @@ from fwwan_monitor import FwWanMonitor
 # sync flag indicated if module implement sync logic. 
 # IMPORTANT! Please keep the list order. It indicates the sync priorities
 modules = {
-    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' },
-    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },
-    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' },
-    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' },
-    'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' },
+    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' }, # fwglobals.g.system_api
+    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },  # fwglobals.g.agent_api
+    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' }, # fwglobals.g.apps
+    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' }, # fwglobals.g.router_api
+    'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' }, # fwglobals.g.os_api
 }
 
 request_handlers = {
@@ -77,7 +77,7 @@ request_handlers = {
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
     'get-wifi-info':                     {'name': '_call_agent_api'},
-    'get-lte-info':                      {'name': '_call_agent_api'},    
+    'get-lte-info':                      {'name': '_call_agent_api'},
     'reset-lte':                         {'name': '_call_agent_api'},
 
     # Router API
@@ -97,7 +97,7 @@ request_handlers = {
     'remove-application':           {'name': '_call_router_api', 'sign': True},
     'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
-    
+
     # System API
     'add-lte':                        {'name': '_call_system_api'},
     'remove-lte':                     {'name': '_call_system_api'},

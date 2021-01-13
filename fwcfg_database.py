@@ -39,7 +39,7 @@ class FwCfgDatabase:
 
     [
         {
-            "Executed": { Indicates if command are already executed }, 
+            "Executed": { Indicates if command are already executed },
             "Key": { The unique key for each request from flexiManage. e.g. "add-interface:pci:0000:08:01" },
             "Params": { Dictonery with params received from flexiManage },
             "Commands": [ list of translated commands ]
@@ -56,10 +56,6 @@ class FwCfgDatabase:
 
     def __enter__(self):
         return self
-
-    # This function is NotImplemented here. Each child class must implement it separately.
-    def _get_request_key(self, request):
-        raise NotImplementedError
 
     def __exit__(self, exc_type, exc_value, traceback):
         # The three arguments to `__exit__` describe the exception
@@ -90,6 +86,23 @@ class FwCfgDatabase:
         # configuration.
         fwutils.reset_device_config_signature("empty_cfg", log=False)
 
+    def set_translators(self, translators):
+       self.translators = translators
+
+    def _get_request_key(self, request):
+        req     = request['message']
+        params  = request.get('params')
+
+        # add-/remove-/modify-X requests use key function defined for 'add-X'.
+        # start-router & stop-router break add-/remove-/modify- convention.
+        if req=='start-router' or req=='stop-router':
+            src_req = 'start-router'
+        else:
+            src_req = re.sub(r'^\w+', 'add', req)
+
+        key_func = getattr(self.translators[src_req]['module'], 'get_request_key')
+        return key_func(params)
+
     def update(self, request, cmd_list=None, executed=False):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
@@ -115,7 +128,7 @@ class FwCfgDatabase:
             elif re.match('modify-', req):
                 entry = self.db[req_key]
                 entry.update({'params' : params})
-                self.db[req_key] = entry 
+                self.db[req_key] = entry
             else:
                 del self.db[req_key]
 
@@ -209,6 +222,35 @@ class FwCfgDatabase:
                         request.update({'key': key})
                     cfg.append(request)
         return cfg
+
+    def dumps(cfg, sections, full):
+        """Dumps configuration into printable string.
+
+        :param cfg:  list of types of configuration requests to be dumped, e.g. [ 'add-interface' , 'add-tunnel' ]
+        :param sections: list of sections to group request with same types. e.g. interfaces, tunnels
+        """
+        out = {}
+        prev_msg = { 'message': 'undefined' }
+
+        for msg in cfg:
+            # Add new section
+            if msg['message'] != prev_msg['message']:
+                prev_msg['message'] = msg['message']
+                section_name = sections[msg['message']]
+                out[section_name] = []
+
+            # Add configuration item to section
+            item = {
+                'Key':    msg['key'],
+                'Params': msg['params']
+            }
+            if full:
+                item.update({'Executed': str(msg['executed'])})
+                item.update({'Commands': yaml_dump(msg['cmd_list']).split('\n')})
+            out[section_name].append(item)
+        if not out:
+            return ''
+        return json.dumps(out, indent=2, sort_keys=True)
 
     def get_requests(self, req):
         """Retrives list of configuration requests parameters for requests with
