@@ -441,6 +441,9 @@ class FwCfgRequestHandler:
     def sync(self, incoming_requests, full_sync=False):
         incoming_requests = list(filter(lambda x: x['message'] in self.translate_funcs, incoming_requests))   
 
+        if len(incoming_requests) == 0:
+            return True
+            
         sync_list = self.cfg_db.get_sync_list(incoming_requests)
 
         if len(sync_list) == 0 and not full_sync:
