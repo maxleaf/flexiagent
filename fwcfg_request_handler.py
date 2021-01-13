@@ -408,14 +408,14 @@ class FwCfgRequestHandler:
         else:  # list
             params.remove(substs_element)
 
-    def restore_configuration(self):
+    def restore_configuration(self, types=None):
         """Restore configuration.
         Run all configuration translated commands.
         """
         try:
             fwglobals.log.info("===restore configuration: started===")
 
-            requests = self.cfg_db.dump(keys=True)
+            requests = self.cfg_db.dump(keys=True, types=types)
             if requests:
                 for req in requests:
                     reply = fwglobals.g.handle_request(req)

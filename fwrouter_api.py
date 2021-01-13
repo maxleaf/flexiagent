@@ -1005,6 +1005,9 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwutils.remove_linux_bridges()
         fwutils.stop_hostapd()
 
+        # keep LTE connectivity on linux interface
+        fwglobals.g.system_api.restore_configuration(types=['add-lte'])
+
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
         fwglobals.g.cache.tap_name_to_vpp_if_name = {}
