@@ -718,9 +718,9 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
         dev_id = fwglobals.g.cache.vpp_if_name_to_dev_id.get(vpp_if_name)
         if dev_id: return dev_id
 
-    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s) not found: sh hard: %s" % (dev_id, vpp_if_name, shif))
-    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s): not found sh vmxnet3: %s" % (dev_id, vpp_if_name, vmxnet3hw))
-    fwglobals.log.debug(str(traceback.extract_stack()))
+    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s): not found: sh hard: %s" % (dev_id, vpp_if_name, shif))
+    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s): not found: sh vmxnet3: %s" % (dev_id, vpp_if_name, vmxnet3hw))
+    fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps(%s, %s): not found: %s" % (dev_id, vpp_if_name, str(traceback.extract_stack())))
     return None
 
 # 'pci_str_to_bytes' converts "0000:0b:00.0" string to bytes to pack following struct:

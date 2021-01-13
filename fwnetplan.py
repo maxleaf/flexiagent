@@ -169,8 +169,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, if_name=%s, wan_failover=%s" % \
+        (is_add, dev_id, ip, gw, metric, dhcp, type, if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -295,13 +295,14 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
         # Remove dev-id-to-tap cached value for this dev id, as netplan might change
         # interface name (see 'set-name' netplan option).
         # As well re-initialize the interface name by dev id.
-        #
-        cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
-        dev_id_full = fwutils.dev_id_to_full(dev_id)
-        if dev_id_full in cache:
-            del cache[dev_id_full]
-        ifname = fwutils.dev_id_to_tap(dev_id)
-        fwglobals.log.debug("Interface name in cache is %s, dev_id %s" % (ifname, dev_id_full))
+        # Note 'dev_id' is None for tap-inject (vppX) of tapcli-X interfaces used for LTE/WiFi devices.
+        if dev_id:
+            cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
+            dev_id_full = fwutils.dev_id_to_full(dev_id)
+            if dev_id_full in cache:
+                del cache[dev_id_full]
+            ifname = fwutils.dev_id_to_tap(dev_id)
+            fwglobals.log.debug("Interface name in cache is %s, dev_id %s" % (ifname, dev_id_full))
 
         if not wan_failover: # Failover might be easily caused by interface down so no need to validate IP
             if is_add and not _has_ip(ifname, (dhcp=='yes')):
