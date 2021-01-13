@@ -198,6 +198,9 @@ class FwCfgDatabase:
         :returns: list of configuration requests stored in DB.
         """
 
+        if not types:
+            raise Exception('"types" was not provided - no items to fetch from db')
+
         if escape:
             for t in escape:
                 types.remove(t)
@@ -223,7 +226,7 @@ class FwCfgDatabase:
                     cfg.append(request)
         return cfg
 
-    def dumps(cfg, sections, full):
+    def dumps(self, cfg, sections, full):
         """Dumps configuration into printable string.
 
         :param cfg:  list of types of configuration requests to be dumped, e.g. [ 'add-interface' , 'add-tunnel' ]

@@ -43,17 +43,17 @@ class FwCfgRequestHandler:
 
     In addition the Request Handler provides following functionality:
     1. Handle aggregated requests
-    2. Implement Sync and full sync logic
+    2. Implement sync and full sync logic
     """
 
-    def __init__(self, translate_funcs, cfg_db, revert_callback = None):
+    def __init__(self, translators, cfg_db, revert_failure_callback = None):
         """Constructor method.
         """
-        self.translate_funcs = translate_funcs
+        self.translators = translators
         self.cfg_db = cfg_db
-        self.revert_callback = revert_callback
+        self.revert_failure_callback = revert_failure_callback
 
-        self.cfg_db.set_translators(translate_funcs)
+        self.cfg_db.set_translators(translators)
 
     def __enter__(self):
         return self
@@ -142,8 +142,8 @@ class FwCfgRequestHandler:
                         # on failure to revert move router into failed state
                         err_str = "_call_aggregated: failed to revert request %s while running rollback on aggregated request" % op
                         fwglobals.log.excep("%s: %s" % (err_str, format(e)))
-                        if self.revert_callback:
-                            self.revert_callback(t)
+                        if self.revert_failure_callback:
+                            self.revert_failure_callback(t)
                         pass
                 raise e
 
@@ -160,16 +160,19 @@ class FwCfgRequestHandler:
         req    = request['message']
         params = request.get('params')
 
-        api_defs = self.translate_funcs.get(req)
+        api_defs = self.translators.get(req)
         assert api_defs, 'there is no api for request "%s"' % req
 
         module = api_defs.get('module')
         assert module, 'there is no module for request "%s"' % req
 
-        func = getattr(self.translate_funcs[req]['module'], self.translate_funcs[req]['api'])
+        api = api_defs.get('api')
+        assert api, 'there is no api for request "%s"' % req
+
+        func = getattr(module, api)
         assert func, 'there is no api function for request "%s"' % req
 
-        if self.translate_funcs[req]['api'] == 'revert':
+        if api == 'revert':
             cmd_list = func(request, self.cfg_db)
             return cmd_list
 
@@ -275,8 +278,8 @@ class FwCfgRequestHandler:
                                 (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
                     fwglobals.log.excep(err_str)
 
-                    if self.revert_callback:
-                        self.revert_callback(err_str)
+                    if self.revert_failure_callback:
+                        self.revert_failure_callback(err_str)
 
     # 'substitute' takes parameters in form of list or dictionary and
     # performs substitutions found in params.
@@ -429,7 +432,7 @@ class FwCfgRequestHandler:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
 
     def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in self.translate_funcs, incoming_requests))
+        incoming_requests = list(filter(lambda x: x['message'] in self.translators, incoming_requests))
 
         if len(incoming_requests) == 0:
             return True

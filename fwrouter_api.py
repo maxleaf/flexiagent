@@ -450,8 +450,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         module = api_defs.get('module')
         assert module, 'there is no module for request "%s"' % req
 
-        func = getattr(module, fwrouter_translators[req]['api'])
-        assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
+        api = api_defs.get('api')
+        assert api, 'there is no api for request "%s"' % req
+
+        func = getattr(module, api)
+        assert func, 'there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
         return cmd_list
