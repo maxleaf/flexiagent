@@ -27,6 +27,7 @@ import os
 import time
 import platform
 import subprocess
+import shlex
 import psutil
 import socket
 import re
@@ -3021,6 +3022,32 @@ def vpp_nat_add_remove_interface(remove, dev_id, metric):
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
+
+def netplan_set_mac_addresses():
+    '''
+    This function replaces the netplan files macaddr with the actual macaddr
+    '''
+    netplan_paths = glob.glob('/etc/netplan/*.yaml')
+    #Changing mac addresses in all netplan files
+    #Copy the current yaml into json variable, change the mac addr
+    #Copy the coverted json string back to yaml file
+    intf_mac_addr = {}
+    interfaces = psutil.net_if_addrs()
+    for nicname, addrs in interfaces.items():
+        for addr in addrs:
+            if addr.family == psutil.AF_LINK:
+                intf_mac_addr[nicname] = addr.address
+    for netplan in netplan_paths:
+        with open(netplan, "r+") as fd:
+            netplan_json = yaml.load(fd)
+            for if_name in netplan_json['network']['ethernets']:
+                interface = netplan_json['network']['ethernets'][if_name]
+                if interface.get('match'):
+                    interface['match']['macaddress'] = intf_mac_addr[if_name]
+	    netplan_str = yaml.dump(netplan_json)
+	    fd.seek(0)
+	    fd.write(netplan_str)
+	    fd.truncate()
 
 def wifi_get_capabilities(dev_id):
 

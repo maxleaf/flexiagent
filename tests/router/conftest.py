@@ -5,21 +5,21 @@ import shutil
 
 @pytest.fixture
 def netplan_backup():
-    orig_yaml = glob.glob("/etc/netplan/*.yaml")+ \
+    orig_yamls = glob.glob("/etc/netplan/*.yaml")+ \
                 glob.glob("/lib/netplan/*.yaml") + \
                 glob.glob("/run/netplan/*.yaml")
     #taking backup of original netplan yaml files
-    for file in orig_yaml:
-        orig_backup = file.replace('yaml', 'yaml.backup')
-        shutil.move(file, orig_backup)
+    for file in orig_yamls:
+        orig_yaml = file.replace('yaml', 'yaml.backup_pytest')
+        shutil.move(file, orig_yaml)
     
     yield
     
     os.system('rm -f /etc/netplan/*.yaml')
-    orig_yaml = glob.glob("/etc/netplan/*.backup")+ \
-                glob.glob("/lib/netplan/*.backup") + \
-                glob.glob("/run/netplan/*.backup")
-    for file in orig_yaml:
-        orig_backup = file.replace('yaml.backup', 'yaml')
-        shutil.move(file, orig_backup)
-    os.system('sudo fwkill vpp')
+    orig_yamls = glob.glob("/etc/netplan/*.backup_pytest")+ \
+                glob.glob("/lib/netplan/*.backup_pytest") + \
+                glob.glob("/run/netplan/*.backup_pytest")
+    for file in orig_yamls:
+        orig_yaml = file.replace('yaml.backup_pytest', 'yaml')
+        shutil.move(file, orig_yaml)
+    os.system('sudo fwkill')

@@ -19,7 +19,7 @@
 ################################################################################
 
 """
-This is a whitebox script to test netplan under different scenarios and with 
+This is a whitebox script to test netplan under different scenarios and with
  combination of netplans.
  The script start with loading a initial configuration in netplan. These initial
  configurations are:
@@ -29,73 +29,81 @@ This is a whitebox script to test netplan under different scenarios and with
  - Use default route in netplan configuration and without
  - Use match in netplan and set name
  - Use incomplete configurations in netplan
- After loading the initial configuration the script will start the loading test 
+ After loading the initial configuration the script will start the loading test
  configurations which are:
- 1) two WANs + LAN, 
- 2) two LANs + WAN, 
- 3) One WAN + One LAN + Unassigned  
+ 1) two WANs + LAN,
+ 2) two LANs + WAN,
+ 3) One WAN + One LAN + Unassigned
  4) Two dhcp + One Static
  After each test the initial netplan file is again loaded.
- 
- Test Environment : This test has to be run on a Ubuntu 18.04 Virtualbox with 
+
+ Test Environment : This test has to be run on a Ubuntu 18.04 Virtualbox with
  3 intf: 0000:00:03.0, 0000:00:08.0 and 0000:00:09.0
- 
+
  REMEMBER TO STOP THE ROUTER BEFORE RUNNING THE SCRIPT
- 
+
  Use : sudo systemctl stop flexiwan-router
- 
+
  To run the script : pytest -s -k 13
- """
+"""
 import glob
 import os
-import re
 import sys
 import shutil
-import macDynamic
-
-code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
-test_root = code_root + '/tests/'
-sys.path.append(test_root)
 import fwtests
 
-cli_path = __file__.replace('.py', '')
-cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
-cli_start_router_file = os.path.join(cli_path, 'start-router.cli')
-multiple_netplan = os.path.join(cli_path, 'multiple_netplans/')
+CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
+TEST_ROOT = CODE_ROOT + '/tests/'
+sys.path.append(CODE_ROOT)
+sys.path.append(TEST_ROOT)
+import fwutils
 
-def test(netplan_backup):
+CLI_PATH = __file__.replace('.py', '')
+CLI_STOP_ROUTER = os.path.join(CLI_PATH, 'stop-router.cli')
+CLI_START_ROUTER = os.path.join(CLI_PATH, 'start-router.cli')
+MULTIPLE_NETPLAN = os.path.join(CLI_PATH, 'multiple_netplans/')
+
+# pylint: disable-msg=unused-argument
+# These are unused arguments are fixture name contains in conftest.py file
+def test_netplan(netplan_backup):
+    '''
+    This tests netplan under different scenarios, with combination of netplans
+    '''
     tests_path = __file__.replace('.py', '')
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     yaml_config = sorted(glob.glob('%s/*.yaml' % tests_path))
-    orig_yaml = glob.glob("/etc/netplan/50*.yaml")
     for yaml in yaml_config:
-        print("Netplan :: %s" % yaml.split('/')[-1])
-        for test in [t for t in test_cases if t not in [cli_stop_router_file, cli_start_router_file]]:
+        print "Netplan :: %s" % yaml.split('/')[-1]
+        for test in [t for t in test_cases if t not in \
+            [CLI_STOP_ROUTER, CLI_START_ROUTER]]:
             #copy the netplan file to netplan dir
-	    if 'multiple_netplan' in yaml:
-                os.system('cp -R %s* /etc/netplan/' % multiple_netplan)
-                #To update the MAC address in the yaml files, uncomment the function below
-                #Please note that 2 modules: getmac and netifaces have to be installed 
-                #macDynamic.convertMacAddress() 
+            if 'multiple_netplan' in yaml:
+                os.system('cp -R %s* /etc/netplan/' % MULTIPLE_NETPLAN)
             else:
-	        shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
-	    #apply netplan
-	    os.system('netplan apply')
+                shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
+            #apply netplan
+            fwutils.netplan_set_mac_addresses()
+            os.system('netplan apply')
 
             with fwtests.TestFwagent() as agent:
-                print("   " + os.path.basename(test))
-	        (ok, out) = agent.cli('-f %s' % cli_start_router_file)
-		assert ok
-                print("start_router: %s" % out)
+                (start_ok, out) = agent.cli('-f %s' % CLI_START_ROUTER)
+                assert start_ok, "Failed to start router"
+                lines = agent.grep_log('Exception: API failed')
+                assert len(lines) == 0, "Error in start router: %s" % '\n'.join(lines)
 
                 # Load router configuration with spoiled lists
-                (ok, out) = agent.cli('--api inject_requests filename=%s ignore_errors=False' % test)
-		assert ok
-                print("Inject cli '%s': %s" %(os.path.basename(test),out))
-		
-                (ok, out) = agent.cli('-f %s' % cli_stop_router_file)
-		assert ok
-                print("stop_router: %s" % out)
+                (cli_ok, out) = agent.cli('--api inject_requests filename=%s \
+                    ignore_errors=False' % test)
+                assert cli_ok, "Failed to inject request with %s file" % test
+                lines = agent.grep_log('Exception: API failed')
+                assert len(lines) == 0, "Errors in %s cli: %s" %(test, '\n'.join(lines))
+
+                (stop_ok, out) = agent.cli('-f %s' % CLI_STOP_ROUTER)
+                assert stop_ok, "Failed to stop router"
+                lines = agent.grep_log('Exception: API failed')
+                assert len(lines) == 0, "Error in stop router: %s" % '\n'.join(lines)
+
             os.system('rm -f /etc/netplan/*.yaml')
+
 if __name__ == '__main__':
-    test()
+    test_netplan()
