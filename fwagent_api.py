@@ -383,13 +383,16 @@ class FWAGENT_API:
         """
         try:
             # don't perform reset if interface is already assigned to vpp and vpp is run
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+            is_assigned = len(fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])) > 0
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to reset the LTE card'}
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
             fwutils.qmi_sim_power_off(params['dev_id'])
             fwutils.qmi_sim_power_on(params['dev_id'])
+
+            # restore lte connection if needed
+            fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
             reply = {'ok': 1, 'message': ''}
         except Exception as e:
