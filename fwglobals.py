@@ -46,12 +46,13 @@ from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
 
-# sync flag indicated if module implement sync logic
+# sync flag indicated if module implement sync logic. 
+# IMPORTANT! Please keep the list order. It indicates the sync priorities
 modules = {
+    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' },
     'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },
     'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' },
     'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' },
-    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' },
     'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' },
 }
 
