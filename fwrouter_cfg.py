@@ -104,7 +104,7 @@ class FwRouterCfg(FwCfgDatabase):
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-        return FwCfgDatabase.dumps(cfg, sections, full)
+        return FwCfgDatabase.dumps(self, cfg, sections, full)
 
     def get_interfaces(self, type=None, dev_id=None, ip=None):
         interfaces = self.get_requests('add-interface')

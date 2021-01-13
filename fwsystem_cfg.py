@@ -63,4 +63,4 @@ class FwSystemCfg(FwCfgDatabase):
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
-        return FwCfgDatabase.dumps(cfg, sections, full)
+        return FwCfgDatabase.dumps(self, cfg, sections, full)
