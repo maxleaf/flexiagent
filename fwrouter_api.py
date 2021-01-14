@@ -216,7 +216,6 @@ class FWROUTER_API(FwCfgRequestHandler):
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
             fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
-            fwglobals.g.cache.tap_name_to_vpp_if_name = {}
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -446,7 +445,6 @@ class FWROUTER_API(FwCfgRequestHandler):
         if not api_defs:
             # This 'modify-X' is not supported (yet?)
             return []
-
         module = api_defs.get('module')
         assert module, 'there is no module for request "%s"' % req
 
@@ -1003,7 +1001,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
-        fwglobals.g.cache.tap_name_to_vpp_if_name = {}
+        fwglobals.g.cache.linux_interfaces = {}
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.

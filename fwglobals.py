@@ -30,6 +30,7 @@ import time
 import traceback
 import yaml
 import fwutils
+import threading
 
 from sqlitedict import SqliteDict
 
@@ -204,22 +205,21 @@ class Fwglobals:
                 'LINUX_INTERFACES': {},
                 'DEV_ID_TO_VPP_IF_NAME': {},
                 'DEV_ID_TO_VPP_TAP_NAME': {},
-                'DEV_IDS': {},
                 'STUN': {},
                 'VPP_IF_NAME_TO_DEV_ID': {},
-                'TAP_NAME_TO_VPP_IF_NAME': {},
+                'LINUX_IF_NAME_TO_DEV_ID': {},
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
                 }
             }
+            self.lock                = threading.Lock()
             self.linux_interfaces    = self.db['LINUX_INTERFACES']
             self.dev_id_to_vpp_if_name  = self.db['DEV_ID_TO_VPP_IF_NAME']
             self.dev_id_to_vpp_tap_name = self.db['DEV_ID_TO_VPP_TAP_NAME']
-            self.dev_ids                = self.db['DEV_IDS']
             self.stun_cache          = self.db['STUN']
             self.vpp_if_name_to_dev_id  = self.db['VPP_IF_NAME_TO_DEV_ID']
-            self.tap_name_to_vpp_if_name  = self.db['TAP_NAME_TO_VPP_IF_NAME']
+            self.linux_if_to_dev_id  = self.db['LINUX_IF_NAME_TO_DEV_ID']
             self.wan_monitor         = self.db['WAN_MONITOR']
 
 
@@ -336,6 +336,8 @@ class Fwglobals:
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
         self.router_api.restore_vpp_if_needed()
+
+        fwutils.get_linux_interfaces(cached=False) # Fill global interface cache
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
 

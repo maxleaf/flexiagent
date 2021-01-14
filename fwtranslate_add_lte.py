@@ -37,7 +37,7 @@ def add_lte(params):
                 'func': 'lte_connect',
                 'args': { 'params': params }
     }
-    cmd['cmd']['descr'] = "Connect LTE to the Cellular provider"
+    cmd['cmd']['descr'] = "Connect LTE to the cellular provider"
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['params'] = {
@@ -45,7 +45,7 @@ def add_lte(params):
                 'func': 'lte_disconnect',
                 'args': { 'dev_id': params['dev_id'] }
     }
-    cmd['revert']['descr'] = "Connect LTE to the Cellular provider"
+    cmd['revert']['descr'] = "Disconnect LTE from the cellular provider"
     cmd_list.append(cmd)
 
     cmd = {}

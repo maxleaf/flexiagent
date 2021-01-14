@@ -111,7 +111,7 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
+            info['network']['interfaces'] = fwutils.get_linux_interfaces().values()
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
@@ -278,50 +278,6 @@ class FWAGENT_API:
         fwglobals.log.info("_sync_device FINISHED")
         return {'ok': 1}
 
-    def _wifi_perform_operation(self, params):
-        try:
-            operation = params['operation'] if 'operation' in params else None
-            if not operation:
-                return (False, 'This interface is not WIFI')
-
-            if fwutils.is_wifi_interface(params['dev_id']) == False:
-                return (False, 'This interface is not a WIFI interface')
-
-            if operation == 'start':
-                is_success, error = self._wifi_start_ap(params)
-            elif operation == 'stop':
-                is_success, error = self._wifi_stop_ap(params)
-            else:
-                is_success, error = (False, 'No supported operation was requested')
-
-            return {'message': error, 'ok': is_success}
-        except Exception as e:
-            raise Exception("_wifi_perform_operation: failed. %s" % str(e))
-
-    def _wifi_start_ap(self, params):
-        try:
-            fwutils.configure_hostapd(params['dev_id'], params['configuration'])
-            is_success, error =  fwutils.start_hostapd()
-
-            return is_success, error
-        except Exception as e:
-            raise Exception("_wifi_start_ap: failed to start wifi access point: %s" % str(e))
-
-    def _wifi_stop_ap(self, params):
-        try:
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if fwutils.vpp_does_run() and is_assigned:
-                return (False, 'Please unassigned this interface in order to stop the Access Point')
-
-            is_success, error = fwutils.stop_hostapd()
-
-            inf_name = fwutils.dev_id_to_linux_if(params['dev_id'])
-            os.system('ifconfig %s 0' % inf_name)
-
-            return is_success, error
-        except Exception as e:
-            raise Exception("_wifi_stop_ap: failed to stop wifi access point: %s" % str(e))
-
     def _get_wifi_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
@@ -349,7 +305,7 @@ class FWAGENT_API:
         system_info = fwutils.lte_get_system_info(params['dev_id'])
         default_apn = fwutils.lte_get_default_apn(params['dev_id'])
 
-        is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+        is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
         if fwutils.vpp_does_run() and is_assigned:
             interface_name = fwutils.dev_id_to_tap(params['dev_id'])
 
@@ -380,7 +336,7 @@ class FWAGENT_API:
         """
         try:
             # don't perform reset if interface is already assigned to vpp and vpp is run
-            is_assigned = len(fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])) > 0
+            is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to reset the LTE card'}
 

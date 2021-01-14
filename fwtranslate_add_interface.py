@@ -101,8 +101,8 @@ def add_interface(params):
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
 
-    is_wifi = fwutils.is_wifi_interface(dev_id)
-    is_lte = fwutils.is_lte_interface(dev_id) if not is_wifi else False
+    is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
+    is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
     is_non_dpdk = is_wifi or is_lte
 
     if is_non_dpdk:
