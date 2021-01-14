@@ -205,6 +205,7 @@ class FWROUTER_API:
                                                                                             bd_id=tun['bridge_id'],
                                                                                             enable=1, shg=1)
                             fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+                            tun['sw_if_index'] = tunnel.sw_if_index
                             tun['state'] = 'running'
                             fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
 
@@ -602,13 +603,16 @@ class FWROUTER_API:
         assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
-        new_cmd_list = []
-        for cmd in cmd_list:
-            if 'modify' in cmd.keys():
-                whitelist = cmd['whitelist']
-            else:
-                new_cmd_list.append(cmd)
-        return (new_cmd_list, whitelist)
+        if isinstance(cmd_list, dict):
+            new_cmd_list = []
+            for cmd in cmd_list:
+                if 'modify' in cmd.keys():
+                    whitelist = cmd['whitelist']
+                else:
+                    new_cmd_list.append(cmd)
+            return (new_cmd_list, whitelist)
+        else:
+            return (cmd_list, None)
 
     def _execute(self, request, cmd_list, filter=None):
         """Execute request.

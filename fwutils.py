@@ -2015,6 +2015,14 @@ def ikev2_remote_certificate_filename_get(machine_id):
 def ikev2_gre_bridge_add(src, bridge_id, profile, role):
     fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id, profile, role)
 
+def ikev2_gre_bridge_remove(src, bridge_id):
+    sw_if_index = fwglobals.g.ikev2tunnels.get_tunnel(src)['sw_if_index']
+    fwglobals.g.ikev2tunnels.remove_tunnel(src)
+
+    if sw_if_index != -1:
+        fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=sw_if_index,
+                                                                        bd_id=bridge_id, enable=0)
+
 def ikev2_add_public_certificate(device_id, certificate):
     '''This function saves public certificate as a file.
 

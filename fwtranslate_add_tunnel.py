@@ -676,6 +676,14 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
                                 'func'  : 'ikev2_gre_bridge_add',
                                 'args'  : {'src': src, 'bridge_id': bridge_id, 'profile': name, 'role': role}
                                 }
+    cmd['revert'] = {}
+    cmd['revert']['name']    = "python"
+    cmd['revert']['descr']   = "remove IKEv2 GRE tunnel from bridge"
+    cmd['revert']['params']  = {
+                                'module': 'fwutils',
+                                'func'  : 'ikev2_gre_bridge_remove',
+                                'args'  : {'src': src, 'bridge_id': bridge_id}
+                                }
     cmd_list.append(cmd)
 
 def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_address, ike, esp):
