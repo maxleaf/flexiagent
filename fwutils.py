@@ -550,7 +550,7 @@ def get_interface_dev_id(if_name):
     # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
     if not dev_id and vpp_does_run():
         vpp_if_name = tap_to_vpp_if_name(if_name)
-        if vpp_if_name:
+        if vpp_if_name and not 'loop' in vpp_if_name:
             dev_id = vpp_if_name_to_dev_id(vpp_if_name)
 
     if not dev_id:
