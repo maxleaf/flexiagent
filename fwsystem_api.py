@@ -1,3 +1,5 @@
+#! /usr/bin/python
+
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
@@ -18,28 +20,24 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import glob
-import os
-import re
-import sys
+import fwglobals
+from fwcfg_request_handler import FwCfgRequestHandler
+import traceback
 
-code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
-test_root = code_root + '/tests/'
-sys.path.append(test_root)
-import fwtests
+fwsystem_translators = {
+    'add-lte':               {'module': __import__('fwtranslate_add_lte'),    'api':'add_lte'},
+    'remove-lte':            {'module': __import__('fwtranslate_revert'),    'api':'revert'},
+}
 
-def test(fixture_globals): 
-    tests_path = __file__.replace('.py', '')
-    test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
-    for (idx,t) in enumerate(test_cases):
-        with fwtests.TestFwagent() as agent:
-
-            if idx == 0:
-                print("")
-            print("   " + os.path.basename(t))
-
-            (ok,_) = agent.cli('-f %s' % t)
-            assert ok, "%s failed" % t
-
-if __name__ == '__main__':
-    test()
+class FWSYSTEM_API(FwCfgRequestHandler):
+    """This is System API class representation.
+        These APIs are used to handle system configuration requests regardless of the vpp state.
+        e.g to enable lte connection even if the vpp is not running.
+        They are invoked by the flexiManage over secure WebSocket
+        connection using JSON requests.
+        For list of available APIs see the 'fwsystem_translators' variable.
+    """
+    def __init__(self, cfg):
+        """Constructor method
+        """
+        FwCfgRequestHandler.__init__(self, fwsystem_translators, cfg, fwglobals.g.system_cfg)

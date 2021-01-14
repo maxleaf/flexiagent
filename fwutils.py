@@ -45,6 +45,7 @@ from fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
+from fwsystem_cfg   import FwSystemCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
@@ -263,7 +264,7 @@ def get_interface_gateway(if_name, if_dev_id=None):
 
 def get_binary_interface_gateway_by_dev_id(dev_id):
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
-    return ip_str_to_bytes(gw_ip)[0]
+    return ip_str_to_bytes(gw_ip)[0] if gw_ip else ''
 
 
 def get_all_interfaces():
@@ -275,7 +276,7 @@ def get_all_interfaces():
     interfaces = psutil.net_if_addrs()
     for nicname, addrs in interfaces.items():
         dev_id = get_interface_dev_id(nicname)
-        if dev_id == '':
+        if not dev_id:
             continue
 
         if is_lte_interface(dev_id) and fwglobals.g.router_api.state_is_started():
@@ -1068,17 +1069,15 @@ def stop_vpp():
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
 
-def reset_fw_linux_config():
-    for key in fwglobals.g.linux_configs_db:
-        fwglobals.g.linux_configs_db[key] = {}
-
-def reset_router_config():
+def reset_device_config():
     """Reset router config by cleaning DB and removing config files.
 
      :returns: None.
      """
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
         router_cfg.clean()
+    with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
+        system_cfg.clean()
     if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
         os.remove(fwglobals.g.ROUTER_STATE_FILE)
     if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
@@ -1099,7 +1098,20 @@ def reset_router_config():
 
     reset_dhcpd()
 
-def print_router_config(basic=True, full=False, multilink=False, signature=False):
+def print_system_config(full=False):
+    """Print router configuration.
+
+     :returns: None.
+     """
+    with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
+        cfg = system_cfg.dumps(full=full)
+        print(cfg)
+
+def print_device_config_signature():
+    cfg = get_device_config_signature()
+    print(cfg)
+
+def print_router_config(basic=True, full=False, multilink=False):
     """Print router configuration.
 
      :returns: None.
@@ -1109,11 +1121,58 @@ def print_router_config(basic=True, full=False, multilink=False, signature=False
             cfg = router_cfg.dumps(full=full, escape=['add-application','add-multilink-policy'])
         elif multilink:
             cfg = router_cfg.dumps(full=full, types=['add-application','add-multilink-policy'])
-        elif signature:
-            cfg = router_cfg.get_signature()
         else:
             cfg = ''
         print(cfg)
+
+def update_device_config_signature(request):
+    """Updates the database signature.
+    This function assists the database synchronization feature that keeps
+    the configuration set by user on the flexiManage in sync with the one
+    stored on the flexiEdge device.
+        The initial signature of the database is empty string. Than on every
+    successfully handled request it is updated according following formula:
+            signature = sha1(signature + request)
+    where both signature and delta are strings.
+
+    :param request: the last successfully handled router configuration
+                    request, e.g. add-interface, remove-tunnel, etc.
+                    As configuration database signature should reflect
+                    the latest configuration, it should be updated with this
+                    request.
+    """
+    current     = fwglobals.g.db['signature']
+    delta       = json.dumps(request, separators=(',', ':'), sort_keys=True)
+    hash_object = hashlib.sha1(current + delta)
+    new         = hash_object.hexdigest()
+
+    fwglobals.g.db['signature'] = new
+    fwglobals.log.debug("sha1: new=%s, current=%s, delta=%s" %
+                        (str(new), str(current), str(delta)))
+
+def get_device_config_signature():
+    if not 'signature' in fwglobals.g.db:
+        reset_device_config_signature()
+    return fwglobals.g.db['signature']
+
+def reset_device_config_signature(new_signature=None, log=True):
+    """Resets configuration signature to the empty sting.
+
+    :param new_signature: string to be used as a signature of the configuration.
+            If not provided, the empty string will be used.
+            When flexiManage detects discrepancy between this signature
+            and between signature that it calculated, it sends
+            the 'sync-device' request in order to apply the user
+            configuration onto device. On successfull sync the signature
+            is reset to the empty string on both sides.
+    :param log: if False the reset will be not logged.
+    """
+    old_signature = fwglobals.g.db.get('signature', '<none>')
+    new_signature = "" if new_signature == None else new_signature
+    fwglobals.g.db['signature'] = new_signature
+    if log:
+        fwglobals.log.debug("reset signature: '%s' -> '%s'" % \
+                            (old_signature, new_signature))
 
 def dump_router_config(full=False):
     """Dumps router configuration into list of requests that look exactly
@@ -1126,6 +1185,19 @@ def dump_router_config(full=False):
     cfg = []
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
         cfg = router_cfg.dump(full)
+    return cfg
+
+def dump_system_config(full=False):
+    """Dumps system configuration into list of requests that look exactly
+    as they would look if were received from server.
+
+    :param full: return requests together with translated commands.
+
+    :returns: list of 'add-X' requests.
+    """
+    cfg = []
+    with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
+        cfg = system_cfg.dump(full)
     return cfg
 
 def get_router_state():
@@ -2246,6 +2318,11 @@ def get_lte_interfaces_dev_ids():
     return out
 
 def set_lte_info_on_linux_interface(dev_id):
+
+    if vpp_does_run():
+        return (True, None)
+    
+
     lte_interfacaes = get_lte_interfaces_dev_ids()
 
     if dev_id in lte_interfacaes:
@@ -2262,9 +2339,9 @@ def set_lte_info_on_linux_interface(dev_id):
                 metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
 
             os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
-            return True
+            return (True , None)
 
-    return None
+    return (False, "Failed to set lte info on linux interface")
 
 def dev_id_to_mbim_device(dev_id):
     try:
@@ -2371,6 +2448,11 @@ def lte_is_sim_inserted(dev_id):
 
 def lte_disconnect(dev_id, hard_reset_service=False):
     try:
+        # don't perform disconnect if this interface is assigned to vpp and vpp is run
+        is_assigned = len(fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)) > 0
+        if vpp_does_run() and is_assigned:
+            return {'ok': 0, 'message': 'Don\'t disconnect LTE. the interface is assigned to vpp'}
+
         done = False
         files = glob.glob("/tmp/mbim_network*")
         for file_path in files:

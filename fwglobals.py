@@ -29,25 +29,31 @@ import signal
 import time
 import traceback
 import yaml
+import fwutils
 
 from sqlitedict import SqliteDict
 
 from fwagent import FwAgent
 from fwrouter_api import FWROUTER_API
+from fwsystem_api import FWSYSTEM_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
+from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
 
+# sync flag indicated if module implement sync logic. 
+# IMPORTANT! Please keep the list order. It indicates the sync priorities
 modules = {
-    'fwagent_api':      __import__('fwagent_api'),
-    'fwapplications':   __import__('fwapplications'),
-    'fwrouter_api':     __import__('fwrouter_api'),
-    'os_api':           __import__('os_api'),
+    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' }, # fwglobals.g.system_api
+    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },  # fwglobals.g.agent_api
+    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' }, # fwglobals.g.apps
+    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' }, # fwglobals.g.router_api
+    'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' }, # fwglobals.g.os_api
 }
 
 request_handlers = {
@@ -66,17 +72,13 @@ request_handlers = {
     'get-device-logs':                   {'name': '_call_agent_api'},
     'get-device-packet-traces':          {'name': '_call_agent_api'},
     'get-device-os-routes':              {'name': '_call_agent_api'},
-    'get-router-config':                 {'name': '_call_agent_api'},
+    'get-device-config':                 {'name': '_call_agent_api'},
     'upgrade-device-sw':                 {'name': '_call_agent_api'},
     'reset-device':                      {'name': '_call_agent_api'},
     'sync-device':                       {'name': '_call_agent_api'},
-    'wifi-perform-operation':            {'name': '_call_agent_api'},
-    'wifi-get-interface-info':           {'name': '_call_agent_api'},
-    'lte-get-interface-info':            {'name': '_call_agent_api'},
-    'lte-enable':                        {'name': '_call_agent_api'},
-    'lte-connect':                       {'name': '_call_agent_api'},
-    'lte-disable':                       {'name': '_call_agent_api'},
-    'lte-reset':                         {'name': '_call_agent_api'},
+    'get-wifi-info':                     {'name': '_call_agent_api'},
+    'get-lte-info':                      {'name': '_call_agent_api'},
+    'reset-lte':                         {'name': '_call_agent_api'},
 
     # Router API
     'aggregated':                   {'name': '_call_router_api', 'sign': True},
@@ -95,6 +97,10 @@ request_handlers = {
     'remove-application':           {'name': '_call_router_api', 'sign': True},
     'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
+
+    # System API
+    'add-lte':                        {'name': '_call_system_api'},
+    'remove-lte':                     {'name': '_call_system_api'},
 
     ##############################################################
     # INTERNAL API-s
@@ -230,6 +236,7 @@ class Fwglobals:
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'
         self.VERSIONS_FILE       = self.DATA_PATH + '.versions.yaml'
         self.ROUTER_CFG_FILE     = self.DATA_PATH + '.requests.sqlite'
+        self.SYSTEM_CFG_FILE     = self.DATA_PATH + '.system.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
@@ -247,7 +254,6 @@ class Fwglobals:
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
-        self.LINUX_CONFIGURATION_DB_FILE        = self.DATA_PATH + '.linux_configs.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.HOSTAPD_CONFIG_DIRECTORY = '/etc/hostapd/'
         self.NETPLAN_FILES       = {}
@@ -270,8 +276,7 @@ class Fwglobals:
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
 
-        # Linux configuration database
-        self.linux_configs_db = SqliteDict(self.LINUX_CONFIGURATION_DB_FILE, autocommit=True)
+        self.db = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! set the db variable regardless of agent initialization
 
         # Load websocket status codes on which agent should reconnect into a list
         self.ws_reconnect_status_codes = []
@@ -319,14 +324,17 @@ class Fwglobals:
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
+        self.system_cfg   = FwSystemCfg(self.SYSTEM_CFG_FILE)
         self.agent_api    = FWAGENT_API()
-        self.router_api   = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.system_api   = FWSYSTEM_API(self.system_cfg)
+        self.router_api   = FWROUTER_API(self.router_cfg, self.MULTILINK_DB_FILE)
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
+        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
         self.router_api.restore_vpp_if_needed()
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
@@ -377,6 +385,9 @@ class Fwglobals:
 
     def _call_agent_api(self, request):
         return self.agent_api.call(request)
+
+    def _call_system_api(self, request):
+        return self.system_api.call(request)
 
     def _call_router_api(self, request):
         return self.router_api.call(request)
@@ -536,8 +547,8 @@ class Fwglobals:
             # flexiManage code.
             #
             if reply['ok'] == 1 and handler.get('sign', False) == True:
-                self.router_cfg.update_signature(received_msg)
-            reply['router-cfg-hash'] = self.router_cfg.get_signature()
+                fwutils.update_device_config_signature(received_msg)
+            reply['router-cfg-hash'] = fwutils.get_device_config_signature()
 
             return reply
 
