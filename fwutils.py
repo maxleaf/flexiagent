@@ -540,24 +540,27 @@ def get_interface_dev_id(if_name):
 
     :returns: dev_id.
     """
-    cache = fwglobals.g.cache.linux_if_to_dev_id
-    dev_id = cache.get(if_name, '')
+    if if_name:
+        cache = fwglobals.g.cache.linux_if_to_dev_id
+        dev_id = cache.get(if_name, '')
 
-    # First try to get dev id if interface is under linux control
-    if not dev_id:
-        dev_id = build_interface_dev_id(if_name)
+        # First try to get dev id if interface is under linux control
+        if not dev_id:
+            dev_id = build_interface_dev_id(if_name)
 
-    # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
-    if not dev_id and vpp_does_run():
-        vpp_if_name = tap_to_vpp_if_name(if_name)
-        if vpp_if_name:
-            dev_id = vpp_if_name_to_dev_id(vpp_if_name)
+        # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
+        if not dev_id and vpp_does_run():
+            vpp_if_name = tap_to_vpp_if_name(if_name)
+            if vpp_if_name:
+                dev_id = vpp_if_name_to_dev_id(vpp_if_name)
 
-    if not dev_id:
-        return ''
+        if not dev_id:
+            return ''
 
-    fwglobals.g.cache.linux_if_to_dev_id[if_name] = dev_id
-    return dev_id
+        fwglobals.g.cache.linux_if_to_dev_id[if_name] = dev_id
+        return dev_id
+
+    return ''
 
 def build_interface_dev_id(if_name):
     """Convert Linux interface name into bus address.
@@ -568,17 +571,19 @@ def build_interface_dev_id(if_name):
     :returns: dev_id or None if interface was created by vppsb
     """
     dev_id = ""
-
     if if_name:
-        if_addr_line = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % if_name, shell=True)
-        regex = r'[0-9A-Fa-f]{4}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{1,2}|usb\d+\/.*(?=\/net)'
-        if_addr = re.findall(regex, if_addr_line)
-        if if_addr:
-            if_addr = if_addr[-1]
-            if re.search(r'usb|pci', if_addr_line):
-                dev_id = dev_id_add_type(if_addr)
-                address = dev_id_add_type(if_addr)
-                dev_id = dev_id_to_full(address)
+        try:
+            if_addr_line = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % if_name, shell=True)
+            regex = r'[0-9A-Fa-f]{4}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{1,2}|usb\d+\/.*(?=\/net)'
+            if_addr = re.findall(regex, if_addr_line)
+            if if_addr:
+                if_addr = if_addr[-1]
+                if re.search(r'usb|pci', if_addr_line):
+                    dev_id = dev_id_add_type(if_addr)
+                    address = dev_id_add_type(if_addr)
+                    dev_id = dev_id_to_full(address)
+        except:
+            pass
     return dev_id
 
 def dev_id_to_linux_if(dev_id):
