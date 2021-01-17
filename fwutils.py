@@ -232,6 +232,9 @@ def get_default_route():
                     via    = _via
                     metric = _metric
     except:
+        pass
+
+    if not dev:
         return ("", "", "")
 
     dev_id = get_interface_dev_id(dev)
@@ -440,6 +443,14 @@ def dev_id_add_type(dev_id):
 
     return ''
 
+def set_linux_interfaces_stun(dev_id, public_ip, public_port, nat_type):
+    with fwglobals.g.cache.lock:
+        interface = fwglobals.g.cache.linux_interfaces.get(dev_id)
+        if interface:
+            interface['public_ip']   = public_ip
+            interface['public_port'] = public_port
+            interface['nat_type']    = nat_type
+
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
 
@@ -473,6 +484,9 @@ def get_linux_interfaces(cached=True):
                 'gateway':          '',
                 'metric':           '',
                 'internetAccess':   '',
+                'public_ip':        '',
+                'public_port':      '',
+                'nat_type':         '',
             }
 
             interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
@@ -510,7 +524,7 @@ def get_linux_interfaces(cached=True):
 
                 # Fetch public address info from STUN module
                 #
-                _, interface['public_ip'], interface['public_port'], interface['nat_type'] = \
+                interface['public_ip'], interface['public_port'], interface['nat_type'] = \
                     fwglobals.g.stun_wrapper.find_addr(dev_id)
 
                 # Fetch internet connectivity info from WAN Monitor module.
@@ -551,8 +565,13 @@ def get_interface_dev_id(if_name):
         # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
         if not dev_id and vpp_does_run():
             vpp_if_name = tap_to_vpp_if_name(if_name)
-            if vpp_if_name:
-                dev_id = vpp_if_name_to_dev_id(vpp_if_name)
+            if not vpp_if_name:
+                return ''
+
+            if re.match(r'^loop', vpp_if_name):
+                return ''   # loopback interfaces have no dev id (bus id)
+
+            dev_id = vpp_if_name_to_dev_id(vpp_if_name)
 
         if not dev_id:
             return ''
@@ -3131,9 +3150,8 @@ def get_reconfig_hash():
         res += 'gateway:' + gw + ','
         res += 'metric:'  + metric + ','
         if gw and addr:
-            _, public_ip, public_port, nat_type = fwglobals.g.stun_wrapper.find_addr(dev_id)
-            res += 'public_ip:'   + public_ip + ','
-            res += 'public_port:' + str(public_port) + ','
+            res += 'public_ip:'   + linux_interfaces[dev_id]['public_ip'] + ','
+            res += 'public_port:' + str(linux_interfaces[dev_id]['public_port']) + ','
 
     hash = hashlib.md5(res).hexdigest()
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
