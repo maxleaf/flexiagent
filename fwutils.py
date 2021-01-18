@@ -2109,3 +2109,9 @@ def ikev2_clean():
 
     for cert in glob.glob(fwglobals.g.IKEV2_FOLDER + '/' + 'remote*.pem'):
         os.remove(cert)
+
+def vpp_interface_status_get(interfaces, sw_if_index):
+    for sw_if in interfaces:
+        if sw_if.sw_if_index == sw_if_index:
+            return sw_if.flags
+    return 0

@@ -194,10 +194,15 @@ class FWROUTER_API:
                 if not fwutils.vpp_does_run():
                     continue
 
+                interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
+
                 tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
 
                 for src, tun in tunnels.items():
+                    tunnel_status = 0
                     tunnel = fwutils.ikev2_gre_tunnel_get(src)
+                    if tunnel:
+                        tunnel_status = fwutils.vpp_interface_status_get(interfaces, tunnel.sw_if_index)
 
                     if tun['state'] == 'stopped':
                         if tunnel:
@@ -210,7 +215,8 @@ class FWROUTER_API:
                             fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
 
                     if tun['state'] == 'running':
-                        if not tunnel:
+                        # Check if tunnel is down
+                        if not tunnel or tunnel_status != 3: # vl_api_if_status_flags_t.IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP
                             tun['state'] = 'stopped'
                             fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
 
