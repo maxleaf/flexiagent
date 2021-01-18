@@ -118,7 +118,6 @@ request_handlers = {
     # OS API
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
-    'ifcount':                      {'name': '_call_os_api'},
     'ifstats':                      {'name': '_call_os_api'},
 
     # VPP API
@@ -207,20 +206,20 @@ class Fwglobals:
                 'DEV_ID_TO_VPP_TAP_NAME': {},
                 'STUN': {},
                 'VPP_IF_NAME_TO_DEV_ID': {},
-                'LINUX_IF_NAME_TO_DEV_ID': {},
+                'LINUX_INTERFACES_BY_NAME': {},
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
                 }
             }
-            self.lock                = threading.Lock()
-            self.linux_interfaces    = self.db['LINUX_INTERFACES']
-            self.dev_id_to_vpp_if_name  = self.db['DEV_ID_TO_VPP_IF_NAME']
-            self.dev_id_to_vpp_tap_name = self.db['DEV_ID_TO_VPP_TAP_NAME']
-            self.stun_cache          = self.db['STUN']
-            self.vpp_if_name_to_dev_id  = self.db['VPP_IF_NAME_TO_DEV_ID']
-            self.linux_if_to_dev_id  = self.db['LINUX_IF_NAME_TO_DEV_ID']
-            self.wan_monitor         = self.db['WAN_MONITOR']
+            self.lock                       = threading.RLock()
+            self.linux_interfaces           = self.db['LINUX_INTERFACES']
+            self.dev_id_to_vpp_if_name      = self.db['DEV_ID_TO_VPP_IF_NAME']
+            self.dev_id_to_vpp_tap_name     = self.db['DEV_ID_TO_VPP_TAP_NAME']
+            self.stun_cache                 = self.db['STUN']
+            self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
+            self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
+            self.wan_monitor                = self.db['WAN_MONITOR']
 
 
     def __init__(self):

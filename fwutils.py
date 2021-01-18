@@ -460,9 +460,12 @@ def get_linux_interfaces(cached=True):
     """
     with fwglobals.g.cache.lock:
 
-        interfaces = {} if not cached else fwglobals.g.cache.linux_interfaces
+        interfaces = fwglobals.g.cache.linux_interfaces
+
         if cached and interfaces:
             return interfaces
+
+        interfaces.clear()
 
         linux_inf = psutil.net_if_addrs()
         for (if_name, addrs) in linux_inf.items():
@@ -543,8 +546,6 @@ def get_linux_interfaces(cached=True):
 
             interfaces[dev_id] = interface
 
-        fwglobals.g.cache.linux_interfaces = interfaces
-
         return interfaces
 
 def get_interface_dev_id(if_name):
@@ -554,13 +555,21 @@ def get_interface_dev_id(if_name):
 
     :returns: dev_id.
     """
-    if if_name:
-        cache = fwglobals.g.cache.linux_if_to_dev_id
-        dev_id = cache.get(if_name, '')
+    if not if_name:
+        return ''
+
+    with fwglobals.g.cache.lock:
+        interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
+        if not interface:
+            fwglobals.g.cache.linux_interfaces_by_name[if_name] = {}
+            interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
+
+        dev_id = interface.get('dev_id')
+        if dev_id != None:
+            return dev_id
 
         # First try to get dev id if interface is under linux control
-        if not dev_id:
-            dev_id = build_interface_dev_id(if_name)
+        dev_id = build_interface_dev_id(if_name)
 
         # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
         if not dev_id and vpp_does_run():
@@ -568,12 +577,8 @@ def get_interface_dev_id(if_name):
             if vpp_if_name and not re.match(r'^loop', vpp_if_name): # loopback interfaces have no dev id (bus id)
                 dev_id = vpp_if_name_to_dev_id(vpp_if_name)
 
-        fwglobals.g.cache.linux_if_to_dev_id[if_name] = dev_id if dev_id else 'None'
-        if dev_id == 'None':
-            return ''
+        interface.update({'dev_id': dev_id})
         return dev_id
-
-    return ''
 
 def build_interface_dev_id(if_name):
     """Convert Linux interface name into bus address.
@@ -1316,14 +1321,14 @@ def get_vpp_if_count():
      """
     shif = _vppctl_read('sh int', wait=False)
     if shif == None:  # Exit with an error
-        return {'message':'Error reading interface info', 'ok':0}
+        return None
     data = shif.splitlines()
     res = {}
     for intf in _get_group_delimiter(data, r"^\w.*?\s"):
         # Contains data for a given interface
         ifdata = ''.join(intf)
         _parse_add_if(ifdata, res)
-    return {'message':res, 'ok':1}
+    return res
 
 def ip_str_to_bytes(ip_str):
     """Convert IP address string into bytes.
@@ -2324,7 +2329,8 @@ def start_hostapd():
 
 def stop_hostapd():
     try:
-        os.system('killall hostapd')
+        if pid_of('hostapd'):
+            os.system('killall hostapd')
 
         files = glob.glob("%s*fwrun.conf" % fwglobals.g.HOSTAPD_CONFIG_DIRECTORY)
         for filePath in files:
@@ -2397,7 +2403,8 @@ def set_lte_info_on_linux_interface(dev_id):
                     pass
 
             os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
-            fwglobals.g.cache.linux_interfaces = {} # remove this code when move ip configuration to netplan
+
+            fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
             return (True , None)
 
     return (False, "Failed to set lte info on linux interface")
@@ -2523,7 +2530,7 @@ def lte_disconnect(dev_id, hard_reset_service=False):
             _run_qmicli_command(dev_id, 'nas-reset')
             _run_qmicli_command(dev_id, 'uim-reset')
 
-        fwglobals.g.cache.linux_interfaces = {} # remove this code when move ip configuration to netplan
+        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
 
         return (True, None)
     except subprocess.CalledProcessError as e:
@@ -2830,14 +2837,27 @@ def get_ethtool_value(linuxif, ethtool_key):
 def get_interface_bus_info(linux_if):
     return get_ethtool_value(linux_if, 'bus-info')
 
-def get_interface_driver(linux_if):
+def get_interface_driver(if_name):
     """Get Linux interface driver.
 
-    :param dev_id: Bus address of interface to check.
+    :param if_name: interface name in Linux.
 
     :returns: driver name.
     """
-    return get_ethtool_value(linux_if, 'driver')
+    with fwglobals.g.cache.lock:
+        interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
+        if not interface:
+            fwglobals.g.cache.linux_interfaces_by_name[if_name] = {}
+            interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
+
+        driver = interface.get('driver')
+        if driver != None:
+            return driver
+
+        driver = get_ethtool_value(if_name, 'driver')
+
+        interface.update({'driver': driver})
+        return driver
 
 def is_dpdk_interface(dev_id):
     return not is_non_dpdk_interface(dev_id)
@@ -2933,8 +2953,8 @@ def netplan_apply(caller_name=None):
 
         # Netplan might change interface names, e.g. enp0s3 -> vpp0, or other parameters so reset cache
         #
-        fwglobals.g.cache.linux_if_to_dev_id = {}
-        fwglobals.g.cache.linux_interfaces = {}
+        fwglobals.g.cache.linux_interfaces_by_name.clear()
+        fwglobals.g.cache.linux_interfaces.clear()
 
         # Find out if the default route was changed. If it was - reconnect agent.
         #

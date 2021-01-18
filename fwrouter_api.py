@@ -215,7 +215,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
-            fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
+            fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -975,7 +975,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
-        fwglobals.g.cache.linux_interfaces = {}
+        fwglobals.g.cache.linux_interfaces.clear()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):
@@ -985,7 +985,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.state_change(FwRouterState.STOPPING)
         self._stop_threads()
         fwutils.reset_dhcpd()
-        fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_after(self):
@@ -1001,8 +1001,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
         self.state_change(FwRouterState.STOPPED)
-        fwglobals.g.cache.dev_id_to_vpp_tap_name = {}
-        fwglobals.g.cache.linux_interfaces = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
+        fwglobals.g.cache.linux_interfaces.clear()
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
