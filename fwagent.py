@@ -707,51 +707,57 @@ def start(start_router):
     daemon_rpc('start', start_vpp=start_router) # if daemon runs, start connection loop and router if required
     fwglobals.log.info("done")
 
-def show(agent_info, router_info, device_info, system_info, daemon_info):
+def show(agent, configuration, database, status):
     """Handles 'fwagent show' command.
     This commands prints various information about device and it's components,
     like router configuration, software version, etc.
     For full list of available options to show use 'fwagent --help'.
 
-    :param agent_info:   Agent information.
-    :param router_info:  Router information.
-    :param daemon_info:  Daemon information.
+    :param agent:          Agent information.
+    :param configuration:  Configuration information.
+    :param database:       Databases information.
+    :param status:         Status information.
 
     :returns: None.
     """
-    if agent_info:
-        out = daemon_rpc('show', what=agent_info)
+
+    if configuration:
+        if configuration == 'all':
+            fwutils.print_router_config()
+            fwutils.print_system_config()
+        elif configuration == 'router':
+            fwutils.print_router_config()
+        elif configuration == 'system':
+            fwutils.print_system_config()
+        elif configuration == 'multilink-policy':
+            fwutils.print_router_config(basic=False, multilink=True)
+        elif configuration == 'signature':
+            fwutils.print_device_config_signature()
+
+    if agent:
+        out = daemon_rpc('show', what=agent)
         if out:
             fwglobals.log.info(out, to_syslog=False)
 
-    if router_info:
-        if router_info == 'state':
-            fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
-        elif router_info == 'configuration':
-            fwutils.print_router_config()
-        elif router_info == 'cfg-db':
+    if database:
+        if database == 'all':
             fwutils.print_router_config(full=True)
-        elif router_info == 'multilink-policy':
-            fwutils.print_router_config(basic=False, multilink=True)
-
-    if device_info:
-        if device_info == 'cfg-signature':
-            fwutils.print_device_config_signature()
-
-    if system_info:
-        if system_info == 'configuration':
-            fwutils.print_system_config()
-        elif system_info == 'cfg-db':
+            fwutils.print_system_config(full=True)
+        elif database == 'router':
+            fwutils.print_router_config(full=True)
+        elif database == 'system':
             fwutils.print_system_config(full=True)
 
-    if daemon_info:
-        if daemon_info == 'status':
+    if status:
+        if status == 'daemon':
             try:
                 daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
                 daemon.ping()   # Check if daemon runs
                 fwglobals.log.info("running")
             except Pyro4.errors.CommunicationError:
                 fwglobals.log.info("not running")
+        elif status == 'router':
+            fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
 
 @Pyro4.expose
 class FwagentDaemon(object):
@@ -1120,11 +1126,10 @@ if __name__ == '__main__':
                     'simulate': lambda args: loadsimulator.g.simulate(count=args.count),
                     'dump': lambda args: dump(filename=args.filename, path=args.path, clean_log=args.clean_log),
                     'show': lambda args: show(
-                        agent_info=args.agent,
-                        router_info=args.router,
-                        device_info=args.device,
-                        system_info=args.system,
-                        daemon_info=args.daemon),
+                        agent=args.agent,
+                        configuration=args.configuration,
+                        database=args.database,
+                        status=args.status),
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
@@ -1162,16 +1167,16 @@ if __name__ == '__main__':
     parser_simulate.add_argument('-c', '--count', dest='count',
                         help="How many devices to simulate")
     parser_show = subparsers.add_parser('show', help='Prints various information to stdout')
-    parser_show.add_argument('--router', choices=['configuration', 'state', 'cfg-db', 'multilink-policy'],
-                        help="show various router parameters")
     parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
-    parser_show.add_argument('--daemon', choices=['status'],
-                        help="show various daemon parameters")
-    parser_show.add_argument('--device', choices=['cfg-signature'],
-                        help="show various device parameters")
-    parser_show.add_argument('--system', choices=['configuration', 'cfg-db'],
-                        help="show various system parameters")
+    parser_show.add_argument('--configuration', const='all', nargs='?',
+                        choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
+                        help="show flexiEdge configuration")
+    parser_show.add_argument('--database', const='all', nargs='?',
+                        choices=['all', 'router', 'system'],
+                        help="show whole flexiEdge database")
+    parser_show.add_argument('--status', choices=['daemon', 'router'],
+                        help="show flexiEdge status")
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read flexiManage requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")

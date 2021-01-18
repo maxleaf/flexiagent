@@ -249,7 +249,7 @@ class FwCfgDatabase:
             }
             if full:
                 item.update({'Executed': str(msg['executed'])})
-                item.update({'Commands': yaml_dump(msg['cmd_list']).split('\n')})
+                item.update({'Commands': fwutils.yaml_dump(msg['cmd_list']).split('\n')})
             out[section_name].append(item)
         if not out:
             return ''
