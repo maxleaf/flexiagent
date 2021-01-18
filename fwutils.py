@@ -593,9 +593,8 @@ def build_interface_dev_id(if_name):
                 if_addr = if_addr[-1]
                 if re.search(r'usb|pci', if_addr_line):
                     dev_id = dev_id_add_type(if_addr)
-                    address = dev_id_add_type(if_addr)
-                    dev_id = dev_id_to_full(address)
-        except:
+                    dev_id = dev_id_to_full(dev_id)
+        except Exception as e:
             pass
     return dev_id
 
