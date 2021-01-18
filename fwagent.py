@@ -195,17 +195,21 @@ class FwAgent:
         serial = fwutils.get_machine_serial()
         url = fwglobals.g.cfg.MANAGEMENT_URL  + "/api/connect/register"
 
-        data = uparse.urlencode({'token': self.token.rstrip(),
-                                'fwagent_version' : self.versions['components']['agent']['version'],
-                                'router_version' : self.versions['components']['router']['version'],
-                                'device_version' : self.versions['device'],
-                                'machine_id' : machine_id,
-                                'serial' : serial,
-                                'machine_name': machine_name,
-                                'ip_list': ip_list,
-                                'default_route': dr_via,
-                                'default_dev': dr_dev,
-                                'interfaces': json.dumps(interfaces)}).encode()
+        data = {'token': self.token.rstrip(),
+                'fwagent_version' : self.versions['components']['agent']['version'],
+                'router_version' : self.versions['components']['router']['version'],
+                'device_version' : self.versions['device'],
+                'machine_id' : machine_id,
+                'serial' : serial,
+                'machine_name': machine_name,
+                'ip_list': ip_list,
+                'default_route': dr_via,
+                'default_dev': dr_dev,
+                'interfaces': interfaces
+        }
+        fwglobals.log.debug("registering with: %s" % json.dumps(data))
+        data.update({'interfaces': json.dumps(interfaces)})
+        data = uparse.urlencode(data).encode()
         req = ureq.Request(url, data)
         ctx = ssl.create_default_context()
         if fwglobals.g.cfg.BYPASS_CERT:
@@ -652,7 +656,7 @@ def reset(soft=False):
     CSTART = "\x1b[0;30;43m"
     CEND = "\x1b[0m"
     choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
-                      "Already deleted in flexiManage y/n [n]" + CEND)
+                      "Already deleted in flexiManage y/n [n]: " + CEND)
     if choice == 'y' or choice == 'Y':
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)

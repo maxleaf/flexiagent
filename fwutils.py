@@ -565,18 +565,12 @@ def get_interface_dev_id(if_name):
         # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
         if not dev_id and vpp_does_run():
             vpp_if_name = tap_to_vpp_if_name(if_name)
-            if not vpp_if_name:
-                return ''
+            if vpp_if_name and not re.match(r'^loop', vpp_if_name): # loopback interfaces have no dev id (bus id)
+                dev_id = vpp_if_name_to_dev_id(vpp_if_name)
 
-            if re.match(r'^loop', vpp_if_name):
-                return ''   # loopback interfaces have no dev id (bus id)
-
-            dev_id = vpp_if_name_to_dev_id(vpp_if_name)
-
-        if not dev_id:
+        fwglobals.g.cache.linux_if_to_dev_id[if_name] = dev_id if dev_id else 'None'
+        if dev_id == 'None':
             return ''
-
-        fwglobals.g.cache.linux_if_to_dev_id[if_name] = dev_id
         return dev_id
 
     return ''
@@ -2404,18 +2398,14 @@ def set_lte_info_on_linux_interface(dev_id):
                     pass
 
             os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
-            get_linux_interfaces(cached=False) # remove this code when move ip configuration to netplan
+            fwglobals.g.cache.linux_interfaces = {} # remove this code when move ip configuration to netplan
             return (True , None)
 
     return (False, "Failed to set lte info on linux interface")
 
 def dev_id_to_usb_device(dev_id, driver="cdc_mbim"):
     try:
-        interfaces = get_linux_interfaces()
-        if_name = interfaces[dev_id]['name']
-        address = subprocess.check_output('ls -l /sys/class/net | grep %s' % if_name, shell=True)
-        address = 'usb%s' % re.search('usb(.+?)/net', address).group(1)
-        usb_addr = address.split('/')[-1]
+        usb_addr = dev_id.split('/')[-1]
         output = subprocess.check_output('ls /sys/bus/usb/drivers/%s/%s/usbmisc/' % (driver, usb_addr), shell=True).strip()
         return output
     except subprocess.CalledProcessError as err:
@@ -2534,7 +2524,7 @@ def lte_disconnect(dev_id, hard_reset_service=False):
             _run_qmicli_command(dev_id, 'nas-reset')
             _run_qmicli_command(dev_id, 'uim-reset')
 
-        get_linux_interfaces(cached=False) # remove this code when move ip configuration to netplan
+        fwglobals.g.cache.linux_interfaces = {} # remove this code when move ip configuration to netplan
 
         return (True, None)
     except subprocess.CalledProcessError as e:
