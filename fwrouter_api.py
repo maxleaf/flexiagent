@@ -939,7 +939,7 @@ class FWROUTER_API:
         #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
         #     Implement real modification on demand :)
         #
-        if re.match('modify-interface', req):
+        if re.match('modify-interface|modify-tunnel', req):
             req     = 'aggregated'
             params  = { 'requests' : _preprocess_modify_X(request) }
             request = {'message': req, 'params': params}
@@ -948,7 +948,7 @@ class FWROUTER_API:
         elif req == 'aggregated':
             new_requests = []
             for _request in params['requests']:
-                if re.match('modify-interface', _request['message']):
+                if re.match('modify-interface|modify-tunnel', _request['message']):
                     new_requests += _preprocess_modify_X(_request)
                 else:
                     new_requests.append(_request)

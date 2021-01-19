@@ -895,7 +895,7 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
         dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)
         _add_ikev2_initiator_profile(
                         cmd_list,
-                        ikev2_profile_name, params['ikev2']['lifetime'],
+                        ikev2_profile_name, 20,
                         'loop1_sw_if_index',
                         dst,
                         params['ikev2']['ike'],
@@ -1101,36 +1101,7 @@ def add_tunnel(params):
     return cmd_list
 
 def modify_tunnel(new_params, old_params):
-    remote_device_id = str(old_params['ikev2']['remote-device-id'])
-    certificate = new_params['ikev2']['certificate']
-    role = old_params['ikev2']['role']
     cmd_list = []
-
-    loop0_ip  = IPNetwork(old_params['loopback-iface']['addr'])
-    loop1_ip  = copy.deepcopy(loop0_ip)
-    loop1_ip.value  += IPAddress('0.1.0.0').value
-    src = str(loop1_ip.ip)
-
-    # Add modify white list
-    cmd = {}
-    cmd['modify'] = 'modify'
-    cmd['whitelist'] = {'certificate'}
-    cmd_list.append(cmd)
-
-    # Add public certificate file
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "modify IKEv2 public certificate for %s" % remote_device_id
-    cmd['cmd']['params']    = {
-                                'module': 'fwutils',
-                                'func'  : 'ikev2_modify_certificate',
-                                'args'  : {'device_id'   : remote_device_id,
-                                           'certificate' : certificate,
-                                           'role'        : role,
-                                           'src'         : src}
-                                }
-    cmd_list.append(cmd)
 
     return cmd_list
 

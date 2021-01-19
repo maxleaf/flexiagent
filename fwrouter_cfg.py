@@ -184,7 +184,7 @@ class FwRouterCfg:
 
             if re.match('add-', req) or re.match('start-router', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
-            elif re.match('modify-interface', req):
+            elif re.match('modify-interface|modify-tunnel', req):
                 entry = self.db[req_key]
                 entry.update({'params' : params})
                 self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
