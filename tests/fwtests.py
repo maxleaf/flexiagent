@@ -100,7 +100,7 @@ class TestFwagent:
         :param expected_router_cfg: The name of the JSON file with dictionary
                     that describes expected router configuration upon successful
                     API invocation as it would be retrieved by the
-                    'agent show --router configuration' command:
+                    'agent show configuration --router' command:
                                     {
                                     "======= START COMMAND =======": [
                                         {
@@ -142,7 +142,7 @@ class TestFwagent:
                 # Poll daemon status until it becomes 'running'
                 #
                 timeout = 120
-                cmd = '%s show --daemon status' % (self.fwagent_py)
+                cmd = '%s show --status daemon' % (self.fwagent_py)
                 out = subprocess.check_output(cmd, shell=True)
                 while out.strip() != 'running' and timeout > 0:
                     time.sleep(1)
@@ -404,9 +404,9 @@ def router_is_configured(expected_cfg_dump_filename,
     # Dumps current agent configuration into temporary file and checks
     # if the dump file is equal to the provided expected dump file.
     actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
-    dump_configuration_cmd = "sudo %s show --router configuration > %s" % (fwagent_py, actual_cfg_dump_filename)
+    dump_configuration_cmd = "sudo %s show --configuration router > %s" % (fwagent_py, actual_cfg_dump_filename)
     subprocess.call(dump_configuration_cmd, shell=True)
-    dump_multilink_cmd = "sudo %s show --router multilink-policy >> %s" % (fwagent_py, actual_cfg_dump_filename)
+    dump_multilink_cmd = "sudo %s show --configuration multilink-policy >> %s" % (fwagent_py, actual_cfg_dump_filename)
     subprocess.call(dump_multilink_cmd, shell=True)
     ok = filecmp.cmp(expected_cfg_dump_filename, actual_cfg_dump_filename)
     if ok:
