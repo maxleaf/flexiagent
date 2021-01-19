@@ -468,9 +468,9 @@ class Fwglobals:
                 reply = {'ok': 0, 'message': str(e)}
             return reply
 
-        def _revert(requests, current_idx, err_msg):
+        def _revert(requests, succeeded_idx=0, err_msg=''):
             revert_list = []
-            for request in reversed(requests[0:current_idx]):
+            for request in reversed(requests[0:succeeded_idx]):
                 op = request['message']
                 request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
                 revert_list.append(request)
@@ -478,6 +478,7 @@ class Fwglobals:
 
         aggregated_list = []
         last_api = None
+        last_aggregate_succeeded_idx = 0
         for (idx, request) in enumerate(requests):
             req = request['message']
 
@@ -496,15 +497,16 @@ class Fwglobals:
                 reply = _call(aggregated_list, last_api) # call api with current list
                 if reply['ok'] == 1:
                     aggregated_list = [] # reset list and append the current which belongs to other api
+                    last_aggregate_succeeded_idx = idx -1
                     aggregated_list.append(request)
                     last_api = api_type
                 elif not revert_mode:
-                    return _revert(requests, idx, reply['message'])
+                    return _revert(requests, last_aggregate_succeeded_idx, reply['message'])
 
             if idx == len(requests) - 1: # make sure the last request sent even if the same api as previous
                 reply = _call(aggregated_list, last_api)
                 if reply['ok'] == 0 and not revert_mode:
-                    return _revert(requests, idx, reply['message'])
+                    return _revert(requests, last_aggregate_succeeded_idx, reply['message'])
 
         if revert_mode: # throw the error message from the first failed aggregated group
             raise Exception(err_msg)
