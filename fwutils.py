@@ -2358,10 +2358,10 @@ def get_lte_interfaces_dev_ids():
     out = {}
     interfacaes = psutil.net_if_addrs()
     for nicname, addrs in interfacaes.items():
-        currernt_dev_id = get_interface_dev_id(nicname)
-        if currernt_dev_id and is_lte_interface(nicname):
-            out[currernt_dev_id] = nicname
-
+        if is_lte_interface(nicname):
+            dev_id = get_interface_dev_id(nicname)
+            if dev_id:
+                out[dev_id] = nicname
     return out
 
 def set_lte_info_on_linux_interface(dev_id):
