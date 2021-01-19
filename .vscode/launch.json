@@ -5,6 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Attach using Process Id",
+            "type": "python",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+        },
+        {
             "name": "fwagent daemon",
             "type": "python",
             "request": "launch",
@@ -46,7 +52,8 @@
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
             "args": [
-                "reset", "-s"
+                "reset",
+                "-s"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
@@ -59,7 +66,8 @@
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
             "args": [
-                "show", "--agent", "cache"
+                "show",
+                "--configuration"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
@@ -72,7 +80,9 @@
             "request": "launch",
             "module": "${workspaceFolder}/tests/router/01_cli_basic_requests_test",
             "cwd": "${workspaceRoot}",
-            "env": {"PYTHONPATH": "${workspaceRoot}"}
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
         },
         {
             "name": "Test: Inject One Cli Request",
@@ -80,10 +90,14 @@
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
             "args": [
-                "cli", "-f", "/home/shneor/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
+                "cli",
+                "-f",
+                "/home/shneor/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
             ],
             "cwd": "${workspaceRoot}",
-            "env": {"PYTHONPATH": "${workspaceRoot}"}
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
         },
         {
             "name": "system_checker",

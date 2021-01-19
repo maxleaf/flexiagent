@@ -81,8 +81,10 @@ request_handlers = {
     'get-lte-info':                      {'name': '_call_agent_api'},
     'reset-lte':                         {'name': '_call_agent_api'},
 
+    # Aggregated API
+    'aggregated':                   {'name': '_call_aggregated'},
+
     # Router API
-    'aggregated':                   {'name': '_call_router_api', 'sign': True},
     'start-router':                 {'name': '_call_router_api', 'sign': True},
     'stop-router':                  {'name': '_call_router_api', 'sign': True},
     'add-interface':                {'name': '_call_router_api', 'sign': True},
@@ -384,6 +386,182 @@ class Fwglobals:
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)
 
+    def _handle_aggregated(self, requests, revert_mode=False, err_msg=None):
+        """Handle aggregated request with mixed API messages.
+        FlexiManage can send a single aggregated request that contains
+        several requests (add-interface, add-lte) belong to different APIs (router-api, system-api) etc.
+
+        Note, the order of the requests is critical.
+        We need to run the requests one by one as they come from flexiManage.
+        If one request is failed, we need to revert all the requests that succeeded before it.
+
+        To handle it, we go through all the requests and trying to group them
+        into separate aggregated groups for each API.
+
+        The logic is as follows:
+        We are looping on the requests until we find that the current request belongs to a different API than the previous one.
+        This means that all the previous requests belong to the same API, and we can group them.
+        Then we call the API with the aggregated group.
+        if the call is failed, then regardless of the API internal revert logic,
+        we need to revert the previous aggregated groups as well.
+
+        :param requests: list of mixed requests:
+            "requests": [
+                {
+                    "entity": "agent",
+                    "message": "remove-lte",
+                    "params": {
+                        "apn": "we",
+                        "enable": false,
+                        "dev_id": "usb:usb1/1-3/1-3:1.4"
+                    }
+                },
+                {
+                    "entity": "agent",
+                    "message": "remove-interface",
+                    "params": {
+                        "dhcp": "yes",
+                        "addr": "10.93.172.31/26",
+                        "addr6": "fe80::b82a:beff:fe44:38e8/64",
+                        "PublicIP": "46.19.85.31",
+                        "PublicPort": "4789",
+                        "useStun": true,
+                        "monitorInternet": true,
+                        "gateway": "10.93.172.32",
+                        "metric": "",
+                        "routing": "NONE",
+                        "type": "WAN",
+                        "configuration": {
+                            "apn": "we",
+                            "enable": false
+                        },
+                        "deviceType": "lte",
+                        "dev_id": "usb:usb1/1-3/1-3:1.4",
+                        "multilink": {
+                            "labels": []
+                        }
+                    }
+                }
+            ]
+
+        :param revert_mode: indicates whether the function is currently in reverse mode.
+            If so, in case of an error, we will not call the revert functionality again
+            but will throw an error out to avoid an infinite loop.
+
+        :param err_msg: an empty string used with revert mode.
+            We throw this error message if the revert is completed successfully.
+            This err_msg will send to flexiManage.
+
+        :returns: dictionary with status code and optional error message.
+        """
+        def _call(aggregated_list, api_type):
+            req = {
+                'message':   'aggregated',
+                'params':    { 'requests': aggregated_list },
+            }
+            handler_func = getattr(self, api_type)
+            try:
+                reply = handler_func(req)
+            except Exception as e:
+                if revert_mode:
+                    raise e
+                reply = {'ok': 0, 'message': str(e)}
+            return reply
+
+        def _revert(requests, current_idx, err_msg):
+            revert_list = []
+            for request in reversed(requests[0:current_idx]):
+                op = request['message']
+                request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
+                revert_list.append(request)
+            return self._handle_aggregated(requests=revert_list, revert_mode=True, err_msg=err_msg)
+
+        aggregated_list = []
+        last_api = None
+        for (idx, request) in enumerate(requests):
+            req = request['message']
+
+            handler = request_handlers.get(req)
+            assert handler, 'fwglobals: "%s" request is not supported' % req
+
+            api_type = handler.get('name')
+
+            if last_api == None: # initialize the previous api on the first iteration
+                last_api = api_type
+
+            if api_type == last_api:
+                aggregated_list.append(request)
+
+            if api_type != last_api:
+                reply = _call(aggregated_list, last_api) # call api with current list
+                if reply['ok'] == 1:
+                    aggregated_list = [] # reset list and append the current which belongs to other api
+                    aggregated_list.append(request)
+                    last_api = api_type
+                elif not revert_mode:
+                    return _revert(requests, idx, reply['message'])
+
+            if idx == len(requests) - 1: # make sure the last request sent even if the same api as previous
+                reply = _call(aggregated_list, last_api)
+                if reply['ok'] == 0 and not revert_mode:
+                    return _revert(requests, idx, reply['message'])
+
+        if revert_mode: # throw the error message from the first failed aggregated group
+            raise Exception(err_msg)
+        return {'ok': 1}
+
+    def _call_aggregated(self, request):
+        """Handle aggregated request from flexiManage.
+
+        :param request: the aggregated request like:
+            {
+                "entity": "agent",
+                "message": "aggregated",
+                "params": {
+                    "requests": [
+                        {
+                            "entity": "agent",
+                            "message": "remove-lte",
+                            "params": {
+                                "apn": "we",
+                                "enable": false,
+                                "dev_id": "usb:usb1/1-3/1-3:1.4"
+                            }
+                        },
+                        {
+                            "entity": "agent",
+                            "message": "remove-interface",
+                            "params": {
+                                "dhcp": "yes",
+                                "addr": "10.93.172.31/26",
+                                "addr6": "fe80::b82a:beff:fe44:38e8/64",
+                                "PublicIP": "46.19.85.31",
+                                "PublicPort": "4789",
+                                "useStun": true,
+                                "monitorInternet": true,
+                                "gateway": "10.93.172.32",
+                                "metric": "",
+                                "routing": "NONE",
+                                "type": "WAN",
+                                "configuration": {
+                                    "apn": "we",
+                                    "enable": false
+                                },
+                                "deviceType": "lte",
+                                "dev_id": "usb:usb1/1-3/1-3:1.4",
+                                "multilink": {
+                                    "labels": []
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+
+        :returns: dictionary with status code and optional error message.
+        """
+        return self._handle_aggregated(request['params']['requests'])
+
     def _call_agent_api(self, request):
         return self.agent_api.call(request)
 
@@ -508,18 +686,8 @@ class Fwglobals:
             req    = request['message']
             params = request.get('params')
 
-            if req != 'aggregated':
-                handler = request_handlers.get(req)
-                assert handler, 'fwglobals: "%s" request is not supported' % req
-            else:
-                # In case of aggregated request use the first request in aggregation
-                # to deduce the handler function.
-                # Note the aggregation might include requests of the same type
-                # only, e.g. Router API (add-tunnel, remove-application, etc)
-                #
-                handler = request_handlers.get(params['requests'][0]['message'])
-                assert handler, 'fwglobals: aggregation with "%s" request is not supported' % \
-                    params['requests'][0]['message']
+            handler = request_handlers.get(req)
+            assert handler, 'fwglobals: "%s" request is not supported' % req
 
             # Keep copy of the request aside for signature purposes,
             # as the original request might by modified by preprocessing.
