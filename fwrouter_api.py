@@ -609,7 +609,7 @@ class FWROUTER_API:
         assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
-        if isinstance(cmd_list, dict):
+        if isinstance(cmd_list, list):
             new_cmd_list = []
             for cmd in cmd_list:
                 if 'modify' in cmd.keys():
