@@ -459,3 +459,16 @@ class FwCfgRequestHandler:
 
         # Full sync
         return self.sync_full(incoming_requests)
+
+    def rollback(self, aggregated_request):
+        for request in reversed(aggregated_request):
+            try:
+                op = request['message']
+                request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
+                self._call_simple(request)
+            except Exception as e:
+                err_str = "rollback: failed to revert request %s while running rollback on aggregated request" % op
+                fwglobals.log.excep("%s: %s" % (err_str, format(e)))
+                if self.revert_failure_callback:
+                    self.revert_failure_callback(t)
+                pass

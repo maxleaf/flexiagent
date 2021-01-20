@@ -82,7 +82,7 @@ request_handlers = {
     'reset-lte':                         {'name': '_call_agent_api'},
 
     # Aggregated API
-    'aggregated':                   {'name': '_call_aggregated'},
+    'aggregated':                   {'name': '_call_aggregated', 'sign': True},
 
     # Router API
     'start-router':                 {'name': '_call_router_api', 'sign': True},
@@ -388,22 +388,6 @@ class Fwglobals:
 
     def _handle_aggregated(self, requests, revert_mode=False, err_msg=None):
         """Handle aggregated request with mixed API messages.
-        FlexiManage can send a single aggregated request that contains
-        several requests (add-interface, add-lte) belong to different APIs (router-api, system-api) etc.
-
-        Note, the order of the requests is critical.
-        We need to run the requests one by one as they come from flexiManage.
-        If one request is failed, we need to revert all the requests that succeeded before it.
-
-        To handle it, we go through all the requests and trying to group them
-        into separate aggregated groups for each API.
-
-        The logic is as follows:
-        We are looping on the requests until we find that the current request belongs to a different API than the previous one.
-        This means that all the previous requests belong to the same API, and we can group them.
-        Then we call the API with the aggregated group.
-        if the call is failed, then regardless of the API internal revert logic,
-        we need to revert the previous aggregated groups as well.
 
         :param requests: list of mixed requests:
             "requests": [
@@ -512,7 +496,13 @@ class Fwglobals:
             raise Exception(err_msg)
         return {'ok': 1}
 
-    def _call_aggregated(self, request):
+    def _get_api_func(self, api_type, func_name):
+        if api_type == '_call_router_api':
+            return getattr(self.router_api, func_name)
+        elif api_type == '_call_system_api':
+            return getattr(self.system_api, func_name)
+
+    def _call_aggregated(self, aggregated_request):
         """Handle aggregated request from flexiManage.
 
         :param request: the aggregated request like:
@@ -562,7 +552,49 @@ class Fwglobals:
 
         :returns: dictionary with status code and optional error message.
         """
-        return self._handle_aggregated(request['params']['requests'])
+        requests = aggregated_request['params']['requests']
+        aggregated_list = []
+        for request in requests:
+            req = request['message']
+
+            handler = request_handlers.get(req)
+            assert handler, 'fwglobals: "%s" request is not supported' % req
+
+            api = handler.get('name')
+
+            if re.match('remove-', req):
+                cfg_db = self._get_api_func(api, 'cfg_db')
+                request['params'] = cfg_db.get_request_params(request)
+
+            if aggregated_list and aggregated_list[-1]['api'] == api:
+                aggregated_list[-1]['messages'].append(request)
+            else:
+                aggregated_list.append({'api': api, 'messages': [request]})
+
+        for (idx, aggregated_group) in enumerate(aggregated_list):
+            api = aggregated_group['api']
+            messages = aggregated_group['messages']
+
+            req = {
+                'message':   'aggregated',
+                'params':    { 'requests': messages },
+            }
+
+            handler_call_func = self._get_api_func(api, 'call')
+            try:
+                handler_call_func(req)
+            except Exception as e:
+                ll = aggregated_list[0:idx]
+                for revert_aggregated in reversed(ll):
+                    api = revert_aggregated['api']
+                    messages = revert_aggregated['messages']
+                    handler_call_func = self._get_api_func(api, 'rollback')
+                    handler_call_func(messages)
+                raise e
+
+        return {'ok': 1}
+
+        # return self._handle_aggregated(aggregated_request['params']['requests'])
 
     def _call_agent_api(self, request):
         return self.agent_api.call(request)
