@@ -558,7 +558,7 @@ class Fwglobals:
         elif api_type == '_call_system_api':
             return getattr(self.system_api, func_name)
 
-    def _call_aggregated(self, aggregated_request):
+    def _call_aggregated(self, request):
         """Handle aggregated request from flexiManage.
 
         :param request: the aggregated request like:
@@ -608,49 +608,55 @@ class Fwglobals:
 
         :returns: dictionary with status code and optional error message.
         """
-        log.debug('SHNEOR: input: %s' % aggregated_request)
-        requests = aggregated_request['params']['requests']
-        log.debug('SHNEOR: requests: %s' % requests)
-        aggregated_list = []
-        for request in requests:
-            req = request['message']
 
-            handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
+        # Break the received aggregated request into aggregated requests by API type
+        #
+        aggregated_requests = []
+        for _request in request['params']['requests']:
+
+            handler = request_handlers.get(_request['message'])
+            assert handler, '"%s" request is not supported' % _request['message']
 
             api = handler.get('name')
+            assert api, 'api for "%s" not found' % _request['message']
 
-            if re.match('remove-', req):
+            # In case we should rollback requests - fill the 'remove-X' request
+            # with full set of parameters out of database, so we could generate
+            # and execute the corresponding 'add-X' request.
+            #
+            if re.match('remove-', _request['message']):
                 cfg_db = self._get_api_func(api, 'cfg_db')
-                request['params'] = cfg_db.get_request_params(request)
+                _request['params'] = cfg_db.get_request_params(_request)
 
-            if aggregated_list and aggregated_list[-1]['api'] == api:
-                aggregated_list[-1]['messages'].append(request)
-            else:
-                aggregated_list.append({'api': api, 'messages': [request]})
+            # Create the aggregated request for the current API type, if it was not created yet.
+            #
+            if not aggregated_requests or aggregated_requests[-1]['api'] != api:
+                aggregated_by_api = {
+                    "message": "aggregated",
+                    "params": {
+                        "requests": []
+                    }
+                }
+                aggregated_requests.append({'api': api, 'request': aggregated_by_api})
 
-        log.debug('SHNEOR: aggregated_list: %s' % aggregated_list)
+            # Finally add the current request to the current aggregation.
+            #
+            aggregated_requests[-1]['request']['params']['requests'].append(_request)
 
-        for (idx, aggregated_group) in enumerate(aggregated_list):
-            api = aggregated_group['api']
-            messages = aggregated_group['messages']
 
-            req = {
-                'message':   'aggregated',
-                'params':    { 'requests': messages },
-            }
-
-            handler_call_func = self._get_api_func(api, 'call')
+        # Go over list of aggregated requests and execute them one by one.
+        #
+        for (idx, aggregated_by_api) in enumerate(aggregated_requests):
+            api = aggregated_by_api['api']
+            api_call_func = self._get_api_func(api, 'call')
             try:
-                handler_call_func(req)
+                api_call_func(aggregated_by_api['request'])
             except Exception as e:
-                ll = aggregated_list[0:idx]
-                log.debug('SHNEOR: ll: %s' % ll)
-                for revert_aggregated in reversed(ll):
-                    api = revert_aggregated['api']
-                    messages = revert_aggregated['messages']
-                    handler_call_func = self._get_api_func(api, 'rollback')
-                    handler_call_func(messages)
+                # Revert the previously executed aggregated requests
+                for aggregated_by_api in reversed(aggregated_requests[0:idx]):
+                    api = aggregated_by_api['api']
+                    rollback_func = self._get_api_func(api, 'rollback')
+                    rollback_func(aggregated_by_api['request'])
                 raise e
 
         return {'ok': 1}

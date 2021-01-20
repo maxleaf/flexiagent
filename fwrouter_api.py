@@ -273,14 +273,14 @@ class FWROUTER_API(FwCfgRequestHandler):
         return (self.router_state == FwRouterState.STARTING or \
                 self.router_state == FwRouterState.STOPPING)
 
-    def call(self, request):
+    def call(self, request, dont_revert_on_failure=False):
         """Executes router configuration request: 'add-X','remove-X' or 'modify-X'.
 
         :param request: The request received from flexiManage.
 
         :returns: dictionary with status code and optional error message.
         """
-        dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
+        dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', dont_revert_on_failure)
 
         # First of all strip out requests that have no impact on configuration,
         # like 'remove-X' for not existing configuration items and 'add-X' for
