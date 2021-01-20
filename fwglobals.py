@@ -694,6 +694,9 @@ class Fwglobals:
                 if re.match('add-', op):
                     request['message'] = op.replace('add-','remove-')
 
+                elif re.match('start-', op):
+                    request['message'] = op.replace('start-','stop-')
+
                 elif re.match('remove-', op):
                     request['message'] = op.replace('remove-','add-')
                     # The "remove-X" might have only subset of configuration parameters.
