@@ -449,6 +449,134 @@ class FwCfgRequestHandler:
         else:  # list
             params.remove(substs_element)
 
+    def _translate_modify(self, request):
+        """Translate modify request in a series of commands.
+
+        :param request: The request received from flexiManage.
+
+        :returns: list of commands.
+        """
+        req    = request['message']
+        params = request.get('params')
+        old_params  = self.cfg_db.get_request_params(request)
+
+        # First of all check if the received parameters differs from the existing ones
+        same = fwutils.compare_request_params(params, old_params)
+        if same:
+            return []
+
+        api_defs = self.translators.get(req)
+        if not api_defs:
+            # This 'modify-X' is not supported (yet?)
+            return []
+
+        module = api_defs.get('module')
+        assert module, 'there is no module for request "%s"' % req
+
+        api = api_defs.get('api')
+        assert api, 'there is no api for request "%s"' % req
+
+        func = getattr(module, api)
+        assert func, 'there is no api function for request "%s"' % req
+
+        cmd_list = func(params) if params else func()
+        return cmd_list
+        #
+
+        req         = request['message']
+        params      = request.get('params')
+        old_params  = self.cfg_db.get_request_params(request)
+
+    def _strip_noop_request(self, request):
+        """Checks if the request has no impact on configuration.
+        For example, the 'remove-X'/'modify-X' for not existing configuration
+        item or 'add-X' request for existing configuration item.
+
+        :param request: The request received from flexiManage.
+
+        :returns: request after stripping out no impact requests.
+        """
+        def _should_be_stripped(__request, aggregated_requests=None):
+            req    = __request['message']
+            params = __request.get('params', {})
+            if re.match('(modify-|remove-)', req) and not self.cfg_db.exists(__request):
+                # Ensure that the aggregated request does not include correspondent 'add-X' before.
+                noop = True
+                if aggregated_requests:
+                    complement_req     = re.sub('(modify-|remove-)','add-', req)
+                    complement_request = { 'message': complement_req, 'params': params }
+                    if _exist(complement_request, aggregated_requests):
+                        noop = False
+                if noop:
+                    return True
+            elif re.match('add-', req) and self.cfg_db.exists(__request):
+                # Ensure this is actually not modification request :)
+                existing_params = self.cfg_db.get_request_params(__request)
+                if fwutils.compare_request_params(existing_params, __request.get('params')):
+                    # Ensure that the aggregated request does not include correspondent 'remove-X' before.
+                    noop = True
+                    if aggregated_requests:
+                        complement_req     = re.sub('add-','remove-', req)
+                        complement_request = { 'message': complement_req, 'params': params }
+                        if _exist(complement_request, aggregated_requests):
+                            noop = False
+                    if noop:
+                        return True
+            elif re.match('start-router', req) and fwutils.vpp_does_run():
+                # start-router & stop-router break add-/remove-/modify- convention.
+                return True
+            elif re.match('modify-', req):
+                # For modification request ensure that it goes to modify indeed:
+                # translate request into commands to execute in order to modify
+                # configuration item in Linux/VPP. If this list is empty,
+                # the request can be stripped out.
+                #
+                cmd_list = self._translate_modify(__request)
+                if not cmd_list:
+                    # Save modify request into database, as it might contain parameters
+                    # that don't impact on interface configuration in Linux or in VPP,
+                    # like PublicPort, PublicIP, useStun, etc.
+                    #
+                    # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
+                    # We assume the 'modify-X' request includes full set of
+                    # parameters and not only modified ones!
+                    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    #
+                    self.cfg_db.update(__request)
+                    return True
+            return False
+
+        def _exist(__request, requests):
+            """Checks if the list of requests has request for the same
+            configuration item as the one denoted by the provided __request.
+            """
+            for r in requests:
+                if (__request['message'] == r['message'] and
+                    self.cfg_db.is_same_cfg_item(__request, r)):
+                    return True
+            return False
+
+
+        if request['message'] != 'aggregated':
+            if _should_be_stripped(request):
+                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
+                return None
+        else:  # aggregated request
+            out_requests = []
+            inp_requests = request['params']['requests']
+            for _request in inp_requests:
+                if _should_be_stripped(_request, inp_requests):
+                    fwglobals.log.debug("_strip_noop_request: embedded request has no impact: %s" % json.dumps(request))
+                else:
+                    out_requests.append(_request)
+            if not out_requests:
+                fwglobals.log.debug("_strip_noop_request: aggregated request has no impact")
+                return None
+            if len(out_requests) < len(inp_requests):
+                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
+            request['params']['requests'] = out_requests
+        return request
+
     def restore_configuration(self, types=None):
         """Restore configuration.
         Run all configuration translated commands.

@@ -59,15 +59,6 @@ class FwRouterCfg(FwCfgDatabase):
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
-    def is_same_cfg_item(self, request1, request2):
-        """Checks if provided requests stand for the same configuration item.
-        """
-        req_key1 = self._get_request_key(request1)
-        req_key2 = self._get_request_key(request2)
-        if req_key1 == req_key2:
-            return True
-        return False
-
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests
         """
