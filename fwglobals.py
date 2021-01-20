@@ -386,216 +386,6 @@ class Fwglobals:
             'RETRY_INTERVAL_MAX':   self.RETRY_INTERVAL_MAX,
             }, indent = 2)
 
-    def _handle_aggregated(self, requests, revert_mode=False, err_msg=None):
-        """Handle aggregated request with mixed API messages.
-
-        :param requests: list of mixed requests:
-            "requests": [
-                {
-                    "entity": "agent",
-                    "message": "remove-lte",
-                    "params": {
-                        "apn": "we",
-                        "enable": false,
-                        "dev_id": "usb:usb1/1-3/1-3:1.4"
-                    }
-                },
-                {
-                    "entity": "agent",
-                    "message": "remove-interface",
-                    "params": {
-                        "dhcp": "yes",
-                        "addr": "10.93.172.31/26",
-                        "addr6": "fe80::b82a:beff:fe44:38e8/64",
-                        "PublicIP": "46.19.85.31",
-                        "PublicPort": "4789",
-                        "useStun": true,
-                        "monitorInternet": true,
-                        "gateway": "10.93.172.32",
-                        "metric": "",
-                        "routing": "NONE",
-                        "type": "WAN",
-                        "configuration": {
-                            "apn": "we",
-                            "enable": false
-                        },
-                        "deviceType": "lte",
-                        "dev_id": "usb:usb1/1-3/1-3:1.4",
-                        "multilink": {
-                            "labels": []
-                        }
-                    }
-                }
-            ]
-
-        :param revert_mode: indicates whether the function is currently in reverse mode.
-            If so, in case of an error, we will not call the revert functionality again
-            but will throw an error out to avoid an infinite loop.
-
-        :param err_msg: an empty string used with revert mode.
-            We throw this error message if the revert is completed successfully.
-            This err_msg will send to flexiManage.
-
-        :returns: dictionary with status code and optional error message.
-        """
-        def _call(aggregated_list, api_type):
-            req = {
-                'message':   'aggregated',
-                'params':    { 'requests': aggregated_list },
-            }
-            handler_func = getattr(self, api_type)
-            try:
-                reply = handler_func(req)
-            except Exception as e:
-                if revert_mode:
-                    raise e
-                reply = {'ok': 0, 'message': str(e)}
-            return reply
-
-        def _revert(requests, succeeded_idx=0, err_msg=''):
-            revert_list = []
-            for request in reversed(requests[0:succeeded_idx]):
-                op = request['message']
-                request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
-                revert_list.append(request)
-            return self._handle_aggregated(requests=revert_list, revert_mode=True, err_msg=err_msg)
-
-        aggregated_list = []
-        last_api = None
-        last_aggregate_succeeded_idx = 0
-        for (idx, request) in enumerate(requests):
-            req = request['message']
-
-            handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
-
-            api_type = handler.get('name')
-
-            if last_api == None: # initialize the previous api on the first iteration
-                last_api = api_type
-
-            if api_type == last_api:
-                aggregated_list.append(request)
-
-            if api_type != last_api:
-                reply = _call(aggregated_list, last_api) # call api with current list
-                if reply['ok'] == 1:
-                    aggregated_list = [] # reset list and append the current which belongs to other api
-                    last_aggregate_succeeded_idx = idx -1
-                    aggregated_list.append(request)
-                    last_api = api_type
-                elif not revert_mode:
-                    return _revert(requests, last_aggregate_succeeded_idx, reply['message'])
-
-            if idx == len(requests) - 1: # make sure the last request sent even if the same api as previous
-                reply = _call(aggregated_list, last_api)
-                if reply['ok'] == 0 and not revert_mode:
-                    return _revert(requests, last_aggregate_succeeded_idx, reply['message'])
-
-        if revert_mode: # throw the error message from the first failed aggregated group
-            raise Exception(err_msg)
-        return {'ok': 1}
-
-    def _get_api_func(self, api_type, func_name):
-        if api_type == '_call_router_api':
-            return getattr(self.router_api, func_name)
-        elif api_type == '_call_system_api':
-            return getattr(self.system_api, func_name)
-
-    def _call_aggregated(self, aggregated_request):
-        """Handle aggregated request from flexiManage.
-
-        :param request: the aggregated request like:
-            {
-                "entity": "agent",
-                "message": "aggregated",
-                "params": {
-                    "requests": [
-                        {
-                            "entity": "agent",
-                            "message": "remove-lte",
-                            "params": {
-                                "apn": "we",
-                                "enable": false,
-                                "dev_id": "usb:usb1/1-3/1-3:1.4"
-                            }
-                        },
-                        {
-                            "entity": "agent",
-                            "message": "remove-interface",
-                            "params": {
-                                "dhcp": "yes",
-                                "addr": "10.93.172.31/26",
-                                "addr6": "fe80::b82a:beff:fe44:38e8/64",
-                                "PublicIP": "46.19.85.31",
-                                "PublicPort": "4789",
-                                "useStun": true,
-                                "monitorInternet": true,
-                                "gateway": "10.93.172.32",
-                                "metric": "",
-                                "routing": "NONE",
-                                "type": "WAN",
-                                "configuration": {
-                                    "apn": "we",
-                                    "enable": false
-                                },
-                                "deviceType": "lte",
-                                "dev_id": "usb:usb1/1-3/1-3:1.4",
-                                "multilink": {
-                                    "labels": []
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-
-        :returns: dictionary with status code and optional error message.
-        """
-        requests = aggregated_request['params']['requests']
-        aggregated_list = []
-        for request in requests:
-            req = request['message']
-
-            handler = request_handlers.get(req)
-            assert handler, 'fwglobals: "%s" request is not supported' % req
-
-            api = handler.get('name')
-
-            if re.match('remove-', req):
-                cfg_db = self._get_api_func(api, 'cfg_db')
-                request['params'] = cfg_db.get_request_params(request)
-
-            if aggregated_list and aggregated_list[-1]['api'] == api:
-                aggregated_list[-1]['messages'].append(request)
-            else:
-                aggregated_list.append({'api': api, 'messages': [request]})
-
-        for (idx, aggregated_group) in enumerate(aggregated_list):
-            api = aggregated_group['api']
-            messages = aggregated_group['messages']
-
-            req = {
-                'message':   'aggregated',
-                'params':    { 'requests': messages },
-            }
-
-            handler_call_func = self._get_api_func(api, 'call')
-            try:
-                handler_call_func(req)
-            except Exception as e:
-                ll = aggregated_list[0:idx]
-                for revert_aggregated in reversed(ll):
-                    api = revert_aggregated['api']
-                    messages = revert_aggregated['messages']
-                    handler_call_func = self._get_api_func(api, 'rollback')
-                    handler_call_func(messages)
-                raise e
-
-        return {'ok': 1}
-
-        # return self._handle_aggregated(aggregated_request['params']['requests'])
-
     def _call_agent_api(self, request):
         return self.agent_api.call(request)
 
@@ -761,6 +551,104 @@ class Fwglobals:
             log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}
             return reply
+
+    def _get_api_func(self, api_type, func_name):
+        if api_type == '_call_router_api':
+            return getattr(self.router_api, func_name)
+        elif api_type == '_call_system_api':
+            return getattr(self.system_api, func_name)
+
+    def _call_aggregated(self, aggregated_request):
+        """Handle aggregated request from flexiManage.
+
+        :param request: the aggregated request like:
+            {
+                "entity": "agent",
+                "message": "aggregated",
+                "params": {
+                    "requests": [
+                        {
+                            "entity": "agent",
+                            "message": "remove-lte",
+                            "params": {
+                                "apn": "we",
+                                "enable": false,
+                                "dev_id": "usb:usb1/1-3/1-3:1.4"
+                            }
+                        },
+                        {
+                            "entity": "agent",
+                            "message": "remove-interface",
+                            "params": {
+                                "dhcp": "yes",
+                                "addr": "10.93.172.31/26",
+                                "addr6": "fe80::b82a:beff:fe44:38e8/64",
+                                "PublicIP": "46.19.85.31",
+                                "PublicPort": "4789",
+                                "useStun": true,
+                                "monitorInternet": true,
+                                "gateway": "10.93.172.32",
+                                "metric": "",
+                                "routing": "NONE",
+                                "type": "WAN",
+                                "configuration": {
+                                    "apn": "we",
+                                    "enable": false
+                                },
+                                "deviceType": "lte",
+                                "dev_id": "usb:usb1/1-3/1-3:1.4",
+                                "multilink": {
+                                    "labels": []
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+
+        :returns: dictionary with status code and optional error message.
+        """
+        requests = aggregated_request['params']['requests']
+        aggregated_list = []
+        for request in requests:
+            req = request['message']
+
+            handler = request_handlers.get(req)
+            assert handler, 'fwglobals: "%s" request is not supported' % req
+
+            api = handler.get('name')
+
+            if re.match('remove-', req):
+                cfg_db = self._get_api_func(api, 'cfg_db')
+                request['params'] = cfg_db.get_request_params(request)
+
+            if aggregated_list and aggregated_list[-1]['api'] == api:
+                aggregated_list[-1]['messages'].append(request)
+            else:
+                aggregated_list.append({'api': api, 'messages': [request]})
+
+        for (idx, aggregated_group) in enumerate(aggregated_list):
+            api = aggregated_group['api']
+            messages = aggregated_group['messages']
+
+            req = {
+                'message':   'aggregated',
+                'params':    { 'requests': messages },
+            }
+
+            handler_call_func = self._get_api_func(api, 'call')
+            try:
+                handler_call_func(req)
+            except Exception as e:
+                ll = aggregated_list[0:idx]
+                for revert_aggregated in reversed(ll):
+                    api = revert_aggregated['api']
+                    messages = revert_aggregated['messages']
+                    handler_call_func = self._get_api_func(api, 'rollback')
+                    handler_call_func(messages)
+                raise e
+
+        return {'ok': 1}
 
 
 def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):
