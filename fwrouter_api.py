@@ -280,8 +280,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         :returns: dictionary with status code and optional error message.
         """
-        dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', dont_revert_on_failure)
-
         # First of all strip out requests that have no impact on configuration,
         # like 'remove-X' for not existing configuration items and 'add-X' for
         # existing configuration items.
@@ -325,7 +323,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Finally handle the request
         #
 
-        reply = FwCfgRequestHandler.call(self, request)
+        reply = FwCfgRequestHandler.call(self, request, dont_revert_on_failure)
 
         # Start vpp if it should be restarted
         #
@@ -535,11 +533,6 @@ class FWROUTER_API(FwCfgRequestHandler):
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
             new_params.update(_params.items())
-
-            # Don't store internal 'sender' to avoid unnecessary sync-s
-            #
-            if 'internals' in new_params:
-                del new_params['internals']
 
             return [
                 { 'message': remove_req, 'params' : old_params },

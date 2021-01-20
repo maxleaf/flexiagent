@@ -555,10 +555,9 @@ class FwCfgRequestHandler:
         sync_request = {
             'message':   'aggregated',
             'params':    { 'requests': incoming_requests },
-            'internals': { 'dont_revert_on_failure': True }
         }
 
-        reply = self.call(sync_request)
+        reply = self.call(sync_request, dont_revert_on_failure=True)
 
         if reply['ok'] == 0:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
@@ -579,11 +578,10 @@ class FwCfgRequestHandler:
 
         sync_request = {
             'message':   'aggregated',
-            'params':    { 'requests': sync_list },
-            'internals': { 'dont_revert_on_failure': True }
+            'params':    { 'requests': sync_list }
         }
 
-        reply = self.call(sync_request)
+        reply = self.call(sync_request, dont_revert_on_failure=True)
 
         if reply['ok'] == 1 and not full_sync:
             fwglobals.log.debug("_sync_device: smart sync succeeded")
