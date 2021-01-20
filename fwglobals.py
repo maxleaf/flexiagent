@@ -552,11 +552,11 @@ class Fwglobals:
             reply = {"message":err_str, 'ok':0}
             return reply
 
-    def _get_api_func(self, api_type, func_name):
+    def _get_api_object_attr(self, api_type, attr):
         if api_type == '_call_router_api':
-            return getattr(self.router_api, func_name)
+            return getattr(self.router_api, attr)
         elif api_type == '_call_system_api':
-            return getattr(self.system_api, func_name)
+            return getattr(self.system_api, attr)
 
     def _call_aggregated(self, request):
         """Handle aggregated request from flexiManage.
@@ -609,9 +609,9 @@ class Fwglobals:
         :returns: dictionary with status code and optional error message.
         """
 
-        # Break the received aggregated request into aggregated requests by API type
+        # Break the received aggregated request into aggregations by API type
         #
-        aggregated_requests = []
+        aggregations = []
         for _request in request['params']['requests']:
 
             handler = request_handlers.get(_request['message'])
@@ -620,46 +620,104 @@ class Fwglobals:
             api = handler.get('name')
             assert api, 'api for "%s" not found' % _request['message']
 
-            # In case we should rollback requests - fill the 'remove-X' request
-            # with full set of parameters out of database, so we could generate
-            # and execute the corresponding 'add-X' request.
+            # Create the aggregations for the current API type, if it was not created yet.
             #
-            if re.match('remove-', _request['message']):
-                cfg_db = self._get_api_func(api, 'cfg_db')
-                _request['params'] = cfg_db.get_request_params(_request)
-
-            # Create the aggregated request for the current API type, if it was not created yet.
-            #
-            if not aggregated_requests or aggregated_requests[-1]['api'] != api:
-                aggregated_by_api = {
+            if not aggregations or aggregations[-1]['api'] != api:
+                aggregated_request = {
                     "message": "aggregated",
                     "params": {
                         "requests": []
                     }
                 }
-                aggregated_requests.append({'api': api, 'request': aggregated_by_api})
+                aggregations.append({'api': api, 'request': aggregated_request})
 
             # Finally add the current request to the current aggregation.
             #
-            aggregated_requests[-1]['request']['params']['requests'].append(_request)
+            aggregations[-1]['request']['params']['requests'].append(_request)
 
 
-        # Go over list of aggregated requests and execute them one by one.
+        # Now generate the rollback aggregated requests for the aggregations created above.
+        # We need them in case of failure to execute any of the created requests,
+        # as we have to revert the previously executed request. This is to ensure
+        # atomic handling of the original aggregated request received from flexiManage.
         #
-        for (idx, aggregated_by_api) in enumerate(aggregated_requests):
-            api = aggregated_by_api['api']
-            api_call_func = self._get_api_func(api, 'call')
+        rollback_aggregations = self._build_rollback_aggregations(aggregations)
+
+        # Go over list of aggregations and execute their requests one by one.
+        #
+        for (idx, aggregation) in enumerate(aggregations):
+            api = aggregation['api']
+            api_call_func = self._get_api_object_attr(api, 'call')
             try:
-                api_call_func(aggregated_by_api['request'])
+                api_call_func(aggregation['request'])
             except Exception as e:
                 # Revert the previously executed aggregated requests
-                for aggregated_by_api in reversed(aggregated_requests[0:idx]):
-                    api = aggregated_by_api['api']
-                    rollback_func = self._get_api_func(api, 'rollback')
-                    rollback_func(aggregated_by_api['request'])
+                for aggregation in reversed(rollback_aggregations[0:idx]):
+                    api = aggregation['api']
+                    rollback_func = self._get_api_object_attr(api, 'rollback')
+                    rollback_func(aggregation['request'])
                 raise e
 
         return {'ok': 1}
+
+
+    def _build_rollback_aggregations(self, aggregations):
+        '''Generates rollback data for the list of aggregated requests grouped by type of api they belong to.
+        The input list format is:
+            [
+                {
+                    'api': <api name, e.g. "router_api", "system_api", etc>
+                    'request':
+                        {
+                            "message": "aggregated",
+                            "params": {
+                                "requests": [ ... ]
+                            }
+                        }
+                }
+                ,
+                ...
+            ]
+
+        The output rollback data represents clone of the input list, where the leaf requests
+        (requests in list element[api]['request']['params']['requests'])
+        perform opposite operation. That means, the "add-X" is replaced with
+        "remove-X", the "remove-X" is replaced with "add-X", and parameters of the "modify-X"
+        are replaced with the old parameters that are currently stored in the configuration database.
+        '''
+        rollbacks_aggregations = copy.deepcopy(aggregations)
+        for aggregation in rollbacks_aggregations:
+            cfg_db = self._get_api_object_attr(aggregation['api'], 'cfg_db')
+            for request in aggregation['request']['params']['requests']:
+
+                op = request['message']
+                if re.match('add-', op):
+                    request['message'] = op.replace('add-','remove-')
+
+                elif re.match('remove-', op):
+                    request['message'] = op.replace('remove-','add-')
+                    # The "remove-X" might have only subset of configuration parameters.
+                    # To ensure proper rollback, populate the correspondent "add-X" with
+                    # full set of configuration parameters. They are stored in database.
+                    #
+                    request['params'] = cfg_db.get_request_params(request)
+                    if request['params'] == None:
+                        request['params'] = {} # Take a care of removal of not existing configuration item
+
+                elif re.match('modify-', op):
+                    # For "modify-X" replace it's parameters with the old parameters,
+                    # that are currently stored in the configuration database.
+                    #
+                    old_params = cfg_db.get_request_params(request)
+                    for param_name in request['params']:
+                        if param_name in old_params:
+                            request['params'][param_name] = old_params[param_name]
+                        else:
+                            del request['params'][param_name]
+                else:
+                    raise Exception("_build_rollback_aggregations: not expected request: %s" % op)
+
+        return rollbacks_aggregations
 
 
 def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):

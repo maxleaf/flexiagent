@@ -66,49 +66,10 @@ class FwCfgRequestHandler:
         return reply
 
     def rollback(self, request):
-        '''Generats the rollback request out of the provided request and executes it.
-        The rollback request is the same request, but with switched `add-X`/`remove-X` name.
-
-        !!!IMPORTANT!!! For the original `remove-X` request this function assumes that it has full set
-        of parameters that should be provided to the corresponding rolling back `add-X` request.
-
-        !!!IMPORTANT!!! Rolling back `modify-X` requests are not supported right now!
-        '''
-		# Generate rollback request out of the provided request.
-        # Firstly, switch the operation type.
-        #
-        op = request['message']
-        if re.match('add-|remove-', op):
-            request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
-        elif op != 'aggregated': # Ignore "modify-X" (and all the others) for now ...
-            err_str = "rollback: ignore '%s'" % op
-            fwglobals.log.excep(err_str)
-            if self.revert_failure_callback:
-                self.revert_failure_callback(err_str)
-            return
-        else: # op == 'aggregated':
-            for _request in request['params']['requests']:
-                op = _request['message']
-                if re.match('add-|remove-', op):
-                    _request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
-                else:
-                    # Ignore "modify-X" (and all the others) for now ...
-                    fwglobals.log.excep("rollback: ignore '%s' in aggregated request" % op)
-
-
-        # For aggregated requests only: switch order of requests to opposite to form the rollback sequence
-        #
-        if request['message'] == 'aggregated':
-            request['params']['requests'].reverse()
-
-        # Now execute the rollback request:
-        #
         try:
-            reply = self.call(request, dont_revert_on_failure=True) # True: Prevent revert of revert :)
-            if reply.get('ok', 1) == 0:
-                raise Exception("call() failed: %s" % (reply.get('message', 'unknown error')))
+            self.call(request, dont_revert_on_failure=True) # True: Prevent revert of rollback :)
         except Exception as e:
-            err_str = "rollback: failed to revert '%s': %s" % (request['message'], str(e))
+            err_str = "rollback: failed for '%s': %s" % (request['message'], str(e))
             fwglobals.log.excep(err_str)
             if self.revert_failure_callback:
                 self.revert_failure_callback(err_str)
