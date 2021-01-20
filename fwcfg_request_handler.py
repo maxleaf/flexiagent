@@ -479,13 +479,8 @@ class FwCfgRequestHandler:
         func = getattr(module, api)
         assert func, 'there is no api function for request "%s"' % req
 
-        cmd_list = func(params) if params else func()
+        cmd_list = func(params, old_params)
         return cmd_list
-        #
-
-        req         = request['message']
-        params      = request.get('params')
-        old_params  = self.cfg_db.get_request_params(request)
 
     def _strip_noop_request(self, request):
         """Checks if the request has no impact on configuration.
