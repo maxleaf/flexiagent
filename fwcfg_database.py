@@ -89,6 +89,15 @@ class FwCfgDatabase:
     def set_translators(self, translators):
        self.translators = translators
 
+    def is_same_cfg_item(self, request1, request2):
+        """Checks if provided requests stand for the same configuration item.
+        """
+        req_key1 = self._get_request_key(request1)
+        req_key2 = self._get_request_key(request2)
+        if req_key1 == req_key2:
+            return True
+        return False
+
     def _get_request_key(self, request):
         req     = request['message']
         params  = request.get('params')
