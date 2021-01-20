@@ -608,7 +608,9 @@ class Fwglobals:
 
         :returns: dictionary with status code and optional error message.
         """
+        log.debug('SHNEOR: input: %s' % aggregated_request)
         requests = aggregated_request['params']['requests']
+        log.debug('SHNEOR: requests: %s' % requests)
         aggregated_list = []
         for request in requests:
             req = request['message']
@@ -627,6 +629,8 @@ class Fwglobals:
             else:
                 aggregated_list.append({'api': api, 'messages': [request]})
 
+        log.debug('SHNEOR: aggregated_list: %s' % aggregated_list)
+
         for (idx, aggregated_group) in enumerate(aggregated_list):
             api = aggregated_group['api']
             messages = aggregated_group['messages']
@@ -641,6 +645,7 @@ class Fwglobals:
                 handler_call_func(req)
             except Exception as e:
                 ll = aggregated_list[0:idx]
+                log.debug('SHNEOR: ll: %s' % ll)
                 for revert_aggregated in reversed(ll):
                     api = revert_aggregated['api']
                     messages = revert_aggregated['messages']
