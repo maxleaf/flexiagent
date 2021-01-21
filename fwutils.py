@@ -1850,44 +1850,10 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
     if addr == 'default':
         return (True, None)
 
-    metric = ' metric %s' % metric if metric else ''
-    op     = 'replace'
+    metric = metric if metric else 0
+    is_add = not remove
 
-    cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
-    try:
-        output = subprocess.check_output(cmd_show, shell=True)
-    except:
-        return False
-
-    lines = output.splitlines()
-    next_hop = ''
-    if lines:
-        removed = False
-        for line in lines:
-            words = line.split('via ')
-            if len(words) > 1:
-                if remove and not removed and re.search(via, words[1]):
-                    removed = True
-                    continue
-
-                next_hop += ' nexthop via ' + words[1]
-
-    if remove:
-        if not next_hop:
-            op = 'del'
-        cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
-    else:
-        if not dev_id:
-            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
-        else:
-            tap = dev_id_to_tap(dev_id)
-            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
-
-    try:
-        fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
-    except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+    fwnwtplan.add_remove_static_route(is_add, dev_id, addr, via, metric)
 
     return True
 
