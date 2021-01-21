@@ -1853,7 +1853,7 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
     metric = metric if metric else 0
     is_add = not remove
 
-    fwnwtplan.add_remove_static_route(is_add, dev_id, addr, via, metric)
+    fwnetplan.add_remove_static_route(is_add, dev_id, addr, via, metric)
 
     return True
 

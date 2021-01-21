@@ -374,6 +374,7 @@ def _has_ip(if_name, dhcp):
 def add_remove_static_route(is_add, dev_id, ip, gw, metric):
     fname_run = ''
     ifname = fwutils.dev_id_to_tap(dev_id)
+    config = None
 
     if dev_id in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[dev_id].get('fname')
@@ -382,23 +383,24 @@ def add_remove_static_route(is_add, dev_id, ip, gw, metric):
         fname_run = fwglobals.g.NETPLAN_FILE
 
     try:
-        with open(fname_run, 'rw') as stream:
+        with open(fname_run, 'r') as stream:
             config = yaml.safe_load(stream)
             network = config['network']
             ethernets = network['ethernets']
             config_section = ethernets[ifname]
             routes = config_section.get('routes', [])
 
-            if is_add == 1:
-                routes.append({'to': ip, 'via': gw, 'metric': metric})
-                config_section['routes'] = routes
-            else:
-                new_routes = []
-                for route in routes:
-                    if route['to'] != ip:
-                        new_routes.append(route)
-                config_section['routes'] = new_routes
+        if is_add == 1:
+            routes.append({'to': ip, 'via': gw, 'metric': metric})
+            config_section['routes'] = routes
+        else:
+            new_routes = []
+            for route in routes:
+                if route['to'] != ip:
+                    new_routes.append(route)
+            config_section['routes'] = new_routes
 
+        with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
             stream.flush()
             os.fsync(stream.fileno())
