@@ -50,5 +50,13 @@
         "metric": 30,
         "dev_id": "pci:0000:00:03.00"
     }
+},
+{
+    "entity": "agent",
+    "message": "add-route",
+    "params": {
+        "addr": "192.168.200.0/24",
+        "via": "192.168.0.1"
+    }
 }
 ]
