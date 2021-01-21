@@ -101,8 +101,8 @@ def add_interface(params):
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
 
-    is_wifi = fwutils.is_wifi_interface(dev_id)
-    is_lte = fwutils.is_lte_interface(dev_id) if not is_wifi else False
+    is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
+    is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
     is_non_dpdk = is_wifi or is_lte
 
     if is_non_dpdk:
@@ -207,7 +207,7 @@ def add_interface(params):
             cmd_list.append(cmd)
 
             # connect the modem to the cellular provider
-            configs = params['configuration'] if params['configuration'] else {}
+            configs = copy.deepcopy(params['configuration'])
             configs['dev_id'] = dev_id
             cmd = {}
             cmd['cmd'] = {}
@@ -557,7 +557,7 @@ def add_interface(params):
         cmd['cmd'] = {}
         cmd['cmd']['name'] = "exec"
         cmd['cmd']['params'] = [
-            "tc -force filter add dev %s parent ffff: \
+            "tc filter add dev %s parent ffff: \
             protocol all prio 2 u32 \
             match u32 0 0 flowid 1:1 \
             action pedit ex munge eth dst set VPP-MAC \

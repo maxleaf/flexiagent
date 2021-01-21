@@ -76,7 +76,7 @@ def test():
         exists = fwtests.file_exists(state_file)
         assert exists==False, "failure state file still exists: %s" % state_file
 
-        config = agent.show("--router configuration")
+        config = agent.show("--configuration router")
         assert config == '', "request database was not emptired by 'reset-router' request:\n%s" % config
 
         # As request database was emptied, add interface again to check normal activity

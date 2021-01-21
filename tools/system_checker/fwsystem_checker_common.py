@@ -1335,21 +1335,18 @@ class Checker:
 
     def lte_interfaces_exists(self):
         for nicname, addrs in psutil.net_if_addrs().items():
-            dev_id = fwutils.get_interface_dev_id(nicname)
-            if dev_id:
-                driver = fwutils.get_interface_driver(dev_id)
-
-                if driver and driver in ['cdc_mbim', 'qmi_wwan']:
-                    return True
+            driver = fwutils.get_interface_driver(nicname)
+            if driver and driver in ['cdc_mbim', 'qmi_wwan']:
+                return True
 
         return False
 
     def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
         drivers = []
         for nicname, addrs in psutil.net_if_addrs().items():
-            dev_id = fwutils.get_interface_dev_id(nicname)
+            dev_id = fwutils.get_interface_dev_id(nicname)# fwutils.get_interface_dev_id(nicname)
             if dev_id:
-                driver = fwutils.get_interface_driver(dev_id)
+                driver = fwutils.get_interface_driver(nicname)
                 if driver and driver in ['cdc_mbim', 'qmi_wwan']:
                     drivers.append({'driver': driver, 'dev_id': dev_id})
 
@@ -1360,8 +1357,7 @@ class Checker:
                         return False
 
                     try:
-                        usb_addr = inf['dev_id'].split('/')[-1]
-                        device = subprocess.check_output('ls /sys/bus/usb/drivers/qmi_wwan/%s/usbmisc/' % usb_addr, shell=True).strip()
+                        device = fwutils.dev_id_to_usb_device(inf['dev_id'], 'qmi_wwan')
                         try:
                             output_vendor = subprocess.check_output('qmicli --device=/dev/%s --dms-get-manufacturer' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
                         except:

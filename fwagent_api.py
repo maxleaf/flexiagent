@@ -25,32 +25,26 @@ import loadsimulator
 import yaml
 import sys
 import os
-import re
 from shutil import copyfile
-import subprocess
-import time
 import fwglobals
 import fwstats
 import fwutils
+import fwsystem_api
+import fwrouter_api
 
 fwagent_api = {
-    'get-device-info':                  '_get_device_info',
-    'get-device-stats':                 '_get_device_stats',
-    'get-device-logs':                  '_get_device_logs',
-    'get-device-packet-traces':         '_get_device_packet_traces',
-    'get-device-os-routes':             '_get_device_os_routes',
-    'get-router-config':                '_get_router_config',
-    'upgrade-device-sw':                '_upgrade_device_sw',
-    'reset-device':                     '_reset_device_soft',
-    'sync-device':                      '_sync_device',
-    # WiFi jobs
-    'wifi-perform-operation':           '_wifi_perform_operation',
-    'wifi-get-interface-info':          '_wifi_get_interface_info',
-    # LTE jobs
-    'lte-get-interface-info':           '_lte_get_interface_info',
-    'lte-enable':                       '_lte_enable',
-    'lte-disable':                      '_lte_disable',
-    'lte-reset':                        '_lte_reset',
+    'get-device-info':               '_get_device_info',
+    'get-device-stats':              '_get_device_stats',
+    'get-device-logs':               '_get_device_logs',
+    'get-device-packet-traces':      '_get_device_packet_traces',
+    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-config':             '_get_device_config',
+    'upgrade-device-sw':             '_upgrade_device_sw',
+    'reset-device':                  '_reset_device_soft',
+    'sync-device':                   '_sync_device',
+    'get-wifi-info':                 '_get_wifi_info',
+    'get-lte-info':                  '_get_lte_info',
+    'reset-lte':                     '_reset_lte',
 }
 
 class FWAGENT_API:
@@ -117,7 +111,7 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
+            info['network']['interfaces'] = fwutils.get_linux_interfaces().values()
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
@@ -227,15 +221,17 @@ class FWAGENT_API:
 
         return {'message': route_entries, 'ok': 1}
 
-    def _get_router_config(self, params):
-        """Get router configuration from DB.
+    def _get_device_config(self, params):
+        """Get device configuration from DB.
 
         :param params: Parameters from flexiManage.
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwutils.dump_router_config()
-        reply = {'ok': 1, 'message': configs if configs else []}
+        router_config = fwutils.dump_router_config()
+        system_config = fwutils.dump_system_config()
+        config = router_config + system_config
+        reply = {'ok': 1, 'message': config if config else []}
         return reply
 
     def _reset_device_soft(self, params=None):
@@ -247,11 +243,11 @@ class FWAGENT_API:
         """
         if fwglobals.g.router_api.state_is_started():
             fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
-        fwutils.reset_router_config()
+        fwutils.reset_device_config()
         return {'ok': 1}
 
     def _sync_device(self, params):
-        """Handles the 'sync-device' request: synchronizes VPP state
+        """Handles the 'sync-device' request: synchronizes device configuration
         to the configuration stored on flexiManage. During synchronization
         all interfaces, tunnels, routes, etc, that do not appear
         in the received 'sync-device' request are removed, all entities
@@ -268,115 +264,21 @@ class FWAGENT_API:
         """
         fwglobals.log.info("_sync_device STARTED")
 
-        # Go over configuration requests received within sync-device request,
-        # intersect them against the requests stored locally and generate new list
-        # of remove-X and add-X requests that should take device to configuration
-        # received with the sync-device.
-        #
-        sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
-        fwglobals.log.debug("_sync_device: sync-list: %s" % \
-                            json.dumps(sync_list, indent=2, sort_keys=True))
-        if not sync_list:
-            fwglobals.log.info("_sync_device: sync_list is empty, no need to sync")
-            fwglobals.g.router_cfg.reset_signature()
-            if params.get('type', '') != 'full-sync':
-                return {'ok': 1}   # Return if there is no full sync enforcement
+        full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        # Finally update configuration.
-        # Firstly try smart sync - apply sync-list modifications only.
-        # If that fails, go with full sync - reset configuration and apply sync-device list
-        #
-        if sync_list:
-            fwglobals.log.debug("_sync_device: start smart sync")
-            sync_request = {
-                'message':   'aggregated',
-                'params':    { 'requests': sync_list },
-                'internals': { 'dont_revert_on_failure': True }
-            }
-            reply = fwglobals.g.router_api.call(sync_request)
+        for module_name, module in fwglobals.modules.items():
+            if module.get('sync', False) == True:
+                # get api module. e.g router_api, system_api
+                api_module = getattr(fwglobals.g, module.get('object'))
+                api_module.sync(params['requests'], full_sync_enforced)
 
-            # If smart sync succeeded and there is no 'full-sync' enforcement
-            # in message, finish sync procedure and return.
-            # Note today the 'full-sync' enforcement is needed for testing only.
-            #
-            if reply['ok'] == 1 and params.get('type', '') != 'full-sync':
-                fwglobals.g.router_cfg.reset_signature()
-                fwglobals.log.debug("_sync_device: smart sync succeeded")
-                fwglobals.log.info("_sync_device FINISHED")
-                return {'ok': 1}
-
-        # At this point we have to perform full sync.
-        # This is due to either smart sync failure or full sync enforcement.
-        #
-        fwglobals.log.debug("_sync_device: start full sync")
-        restart_router = False
-        if fwglobals.g.router_api.state_is_started():
-            restart_router = True
-            fwglobals.g.router_api.call({'message': 'stop-router'})
-
-        self._reset_device_soft()                       # Wipe out the configuration database
-        request = {                                     # Cast 'sync-device' to 'aggregated'
-            'message':   'aggregated',
-            'params':    { 'requests': params['requests'] },
-            'internals': { 'dont_revert_on_failure': True }
-        }
-        reply = fwglobals.g.router_api.call(request)    # Apply finally the received configuration
-        if reply['ok'] == 0:
-            raise Exception(" _sync_device: full sync failed: " + str(reply.get('message')))
-
-        if restart_router:
-            fwglobals.g.router_api.call({'message': 'start-router'})
-        fwglobals.log.debug("_sync_device: full sync succeeded")
-
-        fwglobals.g.router_cfg.reset_signature()
+        # At this point the sync succeeded.
+        # In case of failure - exception is raised by sync()
+        fwutils.reset_device_config_signature()
         fwglobals.log.info("_sync_device FINISHED")
         return {'ok': 1}
 
-    def _wifi_perform_operation(self, params):
-        try:
-            operation = params['operation'] if 'operation' in params else None
-            if not operation:
-                return (False, 'This interface is not WIFI')
-
-            if fwutils.is_wifi_interface(params['dev_id']) == False:
-                return (False, 'This interface is not a WIFI interface')
-
-            if operation == 'start':
-                is_success, error = self._wifi_start_ap(params)
-            elif operation == 'stop':
-                is_success, error = self._wifi_stop_ap(params)
-            else:
-                is_success, error = (False, 'No supported operation was requested')
-
-            return {'message': error, 'ok': is_success}
-        except Exception as e:
-            raise Exception("_wifi_perform_operation: failed. %s" % str(e))
-
-    def _wifi_start_ap(self, params):
-        try:
-            fwutils.configure_hostapd(params['dev_id'], params['configuration'])
-            is_success, error =  fwutils.start_hostapd()
-
-            return is_success, error
-        except Exception as e:
-            raise Exception("_wifi_start_ap: failed to start wifi access point: %s" % str(e))
-
-    def _wifi_stop_ap(self, params):
-        try:
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if fwutils.vpp_does_run() and is_assigned:
-                return (False, 'Please unassigned this interface in order to stop the Access Point')
-
-            is_success, error = fwutils.stop_hostapd()
-
-            inf_name = fwutils.dev_id_to_linux_if(params['dev_id'])
-            os.system('ifconfig %s 0' % inf_name)
-
-            return is_success, error
-        except Exception as e:
-            raise Exception("_wifi_stop_ap: failed to stop wifi access point: %s" % str(e))
-
-    def _wifi_get_interface_info(self, params):
+    def _get_wifi_info(self, params):
         try:
             interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
             ap_status = fwutils.pid_of('hostapd')
@@ -390,143 +292,60 @@ class FWAGENT_API:
 
             return {'message': response, 'ok': 1}
         except Exception as e:
-            raise Exception("_wifi_get_interface_info: %s" % str(e))
+            raise Exception("_get_wifi_info: %s" % str(e))
 
-    def _lte_get_interface_info(self, params):
-        try:
-            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
-
-            sim_status = fwutils.lte_sim_status(params['dev_id'])
-            signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
-            hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
-            connection_state = fwutils.lte_get_connection_state(params['dev_id'])
-            packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
-            system_info = fwutils.lte_get_system_info(params['dev_id'])
-            default_apn = fwutils.lte_get_default_apn(params['dev_id'])
-
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if fwutils.vpp_does_run() and is_assigned:
-                interface_name = fwutils.dev_id_to_tap(params['dev_id'])
-
-            addr = fwutils.get_interface_address(interface_name)
-            connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
-
-            response = {
-                'address'             : addr,
-                'signals'             : signals,
-                'connection_state'    : connection_state,
-                'connectivity'        : connectivity,
-                'packet_service_state': packet_service_state,
-                'hardware_info'       : hardware_info,
-                'system_info'         : system_info,
-                'sim_status'          : sim_status,
-                'default_apn'         : default_apn
-            }
-
-            return {'message': response, 'ok': 1}
-        except Exception as e:
-            raise Exception("_get_lte_interface_status: %s" % str(e))
-
-    def _lte_enable(self, params):
-        file_path = '/etc/flexiwan/start_lte_startup.sh'
+    def _get_lte_info(self, params):
         interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
-        connection_params = fwutils.lte_prepare_connection_params(params)
-        device = fwutils.dev_id_to_mbim_device(params['dev_id'])
 
-        with open (file_path, 'w') as rsh:
-            rsh.write('''\
-#!/bin/bash
+        sim_status = fwutils.lte_sim_status(params['dev_id'])
+        signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
+        hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
+        connection_state = fwutils.lte_get_connection_state(params['dev_id'])
+        packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
+        system_info = fwutils.lte_get_system_info(params['dev_id'])
+        default_apn = fwutils.lte_get_default_apn(params['dev_id'])
 
-{ # try
+        is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
+        if fwutils.vpp_does_run() and is_assigned:
+            interface_name = fwutils.dev_id_to_tap(params['dev_id'])
 
-echo "starting...." > /tmp/lte_start
+        addr = fwutils.get_interface_address(interface_name)
+        connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
-qmicli --device=/dev/''' + device + ''' --device-open-proxy --device-open-mbim --wds-start-network="''' + connection_params + '''" --client-no-release-cid >> /tmp/lte_start
+        response = {
+            'address'             : addr,
+            'signals'             : signals,
+            'connection_state'    : connection_state,
+            'connectivity'        : connectivity,
+            'packet_service_state': packet_service_state,
+            'hardware_info'       : hardware_info,
+            'system_info'         : system_info,
+            'sim_status'          : sim_status,
+            'default_apn'         : default_apn
+        }
 
-echo "network started..." >> /tmp/lte_start
+        return {'message': response, 'ok': 1}
 
-qmicli --device=/dev/''' + device + ''' --device-open-proxy --device-open-mbim --wds-get-current-settings > /tmp/lte
 
-IP=`cat /tmp/lte | grep "IPv4 address" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | head -1`
-GATEWAY=`cat /tmp/lte |grep "IPv4 gateway" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
-SUBNET=`cat /tmp/lte |grep "IPv4 subnet" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
+    def _reset_lte(self, params):
+        """Reset LTE modem card.
 
-PDH=`cat /tmp/lte_start |grep "Packet data handle" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
-CID=`cat /tmp/lte_start |grep "CID" | awk -F ":" {'print $2'} | tr -d "'" | tr -d " " | tail -1`
+        :param params: Parameters to use.
 
-echo "PDH=$PDH" > /tmp/mbim_network_''' + interface_name + '''
-echo "CID=$CID" >> /tmp/mbim_network_''' + interface_name + '''
-
-echo $IP >> /tmp/lte_start
-echo $GATEWAY >> /tmp/lte_start
-echo $SUBNET >> /tmp/lte_start
-
-/sbin/ifconfig ''' + interface_name + ''' $IP netmask $SUBNET up
-/sbin/route add -net 0.0.0.0 gw $GATEWAY
-
-echo "done!" >> /tmp/lte_start
-
-} || { # catch
-echo "ERROR" >> /tmp/lte_start
-# save log for exception
-}
-
-exit 0
-''')
-
-        # grant execution permission to this file
-        os.system('chmod +x %s' % file_path)
-
-        # check if already exists in crontab
-        try:
-            output = subprocess.check_output('sudo crontab -l', shell=True, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            output = ''
-
-        if not file_path in output:
-            os.system('crontab -l > file; echo "@reboot %s" >> file; crontab file; rm file' % file_path)
-
-        try:
-            is_success, error =  fwutils.lte_connect(params)
-            if is_success:
-                fwutils.set_lte_info_on_linux_interface()
-
-            reply = {'ok': 1, 'message': ''}
-        except Exception as e:
-            reply = {'ok': 0, 'message': str(e)}
-
-        return reply
-
-    def _lte_disable(self, params):
-        file_path = '/etc/flexiwan/start_lte_startup.sh'
-        try:
-            output = subprocess.check_output('crontab -l | grep -v "%s"  | crontab -' % file_path, shell=True, stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            pass
-
-        try:
-            # don't perform disconnect if this interface is already assigned to vpp and vpp is run
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
-            if fwutils.vpp_does_run() and is_assigned:
-                return {'ok': 0, 'message': 'Please unassigned this interface in order to disconnect LTE'}
-
-            is_success, error = fwutils.lte_disconnect(params['dev_id'])
-            reply = {'ok': 1, 'message': ''}
-        except Exception as e:
-            reply = {'ok': 0, 'message': str(e)}
-
-        return reply
-
-    def _lte_reset(self, params):
+        :returns: Dictionary status code.
+        """
         try:
             # don't perform reset if interface is already assigned to vpp and vpp is run
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=params['dev_id'])
+            is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
                 return {'ok': 0, 'message': 'Please unassigned this interface in order to reset the LTE card'}
 
-            self._lte_disable(params)
+            is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
             fwutils.qmi_sim_power_off(params['dev_id'])
             fwutils.qmi_sim_power_on(params['dev_id'])
+
+            # restore lte connection if needed
+            fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
             reply = {'ok': 1, 'message': ''}
         except Exception as e:

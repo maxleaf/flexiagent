@@ -5,7 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "fwagnet",
+            "name": "Python: Attach using Process Id",
+            "type": "python",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+        },
+        {
+            "name": "fwagent daemon",
             "type": "python",
             "request": "launch",
             "module": "${workspaceFolder}/fwagent",
@@ -38,6 +44,59 @@
             "cwd": "${workspaceRoot}",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "reset soft",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "reset",
+                "-s"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "Cache",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "show",
+                "--configuration"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "Test: Run Specific Test",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/tests/router/01_cli_basic_requests_test",
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+        {
+            "name": "Test: Inject One Cli Request",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "cli",
+                "-f",
+                "/home/shneor/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
             }
         },
         {
