@@ -53,8 +53,8 @@ def add_lte(params):
     cmd['cmd']['name']   = "python"
     cmd['cmd']['params'] = {
                 'module': 'fwutils',
-                'func': 'set_lte_info_on_linux_interface',
-                'args': { 'dev_id': params['dev_id'] }
+                'func': 'configure_lte_interface',
+                'args': { 'params': params }
     }
     cmd['cmd']['descr'] = "Configure LTE IP and gateway on linux interface if vpp is not run"
     cmd_list.append(cmd)
