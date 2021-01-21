@@ -2364,50 +2364,37 @@ def get_lte_interfaces_dev_ids():
                 out[dev_id] = nicname
     return out
 
-def set_lte_info_on_linux_interface(dev_id):
-
+def configure_lte_interface(params):
     if vpp_does_run():
         return (True, None)
 
-    lte_interfacaes = get_lte_interfaces_dev_ids()
+    dev_id = params['dev_id']
+    if not is_lte_interface_by_dev_id(dev_id):
+        return (False, "dev_id %s is not a lte interface" % dev_id)
 
-    if dev_id in lte_interfacaes:
-        ip_info = lte_get_configuration_received_from_provider(dev_id)
+    ip_config = lte_get_configuration_received_from_provider(dev_id)
+    if ip_config['STATUS']:
+        ip = ip_config['IP']
+        gateway = ip_config['GATEWAY']
+        metric = params['metric']
 
-        if ip_info['STATUS']:
-            nicname = lte_interfacaes[dev_id]
-            os.system('ifconfig %s down' % nicname)
-            os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
+        nicname = dev_id_to_linux_if(dev_id)
 
-            metric = 0
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
-            if is_assigned:
-                metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
-            else:
-                try:
-                    # LTE device should use metric greater than the current default route.
-                    # So we find the minimal default route metric, add 100 to it and ensure
-                    # that the result metric is not used in other default routes.
-                    #
-                    output = os.popen('ip route list match default').read()
-                    if output:
-                        metrics = []
-                        routes = output.splitlines()
-                        for r in routes:
-                            _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
-                            metrics.append(_metric)
-                        metric = min(metrics) + 100
-                        while metric in metrics:
-                            metric += 100
-                except:
-                    pass
+        os.system('ifconfig %s %s up' % (nicname, ip))
 
-            os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
+        # remove old default router
+        output = os.popen('ip route list match default | grep %s' % nicname).read()
+        if output:
+            routes = output.splitlines()
+            for r in routes:
+                os.system('ip route del %s' % r)
+        # set updated default route
+        os.system('route add -net 0.0.0.0 gw %s metric %s' % (gateway, metric))
 
-            fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
-            return (True , None)
+        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
+        return (True , None)
 
-    return (False, "Failed to set lte info on linux interface")
+    return (False, "Failed to configure lte for dev_id %s" % dev_id)
 
 def dev_id_to_usb_device(dev_id, driver="cdc_mbim"):
     try:
@@ -2765,11 +2752,10 @@ def lte_get_configuration_received_from_provider(dev_id):
             'STATUS'  : ''
         }
 
-        ip_info = qmi_get_ip_configuration(dev_id)
-
-        if ip_info:
+        ip_config = qmi_get_ip_configuration(dev_id)
+        if ip_config:
             response['STATUS'] = True
-            lines = ip_info.splitlines()
+            lines = ip_config.splitlines()
             for line in lines:
                 if 'IPv4 address' in line:
                     response['IP'] = line.split(':')[-1].strip().replace("'", '')
