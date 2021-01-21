@@ -3,29 +3,52 @@
 	"entity": "agent",
 	"message": "start-router",
 	"params": {
-	"interfaces": [
-	   {
-		"dev_id": "0000:00:03.00",
-		"addr": "192.168.0.110/24",
-		"gateway": "192.168.0.1",
-		"type":"wan"
-	   },
-	   {
-		"dev_id": "0000:00:08.00",
-		"addr": "20.20.20.1/24",
-		"routing":"ospf",
-		"type":"lan"
-	   }
-        ]
+	    "interfaces": [
+		{
+		    "dhcp": "yes",
+		    "addr": "192.168.0.102/24",
+		    "addr6": "fe80::a00:27ff:fe7e:9f1e/64",
+		    "routing": "NONE",
+		    "type": "WAN",
+		    "multilink": {
+		        "labels": []
+		    },
+		    "deviceType": "dpdk",
+		    "configuration": {},
+		    "deviceParams": {},
+		    "gateway": "192.168.0.1",
+		    "metric": "50",
+		    "PublicIP": "194.44.22.219",
+		    "PublicPort": "25438",
+		    "useStun": true,
+		    "monitorInternet": true,
+		    "dev_id": "pci:0000:00:03.00"
+		},
+		{
+		    "dhcp": "no",
+		    "addr": "100.100.100.1/24",
+		    "addr6": "fe80::a00:27ff:fe54:df98/64",
+		    "routing": "OSPF",
+		    "type": "LAN",
+		    "multilink": {
+		        "labels": []
+		    },
+		    "deviceType": "dpdk",
+		    "configuration": {},
+		    "deviceParams": {},
+		    "dev_id": "pci:0000:00:08.00"
+		}
+	    ]
 	}
 },
 {
-  "entity": "agent",
-  "message": "add-route",
-  "params": {
-    "addr": "111.111.111.111",
-	"via": "192.168.0.154",
-    "dev_id":"pci:0000:00:03.00"
-  }
+    "entity": "agent",
+    "message": "add-route",
+    "params": {
+        "addr": "192.168.100.0/24",
+        "via": "192.168.0.1",
+        "metric": 30,
+        "dev_id": "pci:0000:00:03.00"
+    }
 }
 ]
