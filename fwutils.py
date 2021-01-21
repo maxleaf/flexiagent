@@ -265,6 +265,32 @@ def get_interface_gateway(if_name, if_dev_id=None):
     metric = '' if not 'metric ' in route else route.split('metric ')[1].split(' ')[0]
     return rip, metric
 
+def get_interface_name_by_gateway(gateway):
+    """Get interface name.
+
+    :param gateway:  gateway address
+
+    :returns: Interface name.
+    """
+    try:
+        cmd   = "ip route list match default via %s" % gateway
+        fwglobals.log.debug(cmd)
+        route = os.popen(cmd).read()
+        if not route:
+            return None
+
+        dev_list = route.split('dev ')
+        if len(dev_list) < 2:
+            return None
+
+        dev_list = dev_list[1].split(' ')
+        if len(dev_list) < 1:
+            return None
+
+    except:
+        return None
+
+    return dev_list[0]
 
 def get_binary_interface_gateway_by_dev_id(dev_id):
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)

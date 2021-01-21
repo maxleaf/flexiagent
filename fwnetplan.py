@@ -373,7 +373,16 @@ def _has_ip(if_name, dhcp):
 
 def add_remove_static_route(is_add, dev_id, ip, gw, metric):
     fname_run = ''
-    ifname = fwutils.dev_id_to_tap(dev_id)
+
+    if dev_id:
+        ifname = fwutils.dev_id_to_tap(dev_id)
+    else:
+        ifname = fwutils.get_interface_name_by_gateway(gw)
+        dev_id = fwutils.get_interface_dev_id(ifname)
+
+    if not dev_id:
+        return (False, 'dev_id is %s' % dev_id)
+
     config = None
 
     if dev_id in fwglobals.g.NETPLAN_FILES:
