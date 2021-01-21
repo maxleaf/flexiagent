@@ -1862,27 +1862,6 @@ def get_tunnel_interface_vpp_names():
         res.append(if_vpp_name)
     return res
 
-def add_static_route(addr, via, metric, remove, dev_id=None):
-    """Add static route.
-
-    :param addr:            Destination network.
-    :param via:             Gateway address.
-    :param metric:          Metric.
-    :param remove:          True to remove route.
-    :param dev_id:          Bus address of device to be used for outgoing packets.
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-    if addr == 'default':
-        return (True, None)
-
-    metric = metric if metric else 0
-    is_add = not remove
-
-    fwnetplan.add_remove_static_route(is_add, dev_id, addr, via, metric)
-
-    return True
-
 def vpp_set_dhcp_detect(dev_id, remove):
     """Enable/disable DHCP detect feature.
 

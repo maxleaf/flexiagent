@@ -61,28 +61,28 @@ def add_route(params):
     cmd['cmd']['name']      = "python"
     cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['cmd']['params']    = {
-                                'module': 'fwutils',
-                                'func':   'add_static_route',
+                                'module': 'fwnetplan',
+                                'func':   'add_remove_static_route',
                                 'args':   {
-                                    'addr':   params['addr'],
-                                    'via':    params['via'],
+                                    'ip':     params['addr'],
+                                    'gw':     params['via'],
                                     'metric': params.get('metric'),
-                                    'remove': False,
-                                    'dev_id':    params.get('dev_id')
+                                    'is_add': True,
+                                    'dev_id': params.get('dev_id')
                                 }
                               }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['revert']['params'] = {
-                                'module': 'fwutils',
-                                'func':   'add_static_route',
+                                'module': 'fwnetplan',
+                                'func':   'add_remove_static_route',
                                 'args':   {
-                                    'addr':   params['addr'],
-                                    'via':    params['via'],
+                                    'ip':     params['addr'],
+                                    'gw':     params['via'],
                                     'metric': params.get('metric'),
-                                    'remove': True,
-                                    'dev_id':    params.get('dev_id')
+                                    'is_add': False,
+                                    'dev_id': params.get('dev_id')
                                 }
                               }
     cmd_list.append(cmd)

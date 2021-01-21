@@ -374,6 +374,11 @@ def _has_ip(if_name, dhcp):
 def add_remove_static_route(is_add, dev_id, ip, gw, metric):
     fname_run = ''
 
+    if ip == 'default':
+        return (True, None)
+
+    metric = metric if metric else 0
+
     if dev_id:
         ifname = fwutils.dev_id_to_tap(dev_id)
     else:
