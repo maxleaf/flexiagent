@@ -2,6 +2,7 @@ import pytest
 import os 
 import glob
 import shutil
+from datetime import datetime
 
 @pytest.fixture
 def netplan_backup():
@@ -23,3 +24,12 @@ def netplan_backup():
         orig_yaml = file.replace('yaml.backup_pytest', 'yaml')
         shutil.move(file, orig_yaml)
     os.system('sudo fwkill')
+
+@pytest.fixture
+def fixture_globals():
+    start_time = datetime.now()
+
+    yield
+
+    end_time = datetime.now()
+    print("Elapsed: " + str(end_time - start_time))

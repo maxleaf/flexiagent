@@ -45,7 +45,6 @@ def migrate(prev_version, new_version, upgrade):
         request = {
             'message':   'start-router',
             'params':    {},
-            'internals': {}
         }
         with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
             if not router_cfg.exists(request):

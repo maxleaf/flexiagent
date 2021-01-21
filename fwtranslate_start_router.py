@@ -108,17 +108,18 @@ def start_router(params=None):
     for params in interfaces:
         linux_if  = fwutils.dev_id_to_linux_if(params['dev_id'])
         if linux_if:
-            # Firstly, Mark non-dpdk interfaces as they need special care:
-            #   1. They should not appear in /etc/vpp/startup.conf because they don't have a pci address.
-            #   2. They should not be removed from linux
-            # Additional logic for these interfaces is at add_interface translator
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
+            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
+            cmd_list.append(cmd)
+
+        
+            # Non-dpdk interface should not appear in /etc/vpp/startup.conf because they don't have a pci address.
+            # Additional spaciel logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
-                cmd = {}
-                cmd['cmd'] = {}
-                cmd['cmd']['name']    = "exec"
-                cmd['cmd']['params']  = [ "sudo ip addr flush dev %s" % linux_if ]
-                cmd['cmd']['descr']   = "remove ip addr from dev %s in Linux" % linux_if
-                cmd_list.append(cmd)
                 continue
 
             # Mark 'vmxnet3' interfaces as they need special care:
@@ -132,27 +133,6 @@ def start_router(params=None):
                 pci_list_vmxnet3.append(params['dev_id'])
             else:
                 dev_id_list.append(params['dev_id'])
-
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
-            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
-            cmd_list.append(cmd)
-
-        # Detect 'vmxnet3' interfaces as they need special care:
-        #   1. They should not appear in /etc/vpp/startup.conf.
-        #      If they appear in /etc/vpp/startup.conf, vpp will capture
-        #      them with vfio-pci driver, and 'create interface vmxnet3'
-        #      command will fail with 'device in use'.
-        #   2. They require additional VPP call vmxnet3_create on start
-        #      and complement vmxnet3_delete on stop
-        #
-        if fwutils.dev_id_is_vmxnet3(params['dev_id']):
-            pci_list_vmxnet3.append(params['dev_id'])
-        else:
-            dev_id_list.append(params['dev_id'])
-
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
@@ -270,7 +250,8 @@ def start_router(params=None):
     # into 'remove-interface' and 'add-interface', so we want to avoid deletion
     # and creation interface on every 'modify-interface'. There is no sense to do
     # that and it causes problems in FIB, when default route interface is deleted.
-    for pci in pci_list_vmxnet3:
+    for dev_id in pci_list_vmxnet3:
+        _, pci = fwutils.dev_id_parse(dev_id)
         pci_bytes = fwutils.pci_str_to_bytes(pci)
         cmd = {}
         cmd['cmd'] = {}
@@ -280,7 +261,7 @@ def start_router(params=None):
         cmd['revert'] = {}
         cmd['revert']['name']   = "vmxnet3_delete"
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':pci } ] }
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ] }
         cmd_list.append(cmd)
 
     # Once VPP started, apply configuration to it.

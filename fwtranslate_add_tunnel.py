@@ -430,7 +430,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     dst_addr_bytes = fwutils.ip_str_to_bytes(dst)[0]
 
     # for lte interface, we need to get the current source IP, and not the one stored in DB. The IP may have changed due last 'add-interface' job.
-    if fwutils.is_lte_interface(dev_id):
+    if fwutils.is_lte_interface_by_dev_id(dev_id):
         tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
         if tap:
             source = fwutils.get_interface_address(tap)

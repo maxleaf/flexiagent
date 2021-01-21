@@ -185,13 +185,13 @@ class FwStunWrap:
         """
         if self.standalone:
             #return empty info
-            return '', '', '', ''
+            return '', '', ''
 
         if dev_id in self.stun_cache:
             c = self.stun_cache[dev_id]
-            return c.get('local_ip'), c.get('public_ip'), c.get('public_port'), c.get('nat_type')
+            return c.get('public_ip'), c.get('public_port'), c.get('nat_type')
         else:
-            return '', '', '', ''
+            return '', '', ''
 
     def initialize_addr(self, dev_id):
         """ resets info for a dev id address, as if its local_ip never got a STUN reply.
@@ -225,6 +225,8 @@ class FwStunWrap:
                                 'server_index'    : 0,
                                 'nat_type'        : '',
                            }
+
+        fwutils.set_linux_interfaces_stun(dev_id, '', '', '')
 
         return self.stun_cache[dev_id]
 
@@ -279,6 +281,8 @@ class FwStunWrap:
         cached_addr['public_ip']        = p_ip
         cached_addr['public_port']      = p_port
         cached_addr['server_index']     = st_index
+
+        fwutils.set_linux_interfaces_stun(dev_id, p_ip, p_port, nat_type)
 
     def _send_stun_requests(self):
         """ Send STUN request for each address that has no public IP and port
