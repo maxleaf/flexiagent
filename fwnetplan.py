@@ -414,6 +414,10 @@ def add_remove_static_route(is_add, dev_id, ip, gw, metric):
                     new_routes.append(route)
             config_section['routes'] = new_routes
 
+            cmd = "ip route del %s via %s metric %u" % (ip, gw, metric)
+            fwglobals.log.debug(cmd)
+            output = subprocess.check_output(cmd, shell=True)
+
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
             stream.flush()
