@@ -1642,16 +1642,9 @@ def modify_dhcpd(is_add, params):
     else:
         dns_string = ''
 
-    # Add interface name in case of wifi interface
-    if is_wifi_interface_by_dev_id(dev_id):
-        intf_name = dev_id_to_linux_if(dev_id)
-        intf_string = 'interface %s;\n' % intf_name
-    else:
-        intf_string = ''
-
     subnet_string = 'subnet %s netmask %s' % (subnet, netmask)
     routers_string = 'option routers %s;\n' % (router)
-    dhcp_string = 'echo "' + subnet_string + ' {\n' + intf_string + range_string + \
+    dhcp_string = 'echo "' + subnet_string + ' {\n' + range_string + \
                  routers_string + dns_string + '}"' + ' | sudo tee -a %s;' % config_file
 
     if is_add == 1:
@@ -2197,17 +2190,15 @@ def configure_hostapd(dev_id, configuration):
             if config['enable'] == False:
                 continue
 
+            if_name = dev_id_to_linux_if(dev_id)
             data = {
                 'ssid'                 : config.get('ssid', 'fwrouter_ap'),
-                'interface'            : dev_id_to_linux_if(dev_id),
+                'interface'            : if_name,
                 'channel'              : config.get('channel', 6),
                 'macaddr_acl'          : 0,
                 'auth_algs'            : 3,
-                # 'hw_mode'              : configuration.get('operationMode', 'g'),
                 'ignore_broadcast_ssid': 1 if config.get('hideSsid', 0) == True else 0,
-                'driver'               : 'nl80211',
                 'eap_server'           : 0,
-                'wmm_enabled'          : 0,
                 'logger_syslog'        : -1,
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
@@ -2220,6 +2211,7 @@ def configure_hostapd(dev_id, configuration):
 
             if ap_mode == "g":
                 data['hw_mode']       = 'g'
+
             elif ap_mode == "n":
                 if band == '5GHz':
                     data['hw_mode']       = 'a'
@@ -2228,11 +2220,18 @@ def configure_hostapd(dev_id, configuration):
 
                 data['ieee80211n']    = 1
                 data['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
+
             elif ap_mode == "a":
                 data['hw_mode']       = 'a'
+                data['ieee80211n']    = 1
+                data['ieee80211ac']   = 0
+                data['wmm_enabled']   = 0
+
             elif ap_mode == "ac":
                 data['hw_mode']       = 'a'
                 data['ieee80211ac']   = 1
+                data['ieee80211n']    = 1
+                data['wmm_enabled']   = 1
 
             security_mode = config.get('securityMode', 'wpa2-psk')
 
@@ -2315,8 +2314,6 @@ def start_hostapd():
             proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
             time.sleep(3)
 
-            if 'UNINITIALIZED-' in proc:
-                time.sleep(7)
 
             pid = pid_of('hostapd')
             if pid:
