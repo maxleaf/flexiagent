@@ -2506,16 +2506,20 @@ def lte_disconnect(dev_id, hard_reset_service=False):
         if vpp_does_run() and is_assigned:
             return {'ok': 0, 'message': 'Don\'t disconnect LTE. the interface is assigned to vpp'}
 
-        pdh     = fwglobals.g.db['lte']['interfaces'][dev_id]['PDH']
-        cid     = fwglobals.g.db['lte']['interfaces'][dev_id]['CID']
-        if_name = fwglobals.g.db['lte']['interfaces'][dev_id]['if_name']
-        output = _run_qmicli_command(dev_id, 'wds-stop-network=%s --client-cid=%s' % (pdh, cid))
-        os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
+        lte_db = fwglobals.g.db.get('lte', {})
+        lte_interfaces = lte_db.get('interfaces', {})
+        current_interface = lte_interfaces.get(dev_id, None)
+        if current_interface:
+            pdh     = fwglobals.g.db['lte']['interfaces'][dev_id]['PDH']
+            cid     = fwglobals.g.db['lte']['interfaces'][dev_id]['CID']
+            if_name = fwglobals.g.db['lte']['interfaces'][dev_id]['if_name']
+            output = _run_qmicli_command(dev_id, 'wds-stop-network=%s --client-cid=%s' % (pdh, cid))
+            os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
 
-        if hard_reset_service:
-            _run_qmicli_command(dev_id, 'wds-reset')
-            _run_qmicli_command(dev_id, 'nas-reset')
-            _run_qmicli_command(dev_id, 'uim-reset')
+            if hard_reset_service:
+                _run_qmicli_command(dev_id, 'wds-reset')
+                _run_qmicli_command(dev_id, 'nas-reset')
+                _run_qmicli_command(dev_id, 'uim-reset')
 
         fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
 
