@@ -1,3 +1,5 @@
+argcomplete
+vpp-papi
 Pyro4
 sqlitedict
 websocket
