@@ -1145,6 +1145,9 @@ def reset_device_config():
         db_policies.clean()
     fwnetplan.restore_linux_netplan_files()
 
+    if 'lte' in fwglobals.g.db:
+        fwglobals.g.db['lte'] = {}
+
     reset_dhcpd()
 
 def print_system_config(full=False):
@@ -1155,6 +1158,14 @@ def print_system_config(full=False):
     with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
         cfg = system_cfg.dumps(full=full)
         print(cfg)
+
+def print_global_config(full=False):
+    """Print global configuration.
+
+     :returns: None.
+     """
+    if 'lte' in fwglobals.g.db:
+        print(fwglobals.g.db['lte'])
 
 def print_device_config_signature():
     cfg = get_device_config_signature()
@@ -1642,16 +1653,9 @@ def modify_dhcpd(is_add, params):
     else:
         dns_string = ''
 
-    # Add interface name in case of wifi interface
-    if is_wifi_interface_by_dev_id(dev_id):
-        intf_name = dev_id_to_linux_if(dev_id)
-        intf_string = 'interface %s;\n' % intf_name
-    else:
-        intf_string = ''
-
     subnet_string = 'subnet %s netmask %s' % (subnet, netmask)
     routers_string = 'option routers %s;\n' % (router)
-    dhcp_string = 'echo "' + subnet_string + ' {\n' + intf_string + range_string + \
+    dhcp_string = 'echo "' + subnet_string + ' {\n' + range_string + \
                  routers_string + dns_string + '}"' + ' | sudo tee -a %s;' % config_file
 
     if is_add == 1:
@@ -2197,29 +2201,79 @@ def configure_hostapd(dev_id, configuration):
             if config['enable'] == False:
                 continue
 
+            if_name = dev_id_to_linux_if(dev_id)
             data = {
                 'ssid'                 : config.get('ssid', 'fwrouter_ap'),
-                'interface'            : dev_id_to_linux_if(dev_id),
-                'channel'              : config.get('channel', 6),
+                'interface'            : if_name,
                 'macaddr_acl'          : 0,
-                'auth_algs'            : 3,
-                # 'hw_mode'              : configuration.get('operationMode', 'g'),
-                'ignore_broadcast_ssid': 1 if config.get('hideSsid', 0) == True else 0,
                 'driver'               : 'nl80211',
+                'auth_algs'            : 3,
+                'ignore_broadcast_ssid': 1 if config.get('hideSsid', 0) == True else 0,
                 'eap_server'           : 0,
-                'wmm_enabled'          : 0,
                 'logger_syslog'        : -1,
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
                 'logger_stdout_level'  : 2,
-                'country_code'         : 'IL',
-                'ieee80211d'           : 1
+                'max_num_sta'          : 128
             }
+
+            if band == '5GHz':
+                data['uapsd_advertisement_enabled=1'] = 1
+                data['wmm_ac_bk_cwmin'] = 4
+                data['wmm_ac_bk_cwmax'] = 10
+                data['wmm_ac_bk_aifs'] = 7
+                data['wmm_ac_bk_txop_limit'] = 0
+                data['wmm_ac_bk_acm'] = 0
+                data['wmm_ac_be_aifs'] = 3
+                data['wmm_ac_be_cwmin'] = 4
+                data['wmm_ac_be_cwmax'] = 10
+                data['wmm_ac_be_txop_limit'] = 0
+                data['wmm_ac_be_acm'] = 0
+                data['wmm_ac_vi_aifs'] = 2
+                data['wmm_ac_vi_cwmin'] = 3
+                data['wmm_ac_vi_cwmax'] = 4
+                data['wmm_ac_vi_txop_limit'] = 94
+                data['wmm_ac_vi_acm'] = 0
+                data['wmm_ac_vo_aifs'] = 2
+                data['wmm_ac_vo_cwmin'] = 2
+                data['wmm_ac_vo_cwmax'] = 3
+                data['wmm_ac_vo_txop_limit'] = 47
+                data['wmm_ac_vo_acm'] = 0
+
+                data['tx_queue_data3_aifs'] = 7
+                data['tx_queue_data3_cwmin'] = 15
+                data['tx_queue_data3_cwmax'] = 1023
+                data['tx_queue_data3_burst'] = 0
+                data['tx_queue_data2_aifs'] = 3
+                data['tx_queue_data2_cwmin'] = 15
+                data['tx_queue_data2_cwmax'] = 63
+                data['tx_queue_data2_burst'] = 0
+                data['tx_queue_data1_aifs'] = 1
+                data['tx_queue_data1_cwmin'] = 7
+                data['tx_queue_data1_cwmax'] = 15
+                data['tx_queue_data1_burst'] = 3.0
+                data['tx_queue_data0_aifs'] = 1
+                data['tx_queue_data0_cwmin'] = 3
+                data['tx_queue_data0_cwmax'] = 7
+                data['tx_queue_data0_burst'] = 1.5
+            else:
+                data['wmm_enabled'] = 0
+
+            # Channel
+            channel = config.get('channel', '0')
+            data['channel'] = channel
+
+            country_code = config.get('region', 'other')
+            if channel == '0' and country_code != 'other':
+                data['ieee80211d'] = 1
+                data['ieee80211h'] = 1
+                data['country_code'] = country_code
 
             ap_mode = config.get('operationMode', 'g')
 
             if ap_mode == "g":
                 data['hw_mode']       = 'g'
+
             elif ap_mode == "n":
                 if band == '5GHz':
                     data['hw_mode']       = 'a'
@@ -2227,12 +2281,21 @@ def configure_hostapd(dev_id, configuration):
                     data['hw_mode']       = 'g'
 
                 data['ieee80211n']    = 1
-                data['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
+                data['ht_capab']      = '[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]'
+
             elif ap_mode == "a":
                 data['hw_mode']       = 'a'
+                data['ieee80211n']    = 1
+                data['ieee80211ac']   = 0
+                data['wmm_enabled']   = 0
+
             elif ap_mode == "ac":
                 data['hw_mode']       = 'a'
                 data['ieee80211ac']   = 1
+                data['ieee80211n']    = 1
+                data['wmm_enabled']   = 1
+                data['vht_oper_chwidth=0']   = 0
+                data['ht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
 
             security_mode = config.get('securityMode', 'wpa2-psk')
 
@@ -2313,10 +2376,7 @@ def start_hostapd():
         if files:
             files = ' '.join(files)
             proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
-            time.sleep(3)
-
-            if 'UNINITIALIZED-' in proc:
-                time.sleep(7)
+            time.sleep(1)
 
             pid = pid_of('hostapd')
             if pid:
@@ -2364,50 +2424,37 @@ def get_lte_interfaces_dev_ids():
                 out[dev_id] = nicname
     return out
 
-def set_lte_info_on_linux_interface(dev_id):
-
+def configure_lte_interface(params):
     if vpp_does_run():
         return (True, None)
 
-    lte_interfacaes = get_lte_interfaces_dev_ids()
+    dev_id = params['dev_id']
+    if not is_lte_interface_by_dev_id(dev_id):
+        return (False, "dev_id %s is not a lte interface" % dev_id)
 
-    if dev_id in lte_interfacaes:
-        ip_info = lte_get_configuration_received_from_provider(dev_id)
+    ip_config = lte_get_configuration_received_from_provider(dev_id)
+    if ip_config['STATUS']:
+        ip = ip_config['IP']
+        gateway = ip_config['GATEWAY']
+        metric = params.get('metric', '0')
 
-        if ip_info['STATUS']:
-            nicname = lte_interfacaes[dev_id]
-            os.system('ifconfig %s down' % nicname)
-            os.system('ifconfig %s %s up' % (nicname, ip_info['IP']))
+        nicname = dev_id_to_linux_if(dev_id)
 
-            metric = 0
-            is_assigned = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
-            if is_assigned:
-                metric = is_assigned[0]['metric'] if 'metric' in is_assigned[0] else 0
-            else:
-                try:
-                    # LTE device should use metric greater than the current default route.
-                    # So we find the minimal default route metric, add 100 to it and ensure
-                    # that the result metric is not used in other default routes.
-                    #
-                    output = os.popen('ip route list match default').read()
-                    if output:
-                        metrics = []
-                        routes = output.splitlines()
-                        for r in routes:
-                            _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
-                            metrics.append(_metric)
-                        metric = min(metrics) + 100
-                        while metric in metrics:
-                            metric += 100
-                except:
-                    pass
+        os.system('ifconfig %s %s up' % (nicname, ip))
 
-            os.system('route add -net 0.0.0.0 gw %s metric %s' % (ip_info['GATEWAY'], metric if metric else '0'))
+        # remove old default router
+        output = os.popen('ip route list match default | grep %s' % nicname).read()
+        if output:
+            routes = output.splitlines()
+            for r in routes:
+                os.system('ip route del %s' % r)
+        # set updated default route
+        os.system('route add -net 0.0.0.0 gw %s metric %s' % (gateway, metric))
 
-            fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
-            return (True , None)
+        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
+        return (True , None)
 
-    return (False, "Failed to set lte info on linux interface")
+    return (False, "Failed to configure lte for dev_id %s" % dev_id)
 
 def dev_id_to_usb_device(dev_id, driver="cdc_mbim"):
     try:
@@ -2421,6 +2468,14 @@ def _run_qmicli_command(dev_id, flag):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --device-open-mbim --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
+def _run_mbimcli_command(dev_id, cmd):
+    try:
+        device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
+        output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT)
         return output
     except subprocess.CalledProcessError as err:
         return None
@@ -2488,15 +2543,31 @@ def qmi_sim_power_off(dev_id):
 def qmi_sim_power_on(dev_id):
     return _run_qmicli_command(dev_id, 'uim-sim-power-on=1')
 
-def lte_get_default_apn(dev_id):
+def lte_get_default_settings(dev_id):
     default_settings = qmi_get_default_settings(dev_id)
+    res = {
+        'APN'     : '',
+        'UserName': '',
+        'Password': '',
+        'Auth'    : ''
+    }
     if default_settings:
         data = default_settings.splitlines()
         for line in data:
             if 'APN' in line:
-                return line.split(':')[-1].strip().replace("'", '')
+                res['APN'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'UserName' in line:
+                res['UserName'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Password' in line:
+                res['Password'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Auth' in line:
+                res['Auth'] = line.split(':')[-1].strip().replace("'", '')
+                continue
 
-    return None
+    return res
 
 def lte_sim_status(dev_id):
     status = qmi_get_simcard_status(dev_id)
@@ -2519,10 +2590,17 @@ def lte_disconnect(dev_id, hard_reset_service=False):
         if vpp_does_run() and is_assigned:
             return {'ok': 0, 'message': 'Don\'t disconnect LTE. the interface is assigned to vpp'}
 
-        pdh     = fwglobals.g.db['lte']['interfaces'][dev_id]['PDH']
-        cid     = fwglobals.g.db['lte']['interfaces'][dev_id]['CID']
-        if_name = fwglobals.g.db['lte']['interfaces'][dev_id]['if_name']
-        output = _run_qmicli_command(dev_id, 'wds-stop-network=%s --client-cid=%s' % (pdh, cid))
+        lte_db = fwglobals.g.db.get('lte', {})
+        lte_interfaces = lte_db.get('interfaces', {})
+        current_interface = lte_interfaces.get(dev_id, None)
+        if current_interface:
+            session     = fwglobals.g.db['lte']['interfaces'][dev_id]['Session']
+            if_name = fwglobals.g.db['lte']['interfaces'][dev_id]['if_name']
+        else:
+            session = '0' # defualt session
+            if_name = dev_id_to_linux_if(dev_id)
+
+        output = _run_mbimcli_command(dev_id, '--disconnect=%s' % session)
         os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
 
         if hard_reset_service:
@@ -2537,14 +2615,14 @@ def lte_disconnect(dev_id, hard_reset_service=False):
         return (False, "Exception: %s" % (str(e)))
 
 def lte_prepare_connection_params(params):
-    connection_params = ['ip-type=4']
-    if 'apn' in params:
+    connection_params = []
+    if 'apn' in params and params['apn']:
         connection_params.append('apn=%s' % params['apn'])
-    if 'user' in params:
+    if 'user' in params and params['user']:
         connection_params.append('username=%s' % params['user'])
-    if 'password' in params:
+    if 'password' in params and params['password']:
         connection_params.append('password=%s' % params['password'])
-    if 'auth' in params:
+    if 'auth' in params and params['auth']:
         connection_params.append('auth=%s' % params['auth'])
 
     return ",".join(connection_params)
@@ -2562,14 +2640,16 @@ def lte_connect(params, reset=False):
             return (False, "Sim is not presented")
 
     try:
-        current_connection_state = qmi_get_connection_state(dev_id)
-        if current_connection_state:
+        is_modem_connected = mbim_get_ip_configuration(dev_id)
+        if is_modem_connected:
             return (True, None)
 
         connection_params = lte_prepare_connection_params(params)
 
-        cmd = 'wds-start-network="%s" --client-no-release-cid' % connection_params
-        output = _run_qmicli_command(dev_id, cmd)
+        _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
+        _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
+        _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
+        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close' % connection_params)
         data = output.splitlines()
 
         lte = fwglobals.g.db.get('lte', {})
@@ -2580,11 +2660,8 @@ def lte_connect(params, reset=False):
         }
 
         for line in data:
-            if 'Packet data handle' in line:
-                lte['interfaces'][dev_id]['PDH'] = line.split(':')[-1].strip().replace("'", '')
-                continue
-            if 'CID' in line:
-                lte['interfaces'][dev_id]['CID'] = line.split(':')[-1].strip().replace("'", '')
+            if 'Session ID:' in line:
+                lte['interfaces'][dev_id]['Session'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
         fwglobals.g.db['lte'] = lte # db is SqlDict, so we have to replace all record
@@ -2757,6 +2834,13 @@ def lte_get_radio_signals_state(dev_id):
     except Exception as e:
         return result
 
+def mbim_get_ip_configuration(dev_id):
+    try:
+        output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close')
+        return output
+    except subprocess.CalledProcessError as err:
+        return False
+
 def lte_get_configuration_received_from_provider(dev_id):
     try:
         response = {
@@ -2765,21 +2849,17 @@ def lte_get_configuration_received_from_provider(dev_id):
             'STATUS'  : ''
         }
 
-        ip_info = qmi_get_ip_configuration(dev_id)
-
-        if ip_info:
+        ip_config = mbim_get_ip_configuration(dev_id)
+        if ip_config:
             response['STATUS'] = True
-            lines = ip_info.splitlines()
+            lines = ip_config.splitlines()
             for line in lines:
-                if 'IPv4 address' in line:
+                if 'IP [0]:' in line:
                     response['IP'] = line.split(':')[-1].strip().replace("'", '')
                     continue
-                if 'IPv4 subnet mask' in line:
-                    mask = line.split(':')[-1].strip().replace("'", '')
-                    response['IP'] = response['IP'] + '/' + str(IPAddress(mask).netmask_bits())
-                if 'IPv4 gateway address' in line:
+                if 'Gateway:' in line:
                     response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
+                    break
 
         return response
     except Exception as e:

@@ -303,7 +303,7 @@ class FWAGENT_API:
         connection_state = fwutils.lte_get_connection_state(params['dev_id'])
         packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
         system_info = fwutils.lte_get_system_info(params['dev_id'])
-        default_apn = fwutils.lte_get_default_apn(params['dev_id'])
+        default_settings = fwutils.lte_get_default_settings(params['dev_id'])
 
         is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
         if fwutils.vpp_does_run() and is_assigned:
@@ -321,7 +321,7 @@ class FWAGENT_API:
             'hardware_info'       : hardware_info,
             'system_info'         : system_info,
             'sim_status'          : sim_status,
-            'default_apn'         : default_apn
+            'default_settings'    : default_settings
         }
 
         return {'message': response, 'ok': 1}

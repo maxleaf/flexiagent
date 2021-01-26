@@ -832,6 +832,9 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         # Reset sa-id used by tunnels
         #
+        router_api = fwglobals.g.db.get('router_api')
+        if not router_api:
+            fwglobals.g.db['router_api'] = {}
         router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
         router_api_db['sa_id'] = 0
         fwglobals.g.db['router_api'] = router_api_db
