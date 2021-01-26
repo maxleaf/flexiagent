@@ -2,6 +2,6 @@ argcomplete
 vpp-papi
 Pyro4
 sqlitedict
-websocket
+websocket-client
 psutil
 netaddr
