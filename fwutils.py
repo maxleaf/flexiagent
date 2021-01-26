@@ -1156,6 +1156,14 @@ def print_system_config(full=False):
         cfg = system_cfg.dumps(full=full)
         print(cfg)
 
+def print_global_config(full=False):
+    """Print global configuration.
+
+     :returns: None.
+     """
+    if 'lte' in fwglobals.g.db:
+        print(fwglobals.g.db['lte'])
+
 def print_device_config_signature():
     cfg = get_device_config_signature()
     print(cfg)
@@ -2194,7 +2202,6 @@ def configure_hostapd(dev_id, configuration):
             data = {
                 'ssid'                 : config.get('ssid', 'fwrouter_ap'),
                 'interface'            : if_name,
-                'channel'              : config.get('channel', 6),
                 'macaddr_acl'          : 0,
                 'auth_algs'            : 3,
                 'ignore_broadcast_ssid': 1 if config.get('hideSsid', 0) == True else 0,
@@ -2203,9 +2210,16 @@ def configure_hostapd(dev_id, configuration):
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
                 'logger_stdout_level'  : 2,
-                'country_code'         : 'IL',
-                'ieee80211d'           : 1
             }
+
+            # Channel
+            channel = config.get('channel', '0')
+            data['channel'] = channel
+
+            country_code = config.get('region', 0)
+            if channel == '0' and country_code:
+                data['ieee80211d'] = 1
+                data['country_code'] = country_code
 
             ap_mode = config.get('operationMode', 'g')
 
