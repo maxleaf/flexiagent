@@ -2219,8 +2219,8 @@ def configure_hostapd(dev_id, configuration):
             channel = config.get('channel', '0')
             data['channel'] = channel
 
-            country_code = config.get('region', 0)
-            if channel == '0' and country_code:
+            country_code = config.get('region', 'other')
+            if channel == '0' and country_code != 'other':
                 data['ieee80211d'] = 1
                 data['country_code'] = country_code
 
