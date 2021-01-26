@@ -1145,6 +1145,9 @@ def reset_device_config():
         db_policies.clean()
     fwnetplan.restore_linux_netplan_files()
 
+    if 'lte' in fwglobals.g.db:
+        fwglobals.g.db['lte'] = {}
+
     reset_dhcpd()
 
 def print_system_config(full=False):
@@ -2423,6 +2426,14 @@ def _run_qmicli_command(dev_id, flag):
     except subprocess.CalledProcessError as err:
         return None
 
+def _run_mbimcli_command(dev_id, cmd):
+    try:
+        device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
+        output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT)
+        return output
+    except subprocess.CalledProcessError as err:
+        return None
+
 def qmi_get_simcard_status(dev_id):
     return _run_qmicli_command(dev_id, 'uim-get-card-status')
 
@@ -2521,16 +2532,19 @@ def lte_disconnect(dev_id, hard_reset_service=False):
         lte_interfaces = lte_db.get('interfaces', {})
         current_interface = lte_interfaces.get(dev_id, None)
         if current_interface:
-            pdh     = fwglobals.g.db['lte']['interfaces'][dev_id]['PDH']
-            cid     = fwglobals.g.db['lte']['interfaces'][dev_id]['CID']
+            session     = fwglobals.g.db['lte']['interfaces'][dev_id]['Session']
             if_name = fwglobals.g.db['lte']['interfaces'][dev_id]['if_name']
-            output = _run_qmicli_command(dev_id, 'wds-stop-network=%s --client-cid=%s' % (pdh, cid))
-            os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
+        else:
+            session = '0' # defualt session
+            if_name = dev_id_to_linux_if(dev_id)
 
-            if hard_reset_service:
-                _run_qmicli_command(dev_id, 'wds-reset')
-                _run_qmicli_command(dev_id, 'nas-reset')
-                _run_qmicli_command(dev_id, 'uim-reset')
+        output = _run_mbimcli_command(dev_id, '--disconnect=%s' % session)
+        os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
+
+        if hard_reset_service:
+            _run_qmicli_command(dev_id, 'wds-reset')
+            _run_qmicli_command(dev_id, 'nas-reset')
+            _run_qmicli_command(dev_id, 'uim-reset')
 
         fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
 
@@ -2539,7 +2553,7 @@ def lte_disconnect(dev_id, hard_reset_service=False):
         return (False, "Exception: %s" % (str(e)))
 
 def lte_prepare_connection_params(params):
-    connection_params = ['ip-type=4']
+    connection_params = []
     if 'apn' in params:
         connection_params.append('apn=%s' % params['apn'])
     if 'user' in params:
@@ -2564,14 +2578,16 @@ def lte_connect(params, reset=False):
             return (False, "Sim is not presented")
 
     try:
-        current_connection_state = qmi_get_connection_state(dev_id)
-        if current_connection_state:
+        is_modem_connected = mbim_get_ip_configuration(dev_id)
+        if is_modem_connected:
             return (True, None)
 
         connection_params = lte_prepare_connection_params(params)
 
-        cmd = 'wds-start-network="%s" --client-no-release-cid' % connection_params
-        output = _run_qmicli_command(dev_id, cmd)
+        _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
+        _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
+        _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
+        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close' % connection_params)
         data = output.splitlines()
 
         lte = fwglobals.g.db.get('lte', {})
@@ -2582,11 +2598,8 @@ def lte_connect(params, reset=False):
         }
 
         for line in data:
-            if 'Packet data handle' in line:
-                lte['interfaces'][dev_id]['PDH'] = line.split(':')[-1].strip().replace("'", '')
-                continue
-            if 'CID' in line:
-                lte['interfaces'][dev_id]['CID'] = line.split(':')[-1].strip().replace("'", '')
+            if 'Session ID:' in line:
+                lte['interfaces'][dev_id]['Session'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
         fwglobals.g.db['lte'] = lte # db is SqlDict, so we have to replace all record
@@ -2759,6 +2772,13 @@ def lte_get_radio_signals_state(dev_id):
     except Exception as e:
         return result
 
+def mbim_get_ip_configuration(dev_id):
+    try:
+        output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close')
+        return output
+    except subprocess.CalledProcessError as err:
+        return False
+
 def lte_get_configuration_received_from_provider(dev_id):
     try:
         response = {
@@ -2767,20 +2787,17 @@ def lte_get_configuration_received_from_provider(dev_id):
             'STATUS'  : ''
         }
 
-        ip_config = qmi_get_ip_configuration(dev_id)
+        ip_config = mbim_get_ip_configuration(dev_id)
         if ip_config:
             response['STATUS'] = True
             lines = ip_config.splitlines()
             for line in lines:
-                if 'IPv4 address' in line:
+                if 'IP [0]:' in line:
                     response['IP'] = line.split(':')[-1].strip().replace("'", '')
                     continue
-                if 'IPv4 subnet mask' in line:
-                    mask = line.split(':')[-1].strip().replace("'", '')
-                    response['IP'] = response['IP'] + '/' + str(IPAddress(mask).netmask_bits())
-                if 'IPv4 gateway address' in line:
+                if 'Gateway:' in line:
                     response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
+                    break
 
         return response
     except Exception as e:
