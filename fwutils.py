@@ -461,7 +461,7 @@ def pci_to_linux_iface(pci):
         return None
     if output is None:
         return None
-    return output.rstrip().split('/')[-1]
+    return output.rstrip().decode().split('/')[-1]
 
 def pci_is_vmxnet3(pci):
     """Check if PCI address is vmxnet3.
@@ -1809,7 +1809,7 @@ def set_linux_reverse_path_filter(dev_name, on):
         out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
         current_val = bool(out.split(' = ')[1])
     except Exception as e:
-        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % dev_name, str(e))
+        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % (dev_name, str(e)))
         return None
 
     # Light optimization, no need to set the value
