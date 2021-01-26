@@ -2329,8 +2329,7 @@ def start_hostapd():
         if files:
             files = ' '.join(files)
             proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
-            time.sleep(3)
-
+            time.sleep(1)
 
             pid = pid_of('hostapd')
             if pid:
@@ -2497,15 +2496,31 @@ def qmi_sim_power_off(dev_id):
 def qmi_sim_power_on(dev_id):
     return _run_qmicli_command(dev_id, 'uim-sim-power-on=1')
 
-def lte_get_default_apn(dev_id):
+def lte_get_default_settings(dev_id):
     default_settings = qmi_get_default_settings(dev_id)
+    res = {
+        'APN'     : '',
+        'UserName': '',
+        'Password': '',
+        'Auth'    : ''
+    }
     if default_settings:
         data = default_settings.splitlines()
         for line in data:
             if 'APN' in line:
-                return line.split(':')[-1].strip().replace("'", '')
+                res['APN'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'UserName' in line:
+                res['UserName'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Password' in line:
+                res['Password'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Auth' in line:
+                res['Auth'] = line.split(':')[-1].strip().replace("'", '')
+                continue
 
-    return None
+    return res
 
 def lte_sim_status(dev_id):
     status = qmi_get_simcard_status(dev_id)
