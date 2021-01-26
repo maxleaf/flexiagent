@@ -2206,6 +2206,7 @@ def configure_hostapd(dev_id, configuration):
                 'ssid'                 : config.get('ssid', 'fwrouter_ap'),
                 'interface'            : if_name,
                 'macaddr_acl'          : 0,
+                'driver'               : 'nl80211',
                 'auth_algs'            : 3,
                 'ignore_broadcast_ssid': 1 if config.get('hideSsid', 0) == True else 0,
                 'eap_server'           : 0,
@@ -2213,7 +2214,50 @@ def configure_hostapd(dev_id, configuration):
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
                 'logger_stdout_level'  : 2,
+                'max_num_sta'          : 128
             }
+
+            if band == '5GHz':
+                data['uapsd_advertisement_enabled=1'] = 1
+                data['wmm_ac_bk_cwmin'] = 4
+                data['wmm_ac_bk_cwmax'] = 10
+                data['wmm_ac_bk_aifs'] = 7
+                data['wmm_ac_bk_txop_limit'] = 0
+                data['wmm_ac_bk_acm'] = 0
+                data['wmm_ac_be_aifs'] = 3
+                data['wmm_ac_be_cwmin'] = 4
+                data['wmm_ac_be_cwmax'] = 10
+                data['wmm_ac_be_txop_limit'] = 0
+                data['wmm_ac_be_acm'] = 0
+                data['wmm_ac_vi_aifs'] = 2
+                data['wmm_ac_vi_cwmin'] = 3
+                data['wmm_ac_vi_cwmax'] = 4
+                data['wmm_ac_vi_txop_limit'] = 94
+                data['wmm_ac_vi_acm'] = 0
+                data['wmm_ac_vo_aifs'] = 2
+                data['wmm_ac_vo_cwmin'] = 2
+                data['wmm_ac_vo_cwmax'] = 3
+                data['wmm_ac_vo_txop_limit'] = 47
+                data['wmm_ac_vo_acm'] = 0
+
+                data['tx_queue_data3_aifs'] = 7
+                data['tx_queue_data3_cwmin'] = 15
+                data['tx_queue_data3_cwmax'] = 1023
+                data['tx_queue_data3_burst'] = 0
+                data['tx_queue_data2_aifs'] = 3
+                data['tx_queue_data2_cwmin'] = 15
+                data['tx_queue_data2_cwmax'] = 63
+                data['tx_queue_data2_burst'] = 0
+                data['tx_queue_data1_aifs'] = 1
+                data['tx_queue_data1_cwmin'] = 7
+                data['tx_queue_data1_cwmax'] = 15
+                data['tx_queue_data1_burst'] = 3.0
+                data['tx_queue_data0_aifs'] = 1
+                data['tx_queue_data0_cwmin'] = 3
+                data['tx_queue_data0_cwmax'] = 7
+                data['tx_queue_data0_burst'] = 1.5
+            else:
+                data['wmm_enabled'] = 0
 
             # Channel
             channel = config.get('channel', '0')
@@ -2222,6 +2266,7 @@ def configure_hostapd(dev_id, configuration):
             country_code = config.get('region', 'other')
             if channel == '0' and country_code != 'other':
                 data['ieee80211d'] = 1
+                data['ieee80211h'] = 1
                 data['country_code'] = country_code
 
             ap_mode = config.get('operationMode', 'g')
@@ -2236,7 +2281,7 @@ def configure_hostapd(dev_id, configuration):
                     data['hw_mode']       = 'g'
 
                 data['ieee80211n']    = 1
-                data['ht_capab']      = '[SHORT-GI-40][HT40+][HT40-][DSSS_CCK-40]'
+                data['ht_capab']      = '[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]'
 
             elif ap_mode == "a":
                 data['hw_mode']       = 'a'
@@ -2249,6 +2294,8 @@ def configure_hostapd(dev_id, configuration):
                 data['ieee80211ac']   = 1
                 data['ieee80211n']    = 1
                 data['wmm_enabled']   = 1
+                data['vht_oper_chwidth=0']   = 0
+                data['ht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
 
             security_mode = config.get('securityMode', 'wpa2-psk')
 
@@ -2389,7 +2436,7 @@ def configure_lte_interface(params):
     if ip_config['STATUS']:
         ip = ip_config['IP']
         gateway = ip_config['GATEWAY']
-        metric = params['metric']
+        metric = params.get('metric', '0')
 
         nicname = dev_id_to_linux_if(dev_id)
 
@@ -2569,13 +2616,13 @@ def lte_disconnect(dev_id, hard_reset_service=False):
 
 def lte_prepare_connection_params(params):
     connection_params = []
-    if 'apn' in params:
+    if 'apn' in params and params['apn']:
         connection_params.append('apn=%s' % params['apn'])
-    if 'user' in params:
+    if 'user' in params and params['user']:
         connection_params.append('username=%s' % params['user'])
-    if 'password' in params:
+    if 'password' in params and params['password']:
         connection_params.append('password=%s' % params['password'])
-    if 'auth' in params:
+    if 'auth' in params and params['auth']:
         connection_params.append('auth=%s' % params['auth'])
 
     return ",".join(connection_params)
