@@ -664,7 +664,7 @@ def reset(soft=False):
         # stop LTE connections
         lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
         for dev_id in lte_interfaces:
-            fwutils.lte_disconnect(dev_id, True)
+            fwutils.lte_disconnect(dev_id, False)
 
         fwglobals.log.info("Done")
     else:
