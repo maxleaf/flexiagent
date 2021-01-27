@@ -135,7 +135,7 @@ def check_hard_configuration(checker, check_only):
     """
     succeeded = True
     for element in hard_checkers:
-        (checker_name, checker_params) = element.items()[0]
+        (checker_name, checker_params) = list(element.items())[0]
 
         # Don't run connectivity checkers in check only mode,
         # as every check waits 5 seconds for ping response on every found interface.
@@ -165,7 +165,7 @@ def check_soft_configuration(checker, fix=False, quiet=False):
     succeeded = True
     for element in soft_checkers:
 
-        (checker_name, checker_params) = element.items()[0]
+        (checker_name, checker_params) = list(element.items())[0]
         prompt = checker_name_to_description(checker_name) + ': '
 
         checker_func = getattr(checker, checker_name)
