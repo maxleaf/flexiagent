@@ -158,6 +158,25 @@ def start_router(params=None):
             'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd_list.append(cmd)
+    else:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "add no-pci flag to %s" % vpp_filename
+        cmd['cmd']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_add_nopci',
+            'args'  : { 'vpp_config_filename' : vpp_filename }
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "remove no-pci flag from %s" % vpp_filename
+        cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_remove_nopci',
+            'args'  : { 'vpp_config_filename' : vpp_filename }
+        }
+        cmd_list.append(cmd)
 
     # Enable NAT in vpp configuration file
     cmd = {}
