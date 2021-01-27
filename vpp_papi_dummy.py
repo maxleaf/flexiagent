@@ -57,7 +57,7 @@ class _VPP_API:
             meth = types.MethodType(myfunc, selfapi)
         return meth
 
-class VPP:
+class VPPApiClient:
     """This is Dummy VPP class representation.
     """
     def __init__(self, jlist):
