@@ -30,7 +30,7 @@ try:
     from vpp_papi import VPPApiClient
     vppWrapper = False
 except:
-    fwglobals.log.warning("vpp_papi library not found, using VPP dummy wrapper. Only for testing!!!")
+    print("vpp_papi library not found, using VPP dummy wrapper. Only for testing!!!")
     from vpp_papi_dummy import VPPApiClient
     vppWrapper = True
 
