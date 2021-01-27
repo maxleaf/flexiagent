@@ -309,13 +309,13 @@ def main(args):
                             "\t------------------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=False)
             elif choice == '2':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=True, quiet=True)
             elif choice == '3':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=True, quiet=False)
             elif choice == '4':
                 print ('')
@@ -324,20 +324,20 @@ def main(args):
                 success = True
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-	        if success == True:
-                    print ("Please wait..")
-                    os.system("sudo systemctl stop flexiwan-router")
-                    checker.save_config()
-                    if checker.update_grub == True:
-		                rebootSys = 'x'
-                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
-                                    rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
-                                                    "Would you like to reboot now (Y/n)?")
-                                    if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
-                                        print ("Rebooting...")
-                                        os.system('reboot now')
-                                    else:
-                                        print ("Please reboot the system for changes to take effect.")
+            if success == True:
+                print ("Please wait..")
+                os.system("sudo systemctl stop flexiwan-router")
+                checker.save_config()
+                if checker.update_grub == True:
+                    rebootSys = 'x'
+                    while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
+                        rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
+                                        "Would you like to reboot now (Y/n)?")
+                        if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
+                            print ("Rebooting...")
+                            os.system('reboot now')
+                        else:
+                            print ("Please reboot the system for changes to take effect.")
 
                 os.system("sudo systemctl start flexiwan-router")
                 print ("Done.")

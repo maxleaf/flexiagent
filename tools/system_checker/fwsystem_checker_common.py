@@ -171,7 +171,7 @@ class Checker:
         def _print_without_line_feed(str):
             # So odd print is needed to enforce no line feed, so next print()
             # will override this line.
-            print str,
+            print (str,)
             sys.stdout.flush() # Need this as tail ',' removes the 'newline' in print(), so the print is not flushed immediately
 
         self.wan_interfaces = []
