@@ -636,13 +636,15 @@ def version():
 def dump(filename, path, clean_log):
     fwutils.dump(filename=filename, path=path, clean_log=clean_log)
 
-def reset(soft=False):
+def reset(soft=False, quiet=False):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
 
     :param soft:  Soft reset: resets router configuration only.
                   No re-registration is needed.
+    :param quiet: Quiet reset: resets router configuration without confirmation
+                  of device deletion in management.
 
     :returns: None.
     """
@@ -652,12 +654,16 @@ def reset(soft=False):
         return
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
+    reset_device = True
+    if not quiet:
+        CSTART = "\x1b[0;30;43m"
+        CEND = "\x1b[0m"
+        choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+                      "Already deleted in flexiManage y/n [n]" + CEND)
+        if choice != 'y' and choice != 'Y':
+            reset_device = False
 
-    CSTART = "\x1b[0;30;43m"
-    CEND = "\x1b[0m"
-    choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
-                      "Already deleted in flexiManage y/n [n]: " + CEND)
-    if choice == 'y' or choice == 'Y':
+    if reset_device:
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)
 
@@ -666,7 +672,7 @@ def reset(soft=False):
         for dev_id in lte_interfaces:
             fwutils.lte_disconnect(dev_id, False)
 
-        fwglobals.log.info("Done")
+        fwglobals.log.info("Reset operation done")
     else:
         fwglobals.log.info("Reset operation aborted")
     daemon_rpc('start')     # Start daemon main loop if daemon is alive
@@ -1122,7 +1128,7 @@ if __name__ == '__main__':
 
     command_functions = {
                     'version':lambda args: version(),
-                    'reset': lambda args: reset(soft=args.soft),
+                    'reset': lambda args: reset(soft=args.soft, quiet=args.quiet),
                     'stop': lambda args: stop(reset_device_config=args.reset_softly, stop_router=(not args.dont_stop_vpp)),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
