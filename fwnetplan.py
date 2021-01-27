@@ -87,8 +87,8 @@ def load_netplan_filenames(get_only=False):
 
     devices = {}
     for route in routes:
-        rip = route.split('via ')[1].split(' ')[0]
-        dev = route.split('dev ')[1].split(' ')[0]
+        rip = route.decode().split('via ')[1].split(' ')[0]
+        dev = route.decode().split('dev ')[1].split(' ')[0]
         devices[dev] = rip
 
     files = glob.glob("/etc/netplan/*.fw_run_orig") + \
