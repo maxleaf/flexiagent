@@ -27,11 +27,11 @@ import fwutils
 import time
 
 try:
-    from vpp_papi import VPP
+    from vpp_papi import VPPApiClient
     vppWrapper = False
 except:
     fwglobals.log.warning("vpp_papi library not found, using VPP dummy wrapper. Only for testing!!!")
-    from vpp_papi_dummy import VPP
+    from vpp_papi_dummy import VPPApiClient
     vppWrapper = True
 
 class VPP_API:
@@ -65,7 +65,8 @@ class VPP_API:
         if not self.jsonfiles and not vppWrapper:
             raise Exception("VPP_API.connect_to_vpp: no vpp api files were found")
         fwglobals.log.debug("VPP_API.connect_to_vpp: connecting")
-        self.vpp = VPP(self.jsonfiles)
+
+        self.vpp = VPPApiClient(apifiles=self.jsonfiles, use_socket=True)
         num_retries = 5
         for i in range(num_retries):
             try:
