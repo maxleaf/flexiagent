@@ -180,7 +180,7 @@ def get_os_routing_table():
     :returns: List of routes.
     """
     try:
-        routing_table = subprocess.check_output(['route', '-n']).split('\n')
+        routing_table = subprocess.check_output(['route', '-n']).decode().split('\n')
         return routing_table
     except:
         return (None)
@@ -192,7 +192,7 @@ def get_default_route():
     """
     (via, dev, metric) = ("", "", 0xffffffff)
     try:
-        output = os.popen('ip route list match default').read()
+        output = os.popen('ip route list match default').read().decode()
         if output:
             routes = output.splitlines()
             for r in routes:
