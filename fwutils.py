@@ -1757,8 +1757,7 @@ def compare_request_params(params1, params2):
         # False booleans will be handled by next 'elif'.
         #
         if val1 and val2:
-            if (type(val1) == str or type(val1) == unicode) and \
-               (type(val2) == str or type(val2) == unicode):
+            if (type(val1) == str) and (type(val2) == str):
                 if val1.lower() != val2.lower():
                     return False    # Strings are not equal
             elif type(val1) != type(val2):
