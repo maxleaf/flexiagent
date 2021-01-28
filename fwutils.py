@@ -1891,6 +1891,9 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
         fwglobals.log.debug(cmd)
         output = subprocess.check_output(cmd, shell=True)
     except Exception as e:
+        if op == 'del':
+            fwglobals.log.debug("'%s' failed: %s, ignore this error" % (cmd, str(e)))
+            return True
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
     return True
