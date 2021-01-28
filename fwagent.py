@@ -188,7 +188,7 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces          = fwutils.get_linux_interfaces(cached=False).values()
+        interfaces          = list(fwutils.get_linux_interfaces(cached=False).values())
         (dr_via, dr_dev, _) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
