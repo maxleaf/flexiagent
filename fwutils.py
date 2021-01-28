@@ -1806,7 +1806,7 @@ def set_linux_reverse_path_filter(dev_name, on):
     current_val = None
     try:
         cmd = 'sysctl net.ipv4.conf.%s.rp_filter' % dev_name
-        out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
+        out = subprocess.check_output(cmd, shell=True).decode()  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
         current_val = bool(out.split(' = ')[1])
     except Exception as e:
         fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % (dev_name, str(e)))
@@ -1829,7 +1829,7 @@ def update_linux_metric(prefix, dev, metric):
     """
     try:
         cmd = "ip route show exact %s dev %s" % (prefix, dev)
-        os_route = subprocess.check_output(cmd, shell=True).strip()
+        os_route = subprocess.check_output(cmd, shell=True).strip().decode()
         if not os_route:
             raise Exception("'%s' returned nothing" % cmd)
         cmd = "ip route del " + os_route
@@ -1908,7 +1908,7 @@ def vpp_nat_add_remove_interface(remove, pci, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
-    metric_min = sys.maxint
+    metric_min = sys.maxsize
 
     dev_metric = int(metric or 0)
 
