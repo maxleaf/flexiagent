@@ -441,7 +441,7 @@ class FwRouterCfg:
         """
         current     = self.db['signature']
         delta       = json.dumps(request, separators=(',', ':'), sort_keys=True)
-        hash_object = hashlib.sha1(current + delta)
+        hash_object = hashlib.sha1((current + delta).encode())
         new         = hash_object.hexdigest()
 
         self.db['signature'] = new
