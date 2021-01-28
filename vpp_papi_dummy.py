@@ -60,11 +60,11 @@ class _VPP_API:
 class VPPApiClient:
     """This is Dummy VPP class representation.
     """
-    def __init__(self, jlist):
+    def __init__(self, apifiles, use_socket):
         """Constructor method
         """
         self.api = _VPP_API()
-        fwglobals.log.debug("VPP Init: " + str(jlist))
+        fwglobals.log.debug("VPP Init: " + str(apifiles))
     def connect(self, name="default-conn"):
         """Connect to dummy VPP.
         """
