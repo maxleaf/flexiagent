@@ -256,7 +256,7 @@ class Checker(fwsystem_checker_common.Checker):
         # systemd-timesyncd.service active: yes
         #     RTC in local TZ: no
         try:
-            out = subprocess.check_output("timedatectl | grep 'Time zone:'", shell=True).strip()
+            out = subprocess.check_output("timedatectl | grep 'Time zone:'", shell=True).strip().decode()
         except Exception as e:
             print(prompt + str(e))
             return False
