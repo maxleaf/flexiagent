@@ -6,3 +6,4 @@ sqlitedict
 websocket-client
 psutil
 netaddr
+serial
