@@ -116,7 +116,6 @@ def start_router(params=None):
             cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
             cmd_list.append(cmd)
 
-        
             # Non-dpdk interface should not appear in /etc/vpp/startup.conf because they don't have a pci address.
             # Additional spaciel logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
@@ -159,6 +158,10 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
     else:
+        # When the list of devices in the startup.conf file is empty, the vpp attempts
+        # to manage all the down linux interfaces.
+        # Since we allow non-dpdk interfaces (LTE, WiFi), this list could be empty.
+        # In order to prevent vpp from doing so, we need to add the "no-pci" flag.
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "python"
@@ -166,14 +169,6 @@ def start_router(params=None):
         cmd['cmd']['params']  = {
             'module': 'fwutils',
             'func'  : 'vpp_startup_conf_add_nopci',
-            'args'  : { 'vpp_config_filename' : vpp_filename }
-        }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "remove no-pci flag from %s" % vpp_filename
-        cmd['revert']['params'] = {
-            'module': 'fwutils',
-            'func'  : 'vpp_startup_conf_remove_nopci',
             'args'  : { 'vpp_config_filename' : vpp_filename }
         }
         cmd_list.append(cmd)

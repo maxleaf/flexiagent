@@ -1474,19 +1474,6 @@ def vpp_startup_conf_add_nopci(vpp_config_filename):
         p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_remove_nopci(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
-
-    if config['dpdk'] == None:
-        return
-    key = p.get_element(config['dpdk'], 'no-pci')
-    if key:
-        p.remove_element(config['dpdk'], 'no-pci')
-        p.dump(config, vpp_config_filename)
-
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
