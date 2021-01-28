@@ -990,7 +990,7 @@ def mac_str_to_bytes(mac_str):      # "08:00:27:fd:12:01" -> bytes
 
      :returns: MAC address in bytes representation.
      """
-    return mac_str.replace(':', '').decode('hex')
+    return mac_str.replace(':', '').encode()
 
 def is_python2():
     """Checks if it is Python 2 version.
