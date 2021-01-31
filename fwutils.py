@@ -1854,7 +1854,7 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
     if addr == 'default':
         return (True, None)
 
-    metric = ' metric %s' % metric if metric else ''
+    metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
 
     cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
@@ -1881,10 +1881,14 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
             op = 'del'
         cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
     else:
+        if via in next_hop:
+            return False
         if not dev_id:
             cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
             tap = dev_id_to_tap(dev_id)
+            if not tap:
+                return False
             cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
@@ -3429,3 +3433,82 @@ def dump(filename=None, path=None, clean_log=False):
             os.system("echo '' > %s" % fwglobals.g.ROUTER_LOG_FILE)
     except Exception as e:
         fwglobals.log.error("failed to dump: %s" % (str(e)))
+
+def linux_routes_dictionary_get():
+    routes_dict = {}
+
+    # get only our static routes from Linux
+    try :
+        output = subprocess.check_output('ip route show | grep -v proto', shell=True).strip()
+    except:
+        return routes_dict
+
+    addr = ''
+    metric = 0
+    nexthops = set()
+    routes = output.splitlines()
+
+    for route in routes:
+        part = route.split(' ')[0]
+        if re.search('nexthop', part):
+            parts = route.split('via ')
+            via = parts[1].split(' ')[0]
+            nexthops.add(via)
+            continue
+        else:
+            # save multipath route if needed
+            if nexthops:
+                if metric not in routes_dict:
+                    routes_dict[metric] = {addr: copy.copy(nexthops)}
+                else:
+                    routes_dict[metric][addr] = copy.copy(nexthops)
+
+            # continue with current route
+            nexthops.clear()
+            metric = 0
+            addr = part
+
+        if 'metric' in route:
+            parts = route.split('metric ')
+            metric = int(parts[1])
+
+        parts = route.split('via ')
+        if isinstance(parts, list) and len(parts) > 1:
+            via = parts[1].split(' ')[0]
+            nexthops.add(via)
+
+        if not nexthops:
+            continue
+
+        if metric not in routes_dict:
+            routes_dict[metric] = {addr: copy.copy(nexthops)}
+        else:
+            routes_dict[metric][addr] = copy.copy(nexthops)
+
+        nexthops.clear()
+        metric = 0
+
+    return routes_dict
+
+def linux_routes_dictionary_exist(routes, addr, metric, via):
+    metric = int(metric)
+    if metric in routes.keys():
+        if addr in routes[metric].keys():
+            if via in routes[metric][addr]:
+                return True
+    return False
+
+def check_reinstall_static_routes():
+    routes_db = fwglobals.g.router_cfg.get_routes()
+    routes_linux = linux_routes_dictionary_get()
+
+    for route in routes_db:
+        addr = route['addr']
+        via = route['via']
+        metric = str(route.get('metric', '0'))
+        dev = route.get('dev_id', None)
+
+        if linux_routes_dictionary_exist(routes_linux, addr, metric, via):
+            continue
+
+        add_static_route(addr, via, metric, False, dev)
