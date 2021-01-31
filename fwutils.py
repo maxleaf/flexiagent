@@ -2437,6 +2437,13 @@ def get_lte_interfaces_dev_ids():
     return out
 
 def configure_lte_interface(params):
+    '''
+    To get LTE connectivity, two steps are required:
+    1. Creating a connection between the modem and cellular provider.
+    2. Setting up the Linux interface with the IP/gateway received from the cellular provider
+    This function is responsible for the second stage.
+    If the vpp is running, we have special logic to configure LTE. This logic handled by the add_interface translator.
+    '''
     if vpp_does_run():
         return (True, None)
 
