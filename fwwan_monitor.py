@@ -188,6 +188,12 @@ class FwWanMonitor:
                 route.default = True
                 min_metric    = (route.metric % self.WATERMARK)
 
+            # Filter out routes on tunnel interfaces.
+            # Tunnels use loopback interfaces that has no physical device, so dev_id should be None.
+            #
+            if not route.dev_id:
+                continue
+
             # Filter out routes on interfaces where flexiManage disabled monitoring.
             # Note the 'monitorInternet' flag might not exist (in case of device
             # upgrade). In that case we enable the monitoring.
