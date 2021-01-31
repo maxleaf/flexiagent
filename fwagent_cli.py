@@ -78,7 +78,7 @@ class FwagentCli:
     def run_loop(self):
         while True:
             try:
-                api_str = raw_input(self.prompt)
+                api_str = input(self.prompt)
                 if api_str == '':
                     continue
                 elif api_str == 'q' or api_str == 'quit' or api_str == 'exit':

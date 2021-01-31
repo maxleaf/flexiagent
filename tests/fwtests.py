@@ -143,7 +143,7 @@ class TestFwagent:
                 #
                 timeout = 120
                 cmd = '%s show --daemon status' % (self.fwagent_py)
-                out = subprocess.check_output(cmd, shell=True)
+                out = subprocess.check_output(cmd, shell=True).decode()
                 while out.strip() != 'running' and timeout > 0:
                     time.sleep(1)
                     timeout -= 1
@@ -159,7 +159,7 @@ class TestFwagent:
         # created, API command will be run on it, and instance will be destroyed.
         #
         cmd = '%s cli %s' % (self.fwagent_py, args)
-        out = subprocess.check_output(cmd, shell=True).strip()
+        out = subprocess.check_output(cmd, shell=True).decode().strip()
 
         # Deserialize object printed by CLI onto STDOUT
         match = re.search('return-value-start (.*) return-value-end', out)
@@ -192,7 +192,7 @@ class TestFwagent:
 
     def show(self, args):
         cmd = '%s show %s' % (self.fwagent_py, args)
-        out = subprocess.check_output(cmd, shell=True)
+        out = subprocess.check_output(cmd, shell=True).decode()
         return out.rstrip()
 
     def grep_log(self, pattern, print_findings=True, since=None):
@@ -202,7 +202,7 @@ class TestFwagent:
 
         grep_cmd = "sudo grep -a -E '%s' /var/log/flexiwan/agent.log" % pattern
         try:
-            out = subprocess.check_output(grep_cmd, shell=True)
+            out = subprocess.check_output(grep_cmd, shell=True).decode()
             if out:
                 lines = out.splitlines()
                 for (idx, line) in enumerate(lines):
@@ -245,7 +245,7 @@ def vpp_does_run():
 
 def vpp_pid():
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        pid = subprocess.check_output(['pidof', 'vpp']).decode()
     except:
         pid = None
     return pid
@@ -253,7 +253,7 @@ def vpp_pid():
 def fwagent_daemon_pid():
     try:
         cmd = "ps -ef | egrep 'fwagent.* daemon' | grep -v grep | tr -s ' ' | cut -d ' ' -f2"
-        pid = subprocess.check_output(cmd, shell=True)
+        pid = subprocess.check_output(cmd, shell=True).decode()
     except:
         pid = None
     return pid
@@ -267,7 +267,7 @@ def vpp_is_configured(config_entities, print_error=True):
         # We need it to read output of 'vppctl' command that might exit abnormally
         # on 'clib_socket_init: connect (fd 3, '/run/vpp/cli.sock'): Connection refused' error.
         p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        (out, _) = p.communicate()
+        out = p.communicate()[0].decode()
         retcode = p.poll()
         return (retcode, out.rstrip())
 
@@ -391,7 +391,7 @@ def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
 
 def file_exists(filename, check_size=True):
     try:
-        file_size_str = subprocess.check_output("sudo stat -c %%s %s" % filename, shell=True)
+        file_size_str = subprocess.check_output("sudo stat -c %%s %s" % filename, shell=True).decode()
     except subprocess.CalledProcessError:
         return False
     if check_size and int(file_size_str.rstrip()) == 0:

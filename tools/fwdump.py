@@ -144,7 +144,7 @@ class FwDump:
                 time.sleep(1)  # Give system a time to remove fd
                 os.mkdir(self.temp_folder)
             else:
-                choice = raw_input(self.prompt + "the temporary folder '%s' exists, overwrite? [Y/n]: " % self.temp_folder)
+                choice = input(self.prompt + "the temporary folder '%s' exists, overwrite? [Y/n]: " % self.temp_folder)
                 if choice == 'y' or choice == 'Y' or choice == '':
                     shutil.rmtree(self.temp_folder)
                     time.sleep(1)  # Give system a time to remove fd
@@ -169,7 +169,7 @@ class FwDump:
         g_dumpers map.
         '''
         try:
-            vpp_pid = subprocess.check_output(['pidof', 'vpp'])
+            vpp_pid = subprocess.check_output(['pidof', 'vpp']).decode()
         except:
             vpp_pid = None
 

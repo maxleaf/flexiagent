@@ -63,7 +63,7 @@ def get_device_logs(file, num_of_lines):
     """
     try:
         cmd = "tail -{} {}".format(num_of_lines, file)
-        res = subprocess.check_output(cmd, shell=True).splitlines()
+        res = subprocess.check_output(cmd, shell=True).decode().splitlines()
 
         # On zero matching, res is a list with a single empty
         # string which we do not want to return to the caller
@@ -91,7 +91,7 @@ def get_device_packet_traces(num_of_packets, timeout):
         subprocess.check_output(cmd, shell=True)
         time.sleep(timeout)
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
-        res = subprocess.check_output(cmd, shell=True).splitlines()
+        res = subprocess.check_output(cmd, shell=True).decode().splitlines()
         # skip first line (contains unnecessary information header)
         return res[1:] if res != [''] else []
     except (OSError, subprocess.CalledProcessError) as err:
@@ -147,7 +147,7 @@ def vpp_pid():
     :returns:           process identifier.
     """
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        pid = subprocess.check_output(['pidof', 'vpp']).decode()
     except:
         pid = None
     return pid
@@ -419,9 +419,9 @@ def get_interface_pci(linuxif):
     """
     NETWORK_BASE_CLASS = "02"
     vpp_run = vpp_does_run()
-    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+    lines = subprocess.check_output(["lspci", "-Dvmmn"]).decode().splitlines()
     for line in lines:
-        vals = line.decode().split("\t", 1)
+        vals = line.split("\t", 1)
         if len(vals) == 2:
             # keep slot number
             if vals[0] == 'Slot:':
@@ -456,12 +456,12 @@ def pci_to_linux_iface(pci):
     pci = pci_to_short(pci)
 
     try:
-        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True)
+        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True).decode()
     except:
         return None
     if output is None:
         return None
-    return output.rstrip().decode().split('/')[-1]
+    return output.rstrip().split('/')[-1]
 
 def pci_is_vmxnet3(pci):
     """Check if PCI address is vmxnet3.
@@ -1234,7 +1234,7 @@ def modify_dhcpd(is_add, params):
             exec_string += remove_string_2
 
     try:
-        output = subprocess.check_output(exec_string, shell=True)
+        output = subprocess.check_output(exec_string, shell=True).decode()
     except Exception as e:
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
@@ -1412,7 +1412,7 @@ def add_static_route(addr, via, metric, remove, pci=None):
 
     cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
     try:
-        output = subprocess.check_output(cmd_show, shell=True)
+        output = subprocess.check_output(cmd_show, shell=True).decode()
     except:
         return False
 
@@ -1442,7 +1442,7 @@ def add_static_route(addr, via, metric, remove, pci=None):
 
     try:
         fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
+        output = subprocess.check_output(cmd, shell=True).decode()
     except Exception as e:
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
@@ -1828,7 +1828,7 @@ def update_linux_metric(prefix, dev, metric):
     """
     try:
         cmd = "ip route show exact %s dev %s" % (prefix, dev)
-        os_route = subprocess.check_output(cmd, shell=True).strip().decode()
+        os_route = subprocess.check_output(cmd, shell=True).decode().strip()
         if not os_route:
             raise Exception("'%s' returned nothing" % cmd)
         cmd = "ip route del " + os_route

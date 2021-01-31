@@ -24,19 +24,10 @@ import json
 import loadsimulator
 import os
 
-
-# Try with PY3 else, use PY2
-try:
-    from urllib import request as ureq
-    from urllib import parse as uparse
-    from urllib import error as uerr
-    from http import server as hsvr
-    raw_input = input   # Python 2 has raw_input, and it doesn't support function aliasing, so downgrade :)
-except ImportError:
-    import urllib2 as ureq
-    import urllib as uparse
-    import urllib2 as uerr
-    import BaseHTTPServer as hsvr
+from urllib import request as ureq
+from urllib import parse as uparse
+from urllib import error as uerr
+from http import server as hsvr
 
 import websocket
 import ssl
@@ -650,7 +641,7 @@ def reset(soft=False):
 
     CSTART = "\x1b[0;30;43m"
     CEND = "\x1b[0m"
-    choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+    choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
                       "Already deleted in flexiManage y/n [n]" + CEND)
     if choice == 'y' or choice == 'Y':
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):

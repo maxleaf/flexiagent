@@ -118,7 +118,7 @@ class Checker:
         :returns: 'True' if supported and 'False' otherwise.
         """
         try:
-            out = subprocess.check_output('cat /proc/cpuinfo | grep sse4_2', shell=True).strip()
+            subprocess.check_output('cat /proc/cpuinfo | grep sse4_2', shell=True)
         except subprocess.CalledProcessError:
             return False
         return True
@@ -154,7 +154,7 @@ class Checker:
         """
         try:
             # NETWORK_BASE_CLASS = "02", so look for 'Class:  02XX'
-            out = subprocess.check_output("lspci -Dvmmn | grep -cE 'Class:[[:space:]]+02'", shell=True).strip()
+            out = subprocess.check_output("lspci -Dvmmn | grep -cE 'Class:[[:space:]]+02'", shell=True).decode().strip()
             if int(out) < num_nics:
                 return False
         except subprocess.CalledProcessError:
@@ -216,7 +216,7 @@ class Checker:
         if self.detected_nics is None:
             self.detected_nics = {}
             try:
-                out = subprocess.check_output("lspci -vnn", shell=True).strip().split('\n\n')
+                out = subprocess.check_output("lspci -vnn", shell=True).decode().strip().split('\n\n')
                 # 00:03.0 Ethernet controller [0200]: Intel Corporation 82540EM Gigabit Ethernet Controller [8086:100e] (rev 02)
                 #     Subsystem: Intel Corporation PRO/1000 MT Desktop Adapter [8086:001e]
                 #     Flags: bus master, 66MHz, medium devsel, latency 64, IRQ 19
@@ -310,7 +310,7 @@ class Checker:
             # We use ruamel.yaml and not yaml to preserve comments.
             new_uuid = str(uuid.uuid1()).upper()
             if not silently:
-                choice = raw_input(prompt + "use %s ? [Y/n]: " % new_uuid)
+                choice = input(prompt + "use %s ? [Y/n]: " % new_uuid)
                 if choice != 'y' and choice != 'Y' and choice != '':
                     return False
             f = open(self.CFG_FWAGENT_CONF_FILE, 'r')
@@ -338,7 +338,7 @@ class Checker:
                 self.hard_check_wan_connectivity(True)
 
             # Find all default routes and ensure that configured interface has WAN connectivity
-            default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
+            default_routes = subprocess.check_output('ip route | grep default', shell=True).decode().strip().split('\n')
             if len(default_routes) == 0:
                 print(prompt + "no default route was found")
                 return False
@@ -365,7 +365,7 @@ class Checker:
         """
         try:
             # Find all default routes and ensure that there is exactly one default route
-            default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
+            default_routes = subprocess.check_output('ip route | grep default', shell=True).decode().strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
             return True
@@ -377,21 +377,21 @@ class Checker:
                 if silently:
                     return False
                 while True:
-                    ip = raw_input(prompt + "please enter GW address, e.g. 192.168.1.1: ")
+                    ip = input(prompt + "please enter GW address, e.g. 192.168.1.1: ")
                     try:
-                        out = subprocess.check_output('ip route add default via %s' % ip, shell=True).strip()
+                        out = subprocess.check_output('ip route add default via %s' % ip, shell=True).decode().strip()
                         return True
                     except Exception as e:
                         print(prompt + str(e))
                         while True:
-                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            choice = input(prompt + "repeat? [Y/n]: ")
                             if choice == 'y' or choice == 'Y' or choice == '':
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
 
     def _get_duplicate_metric(self):
-        output = subprocess.check_output('ip route show default', shell=True).strip()
+        output = subprocess.check_output('ip route show default', shell=True).decode().strip()
         routes = output.splitlines()
 
         metrics = {}
@@ -414,7 +414,7 @@ class Checker:
         return None, None
 
     def _get_gateways(self):
-        output = subprocess.check_output('ip route show default', shell=True).strip()
+        output = subprocess.check_output('ip route show default', shell=True).decode().strip()
         routes = output.splitlines()
 
         gws = []
@@ -519,7 +519,7 @@ class Checker:
                         for gw in gws:
                             print("         %u  - %s" % (id, gw))
                             id += 1
-                        id = int(raw_input(prompt + "please choose the gw number: "))
+                        id = int(input(prompt + "please choose the gw number: "))
                         if id > len(gws):
                             print("Wrong number chosen!")
                             return False
@@ -527,7 +527,7 @@ class Checker:
                     except Exception as e:
                         print(prompt + str(e))
                         while True:
-                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            choice = input(prompt + "repeat? [Y/n]: ")
                             if choice == 'y' or choice == 'Y' or choice == '':
                                 break
                             elif choice == 'n' or choice == 'N':
@@ -642,7 +642,7 @@ class Checker:
 
         # Get new hostname from user
         while True:
-            new_hostname = raw_input(prompt + "enter hostname: ")
+            new_hostname = input(prompt + "enter hostname: ")
             if re.match(pattern, new_hostname):
                 break
             print(prompt + "hostname '%s' does not comply standard (%s)" % (new_hostname, pattern))
@@ -698,7 +698,7 @@ class Checker:
 
         def _add_record(address):
             try:
-                out = subprocess.check_output("grep '%s' %s" % (address, hosts_file), shell=True).strip().split('\n')[0]
+                out = subprocess.check_output("grep '%s' %s" % (address, hosts_file), shell=True).decode().strip().split('\n')[0]
                 if not out:
                     raise Exception
                 # At this point we have 127.0.0.1 line, just go and add the hostname to it
@@ -745,7 +745,7 @@ class Checker:
         # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
         grub_filename = '/etc/default/grub'
         try:
-            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).strip()
+            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).decode().strip()
             return True   # No exception - grep found the pattern
         except subprocess.CalledProcessError:
             pass
@@ -860,7 +860,7 @@ class Checker:
         # Read parameter from user input
         hugepages = default_hugepages if num_hugepages is None else num_hugepages
         while True:
-            str_hugepages = raw_input(prompt + "Enter number of 2MB huge pages [%d]: " % hugepages)
+            str_hugepages = input(prompt + "Enter number of 2MB huge pages [%d]: " % hugepages)
             try:
                 if len(str_hugepages) == 0:
                     break
@@ -914,7 +914,7 @@ class Checker:
 
         old = buffers
         while True:
-            str_buffers = raw_input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
+            str_buffers = input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
             try:
                 if len(str_buffers) == 0:
                     break
@@ -968,7 +968,7 @@ class Checker:
         num_worker_cores = psutil.cpu_count() - 1
         input_cores = 0
         while True:
-            str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
+            str_cores = input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
             try:
                 if len(str_cores) == 0:
                     input_cores = num_worker_cores
@@ -1190,7 +1190,7 @@ class Checker:
                     conf_param = tup[0]
 
         while True:
-            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")
+            str_ps_mode = input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")
             if str_ps_mode == 'Y' or str_ps_mode == 'y':
                 enable_ps_mode = True
                 break

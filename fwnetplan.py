@@ -82,13 +82,13 @@ def load_netplan_filenames(get_only=False):
 
     :param get_only: if True the parsed info is not loaded into cache.
     '''
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
     devices = {}
     for route in routes:
-        rip = route.decode().split('via ')[1].split(' ')[0]
-        dev = route.decode().split('dev ')[1].split(' ')[0]
+        rip = route.split('via ')[1].split(' ')[0]
+        dev = route.split('dev ')[1].split(' ')[0]
         devices[dev] = rip
 
     files = glob.glob("/etc/netplan/*.fw_run_orig") + \
