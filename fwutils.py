@@ -2218,7 +2218,7 @@ def configure_hostapd(dev_id, configuration):
 
             if_name = dev_id_to_linux_if(dev_id)
             data = {
-                'ssid'                 : config.get('ssid', 'fwrouter_ap'),
+                'ssid'                 : config.get('ssid', 'fwrouter_ap_%s' % band),
                 'interface'            : if_name,
                 'macaddr_acl'          : 0,
                 'driver'               : 'nl80211',
@@ -2316,7 +2316,7 @@ def configure_hostapd(dev_id, configuration):
 
             if security_mode == "wep":
                 data['wep_default_key']       = 1
-                data['wep_key1']              = '"%s"' % conficonfigguration.get('password', 'fwrouter_ap')
+                data['wep_key1']              = '"%s"' % config.get('password', 'fwrouter_ap')
                 data['wep_key_len_broadcast'] = 5
                 data['wep_key_len_unicast']   = 5
                 data['wep_rekey_period']      = 300
