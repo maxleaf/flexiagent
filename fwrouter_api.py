@@ -91,6 +91,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
+        self.thread_static_route   = None
 
         FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
@@ -165,6 +166,21 @@ class FWROUTER_API(FwCfgRequestHandler):
                 if apply_netplan:
                     fwutils.netplan_apply('dhcpc_thread')
                     time.sleep(10)
+
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
+
+    def static_route_thread(self):
+        """Static route thread.
+        Its function is to monitor static routes.
+        """
+        while self.state_is_started():
+            time.sleep(5)  # 5 sec
+
+            try:  # Ensure thread doesn't exit on exception
+                fwutils.check_reinstall_static_routes()
 
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
@@ -805,6 +821,9 @@ class FWROUTER_API(FwCfgRequestHandler):
         if self.thread_dhcpc is None:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
+        if self.thread_static_route is None:
+            self.thread_static_route = threading.Thread(target=self.static_route_thread, name='Static route Thread')
+            self.thread_static_route.start()
 
     def _stop_threads(self):
         """Stop all threads.
@@ -823,6 +842,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         if self.thread_dhcpc:
             self.thread_dhcpc.join()
             self.thread_dhcpc = None
+
+        if self.thread_static_route:
+            self.thread_static_route.join()
+            self.thread_static_route = None
 
     def _on_start_router_before(self):
         """Handles pre start VPP activities.

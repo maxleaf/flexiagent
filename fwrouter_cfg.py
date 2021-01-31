@@ -112,6 +112,9 @@ class FwRouterCfg(FwCfgDatabase):
             result.append(params)
         return result
 
+    def get_routes(self):
+        return self.get_requests('add-route')
+
     def get_tunnels(self):
         return self.get_requests('add-tunnel')
 
