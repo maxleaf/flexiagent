@@ -300,7 +300,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     try:
         stun_log("get_ip_info, binding to %s:%d" %(source_ip, source_port))
         if dev_name != None:
-            s.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
+            s.setsockopt(socket.SOL_SOCKET, 25, dev_name.encode())
         s.bind((source_ip, source_port))
     except Exception as e:
         stun_log("get_ip_info: bind: %s" % str(e))

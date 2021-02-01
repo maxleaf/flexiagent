@@ -39,7 +39,7 @@ class T(list):
 		lst1 = titems
 		self.list_len = len(lst1)
 		if self.list_len != 2:
-			raise TypeError,"ERROR: Type T must contain 2 elements: key and value, but includes %d element(s)" %(self.list_len)
+			raise TypeError("ERROR: Type T must contain 2 elements: key and value, but includes %d element(s)" %(self.list_len))
 			return None
 		return list.__new__(T, (titems))
 

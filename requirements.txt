@@ -1,0 +1,9 @@
+ruamel.yaml
+argcomplete
+vpp-papi
+Pyro4
+sqlitedict
+websocket-client
+psutil
+netaddr
+serial

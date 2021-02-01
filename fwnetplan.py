@@ -82,7 +82,7 @@ def load_netplan_filenames(get_only=False):
 
     :param get_only: if True the parsed info is not loaded into cache.
     '''
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
     devices = {}

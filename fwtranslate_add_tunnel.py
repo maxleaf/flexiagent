@@ -29,7 +29,6 @@ import fwglobals
 import socket
 
 from netaddr import *
-from vpp_papi import VppEnum
 
 # add_tunnel
 # --------------------------------------

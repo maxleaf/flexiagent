@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python3
 #
 #   BSD LICENSE
 #
@@ -131,7 +131,7 @@ To bind 0000:02:00.0 and 0000:02:00.1 to the ixgbe kernel driver
 def check_output(args, stderr=None):
     '''Run a command and capture its output'''
     return subprocess.Popen(args, stdout=subprocess.PIPE,
-                            stderr=stderr).communicate()[0]
+                            stderr=stderr).communicate()[0].decode()
 
 
 def find_module(mod):
@@ -226,7 +226,7 @@ def get_pci_device_details(dev_id):
     for line in extra_info:
         if len(line) == 0:
             continue
-        name, value = line.decode().split("\t", 1)
+        name, value = line.split("\t", 1)
         name = name.strip(":") + "_str"
         device[name] = value
     # check for a unix interface name
@@ -280,7 +280,7 @@ def get_nic_details():
                 # use dict to make copy of dev
                 devices[dev["Slot"]] = dict(dev)
         else:
-            name, value = dev_line.decode().split("\t", 1)
+            name, value = dev_line.split("\t", 1)
             dev[name.rstrip(":")] = value
 
     # check what is the interface if any for an ssh connection if
@@ -289,7 +289,7 @@ def get_nic_details():
     route = check_output(["ip", "-o", "route"])
     # filter out all lines for 169.254 routes
     route = "\n".join(filter(lambda ln: not ln.startswith("169.254"),
-                             route.decode().splitlines()))
+                             route.splitlines()))
     rt_info = route.split()
     for i in range(len(rt_info) - 1):
         if rt_info[i] == "dev":
@@ -346,7 +346,7 @@ def get_crypto_details():
                 # use dict to make copy of dev
                 devices[dev["Slot"]] = dict(dev)
         else:
-            name, value = dev_line.decode().split("\t", 1)
+            name, value = dev_line.split("\t", 1)
             dev[name.rstrip(":")] = value
 
     # based on the basic info, get extended text details

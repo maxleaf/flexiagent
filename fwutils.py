@@ -65,7 +65,7 @@ def get_device_logs(file, num_of_lines):
     """
     try:
         cmd = "tail -{} {}".format(num_of_lines, file)
-        res = subprocess.check_output(cmd, shell=True).splitlines()
+        res = subprocess.check_output(cmd, shell=True).decode().splitlines()
 
         # On zero matching, res is a list with a single empty
         # string which we do not want to return to the caller
@@ -93,7 +93,7 @@ def get_device_packet_traces(num_of_packets, timeout):
         subprocess.check_output(cmd, shell=True)
         time.sleep(timeout)
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
-        res = subprocess.check_output(cmd, shell=True).splitlines()
+        res = subprocess.check_output(cmd, shell=True).decode().splitlines()
         # skip first line (contains unnecessary information header)
         return res[1:] if res != [''] else []
     except (OSError, subprocess.CalledProcessError) as err:
@@ -149,7 +149,7 @@ def vpp_pid():
     :returns:           process identifier.
     """
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        pid = subprocess.check_output(['pidof', 'vpp']).decode()
     except:
         pid = None
     return pid
@@ -182,7 +182,7 @@ def get_os_routing_table():
     :returns: List of routes.
     """
     try:
-        routing_table = subprocess.check_output(['route', '-n']).split('\n')
+        routing_table = subprocess.check_output(['route', '-n']).decode().split('\n')
         return routing_table
     except:
         return (None)
@@ -194,7 +194,7 @@ def get_default_route():
     """
     (via, dev, metric) = ("", "", 0xffffffff)
     try:
-        output = os.popen('ip route list match default').read()
+        output = os.popen('ip route list match default').read().decode()
         if output:
             routes = output.splitlines()
             for r in routes:
@@ -421,9 +421,9 @@ def get_interface_pci(linuxif):
     """
     NETWORK_BASE_CLASS = "02"
     vpp_run = vpp_does_run()
-    lines = subprocess.check_output(["lspci", "-Dvmmn"]).splitlines()
+    lines = subprocess.check_output(["lspci", "-Dvmmn"]).decode().splitlines()
     for line in lines:
-        vals = line.decode().split("\t", 1)
+        vals = line.split("\t", 1)
         if len(vals) == 2:
             # keep slot number
             if vals[0] == 'Slot:':
@@ -458,7 +458,7 @@ def pci_to_linux_iface(pci):
     pci = pci_to_short(pci)
 
     try:
-        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True)
+        output = subprocess.check_output("sudo ls -l /sys/class/net/ | grep " + pci, shell=True).decode()
     except:
         return None
     if output is None:
@@ -994,7 +994,7 @@ def mac_str_to_bytes(mac_str):      # "08:00:27:fd:12:01" -> bytes
 
      :returns: MAC address in bytes representation.
      """
-    return mac_str.replace(':', '').decode('hex')
+    return mac_str.replace(':', '').encode()
 
 def is_python2():
     """Checks if it is Python 2 version.
@@ -1133,30 +1133,6 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_add_nat(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
-    if config['nat'] == None:
-        tup = p.create_element('nat')
-        config.append(tup)
-        config['nat'].append(p.create_element('endpoint-dependent'))
-        config['nat'].append(p.create_element('translation hash buckets 1048576'))
-        config['nat'].append(p.create_element('translation hash memory 268435456'))
-        config['nat'].append(p.create_element('user hash buckets 1024'))
-        config['nat'].append(p.create_element('max translations per user 10000'))
-
-    p.dump(config, vpp_config_filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
-def vpp_startup_conf_remove_nat(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
-    key = p.get_element(config, 'nat')
-    if key:
-        p.remove_element(config,key)
-    p.dump(config, vpp_config_filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
@@ -1238,7 +1214,7 @@ def modify_dhcpd(is_add, params):
             exec_string += remove_string_2
 
     try:
-        output = subprocess.check_output(exec_string, shell=True)
+        output = subprocess.check_output(exec_string, shell=True).decode()
     except Exception as e:
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
@@ -1416,7 +1392,7 @@ def add_static_route(addr, via, metric, remove, pci=None):
 
     cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
     try:
-        output = subprocess.check_output(cmd_show, shell=True)
+        output = subprocess.check_output(cmd_show, shell=True).decode()
     except:
         return False
 
@@ -1446,7 +1422,7 @@ def add_static_route(addr, via, metric, remove, pci=None):
 
     try:
         fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True)
+        output = subprocess.check_output(cmd, shell=True).decode()
     except Exception as e:
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
@@ -1761,8 +1737,7 @@ def compare_request_params(params1, params2):
         # False booleans will be handled by next 'elif'.
         #
         if val1 and val2:
-            if (type(val1) == str or type(val1) == unicode) and \
-               (type(val2) == str or type(val2) == unicode):
+            if (type(val1) == str) and (type(val2) == str):
                 if val1.lower() != val2.lower():
                     return False    # Strings are not equal
             elif type(val1) != type(val2):
@@ -1810,10 +1785,10 @@ def set_linux_reverse_path_filter(dev_name, on):
     current_val = None
     try:
         cmd = 'sysctl net.ipv4.conf.%s.rp_filter' % dev_name
-        out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
+        out = subprocess.check_output(cmd, shell=True).decode()  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
         current_val = bool(out.split(' = ')[1])
     except Exception as e:
-        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % dev_name, str(e))
+        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % (dev_name, str(e)))
         return None
 
     # Light optimization, no need to set the value
@@ -1833,7 +1808,7 @@ def update_linux_metric(prefix, dev, metric):
     """
     try:
         cmd = "ip route show exact %s dev %s" % (prefix, dev)
-        os_route = subprocess.check_output(cmd, shell=True).strip()
+        os_route = subprocess.check_output(cmd, shell=True).decode().strip()
         if not os_route:
             raise Exception("'%s' returned nothing" % cmd)
         cmd = "ip route del " + os_route
@@ -1904,7 +1879,7 @@ def get_reconfig_hash():
             res += 'public_ip:'   + public_ip + ','
             res += 'public_port:' + str(public_port) + ','
 
-    hash = hashlib.md5(res).hexdigest()
+    hash = hashlib.md5(res.encode()).hexdigest()
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
@@ -1912,7 +1887,7 @@ def vpp_nat_add_remove_interface(remove, pci, metric):
     default_gw = ''
     vpp_if_name_add = ''
     vpp_if_name_remove = ''
-    metric_min = sys.maxint
+    metric_min = sys.maxsize
 
     dev_metric = int(metric or 0)
 

@@ -42,7 +42,7 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     :returns: Command execution result.
     """
     args = shlex.split(cmd)
-    return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0]
+    return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
 
 def tunnel_stats_get_ping_time(host):
     """Use fping to get RTT.

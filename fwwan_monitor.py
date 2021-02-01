@@ -163,13 +163,13 @@ class FwWanMonitor:
         '''Fetches routes from Linux and parses them into FwWanRoute objects.
         '''
         os_routes  = {}
-        min_metric = sys.maxint
+        min_metric = sys.maxsize
 
         out = []
         cmd = 'ip route list match default | grep via'
         for _ in range(5):
             try:
-                out = subprocess.check_output(cmd, shell=True).splitlines()
+                out = subprocess.check_output(cmd, shell=True).decode().splitlines()
                 break
             except Exception as e:
                 fwglobals.log.warning("%s: no default routes found: %s" % (str(self), str(e)))
