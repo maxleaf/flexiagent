@@ -36,6 +36,7 @@ import fwglobals
 import fwutils
 
 from fwrouter_cfg import FwRouterCfg
+from fwrouter_api import fwrouter_translators
 
 def _find_primary_ip():
     output = subprocess.check_output('ip route show default', shell=True).strip()
@@ -69,15 +70,19 @@ def _update_metric():
     primary_ip = _find_primary_ip()
 
     with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
+        router_cfg.set_translators(fwrouter_translators)
         wan_list = router_cfg.get_interfaces(type='wan')
         for wan in wan_list:
             if not 'gateway' in wan:
                 dev_id = wan.get('pci', None)
-                if not dev_id:
+                if dev_id:
+                    dev_id = fwutils.dev_id_add_type(dev_id)
+                else:
                     dev_id = wan.get('dev_id', None)
 
-                gw_ip = _find_gateway_ip(dev_id)
-                wan['gateway'] = gw_ip
+                if dev_id:
+                    gw_ip = _find_gateway_ip(dev_id)
+                    wan['gateway'] = gw_ip
 
             if not 'metric' in wan:
                 if not primary_ip:

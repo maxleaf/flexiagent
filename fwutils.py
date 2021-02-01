@@ -1462,6 +1462,18 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
+def vpp_startup_conf_add_nopci(vpp_config_filename):
+    p = FwStartupConf()
+    config = p.load(vpp_config_filename)
+
+    if config['dpdk'] == None:
+        tup = p.create_element('dpdk')
+        config.append(tup)
+    if p.get_element(config['dpdk'], 'no-pci') == None:
+        config['dpdk'].append(p.create_element('no-pci'))
+        p.dump(config, vpp_config_filename)
+    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     p = FwStartupConf()
     config = p.load(vpp_config_filename)
@@ -2210,7 +2222,7 @@ def configure_hostapd(dev_id, configuration):
 
             if_name = dev_id_to_linux_if(dev_id)
             data = {
-                'ssid'                 : config.get('ssid', 'fwrouter_ap'),
+                'ssid'                 : config.get('ssid', 'fwrouter_ap_%s' % band),
                 'interface'            : if_name,
                 'macaddr_acl'          : 0,
                 'driver'               : 'nl80211',
@@ -2308,7 +2320,7 @@ def configure_hostapd(dev_id, configuration):
 
             if security_mode == "wep":
                 data['wep_default_key']       = 1
-                data['wep_key1']              = '"%s"' % conficonfigguration.get('password', 'fwrouter_ap')
+                data['wep_key1']              = '"%s"' % config.get('password', 'fwrouter_ap')
                 data['wep_key_len_broadcast'] = 5
                 data['wep_key_len_unicast']   = 5
                 data['wep_rekey_period']      = 300
@@ -2432,6 +2444,13 @@ def get_lte_interfaces_dev_ids():
     return out
 
 def configure_lte_interface(params):
+    '''
+    To get LTE connectivity, two steps are required:
+    1. Creating a connection between the modem and cellular provider.
+    2. Setting up the Linux interface with the IP/gateway received from the cellular provider
+    This function is responsible for the second stage.
+    If the vpp is running, we have special logic to configure LTE. This logic handled by the add_interface translator.
+    '''
     if vpp_does_run():
         return (True, None)
 
@@ -2549,6 +2568,18 @@ def qmi_sim_power_off(dev_id):
 
 def qmi_sim_power_on(dev_id):
     return _run_qmicli_command(dev_id, 'uim-sim-power-on=1')
+
+def qmi_get_phone_number(dev_id):
+    return _run_qmicli_command(dev_id, 'dms-get-msisdn')
+
+def lte_get_phone_number(dev_id):
+    phone_number = qmi_get_phone_number(dev_id)
+    if phone_number:
+        data = phone_number.splitlines()
+        for line in data:
+            if 'MSISDN:' in line:
+                return line.split(':')[-1].strip().replace("'", '')
+    return ''
 
 def lte_get_default_settings(dev_id):
     default_settings = qmi_get_default_settings(dev_id)

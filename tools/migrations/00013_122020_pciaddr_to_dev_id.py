@@ -36,11 +36,13 @@ import fwglobals
 import fwutils
 
 from fwrouter_cfg import FwRouterCfg
+from fwrouter_api import fwrouter_translators
 
 def _change_interface_identifier():
     """ The purpose of this migration is to change the existing interface identifiers to the new format.
     """
     with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
+        router_cfg.set_translators(fwrouter_translators)
         all_interfaces = router_cfg.get_interfaces()
 
         for intf in all_interfaces:
