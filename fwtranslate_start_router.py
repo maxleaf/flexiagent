@@ -154,26 +154,6 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
 
-    # Enable NAT in vpp configuration file
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "add NAT to %s" % vpp_filename
-    cmd['cmd']['params']  = {
-        'module': 'fwutils',
-        'func'  : 'vpp_startup_conf_add_nat',
-        'args'  : { 'vpp_config_filename' : vpp_filename }
-    }
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "remove NAT from %s" % vpp_filename
-    cmd['revert']['params'] = {
-        'module': 'fwutils',
-        'func'  : 'vpp_startup_conf_remove_nat',
-        'args'  : { 'vpp_config_filename' : vpp_filename }
-    }
-    cmd_list.append(cmd)
-
     #  Create commands that start vpp and configure it with addresses
     #  sudo systemtctl start vpp
     #  <connect to python bindings of vpp and than run the rest>
@@ -212,6 +192,11 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
+    cmd['cmd']['name']    = "nat44_plugin_enable_disable"
+    cmd['cmd']['descr']   = "enable NAT pluging and configure it"
+    cmd['cmd']['params']  = { 'enable':1, 'flags': 1,  # nat.h: _(0x01, IS_ENDPOINT_DEPENDENT)
+                              'sessions':  100000 }    # Defaults: users=1024, sessions=10x1024, in multicore these parameters are per worker thread
+    cmd_list.append(cmd)
     cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
     cmd['cmd']['descr']   = "enable NAT forwarding"
     cmd['cmd']['params']  = { 'enable':1 }

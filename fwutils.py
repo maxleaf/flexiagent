@@ -1129,30 +1129,6 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
-def vpp_startup_conf_add_nat(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
-    if config['nat'] == None:
-        tup = p.create_element('nat')
-        config.append(tup)
-        config['nat'].append(p.create_element('endpoint-dependent'))
-        config['nat'].append(p.create_element('translation hash buckets 1048576'))
-        config['nat'].append(p.create_element('translation hash memory 268435456'))
-        config['nat'].append(p.create_element('user hash buckets 1024'))
-        config['nat'].append(p.create_element('max translations per user 10000'))
-
-    p.dump(config, vpp_config_filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
-def vpp_startup_conf_remove_nat(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
-    key = p.get_element(config, 'nat')
-    if key:
-        p.remove_element(config,key)
-    p.dump(config, vpp_config_filename)
-    return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
-
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
