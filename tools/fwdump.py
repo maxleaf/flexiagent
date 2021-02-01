@@ -209,7 +209,7 @@ class FwDump:
             print(self.prompt + 'ERROR: "%s" failed: %s' % (cmd, str(e)))
 
     def dump_all(self):
-        dumpers = g_dumpers.keys()
+        dumpers = list(g_dumpers.keys())
         self._dump(dumpers)
 
     def dump_multilink(self):

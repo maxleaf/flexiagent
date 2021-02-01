@@ -858,7 +858,7 @@ class FWROUTER_API:
             old_params = fwglobals.g.router_cfg.get_request_params(request)
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
-            new_params.update(_params.items())
+            new_params.update(_params)
 
             # Don't store internal 'sender' to avoid unnecessary sync-s
             #

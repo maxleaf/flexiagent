@@ -616,7 +616,7 @@ def version():
         print(delimiter)
         print('Device %s' % versions['device'])
         print(delimiter)
-        for component in sorted(versions['components'].keys()):
+        for component in sorted(list(versions['components'].keys())):
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
