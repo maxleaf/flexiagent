@@ -612,10 +612,11 @@ class FWROUTER_API:
         if isinstance(cmd_list, list):
             new_cmd_list = []
             for cmd in cmd_list:
-                if 'modify' in cmd.keys():
-                    whitelist = cmd['whitelist']
-                else:
-                    new_cmd_list.append(cmd)
+                if isinstance(cmd, list):
+                    if 'modify' in list(cmd.keys()):
+                        whitelist = cmd['whitelist']
+                    else:
+                        new_cmd_list.append(cmd)
             return (new_cmd_list, whitelist)
         else:
             return (cmd_list, None)
