@@ -238,7 +238,7 @@ def get_interface_gateway(if_name, if_pci=None):
 
 def get_binary_interface_gateway_by_pci(pci):
     gw_ip, _ = get_interface_gateway('', if_pci=pci)
-    return ipaddress.ip_address(unicode(gw_ip))
+    return ipaddress.ip_address(gw_ip)
 
 
 def get_all_interfaces():
