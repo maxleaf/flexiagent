@@ -606,7 +606,7 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_auth"
-    cmd['cmd']['params']    = { 'name':name, 'auth_method':auth_method, 'data':data, 'data_len':len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'auth_method':auth_method, 'data':data.encode(), 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 auth method, profile %s" % name
     cmd_list.append(cmd)
 
@@ -625,7 +625,7 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type':id_type, 'data':data, 'data_len':len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type':id_type, 'data':data.encode(), 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
     cmd_list.append(cmd)
 
@@ -635,34 +635,38 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'id_type':id_type, 'data':data, 'data_len':len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'id_type':id_type, 'data':data.encode(), 'data_len':len(data) }
     cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':1)
-    proto = 0
-    start_port = 0
-    end_port = 65535
-    start_addr = IPAddress('0.0.0.0').value
-    end_addr = IPAddress('255.255.255.255').value
+    local_ts = {'is_local'    : 1,
+                'protocol_id' : 0,
+                'start_port'  : 0,
+                'end_port'    : 65535,
+                'start_addr'  : ipaddress.ip_address('0.0.0.0'),
+                'end_addr'    : ipaddress.ip_address('255.255.255.255')}
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_ts"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'proto':proto, 'start_port':start_port, 'end_port':end_port, 'start_addr':start_addr, 'end_addr':end_addr }
-    cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
+    cmd['cmd']['params']    = { 'name':name, 'ts':local_ts }
+    cmd['cmd']['descr']     = "set IKEv2 local traffic selector, profile %s" % name
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':0)
-    proto = 0
-    start_port = 0
-    end_port = 65535
-    start_addr = IPAddress('0.0.0.0').value
-    end_addr = IPAddress('255.255.255.255').value
+    remote_ts = {'is_local'    : 0,
+                 'protocol_id' : 0,
+                 'start_port'  : 0,
+                 'end_port'    : 65535,
+                 'start_addr'  : ipaddress.ip_address('0.0.0.0'),
+                 'end_addr'    : ipaddress.ip_address('255.255.255.255')}
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_ts"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'proto':proto, 'start_port':start_port, 'end_port':end_port, 'start_addr':start_addr, 'end_addr':end_addr }
-    cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
+    cmd['cmd']['params']    = { 'name':name, 'ts':remote_ts }
+    cmd['cmd']['descr']     = "set IKEv2 remote traffic selector, profile %s" % name
     cmd_list.append(cmd)
 
     # Asynchronously add IKEv2 GRE tunnel into bridge
@@ -766,34 +770,45 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
         raise Exception("_add_ikev2_initiator_profile: esp dh-group %s is not supported" % esp['dh-group'])
 
     # ikev2.api.json: ikev2_set_responder (...)
+    responder = {
+                 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                 'address':responder_address
+    }
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_responder"
-    cmd['cmd']['params']    = { 'name':name,
-                                'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                'address':responder_address }
+    cmd['cmd']['params']    = { 'name':name, 'responder':responder }
     cmd['cmd']['descr']     = "set IKEv2 responder, profile %s" % name
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_set_ike_transforms (...)
-    crypto_alg = crypto_algs[ike['crypto-alg']]
-    integ_alg = integ_algs[ike['integ-alg']]
-    dh_group = dh_type_algs[ike['dh-group']]
+    ike_tr = {
+              'crypto_alg'      : crypto_algs[ike['crypto-alg']],
+              'crypto_key_size' : ike['key-size'],
+              'integ_alg'       : integ_algs[ike['integ-alg']],
+              'dh_group'        : dh_type_algs[ike['dh-group']]
+             }
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_ike_transforms"
-    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':ike['key-size'], 'integ_alg':integ_alg, 'dh_group':dh_group }
+    cmd['cmd']['params']    = { 'name':name, 'tr':ike_tr }
     cmd['cmd']['descr']     = "set IKEv2 crypto algorithms, profile %s" % name
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_set_esp_transforms (...)
-    crypto_alg = crypto_algs[esp['crypto-alg']]
-    integ_alg = integ_algs[esp['integ-alg']]
-    dh_group = dh_type_algs[esp['dh-group']]
+    esp_tr = {
+              'crypto_alg'      : crypto_algs[esp['crypto-alg']],
+              'crypto_key_size' : esp['key-size'],
+              'integ_alg'       : integ_algs[esp['integ-alg']],
+              'dh_group'        : dh_type_algs[esp['dh-group']]
+             }
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_set_esp_transforms"
-    cmd['cmd']['params']    = { 'name':name, 'crypto_alg':crypto_alg, 'crypto_key_size':esp['key-size'], 'integ_alg':integ_alg, 'dh_group':dh_group }
+    cmd['cmd']['params']    = { 'name':name, 'tr':esp_tr }
     cmd['cmd']['descr']     = "set IKEv2 ESP crypto algorithms, profile %s" % name
     cmd_list.append(cmd)
 
