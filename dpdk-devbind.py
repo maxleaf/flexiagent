@@ -181,17 +181,13 @@ def check_modules():
         sysfs_path = '/sys/module/'
 
         # Get the list of directories in sysfs_path
-        sysfs_mods = [os.path.join(sysfs_path, o) for o
+        sysfs_mods = [o for o
                       in os.listdir(sysfs_path)
                       if os.path.isdir(os.path.join(sysfs_path, o))]
 
-        # Extract the last element of '/sys/module/abc' in the array
-        sysfs_mods = [a.split('/')[-1] for a in sysfs_mods]
-
         # special case for vfio_pci (module is named vfio-pci,
         # but its .ko is named vfio_pci)
-        sysfs_mods = map(lambda a:
-                         a if a != 'vfio_pci' else 'vfio-pci', sysfs_mods)
+        sysfs_mods = ['vfio-pci' if o == 'vfio_pci' else o for o in sysfs_mods ]
 
         for mod in mods:
             if mod["Name"] in sysfs_mods:
@@ -299,7 +295,7 @@ def get_nic_details():
     for d in devices.keys():
         # get additional info and add it to existing data
         devices[d] = devices[d].copy()
-        devices[d].update(get_pci_device_details(d).items())
+        devices[d].update(get_pci_device_details(d))
 
         for _if in ssh_if:
             if _if in devices[d]["Interface"].split(","):
@@ -353,7 +349,7 @@ def get_crypto_details():
     for d in devices.keys():
         # get additional info and add it to existing data
         devices[d] = devices[d].copy()
-        devices[d].update(get_pci_device_details(d).items())
+        devices[d].update(get_pci_device_details(d))
 
         # add igb_uio to list of supporting modules if needed
         if "Module_str" in devices[d]:
@@ -514,8 +510,7 @@ def bind_all(dev_list, driver, force=False):
             continue
 
         # update information about this device
-        devices[d] = dict(devices[d].items() +
-                          get_pci_device_details(d).items())
+        devices[d] = {**devices[d], **get_pci_device_details(d)}  # Merge dictionaries
 
         # check if updated information indicates that the device was bound
         if "Driver_str" in devices[d]:
