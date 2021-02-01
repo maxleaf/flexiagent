@@ -954,7 +954,7 @@ def _parse_add_if(s, res):
     if r!=None: tx_bytes = r.group(1)
     else: tx_bytes = 0
     # Add data to res
-    res[if_name] = {'rx_pkts':long(rx_pkts), 'tx_pkts':long(tx_pkts), 'rx_bytes':long(rx_bytes), 'tx_bytes':long(tx_bytes)}
+    res[if_name] = {'rx_pkts':int(rx_pkts), 'tx_pkts':int(tx_pkts), 'rx_bytes':int(rx_bytes), 'tx_bytes':int(tx_bytes)}
 
 def get_vpp_if_count():
     """Get number of VPP interfaces.
