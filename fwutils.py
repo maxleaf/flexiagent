@@ -2025,14 +2025,14 @@ def ikev2_get_certificate_expiration():
 
     cmd = "openssl x509 -enddate -noout -in %s" % public_pem
     fwglobals.log.debug(cmd)
-    res = subprocess.check_output(cmd, shell=True).strip()
+    res = subprocess.check_output(cmd, shell=True).decode().strip()
     if not res:
         return {'certificateExpiration': '', 'error': 'No enddate for public certificate'}
     end_date = res.split('=')[1]
 
     cmd = "openssl rsa -check -noout -in %s" % private_pem
     fwglobals.log.debug(cmd)
-    res = subprocess.check_output(cmd, shell=True).strip()
+    res = subprocess.check_output(cmd, shell=True).decode().strip()
     if res != "RSA key ok":
         return {'certificateExpiration': '', 'error': 'RSA key is not ok'}
 
