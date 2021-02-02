@@ -772,7 +772,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     # ikev2.api.json: ikev2_set_responder (...)
     responder = {
                  'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                 'address':responder_address
+                 'addr':ipaddress.ip_address(responder_address)
     }
 
     cmd = {}
@@ -906,7 +906,7 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                       bridge_id, src, params['ikev2']['role'])
 
     if params['ikev2']['role'] == 'initiator':
-        dst = ipaddress.ip_address(IPNetwork(l2gre_tunnel_ips['dst']).ip)
+        dst = str(IPNetwork(l2gre_tunnel_ips['dst']).ip)
         _add_ikev2_initiator_profile(
                         cmd_list,
                         ikev2_profile_name, params['ikev2']['lifetime'],
