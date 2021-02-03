@@ -45,6 +45,7 @@ fwagent_api = {
     'get-wifi-info':                 '_get_wifi_info',
     'get-lte-info':                  '_get_lte_info',
     'reset-lte':                     '_reset_lte',
+    'modify-lte-pin':                '_modify_lte_pin',
 }
 
 class FWAGENT_API:
@@ -305,6 +306,7 @@ class FWAGENT_API:
         system_info = fwutils.lte_get_system_info(params['dev_id'])
         default_settings = fwutils.lte_get_default_settings(params['dev_id'])
         phone_number = fwutils.lte_get_phone_number(params['dev_id'])
+        pin_state = fwutils.lte_get_pin_state(params['dev_id'])
 
         is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
         if fwutils.vpp_does_run() and is_assigned:
@@ -323,7 +325,8 @@ class FWAGENT_API:
             'system_info'         : system_info,
             'sim_status'          : sim_status,
             'default_settings'    : default_settings,
-            'phone_number'        : phone_number
+            'phone_number'        : phone_number,
+            'pin_state'           : pin_state
         }
 
         return {'message': response, 'ok': 1}
@@ -340,7 +343,7 @@ class FWAGENT_API:
             # don't perform reset if interface is already assigned to vpp and vpp is run
             is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
             if fwutils.vpp_does_run() and is_assigned:
-                return {'ok': 0, 'message': 'Please unassigned this interface in order to reset the LTE card'}
+                return {'ok': 0, 'message': 'Please stop the router in order to reset the LTE card'}
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
             fwutils.qmi_sim_power_off(params['dev_id'])
@@ -352,5 +355,45 @@ class FWAGENT_API:
             reply = {'ok': 1, 'message': ''}
         except Exception as e:
             reply = {'ok': 0, 'message': str(e)}
+        return reply
 
+    def _modify_lte_pin(self, params):
+        try:
+            dev_id = params['dev_id']
+            new_pin = params.get('newPin')
+            current_pin = params.get('currentPin')
+            enable = params.get('enable', False)
+            puk = params.get('puk')
+
+            current_pin_state = fwutils.lte_get_pin_state(dev_id)
+            is_currently_enabled = current_pin_state.get('PIN1_STATUS') != 'disabled'
+            retries_left = current_pin_state.get('PIN1_RETRIES', '3')
+
+            # check if blocked and puk isn't provided
+            if retries_left == '0' and not puk:
+                return {'ok': 0, 'message': 'The PIN is locked. Please unblocked it with PUK code'}
+
+            if not current_pin:
+                return {'ok': 0, 'message': 'PIN is required'}
+
+            # verify pin first
+            updated_status = fwutils.qmi_verify_pin(dev_id, current_pin)
+            updated_pin_state = updated_status.get('PIN1_STATUS')
+            updated_retries_left = updated_status.get('PIN1_RETRIES', 3)
+            if updated_retries_left != '3' and retries_left != updated_retries_left:
+                return {'ok': 0, 'message': 'PIN is wrong'}
+            if updated_pin_state not in['disabled', 'enabled-verified']:
+                return {'ok': 0, 'message': 'PIN is wrong'}
+
+            # check if need to enable/disable
+            if is_currently_enabled != enable:
+                fwutils.qmi_set_pin_protection(dev_id, current_pin, enable)
+
+            # check if need to change
+            if new_pin and new_pin != current_pin:
+                fwutils.qmi_change_pin(dev_id, current_pin, new_pin)
+
+            reply = {'ok': 1, 'message': ''}
+        except Exception as e:
+            reply = {'ok': 0, 'message': str(e)}
         return reply

@@ -509,8 +509,11 @@ def get_linux_interfaces(cached=True):
             if is_lte_interface(if_name):
                 interface['deviceType'] = 'lte'
                 interface['dhcp'] = 'yes'
-                is_assigned = is_interface_assigned_to_vpp(dev_id)
+                interface['deviceParams'] = {
+                    'initial_pin1_state': lte_get_pin_state(dev_id).get('PIN1_STATUS', '')
+                }
 
+                is_assigned = is_interface_assigned_to_vpp(dev_id)
                 # LTE physical device has no IP, GW etc. so we take this info from vppsb interface (vpp1)
                 tap = dev_id_to_tap(dev_id) if fwglobals.g.router_api.state_is_started() and is_assigned else None
                 if tap:
@@ -2463,6 +2466,8 @@ def configure_lte_interface(params):
         ip = ip_config['IP']
         gateway = ip_config['GATEWAY']
         metric = params.get('metric', '0')
+        if not metric:
+            metric = '0'
 
         nicname = dev_id_to_linux_if(dev_id)
 
@@ -2607,6 +2612,23 @@ def lte_get_default_settings(dev_id):
 
     return res
 
+def lte_get_pin_state(dev_id):
+    res = {
+        'PIN1_STATUS': '',
+        'PIN1_RETRIES': '',
+        'PUK1_RETRIES': '',
+    }
+    status = qmi_get_simcard_status(dev_id)
+    if status:
+        data = status.splitlines()
+        for index, line in enumerate(data):
+            if 'PIN1 state:' in line:
+                res['PIN1_STATUS']= line.split(':')[-1].strip().replace("'", '').split(' ')[0]
+                res['PIN1_RETRIES']= data[index + 1].split(':')[-1].strip().replace("'", '').split(' ')[0]
+                res['PUK1_RETRIES']= data[index + 2].split(':')[-1].strip().replace("'", '').split(' ')[0]
+                break
+    return res
+
 def lte_sim_status(dev_id):
     status = qmi_get_simcard_status(dev_id)
     if status:
@@ -2615,7 +2637,6 @@ def lte_sim_status(dev_id):
             if 'Card state:' in line:
                 state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
                 return state
-
     return False
 
 def lte_is_sim_inserted(dev_id):
@@ -2665,6 +2686,27 @@ def lte_prepare_connection_params(params):
 
     return ",".join(connection_params)
 
+def qmi_verify_pin(dev_id, pin):
+    fwglobals.log.debug('verifying lte pin number')
+    res = _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
+    time.sleep(1)
+    return lte_get_pin_state(dev_id)
+
+def qmi_set_pin_protection(dev_id, pin, is_enable):
+    res = _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
+    time.sleep(1)
+    return lte_get_pin_state(dev_id)
+
+def qmi_change_pin(dev_id, old_pin, new_pin):
+    res = _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
+    time.sleep(1)
+    return lte_get_pin_state(dev_id)
+
+def qmi_unblocked_pin(dev_id, puk, new_pin):
+    res = _run_qmicli_command(dev_id, 'uim-unblock-pin=PIN1,%s,%s' % (puk, new_pin))
+    time.sleep(1)
+    return lte_get_pin_state(dev_id)
+
 def lte_connect(params, reset=False):
     dev_id = params['dev_id']
     if not lte_is_sim_inserted(dev_id) or reset:
@@ -2676,6 +2718,17 @@ def lte_connect(params, reset=False):
 
         if not inserted:
             return (False, "Sim is not presented")
+
+    # check PIN status
+    pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
+    if pin_state not in ['disabled', 'enabled-verified']:
+        pin = params.get('pin')
+        if not pin:
+            return (False, "PIN is required")
+
+        updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
+        if updated_pin_state not in['disabled', 'enabled-verified']:
+            return (False, "PIN is wrong")
 
     try:
         is_modem_connected = mbim_get_ip_configuration(dev_id)
@@ -2912,10 +2965,10 @@ def lte_get_provider_config(dev_id, key):
     """
     info = lte_get_configuration_received_from_provider(dev_id)
 
-    if key:
+    if key in info:
         return info[key]
 
-    return info
+    return ''
 
 def is_wifi_interface_by_dev_id(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
@@ -3262,16 +3315,23 @@ def get_reconfig_hash():
     for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]['name']
 
-        if is_lte_interface(name) and fwglobals.g.router_api.state_is_started():
+        is_lte = is_lte_interface(name)
+        if is_lte:
             is_assigned = is_interface_assigned_to_vpp(dev_id)
-            if is_assigned:
+            if is_assigned and fwglobals.g.router_api.state_is_started():
                 tap_name = dev_id_to_tap(dev_id)
                 if tap_name:
                     name = tap_name
 
         addr = get_interface_address(name, log=False)
-        addr = addr.split('/')[0] if addr else ''
         gw, metric = get_interface_gateway(name)
+
+        # We monitoring the lte IP to handle IP chandes
+        if is_lte:
+            addr = lte_get_provider_config(dev_id, 'IP')
+            gw = lte_get_provider_config(dev_id, 'GATEWAY')
+
+        addr = addr.split('/')[0] if addr else ''
 
         res += 'addr:'    + addr + ','
         res += 'gateway:' + gw + ','
