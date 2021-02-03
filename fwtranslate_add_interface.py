@@ -192,6 +192,70 @@ def add_interface(params):
             }
             cmd_list.append(cmd)
 
+    # Enable NAT.
+    # On WAN interfaces run
+    #   'nat44 add interface address GigabitEthernet0/9/0'
+    #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
+    # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
+    if 'type' not in params or params['type'].lower() == 'wan':
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "enable NAT for interface %s" % iface_pci
+        cmd['cmd']['params']    = {
+                                    'module': 'fwutils',
+                                    'func':   'vpp_nat_add_remove_interface',
+                                    'args':   {
+                                        'remove': False,
+                                        'pci'   : iface_pci,
+                                        'metric': metric
+                                    }
+                                  }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "disable NAT for interface %s" % iface_pci
+        cmd['revert']['params'] = {
+                                    'module': 'fwutils',
+                                    'func':   'vpp_nat_add_remove_interface',
+                                    'args':   {
+                                        'remove': True,
+                                        'pci'   : iface_pci,
+                                        'metric': metric
+                                    }
+                                  }
+        cmd_list.append(cmd)
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
+        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (iface_pci, iface_addr)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                    'is_add':1 }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
+        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (iface_pci, iface_addr)
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                    'is_add':0 }
+        cmd_list.append(cmd)
+
+        # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
+        vxlan_port = 4789
+        udp_proto = 17
+
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
+        cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
+        cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (iface_pci, vxlan_port)
+        cmd['revert'] = {}
+        cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
+        cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':iface_pci } ],
+                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':0 }
+        cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (iface_pci, vxlan_port)
+
+        cmd_list.append(cmd)
+
     # Update ospfd.conf.
     ospfd_file = fwglobals.g.FRR_OSPFD_FILE
     if 'routing' in params and params['routing'].lower() == 'ospf':

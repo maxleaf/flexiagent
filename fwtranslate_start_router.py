@@ -190,7 +190,17 @@ def start_router(params=None):
     cmd['cmd']['params']  = [ "sudo vppctl enable tap-inject" ]
     cmd['cmd']['descr']   = "enable tap-inject"
     cmd_list.append(cmd)
-
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "nat44_plugin_enable_disable"
+    cmd['cmd']['descr']   = "enable NAT pluging and configure it"
+    cmd['cmd']['params']  = { 'enable':1, 'flags': 1,  # nat.h: _(0x01, IS_ENDPOINT_DEPENDENT)
+                              'sessions':  100000 }    # Defaults: users=1024, sessions=10x1024, in multicore these parameters are per worker thread
+    cmd_list.append(cmd)
+    cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
+    cmd['cmd']['descr']   = "enable NAT forwarding"
+    cmd['cmd']['params']  = { 'enable':1 }
+    cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
