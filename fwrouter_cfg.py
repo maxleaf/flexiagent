@@ -305,7 +305,7 @@ class FwRouterCfg:
 
         # The dump is O(num_types x n) - improve that on demand!
         cfg     = []
-        db_keys = sorted(self.db.keys())  # The key order might be affected by dictionary content, so sort it
+        db_keys = sorted(list(self.db.keys()))  # The key order might be affected by dictionary content, so sort it
         for req in types:
             for key in db_keys:
                 if re.match(req, key):
@@ -567,6 +567,6 @@ class FwRouterCfg:
         # for new or for modified configuration items.
         # Just go and add them to the output list 'as-is'.
         #
-        output_requests += input_requests.values()
+        output_requests += list(input_requests.values())
 
         return output_requests

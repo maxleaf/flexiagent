@@ -954,7 +954,7 @@ class Checker:
         :returns: 'True' if check is successful and 'False' otherwise.
         """
         # This function does the following:
-        # 1. sets "main-core", "corelist-workers" and "workers" in "cpu" section in /etc/vpp/startup.conf
+        # 1. sets "main-core" and "corelist-workers" in "cpu" section in /etc/vpp/startup.conf
         # 2. sets "num-rx-queues" in "dpdk" section in /etc/vpp/startup.conf
         # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/default/grub
         # 4. sudo update-grub
@@ -986,12 +986,10 @@ class Checker:
 
         main_core_param                 = None
         main_core_param_val             = 0
-        corelist_worker_param_nim_val   = 0
+        corelist_worker_param_min_val   = 0
         corelist_worker_param_max_val   = 0
         corelist_worker_param           = None
         corelist_worker_param_val       = None
-        workers_param                   = None
-        workers_param_val               = 0
         num_of_rx_queues_param          = None
         num_of_rx_queues_param_val      = -1
         dev_default_key                 = 'dev default' # to avoid errors and mistypes
@@ -1036,18 +1034,10 @@ class Checker:
                 tmp = re.split('\s+', corelist_worker_param.strip())
                 corelist_worker_param_val = tmp[1]
                 if corelist_worker_param_val.isdigit():
-                    corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
+                    corelist_worker_param_min_val = corelist_worker_param_max_val = corelist_worker_param_val
                 else:
-                    corelist_worker_param_nim_val = int(corelist_worker_param_val.split('-')[0])
+                    corelist_worker_param_min_val = int(corelist_worker_param_val.split('-')[0])
                     corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
-
-        string = self.fw_ac_db.get_element(conf['cpu'],'workers')
-        if string:
-            tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
-            if tup_workers:
-                workers_param = tup_workers[0]
-                tmp = re.split('\s+', workers_param.strip())
-                workers_param_val = int(tmp[1])
 
         if conf and conf['dpdk'] == None:
             conf.append(self.fw_ac_db.create_element('dpdk'))
@@ -1063,7 +1053,6 @@ class Checker:
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
         # corelist_workers 1-%input_cores
-        # workers %input_cores
         # num-rx-queues %input_cores
 
         # in case no multi core requested
@@ -1073,9 +1062,6 @@ class Checker:
 
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-
-            if workers_param:
-                self.fw_ac_db.remove_element(conf['cpu'], workers_param)
 
             if num_of_rx_queues_param:
                 if conf['dpdk'][dev_default_key] != None:
@@ -1103,22 +1089,12 @@ class Checker:
             else:
                 new_corelist_worker_param = 'corelist-workers 1-%d' % (input_cores)
             if corelist_worker_param:
-                if corelist_worker_param_nim_val != 1 or corelist_worker_param_max_val != input_cores:
+                if corelist_worker_param_min_val != 1 or corelist_worker_param_max_val != input_cores:
                     self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
                     conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
                     self.vpp_config_modified = True
             else:
                 conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
-                self.vpp_config_modified = True
-
-            new_workers_param = 'workers %d' % (input_cores)
-            if workers_param:
-                if workers_param_val != input_cores:
-                    self.fw_ac_db.remove_element(conf['cpu'], workers_param)
-                    conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
-                    self.vpp_config_modified = True
-            else:
-                conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
                 self.vpp_config_modified = True
 
             if num_of_rx_queues_param_val != input_cores:
@@ -1243,13 +1219,19 @@ class Checker:
         if reset==False:
             cfg = self.vpp_configuration
             if cfg and cfg['cpu']:
-                string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
+                string = self.fw_ac_db.get_element(cfg['cpu'],'corelist-workers')
                 if string:
-                    tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
-                    if tup_workers:
-                        workers_param = tup_workers[0]
-                        tmp = re.split('\s+', workers_param.strip())
-                        num_of_workers_cores = int(tmp[1])
+                    tup_core_list = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                    if tup_core_list:
+                        corelist_worker_param = tup_core_list[0]
+                        tmp = re.split('\s+', corelist_worker_param.strip())
+                        corelist_worker_param_val = tmp[1]
+                        if corelist_worker_param_val.isdigit():
+                            corelist_worker_param_min_val = corelist_worker_param_max_val = corelist_worker_param_val
+                        else:
+                            corelist_worker_param_min_val = int(corelist_worker_param_val.split('-')[0])
+                            corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
+                        num_of_workers_cores = corelist_worker_param_max_val + 1 - corelist_worker_param_min_val
 
         update_line = ''
         if num_of_workers_cores == 0:
