@@ -5,12 +5,12 @@
   "params": {
     "interfaces": [
       {
-        "dev_id":"pci:0000:00:08.00",
+        "dev_id":"__INTERFACE_1__",
         "addr":"10.0.0.4/24",
 		"type": "wan"
       },
       {
-        "dev_id":"pci:0000:00:09.00",
+        "dev_id":"__INTERFACE_2__",
         "addr":"192.168.56.101/24",
 		"type": "lan",
         "routing":"ospf"
@@ -25,7 +25,7 @@
   "params": [
     {
       "src": "8.8.1.1",
-      "dev_id":"pci:0000:00:08.00",
+      "dev_id":"__INTERFACE_1__",
       "dst": "8.8.1.2",
       "tunnel-id": 1,
       "ipsec": {
@@ -86,11 +86,11 @@
   "message": "remove-interface",
   "params": [
     {
-      "dev_id":"pci:0000:00:08.00",
+      "dev_id":"__INTERFACE_1__",
       "addr":"10.0.0.4/24"
     },
     {
-      "dev_id":"pci:0000:00:09.00",
+      "dev_id":"__INTERFACE_2__",
       "addr":"192.168.56.101/24",
       "routing":"ospf"
     }

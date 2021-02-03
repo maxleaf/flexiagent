@@ -4,7 +4,7 @@
   "message": "add-interface",
   "params": [
     {
-      "dev_id":"pci:0000:00:09.00",
+      "dev_id":"__INTERFACE_2__",
       "addr":"192.168.56.101/24",
       "routing":"ospf",
       "type":"lan"
@@ -23,8 +23,8 @@
   "message": "start-router",
   "params": {
     "dev_id": [
-      "pci:0000:00:08.00",
-      "pci:0000:00:09.00"
+      "__INTERFACE_1__",
+      "__INTERFACE_2__"
     ]
   }
 }

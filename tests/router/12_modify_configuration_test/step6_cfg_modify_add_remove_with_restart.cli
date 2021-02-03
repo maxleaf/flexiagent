@@ -43,7 +43,7 @@
           "message": "add-tunnel",
           "params": {
             "src": "10.0.0.4",
-            "dev_id":"pci:0000:00:08.00",
+            "dev_id":"__INTERFACE_1__",
             "dst": "20.0.0.4",
             "tunnel-id": 1,
             "ipsec": {
@@ -78,7 +78,7 @@
           "entity":  "agent",
           "message": "remove-interface",
           "params": {
-              "dev_id":"pci:0000:00:09.00",
+              "dev_id":"__INTERFACE_2__",
               "addr":"192.168.56.102/24",
               "routing":"ospf",
               "type":"lan"
@@ -89,7 +89,7 @@
           "entity":  "agent",
           "message": "add-interface",
           "params": {
-              "dev_id":"pci:0000:00:09.00",
+              "dev_id":"__INTERFACE_2__",
               "addr":"192.168.56.102/24",
               "routing":"ospf",
               "type":"lan"

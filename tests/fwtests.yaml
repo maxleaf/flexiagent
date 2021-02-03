@@ -1,0 +1,14 @@
+devices:
+  virtualbox:
+    __INTERFACE_1__:
+      dev_id:   pci:0000:00:08.00
+      address:  10.0.0.1
+      gateway:  10.0.0.0
+      type:     wan       # wan/lan
+
+    interface-2: pci:0000:00:09.00
+    interface-3: pci:0000:00:03.00
+  silicom:
+    interface-1: pci:0000:02:00.0
+    interface-2: pci:0000:02:00.1
+    interface-3: pci:0000:03:00.0

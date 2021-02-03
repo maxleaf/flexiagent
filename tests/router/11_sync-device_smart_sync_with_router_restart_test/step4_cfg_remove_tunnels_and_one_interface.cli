@@ -7,7 +7,7 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "dev_id":"pci:0000:00:09.00",
+			  "dev_id":"__INTERFACE_2__",
 			  "addr":"192.168.56.102/24",
 			  "routing":"ospf",
 			  "type":"lan"
@@ -326,7 +326,7 @@
 		  "entity": "agent",
 		  "message": "add-dhcp-config",
 		  "params": {
-			"interface": "pci:0000:00:09.00",
+			"interface": "__INTERFACE_2__",
 		    "range_start": "20.20.20.200",
 		    "range_end": "20.20.20.250",
 		    "dns": [

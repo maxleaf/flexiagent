@@ -3,7 +3,7 @@
         "entity": "agent",
         "message": "add-interface",
         "params": {
-            "dev_id": "pci:0000:00:03.00",
+            "dev_id": "__INTERFACE_3__",
             "dhcp": "no",
             "addr": "10.0.1.10/24",
             "routing": "NONE",
@@ -17,7 +17,7 @@
         "entity": "agent",
         "message": "add-interface",
         "params": {
-            "dev_id": "pci:0000:00:08.00",
+            "dev_id": "__INTERFACE_1__",
             "dhcp": "no",
             "addr": "192.168.1.10/24",
             "routing": "NONE",
@@ -31,7 +31,7 @@
         "entity": "agent",
         "message": "add-interface",
         "params": {
-            "dev_id": "pci:0000:00:09.00",
+            "dev_id": "__INTERFACE_2__",
             "dhcp": "no",
             "addr": "192.168.2.10/24",
             "routing": "NONE",

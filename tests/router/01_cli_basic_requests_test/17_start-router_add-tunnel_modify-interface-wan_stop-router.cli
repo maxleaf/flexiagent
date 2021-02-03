@@ -5,13 +5,13 @@
   "params": {
     "interfaces": [
       {
-        "dev_id":"pci:0000:00:08.00",
+        "dev_id":"__INTERFACE_1__",
         "addr":"8.8.1.1/24",
         "gateway": "8.8.1.254",
         "type":"wan"
       },
       {
-        "dev_id":"pci:0000:00:09.00",
+        "dev_id":"__INTERFACE_2__",
         "addr":"40.40.40.40/24",
         "routing":"ospf",
         "type":"lan"
@@ -25,7 +25,7 @@
   "message": "add-tunnel",
   "params": {
     "src": "8.8.1.1",
-    "dev_id":"pci:0000:00:08.00",
+    "dev_id":"__INTERFACE_1__",
     "dst": "8.8.1.2",
     "dstPort": "1068",
     "tunnel-id": 1,
@@ -63,7 +63,7 @@
           "entity":  "agent",
           "message": "modify-interface",
           "params": {
-              "dev_id": "pci:0000:00:08.00",
+              "dev_id": "__INTERFACE_1__",
               "addr": "8.8.4.4/24",
               "type": "WAN"
           }

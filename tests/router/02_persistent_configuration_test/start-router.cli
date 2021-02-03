@@ -4,8 +4,8 @@
   "message": "start-router",
   "params": {
     "dev_id": [
-      "pci:0000:00:08.00",
-      "pci:0000:00:09.00"
+      "__INTERFACE_1__",
+      "__INTERFACE_2__"
     ]
   }
 }

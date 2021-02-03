@@ -7,10 +7,10 @@
   ], 
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:pci:0000:00:03.00", 
+      "Key": "add-interface:__INTERFACE_3__", 
       "Params": {
         "addr": "1.0.0.4/24", 
-        "dev_id": "pci:0000:00:03.00", 
+        "dev_id": "__INTERFACE_3__", 
         "gateway": "1.0.0.1", 
         "multilink": {
           "labels": [
@@ -22,10 +22,10 @@
       }
     }, 
     {
-      "Key": "add-interface:pci:0000:00:08.00", 
+      "Key": "add-interface:__INTERFACE_1__", 
       "Params": {
         "addr": "10.0.0.4/24", 
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
@@ -38,10 +38,10 @@
       }
     }, 
     {
-      "Key": "add-interface:pci:0000:00:09.00", 
+      "Key": "add-interface:__INTERFACE_2__", 
       "Params": {
         "addr": "192.168.56.102/24", 
-        "dev_id": "pci:0000:00:09.00", 
+        "dev_id": "__INTERFACE_2__", 
         "routing": "ospf", 
         "type": "lan"
       }
@@ -51,7 +51,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "dst": "100.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -88,7 +88,7 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -124,7 +124,7 @@
     {
       "Key": "add-tunnel:9", 
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "dst": "90.0.0.9", 
         "ipsec": {
           "local-sa": {
@@ -160,13 +160,13 @@
   ], 
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config pci:0000:00:09.00", 
+      "Key": "add-dhcp-config __INTERFACE_2__", 
       "Params": {
         "dns": [
           "8.8.4.4", 
           "8.8.8.8"
         ], 
-        "interface": "pci:0000:00:09.00", 
+        "interface": "__INTERFACE_2__", 
         "mac_assign": [], 
         "range_end": "20.20.20.250", 
         "range_start": "20.20.20.200"

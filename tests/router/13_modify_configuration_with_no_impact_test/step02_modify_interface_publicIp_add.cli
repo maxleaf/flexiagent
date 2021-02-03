@@ -8,7 +8,7 @@
           "message": "modify-interface",
           "params":
           {
-            "dev_id":"pci:0000:00:08.00",
+            "dev_id":"__INTERFACE_1__",
             "addr":"10.0.0.4/24",
             "gateway": "10.0.0.10",
             "PublicIP": "52.52.52.52",

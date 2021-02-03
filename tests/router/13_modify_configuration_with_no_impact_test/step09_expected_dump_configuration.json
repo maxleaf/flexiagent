@@ -7,10 +7,10 @@
   ], 
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:pci:0000:00:08.00", 
+      "Key": "add-interface:__INTERFACE_1__", 
       "Params": {
         "addr": "10.0.0.4/24", 
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
@@ -24,10 +24,10 @@
       }
     }, 
     {
-      "Key": "add-interface:pci:0000:00:09.00", 
+      "Key": "add-interface:__INTERFACE_2__", 
       "Params": {
         "addr": "192.168.56.101/24", 
-        "dev_id": "pci:0000:00:09.00", 
+        "dev_id": "__INTERFACE_2__", 
         "routing": "ospf", 
         "type": "lan"
       }
@@ -37,7 +37,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "dst": "20.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -74,7 +74,7 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
+        "dev_id": "__INTERFACE_1__", 
         "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
