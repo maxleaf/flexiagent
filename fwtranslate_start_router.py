@@ -171,6 +171,14 @@ def start_router(params=None):
             'func'  : 'vpp_startup_conf_add_nopci',
             'args'  : { 'vpp_config_filename' : vpp_filename }
         }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "remove no-pci flag to %s" % vpp_filename
+        cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_remove_nopci',
+            'args'  : { 'vpp_config_filename' : vpp_filename }
+        }
         cmd_list.append(cmd)
 
     # Enable NAT in vpp configuration file
