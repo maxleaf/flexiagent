@@ -157,7 +157,7 @@ def start_router(params=None):
             'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd_list.append(cmd)
-    else if len(pci_list_vmxnet3) == 0:
+    elif len(pci_list_vmxnet3) == 0:
         # When the list of devices in the startup.conf file is empty, the vpp attempts
         # to manage all the down linux interfaces.
         # Since we allow non-dpdk interfaces (LTE, WiFi), this list could be empty.
