@@ -336,7 +336,7 @@ def _add_bridge(cmd_list, bridge_id):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "bridge_domain_add_del"
-    cmd['cmd']['params']    = { 'bd_id':bridge_id , 'is_add':1, 'learn':0, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':1 }
+    cmd['cmd']['params']    = { 'bd_id':bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0 }
     cmd['cmd']['descr']     = "create bridge"
     cmd['revert'] = {}
     cmd['revert']['name']   = 'bridge_domain_add_del'
