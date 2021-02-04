@@ -340,10 +340,6 @@ class FWAGENT_API:
         :returns: Dictionary status code.
         """
         try:
-            # don't perform reset if interface is already assigned to vpp and vpp is run
-            is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
-            if fwutils.vpp_does_run() and is_assigned:
-                return {'ok': 0, 'message': 'Please stop the router in order to reset the LTE card'}
 
             is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
             fwutils.qmi_sim_power_off(params['dev_id'])

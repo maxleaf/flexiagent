@@ -2467,10 +2467,10 @@ def configure_lte_interface(params):
     This function is responsible for the second stage.
     If the vpp is running, we have special logic to configure LTE. This logic handled by the add_interface translator.
     '''
-    if vpp_does_run():
+    dev_id = params['dev_id']
+    if vpp_does_run() and is_interface_assigned_to_vpp(dev_id):
         return (True, None)
 
-    dev_id = params['dev_id']
     if not is_lte_interface_by_dev_id(dev_id):
         return (False, "dev_id %s is not a lte interface" % dev_id)
 
@@ -2657,10 +2657,6 @@ def lte_is_sim_inserted(dev_id):
 
 def lte_disconnect(dev_id, hard_reset_service=False):
     try:
-        # don't perform disconnect if this interface is assigned to vpp and vpp is run
-        is_assigned = is_interface_assigned_to_vpp(dev_id)
-        if vpp_does_run() and is_assigned:
-            return {'ok': 0, 'message': 'Don\'t disconnect LTE. the interface is assigned to vpp'}
 
         lte_db = fwglobals.g.db.get('lte', {})
         lte_interfaces = lte_db.get('interfaces', {})
