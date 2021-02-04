@@ -157,11 +157,13 @@ def start_router(params=None):
             'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd_list.append(cmd)
-    else:
+    elif len(pci_list_vmxnet3) == 0:
         # When the list of devices in the startup.conf file is empty, the vpp attempts
         # to manage all the down linux interfaces.
         # Since we allow non-dpdk interfaces (LTE, WiFi), this list could be empty.
         # In order to prevent vpp from doing so, we need to add the "no-pci" flag.
+        # Note, on VMWare don't use no-pci, so vpp will capture interfaces and
+        # vmxnet3_create() called after vpp start will succeed.
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "python"
