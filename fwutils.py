@@ -2689,7 +2689,7 @@ def lte_prepare_connection_params(params):
 def qmi_verify_pin(dev_id, pin):
     fwglobals.log.debug('verifying lte pin number')
     res = _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
-    time.sleep(1)
+    time.sleep(2)
     return lte_get_pin_state(dev_id)
 
 def qmi_set_pin_protection(dev_id, pin, is_enable):
@@ -2707,15 +2707,14 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
-def lte_connect(params, reset=False):
+def lte_connect(params):
     dev_id = params['dev_id']
-    if not lte_is_sim_inserted(dev_id) or reset:
+    if not lte_is_sim_inserted(dev_id):
         qmi_sim_power_off(dev_id)
+        time.sleep(1)
         qmi_sim_power_on(dev_id)
+        time.sleep(1)
         inserted = lte_is_sim_inserted(dev_id)
-
-        _run_qmicli_command(dev_id, 'wds-reset')
-
         if not inserted:
             return (False, "Sim is not presented")
 
@@ -2759,9 +2758,6 @@ def lte_connect(params, reset=False):
 
         return (True, None)
     except Exception as e:
-        if not reset:
-            return lte_connect(params, True)
-
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
 def lte_get_system_info(dev_id):

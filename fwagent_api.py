@@ -373,6 +373,19 @@ class FWAGENT_API:
             if retries_left == '0' and not puk:
                 return {'ok': 0, 'message': 'The PIN is locked. Please unblocked it with PUK code'}
 
+            if current_pin_state.get('PIN1_STATUS') == 'blocked':
+                if not puk or not new_pin:
+                    return {'ok': 0, 'message': 'The PIN is locked. Please provide PUK code and new PIN number'}
+                # unblock
+                updated_status = fwutils.qmi_unblocked_pin(dev_id, puk, new_pin)
+                updated_pin_state = updated_status.get('PIN1_STATUS')
+                if updated_pin_state not in['disabled', 'enabled-verified']:
+                    return {'ok': 0, 'message': 'PUK is wrong'}
+
+                # restore lte connection if needed
+                fwglobals.g.system_api.restore_configuration(types=['add-lte'])
+                return {'ok': 1, 'message': ''}
+
             if not current_pin:
                 return {'ok': 0, 'message': 'PIN is required'}
 
