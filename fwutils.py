@@ -50,7 +50,9 @@ from fwsystem_cfg   import FwSystemCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
+from fw_traffic_identification import FwTrafficIdentifications
 
+proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
 
@@ -266,7 +268,7 @@ def get_interface_gateway(if_name, if_dev_id=None):
     return rip, metric
 
 
-def get_binary_interface_gateway_by_dev_id(dev_id):
+def get_binary_interface_gateway_by_dev_id(dev_id, arg=None):
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
     return ip_str_to_bytes(gw_ip)[0] if gw_ip else ''
 
@@ -815,7 +817,8 @@ def pci_bytes_to_str(pci_bytes):
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
-def dev_id_to_vpp_sw_if_index(dev_id):
+
+def dev_id_to_vpp_sw_if_index(dev_id, arg=None):
     """Convert device bus address into VPP sw_if_index.
 
     :param dev_id:      device bus address.
@@ -843,7 +846,7 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def dev_id_to_tap(dev_id):
+def dev_id_to_tap(dev_id, arg=None):
     """Convert Bus address into TAP name.
 
     :param dev_id:      Bus address.
@@ -1005,7 +1008,7 @@ def vpp_sw_if_index_to_name(sw_if_index):
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
 #       loop0 -> vpp2
-def vpp_sw_if_index_to_tap(sw_if_index):
+def vpp_sw_if_index_to_tap(sw_if_index, arg=None):
     """Convert VPP sw_if_index into Linux TAP interface name.
 
      :param sw_if_index:      VPP sw_if_index.
@@ -1147,6 +1150,8 @@ def reset_device_config():
         db_multilink.clean()
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
+    with FwTrafficIdentifications(fwglobals.g.TRAFFIC_ID_DB_FILE) as traffic_db:
+        traffic_db.clean()
     fwnetplan.restore_linux_netplan_files()
 
     if 'lte' in fwglobals.g.db:
@@ -1356,6 +1361,19 @@ def ip_str_to_bytes(ip_str):
     addr_ip = ip_str.split('/')[0]
     addr_len = int(ip_str.split('/')[1]) if len(ip_str.split('/')) > 1 else 32
     return socket.inet_pton(socket.AF_INET, addr_ip), addr_len
+
+def ports_str_to_range(ports_str):
+    """Convert Ports string range into ports_from and ports_to
+
+     :param ports_str:         Ports range string.
+
+     :returns: port_from and port_to
+     """
+    ports_map = map(int, ports_str.split('-'))
+    port_from = port_to = ports_map[0]
+    if len(ports_map) > 1:
+        port_to = ports_map[1]
+    return port_from, port_to
 
 def mac_str_to_bytes(mac_str):      # "08:00:27:fd:12:01" -> bytes
     """Convert MAC address string into bytes.
@@ -3005,9 +3023,10 @@ def lte_get_configuration_received_from_provider(dev_id, cache=True):
         return response
 
 def lte_get_provider_config(dev_id, key, cache=True):
+
     """Get IP from LTE provider
 
-    :param ket: Filter info by key
+    :param dev_id: Device identifier
 
     :returns: ip address.
     """
@@ -3017,6 +3036,10 @@ def lte_get_provider_config(dev_id, key, cache=True):
         return info[key]
 
     return ''
+
+def lte_get_provider_subst_wrapper(params, arg=None):
+
+    return lte_get_configuration_received_from_provider(*params)
 
 def is_wifi_interface_by_dev_id(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
@@ -3712,3 +3735,10 @@ def check_reinstall_static_routes():
             continue
 
         add_static_route(addr, via, metric, False, dev)
+def map_keys_to_acl_ids(keys, arg):
+    # arg carries command cache
+    i = 0
+    while i < len(keys):
+        keys[i] = arg[keys[i]]
+        i += 1
+    return keys

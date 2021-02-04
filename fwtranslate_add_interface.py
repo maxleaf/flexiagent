@@ -28,6 +28,7 @@ import fwglobals
 import fwnetplan
 import fwtranslate_revert
 import fwutils
+import fw_nat_command_helpers
 
 # add_interface
 # --------------------------------------
@@ -258,8 +259,10 @@ def add_interface(params):
 
     if is_lte:
         netplan_params['substs'] = [
-            { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'IP'] },
-            { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] }
+            { 'add_param':'ip', 'val_by_func':'lte_get_provider_subst_wrapper',
+                'arg': [dev_id, 'IP', True] },
+            { 'add_param':'gw', 'val_by_func':'lte_get_provider_subst_wrapper',
+                'arg': [dev_id, 'GATEWAY', True] }
         ]
 
     cmd = {}
@@ -312,67 +315,9 @@ def add_interface(params):
             }
             cmd_list.append(cmd)
 
-    # Enable NAT.
-    # On WAN interfaces run
-    #   'nat44 add interface address GigabitEthernet0/9/0'
-    #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
-    # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
+    # Setup NAT config on WAN interface
     if 'type' not in params or params['type'].lower() == 'wan':
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "python"
-        cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
-        cmd['cmd']['params']    = {
-                                    'module': 'fwutils',
-                                    'func':   'vpp_nat_addr_update_on_interface_add',
-                                    'args':   {
-                                        'dev_id': dev_id,
-                                        'metric': metric
-                                    }
-                                  }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
-        cmd['revert']['params'] = {
-                                    'module': 'fwutils',
-                                    'func':   'vpp_nat_addr_update_on_interface_add',
-                                    'args':   {
-                                        'dev_id': dev_id,
-                                        'metric': metric
-                                    }
-                                  }
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':1, 'is_inside':0 }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':0, 'is_inside':0 }
-        cmd_list.append(cmd)
-
-        # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
-        vxlan_port = 4789
-        udp_proto = 17
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-        cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
-        cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (dev_id, vxlan_port)
-        cmd['revert'] = {}
-        cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-        cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':0 }
-        cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (dev_id, vxlan_port)
-
-        cmd_list.append(cmd)
+        cmd_list.extend(fw_nat_command_helpers.get_nat_wan_setup_config(dev_id, metric))
 
     # Update ospfd.conf.
     ospfd_file = fwglobals.g.FRR_OSPFD_FILE
@@ -436,7 +381,8 @@ def add_interface(params):
                             'gw'      : '',
                             'mac'     : '00:00:00:00:00:00',
                     },
-                    'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':[dev_id, 'GATEWAY'] }]
+                    'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_subst_wrapper', 
+                        'arg':[dev_id, 'GATEWAY', True] }]
         }
         cmd['cmd']['descr']         = "create static arp entry for dev_id %s" % dev_id
         cmd_list.append(cmd)
@@ -444,13 +390,15 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name'] = "exec"
-        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] } ]},
+        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB',
+            'val_by_func':'lte_get_provider_subst_wrapper', 'arg': [dev_id, 'GATEWAY', True] } ]},
                                 "sudo arp -s DEV-STUB 00:00:00:00:00:00" ]
         cmd['cmd']['descr'] = "set arp entry on linux for lte interface"
         cmd['revert'] = {}
         cmd['revert']['name']   = "exec"
         cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] } ]},
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB',
+            'val_by_func':'lte_get_provider_subst_wrapper', 'arg': [dev_id, 'GATEWAY', True] } ]},
                                     "sudo arp -d DEV-STUB" ]
         cmd_list.append(cmd)
 

@@ -44,7 +44,6 @@ from fwcfg_request_handler import FwCfgRequestHandler
 
 import fwtunnel_stats
 
-
 fwrouter_translators = {
     'start-router':             {'module': __import__('fwtranslate_start_router'),    'api':'start_router'},
     'stop-router':              {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
@@ -61,6 +60,8 @@ fwrouter_translators = {
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
+    'remove-firewall-policy':   {'module': __import__('fwtranslate_revert'),          'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -614,6 +615,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             return request
 
         multilink_policy_params = self.cfg_db.get_multilink_policy()
+        firewall_policy_params = self.cfg_db.get_firewall_policy()
 
         # 'add-application' preprocessing:
         # 1. The currently configured applications should be removed firstly.
@@ -636,6 +638,10 @@ class FWROUTER_API(FwCfgRequestHandler):
                     params['requests'][0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
                     params['requests'][-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
 
+                if firewall_policy_params:
+                    params['requests'][0:0]   = [ { 'message': 'remove-firewall-policy', 'params' : firewall_policy_params }]
+                    params['requests'][-1:-1] = [ { 'message': 'add-firewall-policy',    'params' : firewall_policy_params }]
+
                 request = {'message': 'aggregated', 'params': params}
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
                 return request
@@ -650,6 +656,17 @@ class FWROUTER_API(FwCfgRequestHandler):
                 updated_requests = [
                     { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
                     { 'message': 'add-multilink-policy',    'params' : params }
+                ]
+                request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
+                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                return request
+
+        # Setup remove-firewall-policy before executing add-firewall-policy
+        if firewall_policy_params:
+            if req == 'add-firewall-policy':
+                updated_requests = [
+                    { 'message': 'remove-firewall-policy', 'params' : firewall_policy_params },
+                    { 'message': 'add-firewall-policy',    'params' : params }
                 ]
                 request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
@@ -685,10 +702,15 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Go over all requests and rearrange them, as order of requests is
         # important for proper configuration of VPP!
         # The list should start with the 'remove-X' requests in following order:
-        #   [ 'add-multilink-policy', 'add-application', 'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
+        #   [ 'add-firewall-policy', 'add-multilink-policy', 'add-application',
+        #     'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
         # Than the 'add-X' requests should follow in opposite order:
-        #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
+        #     'add-application', 'add-multilink-policy', 'add-firewall-policy' ]
         #
+
+        # TODO: Handle add-firewall-policy case in aggregated message scenario
+
         add_order    = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')

@@ -375,7 +375,7 @@ class FwCfgRequestHandler:
                 func_name = s['val_by_func']
                 func = getattr(fwutils, func_name)
                 old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
-                new  = func(*old) if type(old) == list else func(old)
+                new  = func(old, arg=cache)
                 if new is None:
                     raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
             elif 'val_by_key' in s:
