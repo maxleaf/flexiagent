@@ -309,6 +309,8 @@ class FwWanMonitor:
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
             return
 
+        fwglobals.g.cache.linux_interfaces.clear()
+
         # If vpp runs and interface is under vpp control, i.e. assigned,
         # go and adjust vpp configuration to the newer metric.
         # Note the route does not have dev_id for virtual interfaces that are

@@ -382,8 +382,6 @@ class FWAGENT_API:
                 if updated_pin_state not in['disabled', 'enabled-verified']:
                     return {'ok': 0, 'message': 'PUK is wrong'}
 
-                # restore lte connection if needed
-                fwglobals.g.system_api.restore_configuration(types=['add-lte'])
                 return {'ok': 1, 'message': ''}
 
             if not current_pin:

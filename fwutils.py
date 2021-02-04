@@ -2720,9 +2720,9 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
-def lte_connect(params):
+def lte_connect(params, reset=False):
     dev_id = params['dev_id']
-    if not lte_is_sim_inserted(dev_id):
+    if not lte_is_sim_inserted(dev_id) or reset:
         qmi_sim_power_off(dev_id)
         time.sleep(1)
         qmi_sim_power_on(dev_id)
@@ -2771,6 +2771,8 @@ def lte_connect(params):
 
         return (True, None)
     except Exception as e:
+        if not reset:
+            return lte_connect(params, True)
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
 def lte_get_system_info(dev_id):
