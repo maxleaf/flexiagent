@@ -80,6 +80,7 @@ request_handlers = {
     'get-wifi-info':                     {'name': '_call_agent_api'},
     'get-lte-info':                      {'name': '_call_agent_api'},
     'reset-lte':                         {'name': '_call_agent_api'},
+    'modify-lte-pin':                    {'name': '_call_agent_api'},
 
     # Aggregated API
     'aggregated':                   {'name': '_call_aggregated', 'sign': True},
@@ -332,10 +333,12 @@ class Fwglobals:
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+
+        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
+
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
-        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
         self.router_api.restore_vpp_if_needed()
 
         fwutils.get_linux_interfaces(cached=False) # Fill global interface cache
