@@ -2727,6 +2727,8 @@ def lte_connect(params, reset=False):
         if not inserted:
             return (False, "Sim is not presented")
 
+        lte_disconnect(dev_id, True)
+
     # check PIN status
     pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
     if pin_state not in ['disabled', 'enabled-verified']:

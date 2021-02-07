@@ -118,6 +118,11 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                     self.vpp_api.disconnect_from_vpp()          # Reset connection to vpp to force connection renewal
                     fwutils.stop_vpp()                          # Release interfaces to Linux
+
+                    fwutils.reset_traffic_control()             # Release LTE operations.
+                    fwutils.remove_linux_bridges(               # Release bridges for wifi.
+                    fwutils.stop_hostapd()                      # Stop access point service
+
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
 
@@ -233,6 +238,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
             fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
+            fwnetplan.restore_linux_netplan_files()
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
