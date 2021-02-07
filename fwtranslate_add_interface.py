@@ -149,16 +149,17 @@ def add_interface(params):
             cmd['revert']['descr']  = "stop hostpad"
             cmd_list.append(cmd)
 
+            bridge_name = "br_%s" % fwutils.generate_linux_interface_short_name(iface_name)
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
-            cmd['cmd']['params'] = [ "sudo brctl addbr br_%s" %  iface_name ]
-            cmd['cmd']['descr']  = "create linux bridge for interface %s" % iface_name
+            cmd['cmd']['params'] = [ "sudo brctl addbr %s" %  bridge_name ]
+            cmd['cmd']['descr']  = "create linux bridge %s for interface %s" % (bridge_name, iface_name)
 
             cmd['revert'] = {}
             cmd['revert']['name']   = "exec"
-            cmd['revert']['params'] = [ "sudo ip link set dev br_%s down && sudo brctl delbr br_%s" %  (iface_name, iface_name) ]
-            cmd['revert']['descr']  = "remove linux bridge for interface %s" % iface_name
+            cmd['revert']['params'] = [ "sudo ip link set dev %s down && sudo brctl delbr %s" %  (bridge_name, bridge_name) ]
+            cmd['revert']['descr']  = "remove linux bridge %s for interface %s" % (bridge_name, iface_name)
             cmd_list.append(cmd)
 
             # add tap into a bridge.
@@ -166,33 +167,33 @@ def add_interface(params):
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
             cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                        "sudo brctl addif br_%s DEV-TAP" %  iface_name ]
-            cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge" % iface_name
+                                        "sudo brctl addif %s DEV-TAP" %  bridge_name ]
+            cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge %s" % (iface_name, bridge_name)
 
             cmd['revert'] = {}
             cmd['revert']['name']   = "exec"
             cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                        "sudo brctl delif br_%s DEV-TAP" %  iface_name ]
-            cmd['revert']['descr']  = "remove tap from a bridge"
+                                        "sudo brctl delif %s DEV-TAP" %  bridge_name ]
+            cmd['revert']['descr']  = "remove tap from a bridge %s" % bridge_name
             cmd_list.append(cmd)
 
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
-            cmd['cmd']['params'] =  [ "sudo brctl addif br_%s %s" %  (iface_name, iface_name) ]
-            cmd['cmd']['descr']  = "add wifi interface into a bridge"
+            cmd['cmd']['params'] =  [ "sudo brctl addif %s %s" %  (bridge_name, iface_name) ]
+            cmd['cmd']['descr']  = "add wifi interface %s into the bridge %s" % (iface_name, bridge_name)
 
             cmd['revert'] = {}
             cmd['revert']['name']   = "exec"
-            cmd['revert']['params'] = [ "sudo brctl delif br_%s %s" %  (iface_name, iface_name) ]
-            cmd['revert']['descr']  = "remove wifi interface from a bridge"
+            cmd['revert']['params'] = [ "sudo brctl delif %s %s" %  (bridge_name, iface_name) ]
+            cmd['revert']['descr']  = "remove wifi interface %s from the bridge %s" %  (iface_name, bridge_name)
             cmd_list.append(cmd)
 
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']      = "exec"
-            cmd['cmd']['descr']     = "UP bridge br_%s in Linux" % iface_name
-            cmd['cmd']['params']    = [ "sudo ip link set dev br_%s up" % iface_name]
+            cmd['cmd']['descr']     = "UP bridge %s in Linux" % bridge_name
+            cmd['cmd']['params']    = [ "sudo ip link set dev %s up" % bridge_name]
             cmd_list.append(cmd)
         elif is_lte:
             cmd = {}
