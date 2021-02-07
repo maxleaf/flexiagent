@@ -72,30 +72,30 @@ def test(netplan_backup):
         print("Netplan :: %s" % yaml.split('/')[-1])
         for test in [t for t in test_cases if t not in [cli_stop_router_file, cli_start_router_file]]:
             #copy the netplan file to netplan dir
-	    if 'multiple_netplan' in yaml:
+            if 'multiple_netplan' in yaml:
                 os.system('cp -R %s* /etc/netplan/' % multiple_netplan)
                 #To update the MAC address in the yaml files, uncomment the function below
                 #Please note that 2 modules: getmac and netifaces have to be installed 
                 #macDynamic.convertMacAddress() 
             else:
-	        shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
-	    #apply netplan
-	    os.system('netplan apply')
+                shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
+            #apply netplan
+            os.system('netplan apply')
 
             with fwtests.TestFwagent() as agent:
                 print("   " + os.path.basename(test))
-	        (ok, out) = agent.cli('-f %s' % cli_start_router_file)
-		assert ok
+                (ok, out) = agent.cli('-f %s' % cli_start_router_file)
+                assert ok
                 print("start_router: %s" % out)
 
                 # Load router configuration with spoiled lists
                 (ok, out) = agent.cli('--api inject_requests filename=%s ignore_errors=False' % test)
-		assert ok
+                assert ok
                 print("Inject cli '%s': %s" %(os.path.basename(test),out))
-		
                 (ok, out) = agent.cli('-f %s' % cli_stop_router_file)
-		assert ok
+                assert ok
                 print("stop_router: %s" % out)
             os.system('rm -f /etc/netplan/*.yaml')
+
 if __name__ == '__main__':
     test()

@@ -27,6 +27,6 @@ def convertMacAddress():
         for line in line_num:
             cmd = "sed -e '%s s/maca.*/macaddress: %s/' %s > %s && mv %s %s" % (line, macAds[mac],net_path, temp_path, temp_path, net_path)
             os.system(cmd)
-	    mac += 1
+            mac += 1
 
 convertMacAddress()
