@@ -62,7 +62,7 @@ class LoadSimulator:
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("LoadSimulator: got %s" % fwglobals.g.signal_names[signum])
+        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
         self.stop()
         exit(1)
 

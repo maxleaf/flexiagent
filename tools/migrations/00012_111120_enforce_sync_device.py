@@ -36,14 +36,15 @@ import fwglobals
 import fwutils
 
 from fwrouter_cfg import FwRouterCfg
+from sqlitedict import SqliteDict
 
 def _enforce_sync_device():
     """ We are forcing sync in upgrade because sync should update device router configuration
     items with new parameters added in the latest flexiManage. For example, the 'pci' field
     in the add-tunnel request.
     """
-    with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
-        router_cfg.db['signature'] = 'enforce-sync-device'
+    db = SqliteDict("/etc/flexiwan/agent/.data.sqlite", autocommit=True)
+    db['signature'] = 'enforce-sync-device'
 
 def migrate(prev_version, new_version, upgrade):
     if upgrade != 'upgrade':

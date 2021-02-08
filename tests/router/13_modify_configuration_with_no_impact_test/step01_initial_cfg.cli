@@ -5,7 +5,7 @@
   "params": {
     "interfaces": [
       {
-        "pci":"0000:00:08.00",
+        "dev_id":"pci:0000:00:08.00",
         "addr":"10.0.0.4/24",
         "gateway": "10.0.0.10",
         "type":"wan",
@@ -17,7 +17,7 @@
         }
       },
       {
-        "pci":"0000:00:09.00",
+        "dev_id":"pci:0000:00:09.00",
         "addr":"192.168.56.101/24",
         "routing":"ospf",
         "type":"lan"
@@ -31,7 +31,7 @@
   "message": "add-tunnel",
   "params": {
     "src": "10.0.0.4",
-    "pci":"0000:00:08.00",
+    "dev_id":"pci:0000:00:08.00",
     "dst": "20.0.0.4",
     "tunnel-id": 1,
     "ipsec": {
@@ -67,7 +67,7 @@
   "message": "add-tunnel",
   "params": {
     "src": "10.0.0.4",
-    "pci":"0000:00:08.00",
+    "dev_id":"pci:0000:00:08.00",
     "dst": "30.0.0.4",
     "tunnel-id": 2,
     "ipsec": {

@@ -29,25 +29,32 @@ import signal
 import time
 import traceback
 import yaml
+import fwutils
+import threading
 
 from sqlitedict import SqliteDict
 
 from fwagent import FwAgent
 from fwrouter_api import FWROUTER_API
+from fwsystem_api import FWSYSTEM_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
 from fwlog import Fwlog
 from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
+from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
 
+# sync flag indicated if module implement sync logic. 
+# IMPORTANT! Please keep the list order. It indicates the sync priorities
 modules = {
-    'fwagent_api':      __import__('fwagent_api'),
-    'fwapplications':   __import__('fwapplications'),
-    'fwrouter_api':     __import__('fwrouter_api'),
-    'os_api':           __import__('os_api'),
+    'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' }, # fwglobals.g.system_api
+    'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },  # fwglobals.g.agent_api
+    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' }, # fwglobals.g.apps
+    'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' }, # fwglobals.g.router_api
+    'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' }, # fwglobals.g.os_api
 }
 
 request_handlers = {
@@ -61,18 +68,24 @@ request_handlers = {
     ##############################################################
 
     # Agent API
-    'get-device-info':              {'name': '_call_agent_api'},
-    'get-device-stats':             {'name': '_call_agent_api'},
-    'get-device-logs':              {'name': '_call_agent_api'},
-    'get-device-packet-traces':     {'name': '_call_agent_api'},
-    'get-device-os-routes':         {'name': '_call_agent_api'},
-    'get-router-config':            {'name': '_call_agent_api'},
-    'upgrade-device-sw':            {'name': '_call_agent_api'},
-    'reset-device':                 {'name': '_call_agent_api'},
-    'sync-device':                  {'name': '_call_agent_api'},
+    'get-device-info':                   {'name': '_call_agent_api'},
+    'get-device-stats':                  {'name': '_call_agent_api'},
+    'get-device-logs':                   {'name': '_call_agent_api'},
+    'get-device-packet-traces':          {'name': '_call_agent_api'},
+    'get-device-os-routes':              {'name': '_call_agent_api'},
+    'get-device-config':                 {'name': '_call_agent_api'},
+    'upgrade-device-sw':                 {'name': '_call_agent_api'},
+    'reset-device':                      {'name': '_call_agent_api'},
+    'sync-device':                       {'name': '_call_agent_api'},
+    'get-wifi-info':                     {'name': '_call_agent_api'},
+    'get-lte-info':                      {'name': '_call_agent_api'},
+    'reset-lte':                         {'name': '_call_agent_api'},
+    'modify-lte-pin':                    {'name': '_call_agent_api'},
+
+    # Aggregated API
+    'aggregated':                   {'name': '_call_aggregated', 'sign': True},
 
     # Router API
-    'aggregated':                   {'name': '_call_router_api', 'sign': True},
     'start-router':                 {'name': '_call_router_api', 'sign': True},
     'stop-router':                  {'name': '_call_router_api', 'sign': True},
     'add-interface':                {'name': '_call_router_api', 'sign': True},
@@ -89,6 +102,10 @@ request_handlers = {
     'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
 
+    # System API
+    'add-lte':                        {'name': '_call_system_api'},
+    'remove-lte':                     {'name': '_call_system_api'},
+
     ##############################################################
     # INTERNAL API-s
     # ------------------------------------------------------------
@@ -104,7 +121,6 @@ request_handlers = {
     # OS API
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
-    'ifcount':                      {'name': '_call_os_api'},
     'ifstats':                      {'name': '_call_os_api'},
 
     # VPP API
@@ -176,7 +192,7 @@ class Fwglobals:
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
                 self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERFACES)
             except Exception as e:
-                log.excep("FwConfiguration: %s, set defaults" % str(e))
+                log.excep("%s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
                 self.DEBUG          = DEFAULT_DEBUG
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
@@ -192,23 +208,24 @@ class Fwglobals:
         def __init__(self):
             self.db = {
                 'LINUX_INTERFACES': {},
-                'PCI_TO_VPP_IF_NAME': {},
-                'PCI_TO_VPP_TAP_NAME': {},
-                'PCIS': {},
+                'DEV_ID_TO_VPP_IF_NAME': {},
+                'DEV_ID_TO_VPP_TAP_NAME': {},
                 'STUN': {},
-                'VPP_IF_NAME_TO_PCI': {},
+                'VPP_IF_NAME_TO_DEV_ID': {},
+                'LINUX_INTERFACES_BY_NAME': {},
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
                 }
             }
-            self.linux_interfaces    = self.db['LINUX_INTERFACES']
-            self.pci_to_vpp_if_name  = self.db['PCI_TO_VPP_IF_NAME']
-            self.pci_to_vpp_tap_name = self.db['PCI_TO_VPP_TAP_NAME']
-            self.pcis                = self.db['PCIS']
-            self.stun_cache          = self.db['STUN']
-            self.vpp_if_name_to_pci  = self.db['VPP_IF_NAME_TO_PCI']
-            self.wan_monitor         = self.db['WAN_MONITOR']
+            self.lock                       = threading.RLock()
+            self.linux_interfaces           = self.db['LINUX_INTERFACES']
+            self.dev_id_to_vpp_if_name      = self.db['DEV_ID_TO_VPP_IF_NAME']
+            self.dev_id_to_vpp_tap_name     = self.db['DEV_ID_TO_VPP_TAP_NAME']
+            self.stun_cache                 = self.db['STUN']
+            self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
+            self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
+            self.wan_monitor                = self.db['WAN_MONITOR']
 
 
     def __init__(self):
@@ -224,6 +241,7 @@ class Fwglobals:
         self.DEVICE_TOKEN_FILE   = self.DATA_PATH + 'fwagent_info.txt'
         self.VERSIONS_FILE       = self.DATA_PATH + '.versions.yaml'
         self.ROUTER_CFG_FILE     = self.DATA_PATH + '.requests.sqlite'
+        self.SYSTEM_CFG_FILE     = self.DATA_PATH + '.system.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
@@ -242,6 +260,7 @@ class Fwglobals:
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
+        self.HOSTAPD_CONFIG_DIRECTORY = '/etc/hostapd/'
         self.NETPLAN_FILES       = {}
         self.NETPLAN_FILE        = '/etc/netplan/99-flexiwan.fwrun.yaml'
         self.FWAGENT_DAEMON_NAME = 'fwagent.daemon'
@@ -261,6 +280,8 @@ class Fwglobals:
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
+
+        self.db = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! set the db variable regardless of agent initialization
 
         # Load websocket status codes on which agent should reconnect into a list
         self.ws_reconnect_status_codes = []
@@ -308,15 +329,22 @@ class Fwglobals:
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
+        self.system_cfg   = FwSystemCfg(self.SYSTEM_CFG_FILE)
         self.agent_api    = FWAGENT_API()
-        self.router_api   = FWROUTER_API(self.MULTILINK_DB_FILE)
+        self.system_api   = FWSYSTEM_API(self.system_cfg)
+        self.router_api   = FWROUTER_API(self.router_cfg, self.MULTILINK_DB_FILE)
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+
+        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
+
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
         self.router_api.restore_vpp_if_needed()
+
+        fwutils.get_linux_interfaces(cached=False) # Fill global interface cache
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
 
@@ -367,6 +395,9 @@ class Fwglobals:
     def _call_agent_api(self, request):
         return self.agent_api.call(request)
 
+    def _call_system_api(self, request):
+        return self.system_api.call(request)
+
     def _call_router_api(self, request):
         return self.router_api.call(request)
 
@@ -382,14 +413,14 @@ class Fwglobals:
         :param request: the request like:
             {
                 'name':   "python"
-                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_pci, labels)
+                'descr':  "add multilink labels into interface %s %s: %s" % (iface_addr, iface_dev_id, labels)
                 'params': {
                     'module': 'fwutils',
                     'func'  : 'vpp_multilink_update_labels',
                     'args'  : {
                         'labels':   labels,
                         'next_hop': gw,
-                        'pci':      iface_pci,
+                        'dev_id':   iface_dev_id,
                         'remove':   False
                     }
                 }
@@ -485,18 +516,8 @@ class Fwglobals:
             req    = request['message']
             params = request.get('params')
 
-            if req != 'aggregated':
-                handler = request_handlers.get(req)
-                assert handler, 'fwglobals: "%s" request is not supported' % req
-            else:
-                # In case of aggregated request use the first request in aggregation
-                # to deduce the handler function.
-                # Note the aggregation might include requests of the same type
-                # only, e.g. Router API (add-tunnel, remove-application, etc)
-                #
-                handler = request_handlers.get(params['requests'][0]['message'])
-                assert handler, 'fwglobals: aggregation with "%s" request is not supported' % \
-                    params['requests'][0]['message']
+            handler = request_handlers.get(req)
+            assert handler, 'fwglobals: "%s" request is not supported' % req
 
             # Keep copy of the request aside for signature purposes,
             # as the original request might by modified by preprocessing.
@@ -505,6 +526,7 @@ class Fwglobals:
                 received_msg = copy.deepcopy(request)
 
             handler_func = getattr(self, handler.get('name'))
+
             if result is None:
                 reply = handler_func(request)
             else:
@@ -524,8 +546,8 @@ class Fwglobals:
             # flexiManage code.
             #
             if reply['ok'] == 1 and handler.get('sign', False) == True:
-                self.router_cfg.update_signature(received_msg)
-            reply['router-cfg-hash'] = self.router_cfg.get_signature()
+                fwutils.update_device_config_signature(received_msg)
+            reply['router-cfg-hash'] = fwutils.get_device_config_signature()
 
             return reply
 
@@ -535,6 +557,178 @@ class Fwglobals:
             log.error(err_str + ': %s' % str(traceback.format_exc()))
             reply = {"message":err_str, 'ok':0}
             return reply
+
+    def _get_api_object_attr(self, api_type, attr):
+        if api_type == '_call_router_api':
+            return getattr(self.router_api, attr)
+        elif api_type == '_call_system_api':
+            return getattr(self.system_api, attr)
+
+    def _call_aggregated(self, request):
+        """Handle aggregated request from flexiManage.
+
+        :param request: the aggregated request like:
+            {
+                "entity": "agent",
+                "message": "aggregated",
+                "params": {
+                    "requests": [
+                        {
+                            "entity": "agent",
+                            "message": "remove-lte",
+                            "params": {
+                                "apn": "we",
+                                "enable": false,
+                                "dev_id": "usb:usb1/1-3/1-3:1.4"
+                            }
+                        },
+                        {
+                            "entity": "agent",
+                            "message": "remove-interface",
+                            "params": {
+                                "dhcp": "yes",
+                                "addr": "10.93.172.31/26",
+                                "addr6": "fe80::b82a:beff:fe44:38e8/64",
+                                "PublicIP": "46.19.85.31",
+                                "PublicPort": "4789",
+                                "useStun": true,
+                                "monitorInternet": true,
+                                "gateway": "10.93.172.32",
+                                "metric": "",
+                                "routing": "NONE",
+                                "type": "WAN",
+                                "configuration": {
+                                    "apn": "we",
+                                    "enable": false
+                                },
+                                "deviceType": "lte",
+                                "dev_id": "usb:usb1/1-3/1-3:1.4",
+                                "multilink": {
+                                    "labels": []
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+
+        :returns: dictionary with status code and optional error message.
+        """
+        # Break the received aggregated request into aggregations by API type
+        #
+        # !!! IMPORTANT !!!
+        # Requests that belong to different api modules, e.g. router_api, system_api, etc.,
+        # should not depend on each others. So the order of the execution of aggregated messages
+        # grouped by api, is not important! Hence reuse dict for "aggregations"
+        #
+        aggregations = {}
+        for _request in request['params']['requests']:
+
+            handler = request_handlers.get(_request['message'])
+            assert handler, '"%s" request is not supported' % _request['message']
+
+            api = handler.get('name')
+            assert api, 'api for "%s" not found' % _request['message']
+
+            # Create the aggregations for the current API type, if it was not created yet.
+            #
+            if not api in aggregations:
+                aggregations[api] = {
+                    "message": "aggregated",
+                    "params": {
+                        "requests": []
+                    }
+                }
+
+            # Finally add the current request to the current aggregation.
+            #
+            aggregations[api]['params']['requests'].append(_request)
+
+
+        # Now generate the rollback aggregated requests for the aggregations created above.
+        # We need them in case of failure to execute any of the created requests,
+        # as we have to revert the previously executed request. This is to ensure
+        # atomic handling of the original aggregated request received from flexiManage.
+        #
+        rollback_aggregations = self._build_rollback_aggregations(aggregations)
+
+        # Go over list of aggregations and execute their requests one by one.
+        #
+        apis = aggregations.keys()
+        executed_apis = []
+        for api in apis:
+            api_call_func = self._get_api_object_attr(api, 'call')
+            try:
+                api_call_func(aggregations[api])
+                executed_apis.append(api)
+            except Exception as e:
+                # Revert the previously executed aggregated requests
+                for api in executed_apis:
+                    rollback_func = self._get_api_object_attr(api, 'rollback')
+                    rollback_func(rollback_aggregations[api])
+                raise e
+
+        return {'ok': 1}
+
+
+    def _build_rollback_aggregations(self, aggregations):
+        '''Generates rollback data for the list of aggregated requests grouped by type of api they belong to.
+        The input list format is:
+            {
+                <api name, e.g. "router_api", "system_api", etc>:
+                    {
+                        "message": "aggregated",
+                        "params": {
+                            "requests": [ ... ]
+                        }
+                    }
+                }
+                ,
+                ...
+            }
+
+        The output rollback data represents clone of the input list, where the leaf requests
+        (requests in list element['params']['requests'])
+        perform opposite operation. That means, the "add-X" is replaced with
+        "remove-X", the "remove-X" is replaced with "add-X", and parameters of the "modify-X"
+        are replaced with the old parameters that are currently stored in the configuration database.
+        '''
+        rollbacks_aggregations = copy.deepcopy(aggregations)
+        for (api, aggregated) in rollbacks_aggregations.items():
+            cfg_db = self._get_api_object_attr(api, 'cfg_db')
+            for request in aggregated['params']['requests']:
+
+                op = request['message']
+                if re.match('add-', op):
+                    request['message'] = op.replace('add-','remove-')
+
+                elif re.match('start-', op):
+                    request['message'] = op.replace('start-','stop-')
+
+                elif re.match('remove-', op):
+                    request['message'] = op.replace('remove-','add-')
+                    # The "remove-X" might have only subset of configuration parameters.
+                    # To ensure proper rollback, populate the correspondent "add-X" with
+                    # full set of configuration parameters. They are stored in database.
+                    #
+                    request['params'] = cfg_db.get_request_params(request)
+                    if request['params'] == None:
+                        request['params'] = {} # Take a care of removal of not existing configuration item
+
+                elif re.match('modify-', op):
+                    # For "modify-X" replace it's parameters with the old parameters,
+                    # that are currently stored in the configuration database.
+                    #
+                    old_params = cfg_db.get_request_params(request)
+                    for param_name in list(request['params']): #request['params'].keys() doesn't work in python 3
+                        if param_name in old_params:
+                            request['params'][param_name] = old_params[param_name]
+                        else:
+                            del request['params'][param_name]
+                else:
+                    raise Exception("_build_rollback_aggregations: not expected request: %s" % op)
+
+        return rollbacks_aggregations
 
 
 def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):

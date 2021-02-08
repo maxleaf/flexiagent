@@ -7,10 +7,11 @@
   ], 
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:0000:00:08.00", 
+      "Key": "add-interface:pci:0000:00:08.00", 
       "Params": {
         "PublicPort": 6666, 
         "addr": "10.0.0.4/24", 
+        "dev_id": "pci:0000:00:08.00", 
         "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
@@ -19,15 +20,14 @@
             "red"
           ]
         }, 
-        "pci": "0000:00:08.00", 
         "type": "wan"
       }
     }, 
     {
-      "Key": "add-interface:0000:00:09.00", 
+      "Key": "add-interface:pci:0000:00:09.00", 
       "Params": {
         "addr": "192.168.56.101/24", 
-        "pci": "0000:00:09.00", 
+        "dev_id": "pci:0000:00:09.00", 
         "routing": "ospf", 
         "type": "lan"
       }
@@ -37,6 +37,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "20.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -66,7 +67,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 1
       }
@@ -74,6 +74,7 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -103,7 +104,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 2
       }

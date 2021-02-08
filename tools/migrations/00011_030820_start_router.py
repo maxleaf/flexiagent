@@ -36,6 +36,7 @@ import fwglobals
 import fwutils
 
 from fwrouter_cfg import FwRouterCfg
+from fwrouter_api import fwrouter_translators
 
 def migrate(prev_version, new_version, upgrade):
     if upgrade != 'upgrade' or prev_version.split('-')[0] != '1.3.9':
@@ -45,9 +46,9 @@ def migrate(prev_version, new_version, upgrade):
         request = {
             'message':   'start-router',
             'params':    {},
-            'internals': {}
         }
         with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
+            router_cfg.set_translators(fwrouter_translators)
             if not router_cfg.exists(request):
                 router_cfg.update(request, [], False)
 
