@@ -3622,12 +3622,6 @@ def check_reinstall_static_routes():
 
         add_static_route(addr, via, metric, False, dev)
 
-    except Exception as e:
-        fwglobals.log.error("%s" % str(e))
-        return False
-
-    return True
-
 def ikev2_gre_tunnel_get(src):
     tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
 

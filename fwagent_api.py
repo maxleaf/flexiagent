@@ -24,6 +24,7 @@ import json
 import loadsimulator
 import yaml
 import sys
+import subprocess
 import os
 from shutil import copyfile
 import fwglobals

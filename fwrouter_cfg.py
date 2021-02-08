@@ -45,20 +45,12 @@ class FwRouterCfg(FwCfgDatabase):
         #
 
         req     = request['message']
+        req_key = None
         try:
             if re.match('start-router', req):
-        :param whitelist:   White list of parameters allowed to be modified.
                 params  = request.get('params')
                 req_key = self._get_request_key(request)
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
-                self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
-            elif re.match('modify-', req):
-                entry = self.db[req_key]
-                for key, value in params.items():
-                    if isinstance(value, dict):
-                        for key2, value2 in value.items():
-                            if key2 in whitelist:
-                                entry['params'][key][key2] = value2
             else:
                 FwCfgDatabase.update(self, request, cmd_list, executed)
         except KeyError:
@@ -67,6 +59,7 @@ class FwRouterCfg(FwCfgDatabase):
             fwglobals.log.error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
+
 
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests

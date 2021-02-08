@@ -490,8 +490,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
             execute = False
             filter = None
-                cmd_list, whitelist = self._translate_modify(request)
-            else:
+
             if router_was_started or req == 'start-router':
                 execute = True
             elif re.match('remove-',  req):
@@ -514,17 +513,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
     def _on_revert_failed(self, reason):
         self.state_change(FwRouterState.FAILED, "revert failed: %s" % reason)
-        whitelist   = None
-            new_cmd_list = []
-            for cmd in cmd_list:
-                if isinstance(cmd, list):
-                    if 'modify' in list(cmd.keys()):
-                        whitelist = cmd['whitelist']
-                    else:
-                        new_cmd_list.append(cmd)
-            return (new_cmd_list, whitelist)
-        else:
-            return (cmd_list, None)
 
     def _analyze_request(self, request):
         """Analyzes received request either simple or aggregated in order to
