@@ -120,7 +120,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     fwutils.stop_vpp()                          # Release interfaces to Linux
 
                     fwutils.reset_traffic_control()             # Release LTE operations.
-                    fwutils.remove_linux_bridges(               # Release bridges for wifi.
+                    fwutils.remove_linux_bridges()              # Release bridges for wifi.
                     fwutils.stop_hostapd()                      # Stop access point service
 
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
