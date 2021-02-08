@@ -718,7 +718,7 @@ class Fwglobals:
                     #
                     old_params = cfg_db.get_request_params(request)
                     for param_name in list(request['params']): #request['params'].keys() doesn't work in python 3
-                        if param_name in old_params:
+                        if old_params and param_name in old_params:
                             request['params'][param_name] = old_params[param_name]
                         else:
                             del request['params'][param_name]

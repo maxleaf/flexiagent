@@ -515,7 +515,7 @@ def get_linux_interfaces(cached=True):
 
                 is_assigned = is_interface_assigned_to_vpp(dev_id)
                 # LTE physical device has no IP, GW etc. so we take this info from vppsb interface (vpp1)
-                tap = dev_id_to_tap(dev_id) if fwglobals.g.router_api.state_is_started() and is_assigned else None
+                tap = dev_id_to_tap(dev_id) if not fwglobals.g.router_api.state_is_starting_stopping() and vpp_does_run() and is_assigned else None
                 if tap:
                     interface['gateway'], interface['metric'] = get_interface_gateway(tap)
                     int_addr = get_interface_address(tap)
@@ -2720,9 +2720,27 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
+def mbim_query_connection_state(dev_id):
+    output = _run_mbimcli_command(dev_id, '--query-connection-state')
+    if output:
+        lines = output.splitlines()
+        for line in lines:
+            if 'Activation state' in line:
+                return line.split(':')[-1].strip().replace("'", '') == 'activated'
+    return False
+
 def lte_connect(params, reset=False):
     dev_id = params['dev_id']
-    if not lte_is_sim_inserted(dev_id) or reset:
+
+    if reset:
+        fwglobals.log.debug('lte_connect: reset lte')
+        _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
+        _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
+        time.sleep(8)
+        _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
+        fwglobals.log.debug('lte_connect: reset finished')
+
+    if not lte_is_sim_inserted(dev_id):
         qmi_sim_power_off(dev_id)
         time.sleep(1)
         qmi_sim_power_on(dev_id)
@@ -2730,8 +2748,6 @@ def lte_connect(params, reset=False):
         inserted = lte_is_sim_inserted(dev_id)
         if not inserted:
             return (False, "Sim is not presented")
-
-        lte_disconnect(dev_id, True)
 
     # check PIN status
     pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
@@ -2745,9 +2761,12 @@ def lte_connect(params, reset=False):
             return (False, "PIN is wrong")
 
     try:
-        is_modem_connected = mbim_get_ip_configuration(dev_id)
+        is_modem_connected = mbim_query_connection_state(dev_id)
         if is_modem_connected:
             return (True, None)
+
+        # make sure context is released
+        lte_disconnect(dev_id)
 
         connection_params = lte_prepare_connection_params(params)
 
@@ -2767,6 +2786,12 @@ def lte_connect(params, reset=False):
         for line in data:
             if 'Session ID:' in line:
                 lte['interfaces'][dev_id]['Session'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'IP [0]:' in line:
+                lte['interfaces'][dev_id]['IP'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Gateway:' in line:
+                lte['interfaces'][dev_id]['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
         fwglobals.g.db['lte'] = lte # db is SqlDict, so we have to replace all record
@@ -2774,6 +2799,8 @@ def lte_connect(params, reset=False):
         return (True, None)
     except Exception as e:
         if not reset:
+            lte_disconnect(dev_id, True)
+            fwglobals.log.debug('lte_connect: trying with reset %s' % str(e))
             return lte_connect(params, True)
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
@@ -2945,7 +2972,7 @@ def mbim_get_ip_configuration(dev_id):
     except subprocess.CalledProcessError as err:
         return False
 
-def lte_get_configuration_received_from_provider(dev_id):
+def lte_get_configuration_received_from_provider(dev_id, cache=True):
     try:
         response = {
             'IP'      : '',
@@ -2953,30 +2980,38 @@ def lte_get_configuration_received_from_provider(dev_id):
             'STATUS'  : ''
         }
 
-        ip_config = mbim_get_ip_configuration(dev_id)
-        if ip_config:
-            response['STATUS'] = True
-            lines = ip_config.splitlines()
-            for line in lines:
-                if 'IP [0]:' in line:
-                    response['IP'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
-                if 'Gateway:' in line:
-                    response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
-                    break
-
+        if cache:
+            lte_db = fwglobals.g.db.get('lte', {})
+            lte_interfaces = lte_db.get('interfaces', {})
+            current_interface = lte_interfaces.get(dev_id, None)
+            if current_interface:
+                response['STATUS'] = True
+                response['IP'] = fwglobals.g.db['lte']['interfaces'][dev_id]['IP']
+                response['GATEWAY'] = fwglobals.g.db['lte']['interfaces'][dev_id]['GATEWAY']
+        else:
+            ip_config = mbim_get_ip_configuration(dev_id)
+            if ip_config:
+                response['STATUS'] = True
+                lines = ip_config.splitlines()
+                for line in lines:
+                    if 'IP [0]:' in line:
+                        response['IP'] = line.split(':')[-1].strip().replace("'", '')
+                        continue
+                    if 'Gateway:' in line:
+                        response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
+                        break
         return response
     except Exception as e:
         return response
 
-def lte_get_provider_config(dev_id, key):
+def lte_get_provider_config(dev_id, key, cache=True):
     """Get IP from LTE provider
 
     :param ket: Filter info by key
 
     :returns: ip address.
     """
-    info = lte_get_configuration_received_from_provider(dev_id)
+    info = lte_get_configuration_received_from_provider(dev_id, cache)
 
     if key in info:
         return info[key]
@@ -3341,8 +3376,8 @@ def get_reconfig_hash():
 
         # We monitoring the lte IP to handle IP chandes
         if is_lte:
-            addr = lte_get_provider_config(dev_id, 'IP')
-            gw = lte_get_provider_config(dev_id, 'GATEWAY')
+            addr = lte_get_provider_config(dev_id, 'IP', False)
+            gw = lte_get_provider_config(dev_id, 'GATEWAY', False)
 
         addr = addr.split('/')[0] if addr else ''
 
