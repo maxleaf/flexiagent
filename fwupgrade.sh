@@ -24,7 +24,7 @@
 AGENT_SERVICE_FILE='/etc/systemd/system/multi-user.target.wants/flexiwan-router.service'
 AGENT_SERVICE='flexiwan-router'
 SW_REPOSITORY='deb.flexiwan.com'
-AGENT_CHECK_TIMEOUT=20
+AGENT_CHECK_TIMEOUT=120
 
 # Constants passed to the script by fwagent
 TARGET_VERSION="$1"
@@ -172,7 +172,7 @@ if [ ${PIPESTATUS[0]} != 0 ]; then
     handle_upgrade_failure
 fi
 
-res=$(apt-get -o Dpkg::Options::="--force-confnew" install -y "$AGENT_SERVICE")
+res=$(apt-get -o Dpkg::Options::="--force-confold" install -y "$AGENT_SERVICE")
 if [ ${PIPESTATUS[0]} != 0 ]; then
     log $res
     handle_upgrade_failure 'revert'

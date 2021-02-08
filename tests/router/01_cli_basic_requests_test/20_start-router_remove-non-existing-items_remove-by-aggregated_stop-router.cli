@@ -5,13 +5,13 @@
   "params": {
     "interfaces": [
       {
-        "pci":"0000:00:08.00",
+        "dev_id":"pci:0000:00:08.00",
         "addr":"10.0.0.4/24",
         "gateway": "10.0.0.10",
         "type":"wan"
       },
       {
-        "pci":"0000:00:09.00",
+        "dev_id":"pci:0000:00:09.00",
         "addr":"192.168.56.101/24",
         "gateway": "192.168.56.1",
         "type":"wan",
@@ -27,7 +27,7 @@
   "params": {
       "addr": "9.9.9.9",
 	  "via": "192.168.56.1",
-      "pci":"0000:00:09.00"
+      "dev_id":"pci:0000:00:09.00"
     }
 }
 ,
@@ -98,7 +98,7 @@
   "entity": "agent",
   "message": "remove-dhcp-config",
   "params": {
-	"interface": "0000:00:09.00",
+	"interface": "pci:0000:00:09.00",
     "range_start": "20.20.20.100",
     "range_end": "20.20.20.150",
     "dns": [
@@ -146,7 +146,7 @@
   "entity": "agent",
   "message": "remove-interface",
   "params": {
-    "pci":"0000:00:20.00",
+    "dev_id":"0000:00:20.00",
     "addr":"20.0.0.20/24",
     "gateway": "20.0.0.200",
     "type":"wan"
@@ -164,7 +164,7 @@
           "params": {
             "addr": "9.9.9.9",
             "via": "192.168.56.1",
-            "pci":"0000:00:09.00"
+            "dev_id":"pci:0000:00:09.00"
           }
         }
         ,
@@ -235,7 +235,7 @@
           "entity": "agent",
           "message": "remove-dhcp-config",
           "params": {
-            "interface": "0000:00:09.00",
+            "interface": "pci:0000:00:09.00",
             "range_start": "20.20.20.100",
             "range_end": "20.20.20.150",
             "dns": [
@@ -283,7 +283,7 @@
           "entity": "agent",
           "message": "remove-interface",
           "params": {
-            "pci":"0000:00:20.00",
+            "dev_id":"0000:00:20.00",
             "addr":"20.0.0.20/24",
             "gateway": "20.0.0.200",
             "type":"wan"

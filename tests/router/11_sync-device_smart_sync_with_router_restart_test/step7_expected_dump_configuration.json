@@ -7,9 +7,10 @@
   ], 
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:0000:00:03.00", 
+      "Key": "add-interface:pci:0000:00:03.00", 
       "Params": {
         "addr": "1.0.0.4/24", 
+        "dev_id": "pci:0000:00:03.00", 
         "gateway": "1.0.0.1", 
         "multilink": {
           "labels": [
@@ -17,14 +18,14 @@
             "blue"
           ]
         }, 
-        "pci": "0000:00:03.00", 
         "type": "wan"
       }
     }, 
     {
-      "Key": "add-interface:0000:00:08.00", 
+      "Key": "add-interface:pci:0000:00:08.00", 
       "Params": {
         "addr": "10.0.0.4/24", 
+        "dev_id": "pci:0000:00:08.00", 
         "gateway": "10.0.0.10", 
         "multilink": {
           "labels": [
@@ -33,15 +34,14 @@
             "red"
           ]
         }, 
-        "pci": "0000:00:08.00", 
         "type": "wan"
       }
     }, 
     {
-      "Key": "add-interface:0000:00:09.00", 
+      "Key": "add-interface:pci:0000:00:09.00", 
       "Params": {
         "addr": "192.168.56.102/24", 
-        "pci": "0000:00:09.00", 
+        "dev_id": "pci:0000:00:09.00", 
         "routing": "ospf", 
         "type": "lan"
       }
@@ -51,6 +51,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "100.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -80,7 +81,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 1
       }
@@ -88,6 +88,7 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -116,7 +117,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 2
       }
@@ -124,6 +124,7 @@
     {
       "Key": "add-tunnel:9", 
       "Params": {
+        "dev_id": "pci:0000:00:08.00", 
         "dst": "90.0.0.9", 
         "ipsec": {
           "local-sa": {
@@ -152,7 +153,6 @@
           }, 
           "routing": "ospf"
         }, 
-        "pci": "0000:00:08.00", 
         "src": "10.0.0.4", 
         "tunnel-id": 9
       }
@@ -160,13 +160,13 @@
   ], 
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config 0000:00:09.00", 
+      "Key": "add-dhcp-config pci:0000:00:09.00", 
       "Params": {
         "dns": [
           "8.8.4.4", 
           "8.8.8.8"
         ], 
-        "interface": "0000:00:09.00", 
+        "interface": "pci:0000:00:09.00", 
         "mac_assign": [], 
         "range_end": "20.20.20.250", 
         "range_start": "20.20.20.200"

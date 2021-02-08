@@ -27,7 +27,6 @@ import re
 import time
 import threading
 import traceback
-import yaml
 import json
 import subprocess
 
@@ -42,37 +41,28 @@ from fwikev2 import FwIKEv2Tunnels
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
+from fwcfg_request_handler import FwCfgRequestHandler
 
 import fwtunnel_stats
 
-fwrouter_modules = {
-    'fwtranslate_revert':          __import__('fwtranslate_revert') ,
-    'fwtranslate_start_router':    __import__('fwtranslate_start_router'),
-    'fwtranslate_add_interface':   __import__('fwtranslate_add_interface'),
-    'fwtranslate_add_route':       __import__('fwtranslate_add_route'),
-    'fwtranslate_add_tunnel':      __import__('fwtranslate_add_tunnel'),
-    'fwtranslate_add_dhcp_config': __import__('fwtranslate_add_dhcp_config'),
-    'fwtranslate_add_app':         __import__('fwtranslate_add_app'),
-    'fwtranslate_add_policy':      __import__('fwtranslate_add_policy')
-}
 
 fwrouter_translators = {
-    'start-router':             {'module':'fwtranslate_start_router',    'api':'start_router'},
-    'stop-router':              {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-interface':            {'module':'fwtranslate_add_interface',   'api':'add_interface'},
-    'remove-interface':         {'module':'fwtranslate_revert',          'api':'revert'},
-    'modify-interface':         {'module':'fwtranslate_add_interface',   'api':'modify_interface'},
-    'add-route':                {'module':'fwtranslate_add_route',       'api':'add_route'},
-    'remove-route':             {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-tunnel':               {'module':'fwtranslate_add_tunnel',      'api':'add_tunnel'},
-    'remove-tunnel':            {'module':'fwtranslate_revert',          'api':'revert'},
-    'modify-tunnel':            {'module':'fwtranslate_add_tunnel',      'api':'modify_tunnel'},
-    'add-dhcp-config':          {'module':'fwtranslate_add_dhcp_config', 'api':'add_dhcp_config'},
-    'remove-dhcp-config':       {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-application':          {'module':'fwtranslate_add_app',         'api':'add_app'},
-    'remove-application':       {'module':'fwtranslate_revert',          'api':'revert'},
-    'add-multilink-policy':     {'module':'fwtranslate_add_policy',      'api':'add_policy'},
-    'remove-multilink-policy':  {'module':'fwtranslate_revert',          'api':'revert'},
+    'start-router':             {'module': __import__('fwtranslate_start_router'),    'api':'start_router'},
+    'stop-router':              {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-interface':            {'module': __import__('fwtranslate_add_interface'),   'api':'add_interface'},
+    'remove-interface':         {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'modify-interface':         {'module': __import__('fwtranslate_add_interface'),   'api':'modify_interface'},
+    'add-route':                {'module': __import__('fwtranslate_add_route'),       'api':'add_route'},
+    'remove-route':             {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-tunnel':               {'module': __import__('fwtranslate_add_tunnel'),      'api':'add_tunnel'},
+    'remove-tunnel':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'modify-tunnel':            {'module': __import__('fwtranslate_add_tunnel'),      'api':'modify_tunnel'},
+    'add-dhcp-config':          {'module': __import__('fwtranslate_add_dhcp_config'), 'api':'add_dhcp_config'},
+    'remove-dhcp-config':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-application':          {'module': __import__('fwtranslate_add_app'),         'api':'add_app'},
+    'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
+    'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -82,7 +72,7 @@ class FwRouterState(enum.Enum):
     STOPPED   = 4
     FAILED    = 666
 
-class FWROUTER_API:
+class FWROUTER_API(FwCfgRequestHandler):
     """This is Router API class representation.
     The Router API class provides control over vpp.
     That includes:
@@ -94,7 +84,7 @@ class FWROUTER_API:
 
     :param multilink_db_file: name of file that stores persistent multilink data
     """
-    def __init__(self, multilink_db_file):
+    def __init__(self, cfg, multilink_db_file):
         """Constructor method
         """
         self.vpp_api         = VPP_API()
@@ -103,8 +93,10 @@ class FWROUTER_API:
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
         self.thread_dhcpc    = None
+        self.thread_static_route   = None
         self.thread_ikev2    = None
 
+        FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
@@ -127,9 +119,10 @@ class FWROUTER_API:
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
                     fwglobals.log.debug("watchdog: initiate restore")
 
-                    self.vpp_api.disconnect_from_vpp()        # Reset connection to vpp to force connection renewal
-                    self.router_state = FwRouterState.STOPPED # Reset state so configuration will applied correctly
-                    self._restore_vpp()                       # Rerun VPP and apply configuration
+                    self.vpp_api.disconnect_from_vpp()          # Reset connection to vpp to force connection renewal
+                    fwutils.stop_vpp()                          # Release interfaces to Linux
+                    self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
+                    self._restore_vpp()                         # Rerun VPP and apply configuration
 
                     fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
@@ -161,14 +154,14 @@ class FWROUTER_API:
 
             try:  # Ensure thread doesn't exit on exception
                 apply_netplan = False
-                wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+                wan_list = self.cfg_db.get_interfaces(type='wan')
 
                 for wan in wan_list:
                     dhcp = wan.get('dhcp', 'no')
                     if dhcp == 'no':
                         continue
 
-                    name = fwutils.pci_to_tap(wan['pci'])
+                    name = fwutils.dev_id_to_tap(wan['dev_id'])
                     addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
                         fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
@@ -181,6 +174,47 @@ class FWROUTER_API:
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
+
+    def static_route_thread(self):
+        """Static route thread.
+        Its function is to monitor static routes.
+        """
+        while self.state_is_started():
+            time.sleep(5)  # 5 sec
+
+            try:  # Ensure thread doesn't exit on exception
+                fwutils.check_reinstall_static_routes()
+
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
+
+                for src, tun in tunnels.items():
+                    tunnel_status = 0
+                    tunnel = fwutils.ikev2_gre_tunnel_get(src)
+                    if tunnel:
+                        tunnel_status = fwutils.vpp_interface_status_get(interfaces, tunnel.sw_if_index)
+
+                    if tun['state'] == 'stopped':
+                        if tunnel:
+                            fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index,
+                                                                                            bd_id=tun['bridge_id'],
+                                                                                            enable=1, shg=1)
+                            fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
+                            tun['sw_if_index'] = tunnel.sw_if_index
+                            tun['state'] = 'running'
+                            fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
+
+                    if tun['state'] == 'running':
+                        # Check if tunnel is down
+                        if not tunnel or tunnel_status != 3: # vl_api_if_status_flags_t.IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP
+                            tun['state'] = 'stopped'
+                            fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
+
+            except Exception as e:
+                fwglobals.log.debug("%s" % str(e))
                 pass
 
     def ikev2_thread(self):
@@ -242,7 +276,7 @@ class FWROUTER_API:
 
         # If vpp runs already, or if management didn't request to start it, return.
         vpp_runs = fwutils.vpp_does_run()
-        vpp_should_be_started = fwglobals.g.router_cfg.exists({'message': 'start-router'})
+        vpp_should_be_started = self.cfg_db.exists({'message': 'start-router'})
         if vpp_runs or not vpp_should_be_started:
             fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
@@ -270,7 +304,7 @@ class FWROUTER_API:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
-            fwglobals.g.cache.pci_to_vpp_tap_name = {}
+            fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -280,22 +314,22 @@ class FWROUTER_API:
     def start_router(self):
         """Execute start router command.
         """
-        fwglobals.log.info("FWROUTER_API: start_router")
+        fwglobals.log.info("start_router")
         if self.router_state == FwRouterState.STOPPED or self.router_state == FwRouterState.STOPPING:
             self.call({'message':'start-router'})
-        fwglobals.log.info("FWROUTER_API: start_router: started")
+        fwglobals.log.info("start_router: started")
 
     def stop_router(self):
         """Execute stop router command.
         """
-        fwglobals.log.info("FWROUTER_API: stop_router")
+        fwglobals.log.info("stop_router")
         if self.router_state == FwRouterState.STARTED or self.router_state == FwRouterState.STARTING:
             self.call({'message':'stop-router'})
-        fwglobals.log.info("FWROUTER_API: stop_router: stopped")
+        fwglobals.log.info("stop_router: stopped")
 
     def state_change(self, new_state, reason=''):
         log_reason = '' if not reason else ' (%s)' % reason
-        fwglobals.log.debug("FWROUTER_API: %s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
+        fwglobals.log.debug("%s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
         if self.router_state == new_state:
             return
         old_state = self.router_state
@@ -328,22 +362,20 @@ class FWROUTER_API:
         return (self.router_state == FwRouterState.STARTING or \
                 self.router_state == FwRouterState.STOPPING)
 
-    def call(self, request):
+    def call(self, request, dont_revert_on_failure=False):
         """Executes router configuration request: 'add-X','remove-X' or 'modify-X'.
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: dictionary with status code and optional error message.
         """
-        dont_revert_on_failure = request.get('internals', {}).get('dont_revert_on_failure', False)
-
         # First of all strip out requests that have no impact on configuration,
         # like 'remove-X' for not existing configuration items and 'add-X' for
         # existing configuration items.
         #
         new_request = self._strip_noop_request(request)
         if not new_request:
-            fwglobals.log.debug("FWROUTER_API::call: ignore no-op request: %s" % json.dumps(request))
+            fwglobals.log.debug("call: ignore no-op request: %s" % json.dumps(request))
             return { 'ok': 1, 'message':'request has no impact' }
         request = new_request
 
@@ -379,10 +411,8 @@ class FWROUTER_API:
 
         # Finally handle the request
         #
-        if request['message'] == 'aggregated':
-            reply = self._call_aggregated(request['params']['requests'], dont_revert_on_failure)
-        else:
-            reply = self._call_simple(request)
+
+        reply = FwCfgRequestHandler.call(self, request, dont_revert_on_failure)
 
         # Start vpp if it should be restarted
         #
@@ -417,68 +447,19 @@ class FWROUTER_API:
                 try:
                     cmd = 'ping -c 3 %s' % gw
                     output = subprocess.check_output(cmd, shell=True)
-                    fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, output))
+                    fwglobals.log.debug("call: %s: %s" % (cmd, output))
                 except Exception as e:
-                    fwglobals.log.debug("FWROUTER_API: call: %s: %s" % (cmd, str(e)))
+                    fwglobals.log.debug("call: %s: %s" % (cmd, str(e)))
 
         return reply
 
-
-    def _call_aggregated(self, requests, dont_revert_on_failure=False):
-        """Execute multiple requests.
-        It do that as an atomic operation,
-        i.e. if one of requests fails, all the previous are reverted.
-
-        :param requests:    Request list.
-        :param dont_revert_on_failure:  If True the succeeded requests in list
-                            will not be reverted on failure of any request.
-                            This bizare logic is used for device sync feature,
-                            where there is no need to restore configuration,
-                            as it is out of sync with the flexiManage.
-
-        :returns: Status codes dictionary.
-        """
-        fwglobals.log.debug("FWROUTER_API: === start handling aggregated request ===")
-
-        for (idx, request) in enumerate(requests):
-
-            # Don't print too large requests, if needed check print on request receiving
-            #
-            if request['message'] == 'add-application' or request['message'] == 'remove-application':
-                str_request = request['message'] + '...'
-            else:
-                str_request = json.dumps(request)
-
-            try:
-                fwglobals.log.debug("_call_aggregated: handle request %s" % str_request)
-                self._call_simple(request)
-            except Exception as e:
-                if dont_revert_on_failure:
-                    raise e
-                # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
-                for request in reversed(requests[0:idx]):
-                    try:
-                        op = request['message']
-                        request['message'] = op.replace('add-','remove-') if re.match('add-', op) else op.replace('remove-','add-')
-                        self._call_simple(request)
-                    except Exception as e:
-                        # on failure to revert move router into failed state
-                        err_str = "_call_aggregated: failed to revert request %s while running rollback on aggregated request" % op
-                        fwglobals.log.excep("%s: %s" % (err_str, format(e)))
-                        self.state_change(FwRouterState.FAILED, err_str)
-                        pass
-                raise e
-
-        fwglobals.log.debug("FWROUTER_API: === end handling aggregated request ===")
-        return {'ok':1}
 
     def _fill_tunnel_stats_dict(self):
         """Get tunnels their corresponding loopbacks ip addresses
         to be used by tunnel statistics thread.
         """
         fwtunnel_stats.tunnel_stats_clear()
-        tunnels = fwglobals.g.router_cfg.get_tunnels()
+        tunnels = self.cfg_db.get_tunnels()
         for params in tunnels:
             id   = params['tunnel-id']
             addr = params['loopback-iface']['addr']
@@ -489,7 +470,7 @@ class FWROUTER_API:
 
         :param request: The request received from flexiManage.
 
-        :returns: Status codes dictionary.
+        :returns: dictionary with status code and optional error message.
         """
         try:
             whitelist = None
@@ -504,42 +485,20 @@ class FWROUTER_API:
             #
             if router_was_started == False and \
                (req == 'add-application' or req == 'add-multilink-policy'):
-               fwglobals.g.router_cfg.update(request)
+               self.cfg_db.update(request)
                return {'ok':1}
 
-            # Translate request to list of commands to be executed
-            if re.match('modify-', req):
+            execute = False
+            filter = None
                 cmd_list, whitelist = self._translate_modify(request)
             else:
-                cmd_list = self._translate(request)
-
-            # Execute list of commands. Do it only if vpp runs.
-            # Some 'remove-XXX' requests must be executed
-            # even if vpp doesn't run right now. This is to clean stuff in Linux
-            # that was added by correspondent 'add-XXX' request if the last was
-            # applied to running vpp.
-            #
             if router_was_started or req == 'start-router':
-                self._execute(request, cmd_list)
-                executed = True
+                execute = True
             elif re.match('remove-',  req):
-                self._execute(request, cmd_list, filter='must')
-                executed = True
-            else:
-                executed = False
+                filter = 'must'
+                execute = True
 
-            # Save successfully handled configuration request into database.
-            # We need it and it's translation to execute future 'remove-X'
-            # requests as they are generated by reverting of correspondent
-            # 'add-X' translations from last to the first. As well they are
-            # needed to restore VPP configuration on device reboot or start of
-            # crashed VPP by watchdog.
-            #
-            try:
-                fwglobals.g.router_cfg.update(request, cmd_list, executed, whitelist)
-            except Exception as e:
-                self._revert(cmd_list)
-                raise e
+            FwCfgRequestHandler._call_simple(self, request, execute, filter)
 
             if re.match('(add|remove)-tunnel',  req):
                 self._fill_tunnel_stats_dict()
@@ -553,63 +512,9 @@ class FWROUTER_API:
 
         return {'ok':1}
 
-
-    def _translate(self, request):
-        """Translate request in a series of commands.
-
-        :param request: The request received from flexiManage.
-
-        :returns: list of commands.
-        """
-        req    = request['message']
-        params = request.get('params')
-
-        api_defs = fwrouter_translators.get(req)
-        assert api_defs, 'FWROUTER_API: there is no api for request "%s"' % req
-
-        module = fwrouter_modules.get(fwrouter_translators[req]['module'])
-        assert module, 'FWROUTER_API: there is no module for request "%s"' % req
-
-        func = getattr(module, fwrouter_translators[req]['api'])
-        assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
-
-        if fwrouter_translators[req]['api'] == 'revert':
-            cmd_list = func(request)
-            return cmd_list
-
-        cmd_list = func(params) if params else func()
-        return cmd_list
-
-    def _translate_modify(self, request):
-        """Translate modify request in a series of commands.
-
-        :param request: The request received from flexiManage.
-
-        :returns: list of commands.
-        """
+    def _on_revert_failed(self, reason):
+        self.state_change(FwRouterState.FAILED, "revert failed: %s" % reason)
         whitelist   = None
-        req         = request['message']
-        params      = request.get('params')
-        old_params  = fwglobals.g.router_cfg.get_params(request)
-
-        # First of all check if the received parameters differs from the existing ones
-        same = fwutils.compare_request_params(params, old_params)
-        if same:
-            return []
-
-        api_defs = fwrouter_translators.get(req)
-        if not api_defs:
-            # This 'modify-X' is not supported (yet?)
-            return []
-
-        module = fwrouter_modules.get(fwrouter_translators[req]['module'])
-        assert module, 'FWROUTER_API: there is no module for request "%s"' % req
-
-        func = getattr(module, fwrouter_translators[req]['api'])
-        assert func, 'FWROUTER_API: there is no api function for request "%s"' % req
-
-        cmd_list = func(params, old_params)
-        if isinstance(cmd_list, list):
             new_cmd_list = []
             for cmd in cmd_list:
                 if isinstance(cmd, list):
@@ -620,195 +525,6 @@ class FWROUTER_API:
             return (new_cmd_list, whitelist)
         else:
             return (cmd_list, None)
-
-    def _execute(self, request, cmd_list, filter=None):
-        """Execute request.
-
-        :param request:     The request received from flexiManage.
-        :param cmd_list:    Commands list.
-        :param filter:      Filter for commands to be executed.
-                            If provided and if command has 'filter' field and
-                            their values are same, the command will be executed.
-                            If None, the check for filter is not applied.
-        :returns: None.
-        """
-        cmd_cache = {}
-
-        req = request['message']
-
-        fwglobals.log.debug("FWROUTER_API: === start execution of %s ===" % (req))
-
-        for idx, t in enumerate(cmd_list):      # 't' stands for command Tuple, though it is Python Dictionary :)
-            cmd = t['cmd']
-
-            # If filter was provided, execute only commands that have the provided filter
-            if filter:
-                if not 'filter' in cmd or cmd['filter'] != filter:
-                    fwglobals.log.debug("FWROUTER_API:_execute: filter out command by filter=%s (req=%s, cmd=%s, cmd['filter']=%s, params=%s)" %
-                                        (filter, req, cmd['name'], str(cmd.get('filter')), str(cmd.get('params'))))
-                    continue
-
-            try:
-                # Firstly perform substitutions if needed.
-                # The params might include 'substs' key with list of substitutions.
-                self._substitute(cmd_cache, cmd.get('params'))
-
-                if 'params' in cmd and type(cmd['params'])==dict:
-                    params = fwutils.yaml_dump(cmd['params'])
-                elif 'params' in cmd:
-                    params = format(cmd['params'])
-                else:
-                    params = ''
-                fwglobals.log.debug("FWROUTER_API:_execute: %s(%s)" % (cmd['name'], params))
-
-                # Now execute command
-                result = None if not 'cache_ret_val' in cmd else \
-                    { 'result_attr' : cmd['cache_ret_val'][0] , 'cache' : cmd_cache , 'key' :  cmd['cache_ret_val'][1] }
-                reply = fwglobals.g.handle_request({ 'message': cmd['name'], 'params':  cmd.get('params')}, result)
-                if reply['ok'] == 0:        # On failure go back revert already executed commands
-                    fwglobals.log.debug("FWROUTER_API: %s failed ('ok' is 0)" % cmd['name'])
-                    raise Exception("API failed: %s" % reply['message'])
-
-            except Exception as e:
-                err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), str(traceback.format_exc()))
-                fwglobals.log.error(err_str)
-                fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
-                if self.state_is_starting_stopping:
-                    fwutils.dump()
-                # On failure go back to the begining of list and revert executed commands.
-                self._revert(cmd_list, idx)
-                fwglobals.log.debug("FWROUTER_API: === finished revert of %s ===" % (req))
-                raise Exception('failed to ' + cmd['descr'])
-
-            # At this point the execution succeeded.
-            # Now substitute the revert command, as it will be needed for complement request, e.g. for remove-tunnel.
-            if 'revert' in t and 'params' in t['revert']:
-                try:
-                    self._substitute(cmd_cache, t['revert'].get('params'))
-                except Exception as e:
-                    fwglobals.log.excep("_execute: failed to substitute revert command: %s\n%s, %s" % \
-                                (str(t), str(e), str(traceback.format_exc())))
-                    fwglobals.log.debug("FWROUTER_API: === failed execution of %s ===" % (req))
-                    self._revert(cmd_list, idx)
-                    raise e
-
-        fwglobals.log.debug("FWROUTER_API: === end execution of %s ===" % (req))
-
-    def _revert(self, cmd_list, idx_failed_cmd=-1):
-        """Revert list commands that are previous to the failed command with
-        index 'idx_failed_cmd'.
-        :param cmd_list:        Commands list.
-        :param idx_failed_cmd:  The index of command, execution of which
-                                failed, so all commands in list before it
-                                should be reverted.
-        :returns: None.
-        """
-        idx_failed_cmd = idx_failed_cmd if idx_failed_cmd >= 0 else len(cmd_list)
-
-        for t in reversed(cmd_list[0:idx_failed_cmd]):
-            if 'revert' in t:
-                rev_cmd = t['revert']
-                try:
-                    reply = fwglobals.g.handle_request(
-                        { 'message': rev_cmd['name'], 'params': rev_cmd.get('params')})
-                    if reply['ok'] == 0:
-                        err_str = "handle_request(%s) failed" % rev_cmd['name']
-                        fwglobals.log.error(err_str)
-                        raise Exception(err_str)
-                except Exception as e:
-                    err_str = "_revert: exception while '%s': %s(%s): %s" % \
-                                (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
-                    fwglobals.log.excep(err_str)
-                    self.state_change(FwRouterState.FAILED, "revert failed: %s" % t['cmd']['name'])
-
-    def _strip_noop_request(self, request):
-        """Checks if the request has no impact on configuration.
-        For example, the 'remove-X'/'modify-X' for not existing configuration
-        item or 'add-X' request for existing configuration item.
-
-        :param request: The request received from flexiManage.
-
-        :returns: request after stripping out no impact requests.
-        """
-        def _should_be_stripped(__request, aggregated_requests=None):
-            req    = __request['message']
-            params = __request.get('params', {})
-            if re.match('(modify-|remove-)', req) and not fwglobals.g.router_cfg.exists(__request):
-                # Ensure that the aggregated request does not include correspondent 'add-X' before.
-                noop = True
-                if aggregated_requests:
-                    complement_req     = re.sub('(modify-|remove-)','add-', req)
-                    complement_request = { 'message': complement_req, 'params': params }
-                    if _exist(complement_request, aggregated_requests):
-                        noop = False
-                if noop:
-                    return True
-            elif re.match('add-', req) and fwglobals.g.router_cfg.exists(__request):
-                # Ensure this is actually not modification request :)
-                existing_params = fwglobals.g.router_cfg.get_request_params(__request)
-                if fwutils.compare_request_params(existing_params, __request.get('params')):
-                    # Ensure that the aggregated request does not include correspondent 'remove-X' before.
-                    noop = True
-                    if aggregated_requests:
-                        complement_req     = re.sub('add-','remove-', req)
-                        complement_request = { 'message': complement_req, 'params': params }
-                        if _exist(complement_request, aggregated_requests):
-                            noop = False
-                    if noop:
-                        return True
-            elif re.match('start-router', req) and fwutils.vpp_does_run():
-                return True
-            elif re.match('modify-interface', req):
-                # For modification request ensure that it goes to modify indeed:
-                # translate request into commands to execute in order to modify
-                # configuration item in Linux/VPP. If this list is empty,
-                # the request can be stripped out.
-                #
-                cmd_list, whitelist = self._translate_modify(__request)
-                if not cmd_list:
-                    # Save modify request into database, as it might contain parameters
-                    # that don't impact on interface configuration in Linux or in VPP,
-                    # like PublicPort, PublicIP, useStun, etc.
-                    #
-                    # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
-                    # We assume the 'modify-interface' request includes full set of
-                    # parameters and not only modified ones!
-                    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    #
-                    fwglobals.g.router_cfg.update(__request)
-                    return True
-            return False
-
-        def _exist(__request, requests):
-            """Checks if the list of requests has request for the same
-            configuration item as the one denoted by the provided __request.
-            """
-            for r in requests:
-                if (__request['message'] == r['message'] and
-                    fwglobals.g.router_cfg.is_same_cfg_item(__request, r)):
-                    return True
-            return False
-
-
-        if request['message'] != 'aggregated':
-            if _should_be_stripped(request):
-                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
-                return None
-        else:  # aggregated request
-            out_requests = []
-            inp_requests = request['params']['requests']
-            for _request in inp_requests:
-                if _should_be_stripped(_request, inp_requests):
-                    fwglobals.log.debug("_strip_noop_request: embedded request has no impact: %s" % json.dumps(request))
-                else:
-                    out_requests.append(_request)
-            if not out_requests:
-                fwglobals.log.debug("_strip_noop_request: aggregated request has no impact")
-                return None
-            if len(out_requests) < len(inp_requests):
-                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
-            request['params']['requests'] = out_requests
-        return request
 
     def _analyze_request(self, request):
         """Analyzes received request either simple or aggregated in order to
@@ -846,8 +562,8 @@ class FWROUTER_API:
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
-            old_params = fwglobals.g.router_cfg.get_interfaces(pci=new_params['pci'])[0]
-            if new_params.get('addr') != old_params.get('addr'):
+            old_params = self.cfg_db.get_interfaces(dev_id=new_params['dev_id'])[0]
+            if new_params.get('addr') and new_params.get('addr') != old_params.get('addr'):
                 return True
             if new_params.get('gateway') != old_params.get('gateway'):
                 return True
@@ -916,15 +632,10 @@ class FWROUTER_API:
             _req    = request['message']
             _params = request['params']
             remove_req = _req.replace("modify-", "remove-")
-            old_params = fwglobals.g.router_cfg.get_request_params(request)
+            old_params = self.cfg_db.get_request_params(request)
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
             new_params.update(_params)
-
-            # Don't store internal 'sender' to avoid unnecessary sync-s
-            #
-            if 'internals' in new_params:
-                del new_params['internals']
 
             return [
                 { 'message': remove_req, 'params' : old_params },
@@ -958,7 +669,7 @@ class FWROUTER_API:
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
         # The remove-* request might have partial set of parameters only.
-        # For example, 'remove-interface' has 'pci' parameter only and
+        # For example, 'remove-interface' has 'dev_id' parameter only and
         # has no IP, LAN/WAN type, etc.
         # That makes it impossible to revert these partial remove-X requests
         # on aggregated message rollback that might happen due to failure in
@@ -967,7 +678,7 @@ class FWROUTER_API:
         if req == 'aggregated':
             for _request in params['requests']:
                 if re.match('remove-', _request['message']):
-                    _request['params'] = fwglobals.g.router_cfg.get_request_params(_request)
+                    _request['params'] = self.cfg_db.get_request_params(_request)
 
         ########################################################################
         # The code below preprocesses 'add-application' and 'add-multilink-policy'
@@ -982,7 +693,7 @@ class FWROUTER_API:
                 fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
             return request
 
-        multilink_policy_params = fwglobals.g.router_cfg.get_multilink_policy()
+        multilink_policy_params = self.cfg_db.get_multilink_policy()
 
         # 'add-application' preprocessing:
         # 1. The currently configured applications should be removed firstly.
@@ -992,7 +703,7 @@ class FWROUTER_API:
         #    should be removed before application removal/adding and should be
         #    added again after it.
         #
-        application_params = fwglobals.g.router_cfg.get_applications()
+        application_params = self.cfg_db.get_applications()
         if application_params:
             if req == 'add-application':
                 updated_requests = [
@@ -1197,6 +908,9 @@ class FWROUTER_API:
         if self.thread_dhcpc is None:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
+        if self.thread_static_route is None:
+            self.thread_static_route = threading.Thread(target=self.static_route_thread, name='Static route Thread')
+            self.thread_static_route.start()
         if self.thread_ikev2 is None:
             self.thread_ikev2 = threading.Thread(target=self.ikev2_thread, name='IKEv2 Thread')
             self.thread_ikev2.start()
@@ -1223,6 +937,10 @@ class FWROUTER_API:
             self.thread_ikev2.join()
             self.thread_ikev2 = None
 
+        if self.thread_static_route:
+            self.thread_static_route.join()
+            self.thread_static_route = None
+
     def _on_start_router_before(self):
         """Handles pre start VPP activities.
         :returns: None.
@@ -1231,6 +949,9 @@ class FWROUTER_API:
 
         # Reset sa-id used by tunnels
         #
+        router_api = fwglobals.g.db.get('router_api')
+        if not router_api:
+            fwglobals.g.db['router_api'] = {}
         router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
         router_api_db['sa_id'] = 0
         fwglobals.g.db['router_api'] = router_api_db
@@ -1246,6 +967,7 @@ class FWROUTER_API:
         """
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
+        fwglobals.g.cache.linux_interfaces.clear()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):
@@ -1255,15 +977,24 @@ class FWROUTER_API:
         self.state_change(FwRouterState.STOPPING)
         self._stop_threads()
         fwutils.reset_dhcpd()
-        fwglobals.g.cache.pci_to_vpp_tap_name = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
         fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_after(self):
         """Handles post-VPP stop activities.
         :returns: None.
         """
+        self.router_stopping = False
+        fwutils.reset_traffic_control()
+        fwutils.remove_linux_bridges()
+        fwutils.stop_hostapd()
+
+        # keep LTE connectivity on linux interface
+        fwglobals.g.system_api.restore_configuration(types=['add-lte'])
+
         self.state_change(FwRouterState.STOPPED)
-        fwglobals.g.cache.pci_to_vpp_tap_name = {}
+        fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
+        fwglobals.g.cache.linux_interfaces.clear()
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
@@ -1276,76 +1007,20 @@ class FWROUTER_API:
             'add-route',            # Routes should come after tunnels, as they might use them!
             'add-dhcp-config'
         ]
-        messages = fwglobals.g.router_cfg.dump(types=types)
+        messages = self.cfg_db.dump(types=types)
         for msg in messages:
             reply = fwglobals.g.router_api._call_simple(msg)
             if reply.get('ok', 1) == 0:  # Break and return error on failure of any request
                 return reply
 
+    def sync_full(self, incoming_requests):
+        fwglobals.log.debug("_sync_device: start router full sync")
 
-    # 'substitute' takes parameters in form of list or dictionary and
-    # performs substitutions found in params.
-    # Substitutions are kept in special element which is part of parameter list/dictionary.
-    # When this function finishes to perform substitutions, it removes this element from params.
-    # The substitution element is a dictionary with one key only - 'substs' and list
-    # of substitutions as the value of this key: 
-    #   { 'substs': [ {<subst1>} , {<subst2>} ... {<substN>} ] }
-    # There are few types of substitutions:
-    #   - substitution by function (see 'val_by_func' below)
-    #   - substitution by value fetched from cache (see 'val_by_key' below)
-    # As well 'substitute' function can
-    #   - add new parameter to the original 'params' list/dictionary (see 'add_param' below)
-    #   - go over all parameters found in 'params' and replace old value with new (see 'replace' below)
-    # If function is used, the function argument can be
-    #   - explicit value (see 'arg' below)
-    #   - value fetched from cache (see 'arg_by_key' and 'val_by_key' below)
-    #
-    # That results in following format of single substitution element: 
-    #   {
-    #       'add_param'    : <name of keyword parameter to be added. Used for dict parameters only>
-    #       'val_by_func'  : <function that maps argument into value of new 'add_param' parameter. It should sit in fwutils module>
-    #       'arg'          : <input argument for 'val_by_func' function> 
-    #   }
-    #   {
-    #       'add_param'    : <name of keyword parameter to be added. Used for dict parameters only>
-    #       'val_by_func'  : <function that maps argument into value of new 'add_param' parameter. It should sit in fwutils module>
-    #       'arg_by_key'   : <key to get the input argument for 'val_by_func' function from cache> 
-    #   }
-    #   {
-    #       'add_param'    : <name of keyword parameter to be added. Used for dict parameters only>
-    #       'val_by_key'   : <key to get the value of new parameter> 
-    #   }
-    #   {
-    #       'replace'      : <substring to be replaced>
-    #       'val_by_func'  : <function that maps argument into value of new 'add_param' parameter. It should sit in fwutils module>
-    #       'arg'          : <input argument for 'val_by_func' function> 
-    #   }
-    #   {
-    #       'replace'      : <substring to be replaced>
-    #       'val_by_func'  : <function that maps argument into value of new 'add_param' parameter. It should sit in fwutils module>
-    #       'arg_by_key'   : <key to get the input argument for 'val_by_func' function from cache> 
-    #   }
-    #   {
-    #       'replace'      : <substring to be replaced>
-    #       'val_by_key'   : <key to get the value of new parameter> 
-    #   }
-    #
-    # Once function finishes to handle all substitutions found in the 'substs' element,
-    # it removes 'substs' element from the 'params' list/dictionary.
-    #
-    def _substitute(self, cache, params):
-        """It takes parameters in form of list or dictionary and
-        performs substitutions found in params.
-        Once function finishes to handle all substitutions found in the 'substs' element,
-        it removes 'substs' element from the 'params' list/dictionary.
-
-        :param cache:          Cache.
-        :param params:         Parameters.
-
-        :returns: None.
-        """
-        if params is None:
-            return
+        restart_router = False
+        if self.state_is_started():
+            fwglobals.log.debug("_sync_device: restart_router=True")
+            restart_router = True
+            self.call({'message': 'stop-router'})
 
         # Perform substitutions in nested dictionaries and lists
         #
@@ -1362,59 +1037,9 @@ class FWROUTER_API:
                 key != 'substs':                       # Escape 'substs' element
                     self._substitute(cache, p)
 
-        # Fetch list of substitutions
-        substs = None
-        if type(params)==dict and 'substs' in params:
-            substs = params['substs']
-        elif type(params)==list:
-            for p in params:
-                if type(p)==dict and 'substs' in p:
-                    substs = p['substs']
-                    substs_element = p
-                    break
-        if substs is None:
-            return
+        FwCfgRequestHandler.sync_full(self, incoming_requests)
 
-        # Go over list of substitutions and perform each of them
-        for s in substs:
+        if restart_router:
+            self.call({'message': 'start-router'})
 
-            # Find the new value to be added to params
-            if 'val_by_func' in s:
-                func_name = s['val_by_func']
-                func = getattr(fwutils, func_name)
-                old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
-                new  = func(old)
-                if new is None:
-                    raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
-            elif 'val_by_key' in s:
-                new = cache[s['val_by_key']]
-            else:
-                raise Exception("fwutils.py:substitute: not supported type of substitution source in '%s'" % format(params))
-
-            # Add new param/replace old value with new one
-            if 'add_param' in s:
-                if type(params) is dict:
-                    if 'args' in params:        # Take care of cmd['cmd']['name'] = "python" commands
-                        params['args'][s['add_param']] = new
-                    else:                       # Take care of rest commands
-                        params[s['add_param']] = new
-                else:  # list
-                    params.insert({s['add_param'], new})
-            elif 'replace' in s:
-                old = s['replace']
-                if type(params) is dict:
-                    raise Exception("fwutils.py:substitute: 'replace' is not supported for dictionary in '%s'" % format(params))
-                else:  # list
-                    for (idx, p) in enumerate(params):
-                        if fwutils.is_str(p):
-                            params.insert(idx, p.replace(old, new))
-                            params.remove(p)
-            else:
-                raise Exception("fwutils.py.substitute: not supported type of substitution in '%s'" % format(params))
-
-        # Once all substitutions are made, remove substitution list from params
-        if type(params) is dict:
-            del params['substs']
-        else:  # list
-            params.remove(substs_element)
-
+        fwglobals.log.debug("_sync_device: router full sync succeeded")
