@@ -64,11 +64,11 @@ def add_route(params):
                                 'module': 'fwutils',
                                 'func':   'add_static_route',
                                 'args':   {
-                                    'addr':   params['addr'],
-                                    'via':    params['via'],
+                                    'addr'  : params['addr'],
+                                    'via'   : params['via'],
                                     'metric': params.get('metric'),
                                     'remove': False,
-                                    'dev_id':    params.get('dev_id')
+                                    'dev_id': params.get('dev_id')
                                 }
                               }
     cmd['revert'] = {}
@@ -78,11 +78,11 @@ def add_route(params):
                                 'module': 'fwutils',
                                 'func':   'add_static_route',
                                 'args':   {
-                                    'addr':   params['addr'],
-                                    'via':    params['via'],
+                                    'addr'  : params['addr'],
+                                    'via'   : params['via'],
                                     'metric': params.get('metric'),
                                     'remove': True,
-                                    'dev_id':    params.get('dev_id')
+                                    'dev_id': params.get('dev_id')
                                 }
                               }
     cmd_list.append(cmd)

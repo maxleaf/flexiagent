@@ -286,6 +286,20 @@ def is_interface_assigned_to_vpp(dev_id):
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
         return len(router_cfg.get_interfaces(dev_id=dev_id)) > 0
 
+def is_interface_assigned_to_vpp(dev_id):
+    """ Check if dev_id is assigned to vpp.
+    This function could be called even deamon doesn't run.
+
+    :params dev_id: Bus address to check if assigned
+
+    : return : Boolean
+    """
+    if getattr(fwglobals.g, 'router_cfg', False):
+        return len(fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)) > 0
+
+    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
+        return len(router_cfg.get_interfaces(dev_id=dev_id)) > 0
+
     return False
 
 def get_all_interfaces():
@@ -1606,6 +1620,77 @@ def remove_linux_bridges():
     except:
         return True
 
+def get_lte_interfaces_names():
+    names = []
+    interfaces = psutil.net_if_addrs()
+
+    for nicname, addrs in interfaces.items():
+        dev_id = get_interface_dev_id(nicname)
+        if dev_id and is_lte_interface(nicname):
+            names.append(nicname)
+
+    return names
+
+def traffic_control_add_del_dev_ingress(dev_name, is_add):
+    try:
+        subprocess.check_output('sudo tc -force qdisc %s dev %s ingress handle ffff:' % ('add' if is_add else 'delete', dev_name), shell=True)
+        return (True, None)
+    except Exception as e:
+        return (True, None)
+
+def traffic_control_replace_dev_root(dev_name):
+    try:
+        subprocess.check_output('sudo tc -force qdisc replace dev %s root handle 1: htb' % dev_name, shell=True)
+        return (True, None)
+    except Exception as e:
+        return (True, None)
+
+def traffic_control_remove_dev_root(dev_name):
+    try:
+        subprocess.check_output('sudo tc -force qdisc del dev %s root' % dev_name, shell=True)
+        return (True, None)
+    except Exception as e:
+        return (True, None)
+
+def reset_traffic_control():
+    search = []
+    lte_interfaces = get_lte_interfaces_names()
+
+    if lte_interfaces:
+        search.extend(lte_interfaces)
+
+    for term in search:
+        try:
+            subprocess.check_output('sudo tc -force qdisc del dev %s root' % term, shell=True)
+        except:
+            pass
+
+        try:
+            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff:' % term, shell=True)
+        except:
+            pass
+
+    return True
+
+def remove_linux_bridges():
+    try:
+        lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).splitlines()
+
+        for line in lines:
+            bridge_name = line.rstrip().split('/')[-1]
+            try:
+                output = subprocess.check_output("sudo ip link set %s down " % bridge_name, shell=True)
+            except:
+                pass
+
+            try:
+                subprocess.check_output('sudo brctl delbr %s' % bridge_name, shell=True)
+            except:
+                pass
+        return True
+    except:
+        return True
+
 def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
@@ -1860,6 +1945,9 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     if addr == 'default':
+        return (True, None)
+
+    if not linux_check_gateway_exist(via):
         return (True, None)
 
     metric = ' metric %s' % metric if metric else ' metric 0'
@@ -3567,6 +3655,30 @@ def linux_routes_dictionary_get():
         metric = 0
 
     return routes_dict
+
+def linux_check_gateway_exist(gw):
+    interfaces = psutil.net_if_addrs()
+    for if_name in interfaces:
+        addresses = interfaces[if_name]
+        for address in addresses:
+            if address.family == socket.AF_INET:
+                network = IPNetwork(address.address + '/' + address.netmask)
+                if is_ip_in_subnet(gw, str(network)):
+                    return True
+
+    return False
+
+def linux_routes_dictionary_exist(routes, addr, metric, via):
+    metric = int(metric)
+    if metric in routes.keys():
+        if addr in routes[metric].keys():
+            if via in routes[metric][addr]:
+                return True
+    return False
+
+def check_reinstall_static_routes():
+    routes_db = fwglobals.g.router_cfg.get_routes()
+    routes_linux = linux_routes_dictionary_get()
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric)
