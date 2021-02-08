@@ -191,32 +191,6 @@ class FWROUTER_API(FwCfgRequestHandler):
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
-                for src, tun in tunnels.items():
-                    tunnel_status = 0
-                    tunnel = fwutils.ikev2_gre_tunnel_get(src)
-                    if tunnel:
-                        tunnel_status = fwutils.vpp_interface_status_get(interfaces, tunnel.sw_if_index)
-
-                    if tun['state'] == 'stopped':
-                        if tunnel:
-                            fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index,
-                                                                                            bd_id=tun['bridge_id'],
-                                                                                            enable=1, shg=1)
-                            fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
-                            tun['sw_if_index'] = tunnel.sw_if_index
-                            tun['state'] = 'running'
-                            fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
-
-                    if tun['state'] == 'running':
-                        # Check if tunnel is down
-                        if not tunnel or tunnel_status != 3: # vl_api_if_status_flags_t.IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP
-                            tun['state'] = 'stopped'
-                            fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
-
-            except Exception as e:
-                fwglobals.log.debug("%s" % str(e))
-                pass
-
     def ikev2_thread(self):
         """IKEv2 client thread.
         Its function is to monitor state of IKEv2 GRE tunnels.
