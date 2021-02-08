@@ -1866,6 +1866,9 @@ def add_static_route(addr, via, metric, remove, dev_id=None):
     if addr == 'default':
         return (True, None)
 
+    if not linux_check_gateway_exist(via):
+        return (True, None)
+
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
 
@@ -3520,6 +3523,18 @@ def linux_routes_dictionary_get():
         metric = 0
 
     return routes_dict
+
+def linux_check_gateway_exist(gw):
+    interfaces = psutil.net_if_addrs()
+    for if_name in interfaces:
+        addresses = interfaces[if_name]
+        for address in addresses:
+            if address.family == socket.AF_INET:
+                network = IPNetwork(address.address + '/' + address.netmask)
+                if is_ip_in_subnet(gw, str(network)):
+                    return True
+
+    return False
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric)
