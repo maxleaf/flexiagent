@@ -41,7 +41,6 @@ os_modules = {
 os_api_defs = {
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
-    'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
 }
 
 class OS_DECODERS:

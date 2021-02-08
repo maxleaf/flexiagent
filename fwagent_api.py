@@ -25,24 +25,27 @@ import loadsimulator
 import yaml
 import sys
 import os
-import re
 from shutil import copyfile
-import subprocess
-import time
 import fwglobals
 import fwstats
 import fwutils
+import fwsystem_api
+import fwrouter_api
 
 fwagent_api = {
-    'get-device-info':          '_get_device_info',
-    'get-device-stats':         '_get_device_stats',
-    'get-device-logs':          '_get_device_logs',
-    'get-device-packet-traces': '_get_device_packet_traces',
-    'get-device-os-routes':     '_get_device_os_routes',
-    'get-router-config':        '_get_router_config',
-    'upgrade-device-sw':        '_upgrade_device_sw',
-    'reset-device':             '_reset_device_soft',
-    'sync-device':              '_sync_device'
+    'get-device-info':               '_get_device_info',
+    'get-device-stats':              '_get_device_stats',
+    'get-device-logs':               '_get_device_logs',
+    'get-device-packet-traces':      '_get_device_packet_traces',
+    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-config':             '_get_device_config',
+    'upgrade-device-sw':             '_upgrade_device_sw',
+    'reset-device':                  '_reset_device_soft',
+    'sync-device':                   '_sync_device',
+    'get-wifi-info':                 '_get_wifi_info',
+    'get-lte-info':                  '_get_lte_info',
+    'reset-lte':                     '_reset_lte',
+    'modify-lte-pin':                '_modify_lte_pin',
 }
 
 class FWAGENT_API:
@@ -109,7 +112,7 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
+            info['network']['interfaces'] = list(fwutils.get_linux_interfaces().values())
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
@@ -219,15 +222,17 @@ class FWAGENT_API:
 
         return {'message': route_entries, 'ok': 1}
 
-    def _get_router_config(self, params):
-        """Get router configuration from DB.
+    def _get_device_config(self, params):
+        """Get device configuration from DB.
 
         :param params: Parameters from flexiManage.
 
         :returns: Dictionary with configuration and status code.
         """
-        configs = fwutils.dump_router_config()
-        reply = {'ok': 1, 'message': configs if configs else []}
+        router_config = fwutils.dump_router_config()
+        system_config = fwutils.dump_system_config()
+        config = router_config + system_config
+        reply = {'ok': 1, 'message': config if config else []}
         return reply
 
     def _reset_device_soft(self, params=None):
@@ -239,11 +244,11 @@ class FWAGENT_API:
         """
         if fwglobals.g.router_api.state_is_started():
             fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
-        fwutils.reset_router_config()
+        fwutils.reset_device_config()
         return {'ok': 1}
 
     def _sync_device(self, params):
-        """Handles the 'sync-device' request: synchronizes VPP state
+        """Handles the 'sync-device' request: synchronizes device configuration
         to the configuration stored on flexiManage. During synchronization
         all interfaces, tunnels, routes, etc, that do not appear
         in the received 'sync-device' request are removed, all entities
@@ -258,68 +263,144 @@ class FWAGENT_API:
                         }
         :returns: Dictionary with status code.
         """
-        fwglobals.log.info("FWAGENT_API: _sync_device STARTED")
+        fwglobals.log.info("_sync_device STARTED")
 
-        # Go over configuration requests received within sync-device request,
-        # intersect them against the requests stored locally and generate new list
-        # of remove-X and add-X requests that should take device to configuration
-        # received with the sync-device.
-        #
-        sync_list = fwglobals.g.router_cfg.get_sync_list(params['requests'])
-        fwglobals.log.debug("FWAGENT_API: _sync_device: sync-list: %s" % \
-                            json.dumps(sync_list, indent=2, sort_keys=True))
-        if not sync_list:
-            fwglobals.log.info("FWAGENT_API: _sync_device: sync_list is empty, no need to sync")
-            fwglobals.g.router_cfg.reset_signature()
-            if params.get('type', '') != 'full-sync':
-                return {'ok': 1}   # Return if there is no full sync enforcement
+        full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        # Finally update configuration.
-        # Firstly try smart sync - apply sync-list modifications only.
-        # If that fails, go with full sync - reset configuration and apply sync-device list
-        #
-        if sync_list:
-            fwglobals.log.debug("FWAGENT_API: _sync_device: start smart sync")
-            sync_request = {
-                'message':   'aggregated',
-                'params':    { 'requests': sync_list },
-                'internals': { 'dont_revert_on_failure': True }
-            }
-            reply = fwglobals.g.router_api.call(sync_request)
+        for module_name, module in fwglobals.modules.items():
+            if module.get('sync', False) == True:
+                # get api module. e.g router_api, system_api
+                api_module = getattr(fwglobals.g, module.get('object'))
+                api_module.sync(params['requests'], full_sync_enforced)
 
-            # If smart sync succeeded and there is no 'full-sync' enforcement
-            # in message, finish sync procedure and return.
-            # Note today the 'full-sync' enforcement is needed for testing only.
-            #
-            if reply['ok'] == 1 and params.get('type', '') != 'full-sync':
-                fwglobals.g.router_cfg.reset_signature()
-                fwglobals.log.debug("FWAGENT_API: _sync_device: smart sync succeeded")
-                fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
-                return {'ok': 1}
-
-        # At this point we have to perform full sync.
-        # This is due to either smart sync failure or full sync enforcement.
-        #
-        fwglobals.log.debug("FWAGENT_API: _sync_device: start full sync")
-        restart_router = False
-        if fwglobals.g.router_api.state_is_started():
-            restart_router = True
-            fwglobals.g.router_api.call({'message': 'stop-router'})
-
-        self._reset_device_soft()                       # Wipe out the configuration database
-        request = {                                     # Cast 'sync-device' to 'aggregated'
-            'message':   'aggregated',
-            'params':    { 'requests': params['requests'] },
-            'internals': { 'dont_revert_on_failure': True }
-        }
-        reply = fwglobals.g.router_api.call(request)    # Apply finally the received configuration
-        if reply['ok'] == 0:
-            raise Exception(" _sync_device: full sync failed: " + str(reply.get('message')))
-
-        if restart_router:
-            fwglobals.g.router_api.call({'message': 'start-router'})
-        fwglobals.log.debug("FWAGENT_API: _sync_device: full sync succeeded")
-
-        fwglobals.g.router_cfg.reset_signature()
-        fwglobals.log.info("FWAGENT_API: _sync_device FINISHED")
+        # At this point the sync succeeded.
+        # In case of failure - exception is raised by sync()
+        fwutils.reset_device_config_signature()
+        fwglobals.log.info("_sync_device FINISHED")
         return {'ok': 1}
+
+    def _get_wifi_info(self, params):
+        try:
+            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+            ap_status = fwutils.pid_of('hostapd')
+
+            clients = fwutils.wifi_ap_get_clients(interface_name)
+
+            response = {
+                'clients'             : clients,
+                'ap_status'           : ap_status != None
+            }
+
+            return {'message': response, 'ok': 1}
+        except Exception as e:
+            raise Exception("_get_wifi_info: %s" % str(e))
+
+    def _get_lte_info(self, params):
+        interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+
+        sim_status = fwutils.lte_sim_status(params['dev_id'])
+        signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
+        hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
+        connection_state = fwutils.lte_get_connection_state(params['dev_id'])
+        packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
+        system_info = fwutils.lte_get_system_info(params['dev_id'])
+        default_settings = fwutils.lte_get_default_settings(params['dev_id'])
+        phone_number = fwutils.lte_get_phone_number(params['dev_id'])
+        pin_state = fwutils.lte_get_pin_state(params['dev_id'])
+
+        is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
+        if fwutils.vpp_does_run() and is_assigned:
+            interface_name = fwutils.dev_id_to_tap(params['dev_id'])
+
+        addr = fwutils.get_interface_address(interface_name)
+        connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+
+        response = {
+            'address'             : addr,
+            'signals'             : signals,
+            'connection_state'    : connection_state,
+            'connectivity'        : connectivity,
+            'packet_service_state': packet_service_state,
+            'hardware_info'       : hardware_info,
+            'system_info'         : system_info,
+            'sim_status'          : sim_status,
+            'default_settings'    : default_settings,
+            'phone_number'        : phone_number,
+            'pin_state'           : pin_state
+        }
+
+        return {'message': response, 'ok': 1}
+
+
+    def _reset_lte(self, params):
+        """Reset LTE modem card.
+
+        :param params: Parameters to use.
+
+        :returns: Dictionary status code.
+        """
+        try:
+
+            is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
+            fwutils.qmi_sim_power_off(params['dev_id'])
+            fwutils.qmi_sim_power_on(params['dev_id'])
+
+            # restore lte connection if needed
+            fwglobals.g.system_api.restore_configuration(types=['add-lte'])
+
+            reply = {'ok': 1, 'message': ''}
+        except Exception as e:
+            reply = {'ok': 0, 'message': str(e)}
+        return reply
+
+    def _modify_lte_pin(self, params):
+        try:
+            dev_id = params['dev_id']
+            new_pin = params.get('newPin')
+            current_pin = params.get('currentPin')
+            enable = params.get('enable', False)
+            puk = params.get('puk')
+
+            current_pin_state = fwutils.lte_get_pin_state(dev_id)
+            is_currently_enabled = current_pin_state.get('PIN1_STATUS') != 'disabled'
+            retries_left = current_pin_state.get('PIN1_RETRIES', '3')
+
+            # check if blocked and puk isn't provided
+            if retries_left == '0' and not puk:
+                return {'ok': 0, 'message': 'The PIN is locked. Please unblocked it with PUK code'}
+
+            if current_pin_state.get('PIN1_STATUS') == 'blocked':
+                if not puk or not new_pin:
+                    return {'ok': 0, 'message': 'The PIN is locked. Please provide PUK code and new PIN number'}
+                # unblock
+                updated_status = fwutils.qmi_unblocked_pin(dev_id, puk, new_pin)
+                updated_pin_state = updated_status.get('PIN1_STATUS')
+                if updated_pin_state not in['disabled', 'enabled-verified']:
+                    return {'ok': 0, 'message': 'PUK is wrong'}
+
+                return {'ok': 1, 'message': ''}
+
+            if not current_pin:
+                return {'ok': 0, 'message': 'PIN is required'}
+
+            # verify pin first
+            updated_status = fwutils.qmi_verify_pin(dev_id, current_pin)
+            updated_pin_state = updated_status.get('PIN1_STATUS')
+            updated_retries_left = updated_status.get('PIN1_RETRIES', 3)
+            if updated_retries_left != '3' and retries_left != updated_retries_left:
+                return {'ok': 0, 'message': 'PIN is wrong'}
+            if updated_pin_state not in['disabled', 'enabled-verified']:
+                return {'ok': 0, 'message': 'PIN is wrong'}
+
+            # check if need to enable/disable
+            if is_currently_enabled != enable:
+                fwutils.qmi_set_pin_protection(dev_id, current_pin, enable)
+
+            # check if need to change
+            if new_pin and new_pin != current_pin:
+                fwutils.qmi_change_pin(dev_id, current_pin, new_pin)
+
+            reply = {'ok': 1, 'message': ''}
+        except Exception as e:
+            reply = {'ok': 0, 'message': str(e)}
+        return reply

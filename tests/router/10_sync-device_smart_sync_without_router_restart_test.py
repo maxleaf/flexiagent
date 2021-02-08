@@ -132,7 +132,7 @@ def test():
                 # executed requests in log: 3 'remove-tunnel'-s and 3 'add-tunnel'-s.
                 #
                 if idx == 5:  # step6_cfg_modify_tunnels_only.cli
-                    lines = agent.grep_log('FWROUTER_API: === start execution of ', print_findings=False, since=step_start_time)
+                    lines = agent.grep_log('=== start execution of ', print_findings=False, since=step_start_time)
                     assert len(lines) == 6, "log has not expected number of sync requests: %d:%s" % \
                                             (len(lines), '\n'.join(lines))
 
