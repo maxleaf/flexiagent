@@ -650,10 +650,10 @@ def reset(soft=False, quiet=False):
     if not quiet:
         CSTART = "\x1b[0;30;43m"
         CEND = "\x1b[0m"
-        choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+    choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
                       "Already deleted in flexiManage y/n [n]" + CEND)
-        if choice != 'y' and choice != 'Y':
-            reset_device = False
+    if choice != 'y' and choice != 'Y':
+        reset_device = False
 
     if reset_device:
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
