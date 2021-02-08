@@ -286,20 +286,6 @@ def is_interface_assigned_to_vpp(dev_id):
     with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
         return len(router_cfg.get_interfaces(dev_id=dev_id)) > 0
 
-def is_interface_assigned_to_vpp(dev_id):
-    """ Check if dev_id is assigned to vpp.
-    This function could be called even deamon doesn't run.
-
-    :params dev_id: Bus address to check if assigned
-
-    : return : Boolean
-    """
-    if getattr(fwglobals.g, 'router_cfg', False):
-        return len(fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)) > 0
-
-    with FwRouterCfg(fwglobals.g.ROUTER_CFG_FILE) as router_cfg:
-        return len(router_cfg.get_interfaces(dev_id=dev_id)) > 0
-
     return False
 
 def get_all_interfaces():
@@ -1559,66 +1545,6 @@ def get_lte_interfaces_names():
             names.append(nicname)
 
     return names
-
-def traffic_control_add_del_dev_ingress(dev_name, is_add):
-    try:
-        subprocess.check_output('sudo tc -force qdisc %s dev %s ingress handle ffff:' % ('add' if is_add else 'delete', dev_name), shell=True)
-        return (True, None)
-    except Exception as e:
-        return (True, None)
-
-def traffic_control_replace_dev_root(dev_name):
-    try:
-        subprocess.check_output('sudo tc -force qdisc replace dev %s root handle 1: htb' % dev_name, shell=True)
-        return (True, None)
-    except Exception as e:
-        return (True, None)
-
-def traffic_control_remove_dev_root(dev_name):
-    try:
-        subprocess.check_output('sudo tc -force qdisc del dev %s root' % dev_name, shell=True)
-        return (True, None)
-    except Exception as e:
-        return (True, None)
-
-def reset_traffic_control():
-    search = []
-    lte_interfaces = get_lte_interfaces_names()
-
-    if lte_interfaces:
-        search.extend(lte_interfaces)
-
-    for term in search:
-        try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s root' % term, shell=True)
-        except:
-            pass
-
-        try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff:' % term, shell=True)
-        except:
-            pass
-
-    return True
-
-def remove_linux_bridges():
-    try:
-        lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).splitlines()
-
-        for line in lines:
-            bridge_name = line.rstrip().split('/')[-1]
-            try:
-                output = subprocess.check_output("sudo ip link set %s down " % bridge_name, shell=True)
-            except:
-                pass
-
-            try:
-                subprocess.check_output('sudo brctl delbr %s' % bridge_name, shell=True)
-            except:
-                pass
-        return True
-    except:
-        return True
 
 def get_lte_interfaces_names():
     names = []
@@ -3667,18 +3593,6 @@ def linux_check_gateway_exist(gw):
                     return True
 
     return False
-
-def linux_routes_dictionary_exist(routes, addr, metric, via):
-    metric = int(metric)
-    if metric in routes.keys():
-        if addr in routes[metric].keys():
-            if via in routes[metric][addr]:
-                return True
-    return False
-
-def check_reinstall_static_routes():
-    routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_routes_dictionary_get()
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric)
