@@ -60,7 +60,6 @@ class FwRouterCfg(FwCfgDatabase):
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
-
     def dump(self, types=None, escape=None, full=False, keys=False):
         """Dumps router configuration into list of requests
         """

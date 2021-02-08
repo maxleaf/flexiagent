@@ -1159,6 +1159,9 @@ def reset_device_config():
     fwnetplan.restore_linux_netplan_files()
     ikev2_clean()
 
+    if 'lte' in fwglobals.g.db:
+        fwglobals.g.db['lte'] = {}
+
     reset_dhcpd()
 
 def print_system_config(full=False):

@@ -645,18 +645,15 @@ def reset(soft=False, quiet=False):
     if soft:
         return
 
-    if os.path.exists(fwglobals.g.IKEV2_FOLDER):
-        shutil.rmtree(fwglobals.g.IKEV2_FOLDER, ignore_errors=True)
-
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
     reset_device = True
     if not quiet:
         CSTART = "\x1b[0;30;43m"
         CEND = "\x1b[0m"
-    choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+        choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
                       "Already deleted in flexiManage y/n [n]" + CEND)
-    if choice != 'y' and choice != 'Y':
-        reset_device = False
+        if choice != 'y' and choice != 'Y':
+            reset_device = False
 
     if reset_device:
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):

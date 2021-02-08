@@ -490,7 +490,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
             execute = False
             filter = None
-
             if router_was_started or req == 'start-router':
                 execute = True
             elif re.match('remove-',  req):
