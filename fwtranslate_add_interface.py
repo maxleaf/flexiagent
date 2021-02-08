@@ -323,9 +323,8 @@ def add_interface(params):
         cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
         cmd['cmd']['params']    = {
                                     'module': 'fwutils',
-                                    'func':   'vpp_nat_add_remove_interface',
+                                    'func':   'vpp_nat_addr_update_on_interface_add',
                                     'args':   {
-                                        'remove': False,
                                         'dev_id': dev_id,
                                         'metric': metric
                                     }
@@ -335,9 +334,8 @@ def add_interface(params):
         cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
         cmd['revert']['params'] = {
                                     'module': 'fwutils',
-                                    'func':   'vpp_nat_add_remove_interface',
+                                    'func':   'vpp_nat_addr_update_on_interface_add',
                                     'args':   {
-                                        'remove': True,
                                         'dev_id': dev_id,
                                         'metric': metric
                                     }
