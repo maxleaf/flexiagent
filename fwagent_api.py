@@ -43,6 +43,7 @@ fwagent_api = {
     'upgrade-device-sw':             '_upgrade_device_sw',
     'reset-device':                  '_reset_device_soft',
     'sync-device':                   '_sync_device',
+    'get-wifi-info':                 '_get_wifi_info',
     'get-lte-info':                  '_get_lte_info',
     'reset-lte':                     '_reset_lte',
     'modify-lte-pin':                '_modify_lte_pin',
