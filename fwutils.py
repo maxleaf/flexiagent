@@ -921,15 +921,16 @@ def vpp_if_name_to_tap(vpp_if_name):
     tap = match.group(1)
     return tap
 
-def generate_linux_tap_name(linux_if_name):
-    if len(linux_if_name) > 6:
-        return linux_if_name[-6:]
-
-    return linux_if_name
+def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
+    new_name = '%s_%s' % (prefix, linux_if_name)
+    if len(new_name) > max_length:
+        letters_to_cat = len(new_name) - 15
+        new_name = '%s_%s' % (prefix, linux_if_name[letters_to_cat:])
+    return new_name
 
 def linux_tap_by_interface_name(linux_if_name):
     try:
-        links = subprocess.check_output("sudo ip link | grep tap_%s" % generate_linux_tap_name(linux_if_name), shell=True)
+        links = subprocess.check_output("sudo ip link | grep %s" % generate_linux_interface_short_name("tap", linux_if_name), shell=True)
         lines = links.splitlines()
 
         for line in lines:
@@ -951,7 +952,7 @@ def configure_tap_in_linux_and_vpp(linux_if_name):
     """
 
     # length = str(len(vpp_if_name_to_pci))
-    linux_tap_name = "tap_%s" % generate_linux_tap_name(linux_if_name)
+    linux_tap_name = generate_linux_interface_short_name("tap", linux_if_name)
 
     try:
         vpp_tap_connect(linux_tap_name)
@@ -2729,6 +2730,8 @@ def lte_connect(params, reset=False):
         inserted = lte_is_sim_inserted(dev_id)
         if not inserted:
             return (False, "Sim is not presented")
+
+        lte_disconnect(dev_id, True)
 
     # check PIN status
     pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
