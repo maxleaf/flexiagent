@@ -3354,52 +3354,17 @@ def get_reconfig_hash():
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
-def vpp_nat_add_remove_interface(remove, dev_id, metric):
-    default_gw = ''
-    vpp_if_name_add = ''
-    vpp_if_name_remove = ''
-    metric_min = sys.maxint
+def _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add):
 
-    fo_metric = get_wan_failover_metric(dev_id, metric)
-    if fo_metric != metric:
-        fwglobals.log.debug(
-            "vpp_nat_add_remove_interface: dev_id=%s, use wan failover metric %d" % (dev_id, fo_metric))
-        metric = fo_metric
-
-    # Find interface with lowest metric.
-    #
-    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
-    for wan in wan_list:
-        if dev_id == wan['dev_id']:
-            continue
-        metric_cur_str = wan.get('metric')
-        if metric_cur_str == None:
-            continue
-        metric_cur = int(metric_cur_str or 0)
-        metric_cur = get_wan_failover_metric(wan['dev_id'], metric_cur)
-        if metric_cur < metric_min:
-            metric_min = metric_cur
-            default_gw = wan['dev_id']
-
-    if remove:
-        if metric < metric_min or not default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
-        if metric < metric_min and default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(default_gw)
-
-    if not remove:
-        if metric < metric_min and default_gw:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(default_gw)
-        if metric < metric_min or not default_gw:
-            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
-
-    if vpp_if_name_remove:
+    if vpp_if_name_remove is not None:
+        fwglobals.log.debug("NAT Address Remove- (%s)" % (vpp_if_name_remove))
         vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
         out = _vppctl_read(vppctl_cmd, wait=False)
         if out is None:
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
-    if vpp_if_name_add:
+    if vpp_if_name_add is not None:
+        fwglobals.log.debug("NAT Address Add- (%s)" % (vpp_if_name_add))
         vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_add
         out = _vppctl_read(vppctl_cmd, wait=False)
         if out is None:
@@ -3410,6 +3375,90 @@ def vpp_nat_add_remove_interface(remove, dev_id, metric):
             return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
+
+def _vpp_get_min_metric_values(skip_dev_id):
+
+    metric_min_dev_id = None
+    metric_min = sys.maxint
+
+    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    for wan in wan_list:
+        if skip_dev_id and skip_dev_id == wan['dev_id']:
+            fwglobals.log.debug("Min Metric Check - Skip dev_id: %s" % (skip_dev_id))
+            continue
+
+        metric_iter_str = wan.get('metric')
+        fwglobals.log.debug("Min Metric Check (Device: %s) Metric: %s" %
+            (wan['dev_id'], metric_iter_str))
+        if metric_iter_str:
+            metric_iter = int(metric_iter_str or 0)
+            metric_iter = get_wan_failover_metric(wan['dev_id'], metric_iter)
+            fwglobals.log.debug("Min Metric Check (Device: %s) FO Metric: %s" %
+                (wan['dev_id'], str(metric_iter)))
+            if metric_iter < metric_min:
+                metric_min = metric_iter
+                metric_min_dev_id = wan['dev_id']
+
+    return (metric_min_dev_id, metric_min)
+
+def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
+
+    vpp_if_name_remove = None
+    vpp_if_name_add = None
+    fwglobals.log.debug("NAT Metric change - (%s): To: %s" %
+        (dev_id, str(new_metric)))
+
+    # Find interface with lowest metric - excluding the passed dev_id
+    (metric_min_dev_id, metric_min) = _vpp_get_min_metric_values(dev_id)
+    fwglobals.log.debug("NAT Metric change - Other MIN Metric ID - (Device: %s): %s"
+        % (metric_min_dev_id, str(metric_min)))
+
+    if metric_min_dev_id is not None:
+        # One other WAN link exist
+
+        # Case of device route metric Increased
+        if new_metric > metric_min:
+            # Replace if lowest min state has changed
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+            vpp_if_name_add = dev_id_to_vpp_if_name(metric_min_dev_id)
+
+        # Case of device route metric Decreased (increase in priority)
+        elif new_metric < metric_min:
+            vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+
+    fwglobals.log.debug("NAT Action on Metric change. REMOVE - (Device: %s): %s" %
+        (dev_id, vpp_if_name_remove))
+    fwglobals.log.debug("NAT Action on Metric change. ADD - (Device: %s): %s" %
+        (metric_min_dev_id, vpp_if_name_add))
+    return _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+
+
+def vpp_nat_addr_update_on_interface_add(dev_id, metric):
+
+    vpp_if_name_remove = None
+    vpp_if_name_add = None
+
+    metric = get_wan_failover_metric(dev_id, metric)
+    fwglobals.log.debug("NAT Address - New Interface Check - (%s): %s" % (dev_id, str(metric)))
+
+    #Find interface with lowest metric - excluding the passed dev_id
+    (metric_min_dev_id, metric_min) = _vpp_get_min_metric_values(dev_id)
+
+    if metric_min_dev_id is None:
+        # At this point - No other WAN link exist
+        vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+    else:
+        if metric < metric_min:
+            # Remove previous lowest min
+            vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
+            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+            fwglobals.log.debug("NAT Action on Interface Add. REMOVE - (Device: %s): %s" %
+                (dev_id, vpp_if_name_remove))
+            fwglobals.log.debug("NAT Action on Interface Add. ADD - (Device: %s): %s" %
+                (metric_min_dev_id, vpp_if_name_add))
+
+    return _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
 
 def netplan_set_mac_addresses():
     '''
