@@ -149,7 +149,7 @@ def add_interface(params):
             cmd['revert']['descr']  = "stop hostpad"
             cmd_list.append(cmd)
 
-            bridge_name = "br_%s" % fwutils.generate_linux_interface_short_name(iface_name)
+            bridge_name = fwutils.generate_linux_interface_short_name("br", iface_name)
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
