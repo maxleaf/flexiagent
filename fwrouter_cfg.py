@@ -38,7 +38,7 @@ class FwRouterCfg(FwCfgDatabase):
     :param db_file: SQLite DB file name.
     """
 
-    def update(self, request, cmd_list=None, executed=False):
+    def update(self, request, cmd_list=None, executed=False, whitelist=None):
         # The `start-router` does not conform `add-X`, `remove-X`, `modify-X` format
         # handled by the superclass update(), so we handle it here.
         # All the rest are handled by FwCfgDatabase.update().
