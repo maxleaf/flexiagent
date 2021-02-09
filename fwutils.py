@@ -86,9 +86,9 @@ def get_device_packet_traces(num_of_packets, timeout):
         cmd = 'sudo vppctl show vmxnet3'
         shif_vmxnet3 = subprocess.check_output(cmd, shell=True)
         if shif_vmxnet3 is '':
-            cmd = 'sudo vppctl trace add dpdk-input {}'.format(num_of_packets)
+            cmd = 'sudo vppctl trace add dpdk-input %s && sudo vppctl trace add tapcli-rx %s' % (num_of_packets, num_of_packets)
         else:
-            cmd = 'sudo vppctl trace add vmxnet3-input {}'.format(num_of_packets)
+            cmd = 'sudo vppctl trace add vmxnet3-input %s && sudo vppctl trace add tapcli-rx %s' % (num_of_packets, num_of_packets)
         subprocess.check_output(cmd, shell=True)
         time.sleep(timeout)
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
@@ -2487,7 +2487,6 @@ def configure_lte_interface(params):
             metric = '0'
 
         nicname = dev_id_to_linux_if(dev_id)
-
         os.system('ifconfig %s %s up' % (nicname, ip))
 
         # remove old default router
@@ -2661,19 +2660,24 @@ def lte_is_sim_inserted(dev_id):
 
 def lte_disconnect(dev_id, hard_reset_service=False):
     try:
-
         lte_db = fwglobals.g.db.get('lte', {})
         lte_interfaces = lte_db.get('interfaces', {})
-        current_interface = lte_interfaces.get(dev_id, None)
-        if current_interface:
-            session     = fwglobals.g.db['lte']['interfaces'][dev_id]['Session']
-            if_name = fwglobals.g.db['lte']['interfaces'][dev_id]['if_name']
+        lte_cache = lte_interfaces.get(dev_id, None)
+        if lte_cache:
+            session = lte_cache.get('Session', '0')
+            if_name = lte_cache.get('if_name', dev_id_to_linux_if(dev_id))
         else:
             session = '0' # defualt session
             if_name = dev_id_to_linux_if(dev_id)
 
         output = _run_mbimcli_command(dev_id, '--disconnect=%s' % session)
         os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
+
+        # update the cache
+        if lte_cache:
+            lte_cache['IP'] = ''
+            lte_cache['GATEWAY'] = ''
+            fwglobals.g.db['lte'] = lte_db # db is SqlDict, so we have to replace all record
 
         if hard_reset_service:
             _run_qmicli_command(dev_id, 'wds-reset')
@@ -2799,10 +2803,8 @@ def lte_connect(params, reset=False):
         return (True, None)
     except Exception as e:
         if not reset:
-            lte_disconnect(dev_id, True)
-            fwglobals.log.debug('lte_connect: trying with reset %s' % str(e))
             return lte_connect(params, True)
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % str(e))
 
 def lte_get_system_info(dev_id):
     try:
@@ -2967,7 +2969,7 @@ def lte_get_radio_signals_state(dev_id):
 
 def mbim_get_ip_configuration(dev_id):
     try:
-        output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close')
+        output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
         return output
     except subprocess.CalledProcessError as err:
         return False
@@ -2980,26 +2982,44 @@ def lte_get_configuration_received_from_provider(dev_id, cache=True):
             'STATUS'  : ''
         }
 
-        if cache:
-            lte_db = fwglobals.g.db.get('lte', {})
-            lte_interfaces = lte_db.get('interfaces', {})
-            current_interface = lte_interfaces.get(dev_id, None)
-            if current_interface:
-                response['STATUS'] = True
-                response['IP'] = fwglobals.g.db['lte']['interfaces'][dev_id]['IP']
-                response['GATEWAY'] = fwglobals.g.db['lte']['interfaces'][dev_id]['GATEWAY']
-        else:
+        ip = ''
+        gateway = ''
+
+        lte = fwglobals.g.db.get('lte', {})
+        if not 'interfaces' in lte:
+            lte['interfaces'] = {}
+        lte_dev_id_cache = lte['interfaces'].get(dev_id, None)
+
+        # try to get it from cache
+        if cache and lte_dev_id_cache:
+            response['STATUS'] = True
+            ip = fwglobals.g.db['lte']['interfaces'][dev_id]['IP']
+            gateway = fwglobals.g.db['lte']['interfaces'][dev_id]['GATEWAY']
+
+        # if not exists in cache, take from modem and update cache
+        if not ip or not gateway:
             ip_config = mbim_get_ip_configuration(dev_id)
             if ip_config:
                 response['STATUS'] = True
                 lines = ip_config.splitlines()
                 for line in lines:
                     if 'IP [0]:' in line:
-                        response['IP'] = line.split(':')[-1].strip().replace("'", '')
+                        ip = line.split(':')[-1].strip().replace("'", '')
                         continue
                     if 'Gateway:' in line:
-                        response['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
+                        gateway = line.split(':')[-1].strip().replace("'", '')
                         break
+
+                if ip and gateway:
+                    if not dev_id in lte['interfaces']:
+                        lte['interfaces'][dev_id] = {}
+
+                    lte['interfaces'][dev_id]['IP'] =  ip
+                    lte['interfaces'][dev_id]['GATEWAY'] =  gateway
+                    fwglobals.g.db['lte'] = lte
+
+        response['IP'] = ip
+        response['GATEWAY'] = gateway
         return response
     except Exception as e:
         return response
