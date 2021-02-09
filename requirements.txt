@@ -1,9 +1,10 @@
-ruamel.yaml
 argcomplete
-vpp-papi
-Pyro4
-sqlitedict
-websocket-client
-psutil
+getmac
 netaddr
+Pyro4
+psutil
+ruamel.yaml
+sqlitedict
 serial
+vpp-papi
+websocket-client

@@ -58,50 +58,53 @@ def update_stats():
         reset_stats()
         vpp_pid = current_vpp_pid
 
-    new_stats = fwutils.get_vpp_if_count()
-    if new_stats['ok'] == 1:
-        prev_stats = dict(stats)  # copy of prev stats
-        stats['time'] = time.time()
-        stats['last'] = new_stats['message']
-        stats['ok'] = 1
-        # Update info if previous stats valid
-        if prev_stats['ok'] == 1:
-            if_bytes = {}
-            tunnel_stats = tunnel_stats_get()
-            fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
-            for intf, counts in stats['last'].items():
-                if (intf.startswith('gre') or
-                    intf.startswith('loop')): continue
-                prev_stats_if = prev_stats['last'].get(intf, None)
-                if prev_stats_if != None:
-                    rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])
-                    rx_pkts  = 1.0 * (counts['rx_pkts'] - prev_stats_if['rx_pkts'])
-                    tx_bytes = 1.0 * (counts['tx_bytes'] - prev_stats_if['tx_bytes'])
-                    tx_pkts  = 1.0 * (counts['tx_pkts'] - prev_stats_if['tx_pkts'])
-                    calc_stats = {
-                            'rx_bytes': rx_bytes,
-                            'rx_pkts': rx_pkts,
-                            'tx_bytes': tx_bytes,
-                            'tx_pkts': tx_pkts
-                        }
-                    if (intf.startswith('vxlan_tunnel')):
-                        vxlan_id = int(intf[12:])
-                        tunnel_id = vxlan_id/2
-                        t_stats = tunnel_stats.get(tunnel_id)
-                        if t_stats:
-                            t_stats.update(calc_stats)
-                    else:
-                        # For other interfaces try to get pci index
-                        pci = fwutils.vpp_if_name_to_pci(intf)
-                        if pci:
-                            if_bytes[pci] = calc_stats
-
-            stats['bytes'] = if_bytes
-            stats['tunnel_stats'] = tunnel_stats
-            stats['period'] = stats['time'] - prev_stats['time']
-            stats['running'] = True if fwutils.vpp_does_run() else False
-    else:
+    if not vpp_pid:
         stats['ok'] = 0
+    else:
+        new_stats = fwutils.get_vpp_if_count()
+        if not new_stats:
+            stats['ok'] = 0
+        else:
+            prev_stats = dict(stats)  # copy of prev stats
+            stats['time'] = time.time()
+            stats['last'] = new_stats
+            stats['ok'] = 1
+            # Update info if previous stats valid
+            if prev_stats['ok'] == 1:
+                if_bytes = {}
+                tunnel_stats = tunnel_stats_get()
+                fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
+                for intf, counts in stats['last'].items():
+                    if (intf.startswith('gre') or
+                        intf.startswith('loop')): continue
+                    prev_stats_if = prev_stats['last'].get(intf, None)
+                    if prev_stats_if != None:
+                        rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])
+                        rx_pkts  = 1.0 * (counts['rx_pkts'] - prev_stats_if['rx_pkts'])
+                        tx_bytes = 1.0 * (counts['tx_bytes'] - prev_stats_if['tx_bytes'])
+                        tx_pkts  = 1.0 * (counts['tx_pkts'] - prev_stats_if['tx_pkts'])
+                        calc_stats = {
+                                'rx_bytes': rx_bytes,
+                                'rx_pkts': rx_pkts,
+                                'tx_bytes': tx_bytes,
+                                'tx_pkts': tx_pkts
+                            }
+                        if (intf.startswith('vxlan_tunnel')):
+                            vxlan_id = int(intf[12:])
+                            tunnel_id = vxlan_id/2
+                            t_stats = tunnel_stats.get(tunnel_id)
+                            if t_stats:
+                                t_stats.update(calc_stats)
+                        else:
+                            # For other interfaces try to get interface id
+                            dev_id = fwutils.vpp_if_name_to_dev_id(intf)
+                            if dev_id:
+                                if_bytes[dev_id] = calc_stats
+
+                stats['bytes'] = if_bytes
+                stats['tunnel_stats'] = tunnel_stats
+                stats['period'] = stats['time'] - prev_stats['time']
+                stats['running'] = True if fwutils.vpp_does_run() else False
 
     # Add the update to the list of updates. If the list is full,
     # remove the oldest update before pushing the new one

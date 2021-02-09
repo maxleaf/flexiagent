@@ -435,11 +435,12 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id, remote_sa_id):
                             }
     cmd_list.append(cmd)
 
-def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, params):
+def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     """Add VxLAN tunnel command into the list.
 
     :param cmd_list:             List of commands.
     :param cache_key:            Cache key of the tunnel to be used by others.
+    :param dev_id:               Interface bus address to create tunnel for.
     :param bridge_id:            Bridge identifier.
     :param src:                  Source ip address.
     :param src:                  Destination ip address.
@@ -451,14 +452,24 @@ def _add_vxlan_tunnel(cmd_list, cache_key, bridge_id, src, dst, params):
     ret_attr = 'sw_if_index'
     src_addr = ipaddress.ip_address(src)
     dst_addr = ipaddress.ip_address(dst)
+
+    # for lte interface, we need to get the current source IP, and not the one stored in DB. The IP may have changed due last 'add-interface' job.
+    if fwutils.is_lte_interface_by_dev_id(dev_id):
+        tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
+        if tap:
+            source = fwutils.get_interface_address(tap)
+            if source:
+                src = source.split('/')[0]
+                src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
+
     cmd_params = {
             'is_add'               : 1,
             'src_address'          : src_addr,
             'dst_address'          : dst_addr,
             'vni'                  : bridge_id,
             'dest_port'            : int(params.get('dstPort', 4789)),
-            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'pci_to_vpp_sw_if_index', 'arg': params['pci']},
-                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_binary_interface_gateway_by_pci', 'arg': params['pci']}],
+            'substs': [{'add_param': 'next_hop_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg': params['dev_id']},
+                       {'add_param': 'next_hop_ip', 'val_by_func': 'get_binary_interface_gateway_by_dev_id', 'arg': params['dev_id']}],
             'instance'             : bridge_id,
             'decap_next_index'     : 1 # VXLAN_INPUT_NEXT_L2_INPUT, vpp/include/vnet/vxlan/vxlan.h
     }
@@ -939,6 +950,7 @@ def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre
     _add_vxlan_tunnel(
                 cmd_list,
                 'vxlan_tunnel_sw_if_index',
+                params.get('dev_id'),
                 bridge_id,
                 l2gre_tunnel_ips['src'],
                 l2gre_tunnel_ips['dst'],
