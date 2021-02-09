@@ -238,7 +238,15 @@ class FWROUTER_API(FwCfgRequestHandler):
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
             fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
+
+            # Reboot might cause change of lte modem wan address,
+            # so it will not match the netplan file that was before reboot.
+            # That might cause contamination of vpp fib with wrong routes
+            # during start-router execution. To avoid that we restore original
+            # Linux netplan files to remove any lte related information.
+            #
             fwnetplan.restore_linux_netplan_files()
+
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
