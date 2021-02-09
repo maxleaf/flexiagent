@@ -3625,29 +3625,6 @@ def check_reinstall_static_routes():
 
         add_static_route(addr, via, metric, False, dev)
 
-def ikev2_gre_tunnel_get(src):
-    tunnels = fwglobals.g.router_api.vpp_api.vpp.api.gre_tunnel_dump(sw_if_index=(0xffffffff))
-
-    for gre in tunnels:
-        tunnel = gre.tunnel
-        if (str(tunnel.src) == str(src)):
-            return tunnel
-
-    return None
-
-def ikev2_clean():
-    with FwIKEv2Tunnels(fwglobals.g.IKEV2_DB_FILE) as db_ikev2:
-        db_ikev2.clean()
-
-    for cert in glob.glob(fwglobals.g.IKEV2_FOLDER + '/' + 'remote*.pem'):
-        os.remove(cert)
-
-def vpp_interface_status_get(interfaces, sw_if_index):
-    for sw_if in interfaces:
-        if sw_if.sw_if_index == sw_if_index:
-            return sw_if.flags
-    return 0
-
 def ikev2_certificate_filename_get():
     machine_id = get_machine_id()
     public_pem = fwglobals.g.IKEV2_FOLDER + "local_certificate_" + machine_id + ".pem"
