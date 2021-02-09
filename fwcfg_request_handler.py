@@ -81,9 +81,13 @@ class FwCfgRequestHandler:
 
         :returns: dictionary with status code and optional error message.
         """
+        whitelist = None
         try:
             # Translate request to list of commands to be executed
-            cmd_list = self._translate(request)
+            if re.match('modify-', request['message']):
+                cmd_list, whitelist = self._translate_modify(request)
+            else:
+                cmd_list = self._translate(request)
 
             # Execute list of commands. Do it only if vpp runs.
             # Some 'remove-XXX' requests must be executed
@@ -100,7 +104,7 @@ class FwCfgRequestHandler:
             # needed to restore VPP configuration on device reboot or start of
             # crashed VPP by watchdog.
             try:
-                self.cfg_db.update(request, cmd_list, execute)
+                self.cfg_db.update(request, cmd_list, execute, whitelist)
             except Exception as e:
                 self._revert(cmd_list)
                 raise e
@@ -417,6 +421,7 @@ class FwCfgRequestHandler:
 
         :returns: list of commands.
         """
+        whitelist = None
         req    = request['message']
         params = request.get('params')
         old_params  = self.cfg_db.get_request_params(request)
@@ -441,7 +446,17 @@ class FwCfgRequestHandler:
         assert func, 'there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
-        return cmd_list
+
+        if isinstance(cmd_list, list):
+            new_cmd_list = []
+            for cmd in cmd_list:
+                if 'modify' in cmd.keys():
+                    whitelist = cmd['whitelist']
+                else:
+                    new_cmd_list.append(cmd)
+            return (new_cmd_list, whitelist)
+        else:
+            return (cmd_list, None)
 
     def _strip_noop_request(self, request):
         """Checks if the request has no impact on configuration.
@@ -481,20 +496,20 @@ class FwCfgRequestHandler:
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 # start-router & stop-router break add-/remove-/modify- convention.
                 return True
-            elif re.match('modify-', req):
+            elif re.match('modify-interface', req):
                 # For modification request ensure that it goes to modify indeed:
                 # translate request into commands to execute in order to modify
                 # configuration item in Linux/VPP. If this list is empty,
                 # the request can be stripped out.
                 #
-                cmd_list = self._translate_modify(__request)
+                cmd_list, _ = self._translate_modify(__request)
                 if not cmd_list:
                     # Save modify request into database, as it might contain parameters
                     # that don't impact on interface configuration in Linux or in VPP,
                     # like PublicPort, PublicIP, useStun, etc.
                     #
                     # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
-                    # We assume the 'modify-X' request includes full set of
+                    # We assume the 'modify-interface' request includes full set of
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
