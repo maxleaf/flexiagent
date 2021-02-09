@@ -645,6 +645,9 @@ def reset(soft=False, quiet=False):
     if soft:
         return
 
+    if os.path.exists(fwglobals.g.IKEV2_FOLDER):
+        shutil.rmtree(fwglobals.g.IKEV2_FOLDER, ignore_errors=True)
+
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
     reset_device = True
     if not quiet:
