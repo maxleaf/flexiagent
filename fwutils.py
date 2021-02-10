@@ -3741,9 +3741,6 @@ def exec_with_timeout(cmd, timeout=60):
 
     :returns: Command execution result
     """
-    import threading
-    import subprocess
-    import psutil
     state = {'output':'', 'error':'', 'returncode':0}
     def target():
         try:
@@ -3751,8 +3748,8 @@ def exec_with_timeout(cmd, timeout=60):
             (output, error) = state['proc'].communicate()
         except OSError as err:
             state['error'] = str(err)
-        except:
-            state['error'] = "Error executing command '%s'" % (str(cmd))
+        except Exception as err:
+            state['error'] = "Error executing command '%s', error: %s" % (str(cmd), str(err))
         state['output'] = output
         state['error'] = error
         state['returncode'] = state['proc'].returncode
@@ -3771,7 +3768,7 @@ def exec_with_timeout(cmd, timeout=60):
         except psutil.NoSuchProcess:
             pass
         except Exception as err:
-            state['error'] = "Error killing command '%s'" % (str(cmd))
-            fwglobals.log.error("Error killing exec command '%s'" % (str(cmd)))
+            state['error'] = "Error killing command '%s', error %s" % (str(cmd), str(err))
+            fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
