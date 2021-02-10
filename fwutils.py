@@ -3636,8 +3636,8 @@ def ikev2_remote_certificate_filename_get(machine_id):
     public_pem = fwglobals.g.IKEV2_FOLDER + "remote_certificate_" + machine_id + ".pem"
     return public_pem
 
-def ikev2_gre_bridge_add(src, bridge_id, profile, role):
-    fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id, profile, role)
+def ikev2_gre_bridge_add(src, bridge_id, profile, role, lifetime):
+    fwglobals.g.ikev2tunnels.add_tunnel(src, bridge_id, profile, role, lifetime)
 
 def ikev2_gre_bridge_remove(src, bridge_id):
     sw_if_index = fwglobals.g.ikev2tunnels.get_tunnel(src)['sw_if_index']

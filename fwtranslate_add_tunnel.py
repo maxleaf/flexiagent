@@ -571,7 +571,7 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
-def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certificate, bridge_id, src, role):
+def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certificate, bridge_id, src, role, lifetime):
     """Add IKEv2 common profile commands into the list.
 
     :param cmd_list:            List of commands.
@@ -582,6 +582,7 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     :param bridge_id:           Bridge id to add GRE tunnel to.
     :param src:                 GRE tunnel source ip.
     :param role:                IKEv2 role.
+    :param lifetime:            Session lifetime.
 
     :returns: None.
     """
@@ -688,7 +689,7 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
                                 'func'  : 'ikev2_gre_bridge_add',
-                                'args'  : {'src': src, 'bridge_id': bridge_id, 'profile': name, 'role': role}
+                                'args'  : {'src': src, 'bridge_id': bridge_id, 'profile': name, 'role': role, 'lifetime': lifetime}
                                 }
     cmd['revert'] = {}
     cmd['revert']['name']    = "python"
@@ -910,17 +911,19 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
 
     src = str(IPNetwork(l2gre_tunnel_ips['src']).ip)
     ikev2_profile_name = 'pr' + str(params['tunnel-id'])
+    lifetime = params['ikev2']['lifetime'] if params['ikev2']['role'] == 'initiator' else 0
     _add_ikev2_common_profile(
                       cmd_list, ikev2_profile_name, params['tunnel-id'],
                       params['ikev2']['remote-device-id'],
                       params['ikev2']['certificate'],
-                      bridge_id, src, params['ikev2']['role'])
+                      bridge_id, src, params['ikev2']['role'],
+                      lifetime)
 
     if params['ikev2']['role'] == 'initiator':
         dst = str(IPNetwork(l2gre_tunnel_ips['dst']).ip)
         _add_ikev2_initiator_profile(
                         cmd_list,
-                        ikev2_profile_name, params['ikev2']['lifetime'],
+                        ikev2_profile_name, 0,
                         'loop1_sw_if_index',
                         dst,
                         params['ikev2']['ike'],
