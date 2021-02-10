@@ -121,7 +121,7 @@ request_handlers = {
     # OS API
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
-    'ifstats':                      {'name': '_call_os_api'},
+    'exec_timeout':                 {'name': '_call_os_api'},
 
     # VPP API
     'abf_itf_attach_add_del':       {'name': '_call_vpp_api'},

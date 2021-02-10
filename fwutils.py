@@ -27,7 +27,6 @@ import os
 import time
 import platform
 import subprocess
-import shlex
 import psutil
 import socket
 import re
@@ -39,6 +38,7 @@ import sys
 import traceback
 import yaml
 from netaddr import IPNetwork, IPAddress
+import threading
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
 sys.path.append(common_tools)
@@ -3733,3 +3733,43 @@ def check_reinstall_static_routes():
             continue
 
         add_static_route(addr, via, metric, False, dev)
+
+def exec_with_timeout(cmd, timeout=60):
+    """Run bash command with timeout option
+
+    :param cmd:         Bash command
+    :param timeout:     kill process after timeout, default=60sec
+
+    :returns: Command execution result
+    """
+    state = {'output':'', 'error':'', 'returncode':0}
+    def target():
+        try:
+            state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (output, error) = state['proc'].communicate()
+        except OSError as err:
+            state['error'] = str(err)
+        except Exception as err:
+            state['error'] = "Error executing command '%s', error: %s" % (str(cmd), str(err))
+        state['output'] = output
+        state['error'] = error
+        state['returncode'] = state['proc'].returncode
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join(timeout)
+    if thread.is_alive():
+        try:
+            process = psutil.Process(state['proc'].pid)
+            for proc in process.children(recursive=True):
+                proc.kill()
+            process.kill()
+            state['error'] = "Command '%s' didn't complete after %d and killed" % (str(cmd), timeout)
+            fwglobals.log.debug("Command '%s' killed after timeout %d" % (str(cmd), timeout))
+            thread.join()
+        except psutil.NoSuchProcess:
+            pass
+        except Exception as err:
+            state['error'] = "Error killing command '%s', error %s" % (str(cmd), str(err))
+            fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
+    return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
+
