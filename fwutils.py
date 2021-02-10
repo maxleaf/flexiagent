@@ -3414,7 +3414,7 @@ def _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add):
 
     return (True, None)
 
-def _vpp_get_min_metric_values(skip_dev_id):
+def get_min_metric_device(skip_dev_id):
 
     metric_min_dev_id = None
     metric_min = sys.maxint
@@ -3422,20 +3422,19 @@ def _vpp_get_min_metric_values(skip_dev_id):
     wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
     for wan in wan_list:
         if skip_dev_id and skip_dev_id == wan['dev_id']:
-            fwglobals.log.debug("Min Metric Check - Skip dev_id: %s" % (skip_dev_id))
+            fwglobals.log.trace("Min Metric Check - Skip dev_id: %s" % (skip_dev_id))
             continue
 
         metric_iter_str = wan.get('metric')
-        fwglobals.log.debug("Min Metric Check (Device: %s) Metric: %s" %
+        fwglobals.log.trace("Min Metric Check (Device: %s) Metric: %s" %
             (wan['dev_id'], metric_iter_str))
-        if metric_iter_str:
-            metric_iter = int(metric_iter_str or 0)
-            metric_iter = get_wan_failover_metric(wan['dev_id'], metric_iter)
-            fwglobals.log.debug("Min Metric Check (Device: %s) FO Metric: %s" %
-                (wan['dev_id'], str(metric_iter)))
-            if metric_iter < metric_min:
-                metric_min = metric_iter
-                metric_min_dev_id = wan['dev_id']
+        metric_iter = int(metric_iter_str or 0)
+        metric_iter = get_wan_failover_metric(wan['dev_id'], metric_iter)
+        fwglobals.log.trace("Min Metric Check (Device: %s) FO Metric: %d" %
+            (wan['dev_id'], metric_iter))
+        if metric_iter < metric_min:
+            metric_min = metric_iter
+            metric_min_dev_id = wan['dev_id']
 
     return (metric_min_dev_id, metric_min)
 
@@ -3443,60 +3442,62 @@ def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
 
     vpp_if_name_remove = None
     vpp_if_name_add = None
-    fwglobals.log.debug("NAT Metric change - (%s): To: %s" %
-        (dev_id, str(new_metric)))
 
     # Find interface with lowest metric - excluding the passed dev_id
-    (metric_min_dev_id, metric_min) = _vpp_get_min_metric_values(dev_id)
-    fwglobals.log.debug("NAT Metric change - Other MIN Metric ID - (Device: %s): %s"
-        % (metric_min_dev_id, str(metric_min)))
+    (metric_min_dev_id, metric_min) = get_min_metric_device(dev_id)
+    fwglobals.log.debug("NAT Address - Metric change Device Id:%s New Metric: %d \
+        Min Dev id: %s Min Metric: %d" % (dev_id, new_metric, metric_min_dev_id, metric_min))
 
-    if metric_min_dev_id is not None:
-        # One other WAN link exist
+    if metric_min_dev_id is None:
+        return True
 
-        # Case of device route metric Increased
-        if new_metric > metric_min:
-            # Replace if lowest min state has changed
-            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
-            vpp_if_name_add = dev_id_to_vpp_if_name(metric_min_dev_id)
+    # One other WAN link exist
+    if (new_metric > metric_min):
+        # Case of device route metric Increased i.e Move to lower priority
+        vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+        vpp_if_name_add = dev_id_to_vpp_if_name(metric_min_dev_id)
+    elif (new_metric < metric_min):
+        # Case of device route metric Decreased i.e. Move to higher priority
+        vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
+        vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
-        # Case of device route metric Decreased (increase in priority)
-        elif new_metric < metric_min:
-            vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
-            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
-
-    fwglobals.log.debug("NAT Action on Metric change. REMOVE - (Device: %s): %s" %
-        (dev_id, vpp_if_name_remove))
-    fwglobals.log.debug("NAT Action on Metric change. ADD - (Device: %s): %s" %
-        (metric_min_dev_id, vpp_if_name_add))
-    return _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+    success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+    return success
 
 
-def vpp_nat_addr_update_on_interface_add(dev_id, metric):
+def vpp_nat_addr_update_on_interface_add(dev_id, metric, remove):
 
     vpp_if_name_remove = None
     vpp_if_name_add = None
 
     metric = get_wan_failover_metric(dev_id, metric)
-    fwglobals.log.debug("NAT Address - New Interface Check - (%s): %s" % (dev_id, str(metric)))
-
     #Find interface with lowest metric - excluding the passed dev_id
-    (metric_min_dev_id, metric_min) = _vpp_get_min_metric_values(dev_id)
+    (metric_min_dev_id, metric_min) = get_min_metric_device(dev_id)
 
-    if metric_min_dev_id is None:
-        # At this point - No other WAN link exist
-        vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
+    fwglobals.log.debug("NAT Address - Interface Add/Remove Device Id:%s (Remove: %d): Metric: %d\
+        Min Dev id: %s Min Metric: %d" % (dev_id, remove, metric, metric_min_dev_id, metric_min))
+
+    if remove:
+        if metric_min_dev_id is None:
+            # Remove self
+            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+        else:
+            if (metric < metric_min):
+                # Remove self and Add next min
+                vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
+                vpp_if_name_add = dev_id_to_vpp_if_name(metric_min_dev_id)
     else:
-        if metric < metric_min:
-            # Remove previous lowest min
-            vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
+        if metric_min_dev_id is None:
+            # Add self
             vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
-            fwglobals.log.debug("NAT Action on Interface Add. REMOVE - (Device: %s): %s" %
-                (dev_id, vpp_if_name_remove))
-            fwglobals.log.debug("NAT Action on Interface Add. ADD - (Device: %s): %s" %
-                (metric_min_dev_id, vpp_if_name_add))
+        else:
+            if metric < metric_min:
+                # Add self and Remove previous min
+                vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
+                vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
-    return _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+    success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+    return success
 
 def netplan_set_mac_addresses():
     '''

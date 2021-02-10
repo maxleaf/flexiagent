@@ -327,7 +327,8 @@ def add_interface(params):
                                     'func':   'vpp_nat_addr_update_on_interface_add',
                                     'args':   {
                                         'dev_id': dev_id,
-                                        'metric': metric
+                                        'metric': metric,
+                                        'remove': False
                                     }
                                   }
         cmd['revert'] = {}
@@ -338,7 +339,8 @@ def add_interface(params):
                                     'func':   'vpp_nat_addr_update_on_interface_add',
                                     'args':   {
                                         'dev_id': dev_id,
-                                        'metric': metric
+                                        'metric': metric,
+                                        'remove': True
                                     }
                                   }
         cmd_list.append(cmd)
