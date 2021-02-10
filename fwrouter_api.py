@@ -223,10 +223,20 @@ class FWROUTER_API(FwCfgRequestHandler):
                             fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
 
                     if tun['state'] == 'running':
-                        # Check if tunnel is down
+                        # Tunnel is down
                         if not tunnel or tunnel_status != 3: # vl_api_if_status_flags_t.IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP
                             tun['state'] = 'stopped'
+                            tun['ttl'] = tun['lifetime']
                             fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
+                        # Tunnel is up
+                        else:
+                            if tun['role'] == 'initiator':
+                                if tun['ttl'] == 0:
+                                    tun['ttl'] = tun['lifetime']
+                                    fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                                else:
+                                    tun['ttl'] = tun['ttl'] - 1
+                                fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
 
             except Exception as e:
                 fwglobals.log.debug("%s" % str(e))
