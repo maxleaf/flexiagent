@@ -153,7 +153,7 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
-            cmd['cmd']['params'] = [ "sudo brctl addbr %s" %  bridge_name ]
+            cmd['cmd']['params'] = [ "sudo brctl addbr %s || true" %  bridge_name ]
             cmd['cmd']['descr']  = "create linux bridge %s for interface %s" % (bridge_name, iface_name)
 
             cmd['revert'] = {}
@@ -167,7 +167,7 @@ def add_interface(params):
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
             cmd['cmd']['params'] =  [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'linux_tap_by_interface_name', 'arg':iface_name } ]},
-                                        "sudo brctl addif %s DEV-TAP" %  bridge_name ]
+                                        "sudo brctl addif %s DEV-TAP || true" %  bridge_name ]
             cmd['cmd']['descr']  = "add tap interface of %s into the appropriate bridge %s" % (iface_name, bridge_name)
 
             cmd['revert'] = {}
@@ -180,7 +180,7 @@ def add_interface(params):
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']   = "exec"
-            cmd['cmd']['params'] =  [ "sudo brctl addif %s %s" %  (bridge_name, iface_name) ]
+            cmd['cmd']['params'] =  [ "sudo brctl addif %s %s || true" %  (bridge_name, iface_name) ]
             cmd['cmd']['descr']  = "add wifi interface %s into the bridge %s" % (iface_name, bridge_name)
 
             cmd['revert'] = {}
