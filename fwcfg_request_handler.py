@@ -358,6 +358,21 @@ class FwCfgRequestHandler:
         if params is None:
             return
 
+        # Perform substitutions in nested dictionaries and lists
+        #
+        if type(params)==list:
+            for p in params:
+                if type(p)==list or\
+                (type(p)==dict and not 'substs' in p):  # Escape 'substs' element
+                    self._substitute(cache, p)
+        elif type(params)==dict:
+            for item in params.items():
+                key = item[0]
+                p   = item[1]
+                if (type(p)==dict or type(p)==list) and \
+                key != 'substs':                       # Escape 'substs' element
+                    self._substitute(cache, p)
+
         # Fetch list of substitutions
         substs = None
         if type(params)==dict and 'substs' in params:
