@@ -364,14 +364,14 @@ class FwCfgRequestHandler:
             for p in params:
                 if type(p)==list or\
                 (type(p)==dict and not 'substs' in p):  # Escape 'substs' element
-                    self._substitute(cache, p)
+                    self.substitute(cache, p)
         elif type(params)==dict:
             for item in params.items():
                 key = item[0]
                 p   = item[1]
                 if (type(p)==dict or type(p)==list) and \
                 key != 'substs':                       # Escape 'substs' element
-                    self._substitute(cache, p)
+                    self.substitute(cache, p)
 
         # Fetch list of substitutions
         substs = None
