@@ -41,6 +41,7 @@ os_modules = {
 os_api_defs = {
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
+    'exectimeout':{'module':'fwutils', 'api':'exec_with_timeout', 'decode':'exectimeoutd'}
 }
 
 class OS_DECODERS:
@@ -58,6 +59,18 @@ class OS_DECODERS:
         if retcode == None or retcode == 0: ok=1
         else: ok=0
         return (data, ok)
+
+    def exectimeoutd(self, handle):
+        """Read from a descriptor.
+
+        :param handle:         Dict with command execution result.
+
+        :returns: Return value.
+        """
+        if handle['returncode'] == 0: ok=1
+        else: ok=0
+        return (handle, ok)
+
     def default(self, inp):
         """Return default message.
         """
