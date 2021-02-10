@@ -79,7 +79,7 @@ class VPP_API:
                 if i == num_retries-1:
                     raise e
                 else:
-                    time.sleep(10)
+                    time.sleep(20)
         self.connected_to_vpp = True
         fwglobals.log.debug("connect_to_vpp: connected")
 
