@@ -292,13 +292,26 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
                 fwutils.netplan_apply('add_remove_netplan_interface')
                 ifname = set_name
 
-        # Remove dev-id-to-tap cached value for this dev id, as netplan might change
-        # interface name (see 'set-name' netplan option).
-        # As well re-initialize the interface name by dev id.
-        # Note 'dev_id' is None for tap-inject (vppX) of tapcli-X interfaces used for LTE/WiFi devices.
+        # On interface adding or removal update caches interface related caches.
+        #
         if dev_id:
-            cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
             dev_id_full = fwutils.dev_id_to_full(dev_id)
+
+            # Remove dev-id-to-vpp-if-name and vpp-if-name-to-dev-id cached
+            # values for this dev id if the interface is removed from system.
+            #
+            if is_add == False:
+                vpp_if_name = fwglobals.g.cache.dev_id_to_vpp_if_name.get(dev_id_full)
+                if vpp_if_name:
+                    del fwglobals.g.cache.dev_id_to_vpp_if_name[dev_id_full]
+                    del fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_if_name]
+
+            # Remove dev-id-to-tap cached value for this dev id, as netplan might change
+            # interface name (see 'set-name' netplan option).
+            # As well re-initialize the interface name by dev id.
+            # Note 'dev_id' is None for tap-inject (vppX) of tapcli-X interfaces used for LTE/WiFi devices.
+            #
+            cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
             if dev_id_full in cache:
                 del cache[dev_id_full]
             ifname = fwutils.dev_id_to_tap(dev_id)

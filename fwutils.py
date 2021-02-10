@@ -885,7 +885,6 @@ def tap_to_vpp_if_name(tap):
         raise Exception("tap_to_vpp_if_name: failed to fetch tap info from VPP")
 
     taps = taps.splitlines()
-    pattern = '([a-zA-Z0-9_]+) -> %s' % tap
     for line in taps:
         if tap in line:
             vpp_if_name = line.split(' ->')[0]
@@ -1057,7 +1056,6 @@ def _vppctl_read(cmd, wait=True):
     for _ in range(retries):
         try:
             _ = open(os.devnull, 'r+b', 0)
-            fwglobals.log.debug("vppctl " + cmd)
             handle = os.popen('sudo vppctl ' + cmd + ' 2>/dev/null')
             data = handle.read()
             retcode = handle.close()
