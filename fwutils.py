@@ -3063,7 +3063,7 @@ def get_bus_info(interface_name):
     """
     try:
         cmd = 'ethtool -i %s' % interface_name
-        out = subprocess.check_output(cmd, shell=True).splitlines()
+        out = subprocess.check_output(cmd, shell=True).decode().splitlines()
         vals = out[4].decode().split("bus-info: ", 1)
         return str(vals[-1])
     except subprocess.CalledProcessError:
