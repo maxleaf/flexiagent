@@ -257,7 +257,7 @@ def get_interface_gateway(if_name, if_dev_id=None):
 
     try:
         cmd   = "ip route list match default | grep via | grep 'dev %s'" % if_name
-        route = os.popen(cmd).read()
+        route = os.popen(cmd).read().decode()
         if not route:
             return '', ''
     except:
@@ -2479,7 +2479,7 @@ def configure_lte_interface(params):
         os.system('ifconfig %s %s up' % (nicname, ip))
 
         # remove old default router
-        output = os.popen('ip route list match default | grep %s' % nicname).read()
+        output = os.popen('ip route list match default | grep %s' % nicname).read().decode()
         if output:
             routes = output.splitlines()
             for r in routes:
@@ -3258,7 +3258,7 @@ def compare_request_params(params1, params2):
     return True
 
 def check_if_virtual_environment():
-    virt_exist = os.popen('dmesg |grep -i hypervisor| grep -i detected').read()
+    virt_exist = os.popen('dmesg |grep -i hypervisor| grep -i detected').read().decode()
     if virt_exist =='':
         return False
     else:
