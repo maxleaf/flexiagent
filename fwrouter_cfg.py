@@ -52,7 +52,7 @@ class FwRouterCfg(FwCfgDatabase):
                 req_key = self._get_request_key(request)
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
             else:
-                FwCfgDatabase.update(self, request, cmd_list, executed)
+                FwCfgDatabase.update(self, request, cmd_list, executed, whitelist)
         except KeyError:
             pass
         except Exception as e:
