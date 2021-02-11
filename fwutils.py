@@ -3711,7 +3711,12 @@ def ikev2_modify_private_key(private_pem):
     '''
     try:
         fwglobals.g.router_api.vpp_api.vpp.api.ikev2_set_local_key(key_file=private_pem)
+
         tunnels = fwglobals.g.ikev2tunnels.get_tunnels()
+        for tunnel in tunnels.values():
+            if tunnel['role'] == 'initiator':
+                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tunnel['profile'])
+
 
     except Exception as e:
         fwglobals.log.error("%s" % str(e))
