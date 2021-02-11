@@ -117,7 +117,7 @@ def start_router(params=None):
             cmd_list.append(cmd)
 
             # Non-dpdk interface should not appear in /etc/vpp/startup.conf because they don't have a pci address.
-            # Additional spaciel logic for these interfaces is at add_interface translator
+            # Additional spacial logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
                 continue
 
