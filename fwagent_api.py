@@ -87,12 +87,21 @@ class FWAGENT_API:
                 if tunnel_id in tunnel_ids:
                     # key1-key4 are the crypto keys stored in
                     # the management for each tunnel
+                    key1 = ""
+                    key2 = ""
+                    key3 = ""
+                    key4 = ""
+                    if "ipsec" in params:
+                        key1 = params["ipsec"]["local-sa"]["crypto-key"]
+                        key2 = params["ipsec"]["local-sa"]["integr-key"]
+                        key3 = params["ipsec"]["remote-sa"]["crypto-key"]
+                        key4 = params["ipsec"]["remote-sa"]["integr-key"]
                     tunnel_info.append({
                         "id": str(tunnel_id),
-                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
-                        "key2": params["ipsec"]["local-sa"]["integr-key"],
-                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
-                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
+                        "key1": key1,
+                        "key2": key2,
+                        "key3": key3,
+                        "key4": key4
                     })
 
             except Exception as e:
