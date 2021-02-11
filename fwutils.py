@@ -510,7 +510,8 @@ def get_linux_interfaces(cached=True):
                 interface['deviceType'] = 'lte'
                 interface['dhcp'] = 'yes'
                 interface['deviceParams'] = {
-                    'initial_pin1_state': lte_get_pin_state(dev_id).get('PIN1_STATUS', '')
+                    'initial_pin1_state': lte_get_pin_state(dev_id),
+                    'default_settings':   lte_get_default_settings(dev_id)
                 }
 
                 is_assigned = is_interface_assigned_to_vpp(dev_id)
@@ -2412,7 +2413,7 @@ def start_hostapd():
 
         if files:
             files = ' '.join(files)
-            proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
+            proc = subprocess.check_output('sudo hostapd %s -B -dd -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
             time.sleep(1)
 
             pid = pid_of('hostapd')
