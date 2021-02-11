@@ -3702,6 +3702,9 @@ def ikev2_modify_certificate(device_id, certificate, role, src):
                                                                       data=public_pem.encode(),
                                                                       data_len=len(public_pem))
 
+        if role == 'initiator':
+            fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=profile)
+
     except Exception as e:
         fwglobals.log.error("%s" % str(e))
         pass
