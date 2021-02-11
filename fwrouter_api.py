@@ -915,6 +915,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
+        fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwglobals.g.cache.linux_interfaces.clear()
 
     def _on_apply_router_config(self):
