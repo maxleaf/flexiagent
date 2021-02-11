@@ -255,7 +255,7 @@ class FwWanMonitor:
 
     def _check_connectivity(self, route, server):
 
-        cmd = "fping %s -C 1 -q -I %s > /dev/null 2>&1" % (server, route.dev)
+        cmd = "fping %s -C 1 -q -R -I %s > /dev/null 2>&1" % (server, route.dev)
         ok = not subprocess.call(cmd, shell=True)
 
         route.probes.append(ok)
@@ -272,8 +272,12 @@ class FwWanMonitor:
         new_metric = None
         if route.metric < self.WATERMARK and failures >= self.THRESHOLD:
             new_metric = route.metric + self.WATERMARK
+            fwglobals.log.debug("WAN Monitor: Link down Metric Update - From: %d To: %d" %
+                (route.metric, new_metric))
         elif route.metric >= self.WATERMARK and successes >= self.THRESHOLD:
             new_metric = route.metric - self.WATERMARK
+            fwglobals.log.debug("WAN Monitor: Link up Metric Update - From: %d To: %d" %
+                (route.metric, new_metric))
 
         if new_metric != None:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
@@ -342,10 +346,10 @@ class FwWanMonitor:
             # Update VPP NAT with the new default route interface.
             #
             if route.default:
-                success = fwutils.vpp_nat_add_remove_interface(False, route.dev_id, new_metric)
+                success = fwutils.vpp_nat_addr_update_on_metric_change(route.dev_id, new_metric)
                 if not success:
                     route.ok = prev_ok
-                    fwglobals.log.error("failed to update metric in VPP NAT")
+                    fwglobals.log.error("failed to reflect metric in VPP NAT Address")
                     fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.dev_id, ip, route.via, prev_metric, dhcp, 'WAN',

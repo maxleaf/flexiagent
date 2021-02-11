@@ -639,6 +639,11 @@ def reset(soft=False, quiet=False):
 
     :returns: None.
     """
+    # prevent reset configuration when vpp is run
+    if fwutils.vpp_does_run() and soft:
+        print("Router must be stopped in order to reset the configuration")
+        return
+
     fwutils.reset_device_config()
 
     if soft:
