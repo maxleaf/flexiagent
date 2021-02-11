@@ -1004,7 +1004,7 @@ def add_tunnel(params):
     """
     cmd_list = []
 
-    encryption_mode = params.get("encryption-mode", "static")
+    encryption_mode = params.get("encryption-mode", "pre-shared-key")
 
     loop0_ip  = IPNetwork(params['loopback-iface']['addr'])     # 10.100.0.4 / 10.100.0.5
     loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
@@ -1026,7 +1026,7 @@ def add_tunnel(params):
     _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=(params['tunnel-id']*2+1))
 
     l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
-    if encryption_mode == "static":
+    if encryption_mode == "pre-shared-key":
         # Add loop0-bridge-l2gre-ipsec
         _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
     elif encryption_mode == "ikev2":
