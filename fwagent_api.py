@@ -89,11 +89,10 @@ class FWAGENT_API:
                     # the management for each tunnel
                     tunnel_info.append({
                         "id": str(tunnel_id),
-                        # A temporary fix of the exception
-                        #"key1": params["ipsec"]["local-sa"]["crypto-key"],
-                        #"key2": params["ipsec"]["local-sa"]["integr-key"],
-                        #"key3": params["ipsec"]["remote-sa"]["crypto-key"],
-                        #"key4": params["ipsec"]["remote-sa"]["integr-key"]
+                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
+                        "key2": params["ipsec"]["local-sa"]["integr-key"],
+                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
+                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
                     })
 
             except Exception as e:
