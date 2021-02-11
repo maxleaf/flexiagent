@@ -881,6 +881,8 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         fwnetplan.load_netplan_filenames()
 
+        fwglobals.g.cache.dev_id_to_vpp_if_name.clear() # Clear this cache at the begging of start router  to make sure that it will be build from scratch
+
 
     def _on_start_router_after(self):
         """Handles post start VPP activities.
