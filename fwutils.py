@@ -3699,7 +3699,7 @@ def ikev2_modify_certificate(device_id, certificate, role, src):
     try:
         fwglobals.g.router_api.vpp_api.vpp.api.ikev2_profile_set_auth(name=profile,
                                                                       auth_method=1,
-                                                                      data=public_pem,
+                                                                      data=public_pem.encode(),
                                                                       data_len=len(public_pem))
 
     except Exception as e:
