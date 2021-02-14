@@ -138,6 +138,7 @@ def add_interface(params):
             cmd['cmd']['params'] = {
                     'module': 'fwutils',
                     'func': 'start_hostapd',
+                    'args': { 'linux_if_name': iface_name }
             }
             cmd['cmd']['descr']  = "start hostpad"
             cmd['revert'] = {}

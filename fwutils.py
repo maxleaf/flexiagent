@@ -2402,7 +2402,28 @@ def wifi_ap_get_clients(interface_name):
 
     return response
 
-def start_hostapd():
+def wait_hostapd_to_start(if_name, timeout=60):
+    # Make sure hostapd didn't terminate
+    pid = pid_of('hostapd')
+    if not pid:
+        return False
+
+    # Wait for hostapd to be enabled
+    while timeout > 0:
+        res = os.system('grep "%s: AP-ENABLED" %s' % (if_name, fwglobals.g.HOSTAPD_LOG_FILE))
+        # Exit if enabled found
+        if res == 0:
+            break
+
+        # if not, wait a second and try again till the timeout
+        time.sleep(1)
+        timeout -= 1
+
+    if timeout == 0:
+        return False
+    return True
+
+def start_hostapd(linux_if_name):
     try:
 
         if pid_of('hostapd'):
@@ -2413,11 +2434,15 @@ def start_hostapd():
 
         if files:
             files = ' '.join(files)
-            proc = subprocess.check_output('sudo hostapd %s -B -dd -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
-            time.sleep(1)
 
-            pid = pid_of('hostapd')
-            if pid:
+            # Clear log file
+            os.system('echo "" > %s' % fwglobals.g.HOSTAPD_LOG_FILE)
+            # Start hostapd in background
+            proc = subprocess.check_output('sudo hostapd %s -B -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
+            started = wait_hostapd_to_start(linux_if_name)
+
+            # pid = pid_of('hostapd')
+            if started:
                 return (True, None)
 
         return (False, 'Error in activating your access point. Your hardware may not support the selected settings')
