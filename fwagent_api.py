@@ -112,7 +112,7 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = list(fwutils.get_linux_interfaces().values())
+            info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
@@ -169,6 +169,8 @@ class FWAGENT_API:
             'dhcp': fwglobals.g.DHCP_LOG_FILE,
             'vpp': fwglobals.g.VPP_LOG_FILE,
             'ospf': fwglobals.g.OSPF_LOG_FILE,
+            'hostapd': fwglobals.g.HOSTAPD_LOG_FILE,
+            'agentui': fwglobals.g.AGNET_UI_LOG_FILE
 	    }
         file = dl_map.get(params['filter'], '')
         try:

@@ -888,7 +888,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
-        fwglobals.g.cache.linux_interfaces.clear()
+        fwutils.clear_linux_interfaces_cache()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):
@@ -915,7 +915,8 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
-        fwglobals.g.cache.linux_interfaces.clear()
+        fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
+        fwutils.clear_linux_interfaces_cache()
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.

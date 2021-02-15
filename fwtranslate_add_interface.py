@@ -137,7 +137,7 @@ def add_interface(params):
             cmd['cmd']['name']   = "python"
             cmd['cmd']['params'] = {
                     'module': 'fwutils',
-                    'func': 'start_hostapd',
+                    'func': 'start_hostapd'
             }
             cmd['cmd']['descr']  = "start hostpad"
             cmd['revert'] = {}
