@@ -455,6 +455,10 @@ def set_linux_interfaces_stun(dev_id, public_ip, public_port, nat_type):
             interface['public_port'] = public_port
             interface['nat_type']    = nat_type
 
+def clear_linux_interfaces_cache():
+    with fwglobals.g.cache.lock:
+        fwglobals.g.cache.linux_interfaces.clear()
+
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
 
@@ -469,6 +473,7 @@ def get_linux_interfaces(cached=True):
         if cached and interfaces:
             return interfaces
 
+        fwglobals.log.debug("get_linux_interfaces: Start to build Linux interfaces cache")
         interfaces.clear()
 
         linux_inf = psutil.net_if_addrs()
@@ -514,7 +519,8 @@ def get_linux_interfaces(cached=True):
                 interface['deviceType'] = 'lte'
                 interface['dhcp'] = 'yes'
                 interface['deviceParams'] = {
-                    'initial_pin1_state': lte_get_pin_state(dev_id).get('PIN1_STATUS', '')
+                    'initial_pin1_state': lte_get_pin_state(dev_id),
+                    'default_settings':   lte_get_default_settings(dev_id)
                 }
 
                 is_assigned = is_interface_assigned_to_vpp(dev_id)
@@ -553,6 +559,7 @@ def get_linux_interfaces(cached=True):
 
             interfaces[dev_id] = interface
 
+        fwglobals.log.debug("get_linux_interfaces: Finished to build Linux interfaces cache")
         return interfaces
 
 def get_interface_dev_id(if_name):
@@ -2296,11 +2303,11 @@ def configure_hostapd(dev_id, configuration):
             channel = config.get('channel', '0')
             data['channel'] = channel
 
-            country_code = config.get('region', 'other')
-            if channel == '0' and country_code != 'other':
+            country_code = config.get('region', 'US')
+            data['country_code'] = country_code
+            if channel == '0':
                 data['ieee80211d'] = 1
                 data['ieee80211h'] = 1
-                data['country_code'] = country_code
 
             ap_mode = config.get('operationMode', 'g')
 
@@ -2408,8 +2415,10 @@ def start_hostapd():
 
         if files:
             files = ' '.join(files)
-            proc = subprocess.check_output('sudo hostapd %s -B -dd' % files, stderr=subprocess.STDOUT, shell=True)
-            time.sleep(1)
+
+            # Start hostapd in background
+            proc = subprocess.check_output('sudo hostapd %s -B -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
+            time.sleep(2)
 
             pid = pid_of('hostapd')
             if pid:
@@ -2492,7 +2501,7 @@ def configure_lte_interface(params):
         # set updated default route
         os.system('route add -net 0.0.0.0 gw %s metric %s' % (gateway, metric))
 
-        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
+        clear_linux_interfaces_cache() # remove this code when move ip configuration to netplan
         return (True , None)
 
     return (False, "Failed to configure lte for dev_id %s" % dev_id)
@@ -2678,7 +2687,7 @@ def lte_disconnect(dev_id, hard_reset_service=False):
             _run_qmicli_command(dev_id, 'nas-reset')
             _run_qmicli_command(dev_id, 'uim-reset')
 
-        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
+        clear_linux_interfaces_cache() # remove this code when move ip configuration to netplan
 
         return (True, None)
     except subprocess.CalledProcessError as e:
@@ -3188,7 +3197,7 @@ def netplan_apply(caller_name=None):
         # Netplan might change interface names, e.g. enp0s3 -> vpp0, or other parameters so reset cache
         #
         fwglobals.g.cache.linux_interfaces_by_name.clear()
-        fwglobals.g.cache.linux_interfaces.clear()
+        clear_linux_interfaces_cache()
 
         # Find out if the default route was changed. If it was - reconnect agent.
         #
@@ -3452,6 +3461,17 @@ def get_min_metric_device(skip_dev_id):
 
     return (metric_min_dev_id, metric_min)
 
+def vpp_nat_add_del_identity_mapping(vpp_if_name, protocol, port, is_add):
+
+    del_str = '' if is_add else 'del'
+    vppctl_cmd = 'nat44 add identity mapping external %s %s %d vrf 0 %s' %\
+        (vpp_if_name, protocol, port, del_str)
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        fwglobals.log.error("Failed vppctl command: %s" % vppctl_cmd)
+    else:
+        fwglobals.log.debug("Executed nat44 mapping command: %s" % vppctl_cmd)
+
 def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
 
     vpp_if_name_remove = None
@@ -3475,7 +3495,20 @@ def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
         vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
         vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
+    '''
+    On removing NAT interface address - Identity mapping on the interface gets to a partially
+    removed state in VPP. So, removing and re-adding identity mapping on interface address deletion.
+    A good fix would be to root cause and modify VPP and ensure the identity mappings do not need
+    deletion and addition (addition needed for vxlan tunnel) on nat44 address removal.
+    '''
+    if vpp_if_name_remove:
+        vpp_nat_add_del_identity_mapping(vpp_if_name_remove, 'udp', 4789, 0)
+
     success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+
+    if vpp_if_name_remove:
+        vpp_nat_add_del_identity_mapping(vpp_if_name_remove, 'udp', 4789, 1)
+
     return success
 
 

@@ -259,6 +259,8 @@ class Fwglobals:
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
+        self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
+        self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
         self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
