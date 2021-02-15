@@ -444,12 +444,12 @@ class FwCfgRequestHandler:
         # First of all check if the received parameters differs from the existing ones
         same = fwutils.compare_request_params(params, old_params)
         if same:
-            return []
+            return ([], None)
 
         api_defs = self.translators.get(req)
         if not api_defs:
             # This 'modify-X' is not supported (yet?)
-            return []
+            return ([], None)
 
         module = api_defs.get('module')
         assert module, 'there is no module for request "%s"' % req
