@@ -465,7 +465,7 @@ class FwCfgRequestHandler:
         if isinstance(cmd_list, list):
             new_cmd_list = []
             for cmd in cmd_list:
-                if 'modify' in cmd.keys():
+                if 'modify' in cmd:
                     whitelist = cmd['whitelist']
                 else:
                     new_cmd_list.append(cmd)
