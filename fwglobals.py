@@ -242,6 +242,7 @@ class Fwglobals:
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
+        self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
