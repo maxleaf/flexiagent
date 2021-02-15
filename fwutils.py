@@ -3457,6 +3457,17 @@ def get_min_metric_device(skip_dev_id):
 
     return (metric_min_dev_id, metric_min)
 
+def vpp_nat_add_del_identity_mapping(vpp_if_name, protocol, port, is_add):
+
+    del_str = '' if is_add else 'del'
+    vppctl_cmd = 'nat44 add identity mapping external %s %s %d vrf 0 %s' %\
+        (vpp_if_name, protocol, port, del_str)
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        fwglobals.log.error("Failed vppctl command: %s" % vppctl_cmd)
+    else:
+        fwglobals.log.debug("Executed nat44 mapping command: %s" % vppctl_cmd)
+
 def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
 
     vpp_if_name_remove = None
@@ -3480,7 +3491,20 @@ def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
         vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
         vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
 
+    '''
+    On removing NAT interface address - Identity mapping on the interface gets to a partially
+    removed state in VPP. So, removing and re-adding identity mapping on interface address deletion.
+    A good fix would be to root cause and modify VPP and ensure the identity mappings do not need
+    deletion and addition (addition needed for vxlan tunnel) on nat44 address removal.
+    '''
+    if vpp_if_name_remove:
+        vpp_nat_add_del_identity_mapping(vpp_if_name_remove, 'udp', 4789, 0)
+
     success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
+
+    if vpp_if_name_remove:
+        vpp_nat_add_del_identity_mapping(vpp_if_name_remove, 'udp', 4789, 1)
+
     return success
 
 
