@@ -226,6 +226,9 @@ class FWROUTER_API(FwCfgRequestHandler):
                             tun['sw_if_index'] = tunnel.sw_if_index
                             tun['state'] = 'running'
                             fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
+                        else:
+                            if tun['role'] == 'initiator':
+                                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
                         continue
 
                     if tun['state'] == 'running':
