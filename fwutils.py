@@ -451,6 +451,11 @@ def set_linux_interfaces_stun(dev_id, public_ip, public_port, nat_type):
             interface['public_port'] = public_port
             interface['nat_type']    = nat_type
 
+def clear_linux_interfaces_cache():
+    with fwglobals.g.cache.lock:
+        fwglobals.log.debug("clear_linux_interfaces_cache: Clear Linux interface cache")
+        fwglobals.g.cache.linux_interfaces.clear()
+
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
 
@@ -465,6 +470,7 @@ def get_linux_interfaces(cached=True):
         if cached and interfaces:
             return interfaces
 
+        fwglobals.log.debug("get_linux_interfaces: Start to build Linux interfaces cache")
         interfaces.clear()
 
         linux_inf = psutil.net_if_addrs()
@@ -550,6 +556,7 @@ def get_linux_interfaces(cached=True):
 
             interfaces[dev_id] = interface
 
+        fwglobals.log.debug("get_linux_interfaces: Finished to build Linux interfaces cache")
         return interfaces
 
 def get_interface_dev_id(if_name):
@@ -2301,11 +2308,11 @@ def configure_hostapd(dev_id, configuration):
             channel = config.get('channel', '0')
             data['channel'] = channel
 
-            country_code = config.get('region', 'other')
-            if channel == '0' and country_code != 'other':
+            country_code = config.get('region', 'US')
+            data['country_code'] = country_code
+            if channel == '0':
                 data['ieee80211d'] = 1
                 data['ieee80211h'] = 1
-                data['country_code'] = country_code
 
             ap_mode = config.get('operationMode', 'g')
 
@@ -2402,27 +2409,6 @@ def wifi_ap_get_clients(interface_name):
 
     return response
 
-def wait_hostapd_to_start(if_name, timeout=60):
-    # Make sure hostapd didn't terminate
-    pid = pid_of('hostapd')
-    if not pid:
-        return False
-
-    # Wait for hostapd to be enabled
-    while timeout > 0:
-        res = os.system('grep "%s: AP-ENABLED" %s' % (if_name, fwglobals.g.HOSTAPD_LOG_FILE))
-        # Exit if enabled found
-        if res == 0:
-            break
-
-        # if not, wait a second and try again till the timeout
-        time.sleep(1)
-        timeout -= 1
-
-    if timeout == 0:
-        return False
-    return True
-
 def start_hostapd(linux_if_name):
     try:
 
@@ -2439,10 +2425,10 @@ def start_hostapd(linux_if_name):
             os.system('echo "" > %s' % fwglobals.g.HOSTAPD_LOG_FILE)
             # Start hostapd in background
             proc = subprocess.check_output('sudo hostapd %s -B -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
-            started = wait_hostapd_to_start(linux_if_name)
+            time.sleep(2)
 
-            # pid = pid_of('hostapd')
-            if started:
+            pid = pid_of('hostapd')
+            if pid:
                 return (True, None)
 
         return (False, 'Error in activating your access point. Your hardware may not support the selected settings')
@@ -2522,7 +2508,7 @@ def configure_lte_interface(params):
         # set updated default route
         os.system('route add -net 0.0.0.0 gw %s metric %s' % (gateway, metric))
 
-        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
+        clear_linux_interfaces_cache() # remove this code when move ip configuration to netplan
         return (True , None)
 
     return (False, "Failed to configure lte for dev_id %s" % dev_id)
@@ -2708,7 +2694,7 @@ def lte_disconnect(dev_id, hard_reset_service=False):
             _run_qmicli_command(dev_id, 'nas-reset')
             _run_qmicli_command(dev_id, 'uim-reset')
 
-        fwglobals.g.cache.linux_interfaces.clear() # remove this code when move ip configuration to netplan
+        clear_linux_interfaces_cache() # remove this code when move ip configuration to netplan
 
         return (True, None)
     except subprocess.CalledProcessError as e:
@@ -3217,7 +3203,7 @@ def netplan_apply(caller_name=None):
         # Netplan might change interface names, e.g. enp0s3 -> vpp0, or other parameters so reset cache
         #
         fwglobals.g.cache.linux_interfaces_by_name.clear()
-        fwglobals.g.cache.linux_interfaces.clear()
+        clear_linux_interfaces_cache()
 
         # Find out if the default route was changed. If it was - reconnect agent.
         #
