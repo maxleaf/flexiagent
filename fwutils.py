@@ -2408,7 +2408,7 @@ def wifi_ap_get_clients(interface_name):
 
     return response
 
-def start_hostapd(linux_if_name):
+def start_hostapd():
     try:
 
         if pid_of('hostapd'):
@@ -2420,8 +2420,6 @@ def start_hostapd(linux_if_name):
         if files:
             files = ' '.join(files)
 
-            # Clear log file
-            os.system('echo "" > %s' % fwglobals.g.HOSTAPD_LOG_FILE)
             # Start hostapd in background
             proc = subprocess.check_output('sudo hostapd %s -B -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
             time.sleep(2)
