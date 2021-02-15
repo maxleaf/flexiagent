@@ -3637,7 +3637,7 @@ def linux_routes_dictionary_get():
 
     # get only our static routes from Linux
     try :
-        output = subprocess.check_output('ip route show | grep -v proto', shell=True).strip()
+        output = subprocess.check_output('ip route show | grep -v proto', shell=True).strip().decode()
     except:
         return routes_dict
 
