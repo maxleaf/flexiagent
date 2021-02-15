@@ -453,7 +453,6 @@ def set_linux_interfaces_stun(dev_id, public_ip, public_port, nat_type):
 
 def clear_linux_interfaces_cache():
     with fwglobals.g.cache.lock:
-        fwglobals.log.debug("clear_linux_interfaces_cache: Clear Linux interface cache")
         fwglobals.g.cache.linux_interfaces.clear()
 
 def get_linux_interfaces(cached=True):
