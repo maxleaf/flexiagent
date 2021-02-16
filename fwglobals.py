@@ -616,9 +616,7 @@ class Fwglobals:
         # Break the received aggregated request into aggregations by API type
         #
         # !!! IMPORTANT !!!
-        # Requests that belong to different api modules, e.g. router_api, system_api, etc.,
-        # should not depend on each others. So the order of the execution of aggregated messages
-        # grouped by api, is not important! Hence reuse dict for "aggregations"
+        # ATM we decided to run system-api requests before router-api requests.
         #
         aggregations = {}
         for _request in request['params']['requests']:
@@ -653,19 +651,20 @@ class Fwglobals:
 
         # Go over list of aggregations and execute their requests one by one.
         #
-        apis = aggregations.keys()
         executed_apis = []
-        for api in apis:
-            api_call_func = self._get_api_object_attr(api, 'call')
-            try:
-                api_call_func(aggregations[api])
-                executed_apis.append(api)
-            except Exception as e:
-                # Revert the previously executed aggregated requests
-                for api in executed_apis:
-                    rollback_func = self._get_api_object_attr(api, 'rollback')
-                    rollback_func(rollback_aggregations[api])
-                raise e
+
+        for api in ['_call_system_api', '_call_router_api']:
+            if api in aggregations:
+                api_call_func = self._get_api_object_attr(api, 'call')
+                try:
+                    api_call_func(aggregations[api])
+                    executed_apis.append(api)
+                except Exception as e:
+                    # Revert the previously executed aggregated requests
+                    for api in executed_apis:
+                        rollback_func = self._get_api_object_attr(api, 'rollback')
+                        rollback_func(rollback_aggregations[api])
+                    raise e
 
         return {'ok': 1}
 
