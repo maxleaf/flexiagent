@@ -94,7 +94,7 @@ def tunnel_stats_test():
 
     :returns: None.
     """
-    for value in tunnel_stats_global.values():
+    for value in list(tunnel_stats_global.values()):
         value['sent'] += 1
 
         rtt = tunnel_stats_get_ping_time(value['loopback_remote'])
