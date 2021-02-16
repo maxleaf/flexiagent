@@ -1594,6 +1594,7 @@ def traffic_control_remove_dev_root(dev_name):
         return (True, None)
 
 def reset_traffic_control():
+    fwglobals.log.debug('clean Linux traffic control settings')
     search = []
     lte_interfaces = get_lte_interfaces_names()
 
