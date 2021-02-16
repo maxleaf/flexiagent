@@ -217,6 +217,10 @@ class FWROUTER_API(FwCfgRequestHandler):
                     if tunnel:
                         tunnel_status = fwutils.vpp_interface_status_get(interfaces, tunnel.sw_if_index)
 
+                    if tun['sa_init'] > 0:
+                        tun['sa_init'] = tun['sa_init'] - 1
+                        fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
+
                     if tun['state'] == 'init':
                         if tunnel:
                             fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_l2_bridge(rx_sw_if_index=tunnel.sw_if_index,
@@ -225,10 +229,13 @@ class FWROUTER_API(FwCfgRequestHandler):
                             fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_set_flags(sw_if_index=tunnel.sw_if_index, flags=1)
                             tun['sw_if_index'] = tunnel.sw_if_index
                             tun['state'] = 'running'
-                            fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
                         else:
                             if tun['role'] == 'initiator':
-                                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                                if tun['sa_init'] == 0:
+                                    fwglobals.log.debug('SA-INIT')
+                                    fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                                    tun['sa_init'] = 5
+                            fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
                         continue
 
                     if tun['state'] == 'running':
@@ -242,7 +249,10 @@ class FWROUTER_API(FwCfgRequestHandler):
                             if tun['role'] == 'initiator':
                                 if tun['ttl'] == 0:
                                     tun['ttl'] = tun['lifetime']
-                                    fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                                    if tun['sa_init'] == 0:
+                                        fwglobals.log.debug('SA-INIT')
+                                        fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                                        tun['sa_init'] = 5
                                 else:
                                     tun['ttl'] = tun['ttl'] - 1
                                 fwglobals.g.ikev2tunnels.update_tunnel(src, tun)
@@ -250,7 +260,10 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                     if tun['state'] == 'stopped':
                         if tun['role'] == 'initiator':
-                            fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                            if tun['sa_init'] == 0:
+                                fwglobals.log.debug('SA-INIT')
+                                fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=tun['profile'])
+                                tun['sa_init'] = 5
 
                         tun['state'] = 'init'
                         fwglobals.g.ikev2tunnels.update_tunnel(src, tun)

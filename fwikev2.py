@@ -68,7 +68,7 @@ class FwIKEv2Tunnels:
 
         :returns: None.
         """
-        self.db[src] = {'bridge_id': bd_id, 'profile': profile, 'role': role, 'sw_if_index': -1, 'state': 'init', 'lifetime': lifetime, 'ttl': lifetime}
+        self.db[src] = {'bridge_id': bd_id, 'profile': profile, 'role': role, 'sw_if_index': -1, 'state': 'init', 'lifetime': lifetime, 'ttl': lifetime, 'sa_init': 5}
 
     def remove_tunnel(self, src):
         """Removes tunnel from database.
