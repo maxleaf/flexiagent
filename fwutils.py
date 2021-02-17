@@ -2741,16 +2741,19 @@ def mbim_query_connection_state(dev_id):
                 return line.split(':')[-1].strip().replace("'", '') == 'activated'
     return False
 
+def reset_modem(dev_id):
+    fwglobals.log.debug('reset_modem: reset starting')
+    _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
+    _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
+    time.sleep(8)
+    _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
+    fwglobals.log.debug('reset_modem: reset finished')
+
 def lte_connect(params, reset=False):
     dev_id = params['dev_id']
 
     if reset:
-        fwglobals.log.debug('lte_connect: reset lte')
-        _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
-        _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
-        time.sleep(8)
-        _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
-        fwglobals.log.debug('lte_connect: reset finished')
+        reset_modem(dev_id)
 
     if not lte_is_sim_inserted(dev_id):
         qmi_sim_power_off(dev_id)
