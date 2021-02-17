@@ -3308,7 +3308,8 @@ def set_linux_reverse_path_filter(dev_name, rpf_value):
         out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
         current_val = int(out.split(' = ')[1])
     except Exception as e:
-        fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % dev_name, str(e))
+        fwglobals.log.warning("set_linux_reverse_path_filter(%s): failed to fetch current value: %s"
+             % (dev_name, str(e)))
         return None
 
     # Light optimization, no need to set the value
@@ -3324,6 +3325,14 @@ def set_linux_reverse_path_filter(dev_name, rpf_value):
         fwglobals.log.debug("RPF set command successfully executed: %s" % (sys_cmd))
     else:
         fwglobals.log.error("RPF set command failed : %s" % (sys_cmd))
+
+    '''
+    Below global setting is not required if rpf access is setup correctly
+    Putting back the initial below code till rpf access is streamlined
+    '''
+    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (rpf_value))
+    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (rpf_value))
+
     return current_val
 
 def update_linux_metric(prefix, dev, metric):

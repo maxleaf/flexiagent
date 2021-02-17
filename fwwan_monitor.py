@@ -250,10 +250,16 @@ class FwWanMonitor:
         #
         stale_keys = list(set(self.routes.keys()) - set(os_routes.keys()))
         for key in stale_keys:
+            '''
+            Commented till rpf access race with stun thread is resolved
+
             # Put back the RPF value originally seen on the interface
-            fwutils.set_linux_reverse_path_filter(self.routes[key].dev, self.routes[key].prev_rpf)
+            if self.routes[key].prev_rpf is not None:
+                fwutils.set_linux_reverse_path_filter(self.routes[key].dev, self.routes[key].prev_rpf)
             fwglobals.log.debug("Stop WAN Monitoring on '%s' (Restore RPF to: %s)" %
                 (str(self.routes[key]), str(self.routes[key].prev_rpf)))
+            '''
+            fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
         return self.routes.values()
