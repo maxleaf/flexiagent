@@ -51,6 +51,9 @@ from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
 
+RPF_DISABLE     = 0
+RPF_STRICT_MODE = 1
+RPF_LOOSE_MODE  = 2
 
 dpdk = __import__('dpdk-devbind')
 
@@ -3288,43 +3291,37 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
-def set_linux_reverse_path_filter(dev_name, on):
+def set_linux_reverse_path_filter(dev_name, rpf_value):
     """ set rp_filter value of Linux property
 
     : param dev_name : device name to set the property for
-    : param on       : if on is False, disable rp_filter. Else, enable it
+    : param rpf_value: RPF value to be set using the sysctl command
     """
-    if dev_name == None:
-        return None
-
-    # For default interface skip the setting as it is redundant
-    #
-    _, metric = get_interface_gateway(dev_name)
-    if metric == '' or int(metric) == 0:
-        return None
-
     # Fetch current setting, so it could be restored later if needed.
     #
     current_val = None
     try:
         cmd = 'sysctl net.ipv4.conf.%s.rp_filter' % dev_name
         out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
-        current_val = bool(out.split(' = ')[1])
+        current_val = int(out.split(' = ')[1])
     except Exception as e:
         fwglobals.log.error("set_linux_reverse_path_filter(%s): failed to fetch current value: %s" % dev_name, str(e))
         return None
 
     # Light optimization, no need to set the value
     #
-    if current_val == on:
+    if current_val == rpf_value:
         return current_val
 
     # Finally set the value
     #
-    val = 1 if on else 0
-    os.system('sysctl -w net.ipv4.conf.%s.rp_filter=%d > /dev/null' % (dev_name, val))
-    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (val))
-    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (val))
+    sys_cmd = 'sysctl -w net.ipv4.conf.%s.rp_filter=%d > /dev/null' % (dev_name, rpf_value)
+    rc = os.system(sys_cmd)
+    if rc == 0:
+        fwglobals.log.debug("RPF set command successfully executed: %s" % (sys_cmd))
+    else:
+        fwglobals.log.error("RPF set command failed : %s" % (sys_cmd))
+    return current_val
 
 def update_linux_metric(prefix, dev, metric):
     """Invokes 'ip route' commands to update metric on the provide device.
