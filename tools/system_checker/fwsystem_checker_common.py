@@ -1377,13 +1377,13 @@ class Checker:
                                 for at in at_commands:
                                     ser.write(at + '\r')
                                     time.sleep(0.5)
+                                time.sleep(8)
                                 ser.close()
-                        elif 'Sierra Wireless' in vendor and 'EM7455' in model:
-                            current_usb_cop = subprocess.check_output('qmicli --device=/dev/%s --dms-swi-get-usb-composition' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
+                        elif 'Sierra Wireless' in vendor:
                             subprocess.check_output('qmicli --device=/dev/%s --dms-swi-set-usb-composition=8' % device, shell=True, stderr=subprocess.STDOUT)
                             subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=offline' % device, shell=True, stderr=subprocess.STDOUT)
                             subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=reset' % device, shell=True, stderr=subprocess.STDOUT)
-                            time.sleep(5)
+                            time.sleep(8)
                         else:
                             return False
 
