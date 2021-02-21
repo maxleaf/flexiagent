@@ -1370,6 +1370,7 @@ class Checker:
 
                         at_commands = []
                         if 'Quectel' in vendor and 'EM06-E' in model:
+                            print('Please wait...')
                             at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
                             at_serial_port = self.get_at_port(inf['dev_id'])
                             if at_serial_port and len(at_serial_port) > 0:
@@ -1377,13 +1378,14 @@ class Checker:
                                 for at in at_commands:
                                     ser.write(at + '\r')
                                     time.sleep(0.5)
-                                time.sleep(8)
+                                time.sleep(10)
                                 ser.close()
                         elif 'Sierra Wireless' in vendor:
+                            print('Please wait...')
                             subprocess.check_output('qmicli --device=/dev/%s --dms-swi-set-usb-composition=8' % device, shell=True, stderr=subprocess.STDOUT)
                             subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=offline' % device, shell=True, stderr=subprocess.STDOUT)
                             subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=reset' % device, shell=True, stderr=subprocess.STDOUT)
-                            time.sleep(8)
+                            time.sleep(10)
                         else:
                             return False
 
