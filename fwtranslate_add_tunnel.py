@@ -460,7 +460,7 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
             source = fwutils.get_interface_address(tap)
             if source:
                 src = source.split('/')[0]
-                src_addr_bytes = fwutils.ip_str_to_bytes(src)[0]
+                src_addr = ipaddress.ip_address(src)
 
     cmd_params = {
             'is_add'               : 1,
