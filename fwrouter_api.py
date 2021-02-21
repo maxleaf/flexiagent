@@ -118,6 +118,11 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                     self.vpp_api.disconnect_from_vpp()          # Reset connection to vpp to force connection renewal
                     fwutils.stop_vpp()                          # Release interfaces to Linux
+
+                    fwutils.reset_traffic_control()             # Release LTE operations.
+                    fwutils.remove_linux_bridges()              # Release bridges for wifi.
+                    fwutils.stop_hostapd()                      # Stop access point service
+
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
 
@@ -233,6 +238,15 @@ class FWROUTER_API(FwCfgRequestHandler):
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
                 db_policies.clean()
             fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
+
+            # Reboot might cause change of lte modem wan address,
+            # so it will not match the netplan file that was before reboot.
+            # That might cause contamination of vpp fib with wrong routes
+            # during start-router execution. To avoid that we restore original
+            # Linux netplan files to remove any lte related information.
+            #
+            fwnetplan.restore_linux_netplan_files()
+
             self.call({'message':'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
@@ -874,7 +888,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
-        fwglobals.g.cache.linux_interfaces.clear()
+        fwutils.clear_linux_interfaces_cache()
         fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):
@@ -901,7 +915,8 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.state_change(FwRouterState.STOPPED)
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
-        fwglobals.g.cache.linux_interfaces.clear()
+        fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
+        fwutils.clear_linux_interfaces_cache()
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.

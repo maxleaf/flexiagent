@@ -30,6 +30,80 @@ import fwsystem_checker_common
 class Checker(fwsystem_checker_common.Checker):
     """This is Checker class representation.
     """
+    def soft_check_resolvconf(self, fix=False, silently=False, prompt=None):
+        """Check if resolvconf is installed.
+
+        :param fix:             Install resolvconf.
+        :param silently:        Run silently.
+        :param prompt:          Ask user for prompt.
+
+        :returns: 'True' if it resolvconf is installed, 'False' otherwise.
+        """
+        installed = False
+        config_filename = '/etc/resolvconf/resolv.conf.d/tail'
+        try: # Refresh self.nameservers on every invocation
+            out = subprocess.check_output("grep '^nameserver ' %s" % config_filename, shell=True).strip().split('\n')
+            self.nameservers = [ line.split(' ')[1] for line in out ]  # 'line' format is 'nameserver 127.0.0.53'
+        except:
+            self.nameservers = []
+
+        try:
+            out = subprocess.check_output('dpkg -l | grep resolvconf', shell=True).strip()
+            if len(out) == 0:
+                raise Exception(prompt + 'resolvconf is not installed')
+            else:
+                installed = True
+            # The resolvconf is installed now , ensure that it is configured with DNS servers
+            if len(self.nameservers) == 0:
+                raise Exception('no name servers was found in %s' % config_filename)
+            return True
+        except Exception as e:
+            print(prompt + str(e))
+            if not fix:
+                return False
+            else:
+                if silently:
+                    # Install the daemon if not installed
+                    if not installed:
+                        ret = os.system('apt -y install resolvconf > /dev/null 2>&1')
+                        if ret != 0:
+                            print(prompt + 'failed to install resolvconf')
+                            return False
+                    # Now add the 8.8.8.8 to it's configuration
+                    if len(self.nameservers) == 0:
+                        ret = os.system('printf "\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n" >> %s' % config_filename)
+                        if ret != 0:
+                            print(prompt + 'failed to add 8.8.8.8 to %s' % config_filename)
+                            return False
+                        os.system('systemctl restart resolvconf > /dev/null 2>&1')
+                        return True
+                else:
+                    # Install the daemon if not installed
+                    if not installed:
+                        choice = raw_input(prompt + "download and install resolvconf? [Y/n]: ")
+                        if choice == 'y' or choice == 'Y' or choice == '':
+                            ret = os.system('apt -y install resolvconf')
+                            if ret != 0:
+                                print(prompt + 'failed to install resolvconf')
+                                return False
+                        else:
+                            return False
+                    # Now add DNS servers to it's configuration, if no servers present
+                    if len(self.nameservers) == 0:
+                        while True:
+                            server = raw_input(prompt + "enter DNS Server address, e.g. 8.8.8.8: ")
+                            ret = os.system('printf "nameserver %s\n" >> %s' % (server, config_filename))
+                            ret_str = 'succeeded' if ret == 0 else 'failed'
+                            print(prompt + ret_str + ' to add ' + server)
+                            choice = raw_input(prompt + "repeat? [y/N]: " )
+                            if choice == 'y' or choice == 'Y':
+                                continue
+                            elif choice == 'n' or choice == 'N' or choice == '':
+                                break
+                        os.system('systemctl restart resolvconf > /dev/null 2>&1')
+                        return True if ret == 0 else False
+                    return True
+
     def _is_service_active(self, service):
         """Return True if service is running"""
         cmd = '/bin/systemctl status %s.service' % service

@@ -47,6 +47,7 @@ class FwWanRoute:
         self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
         self.ok         = True      # If True there is connectivity to internet
         self.default    = False     # If True the route is the default one - has lowest metric
+        self.prev_rpf   = None      # To put back previous value on monitor disable
 
     def __str__(self):
         route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.dev_id)
@@ -228,11 +229,13 @@ class FwWanMonitor:
                 route.probes    = cached.probes
                 route.ok        = cached.ok
                 route.default   = cached.default
+                route.prev_rpf  = cached.prev_rpf
             else:
-                # Suppress RPF permanently to avoid Linux to filter out
-                # responses for ping-s on not default route interfaces.
-                fwutils.set_linux_reverse_path_filter(route.dev, on=False)
-                fwglobals.log.debug("start on '%s'" % str(route))
+                # Suppress RPF to prevent linux network stack from dropping ping responses
+                route.prev_rpf = fwutils.prev_rpf = fwutils.set_linux_reverse_path_filter(
+                    route.dev, fwutils.RPF_LOOSE_MODE)
+                fwglobals.log.debug("Start WAN Monitoring on '%s' (Previous RPF :%s)" %
+                    (str(route), str(route.prev_rpf)))
 
             # Finally store the route into cache.
             #
@@ -247,7 +250,16 @@ class FwWanMonitor:
         #
         stale_keys = list(set(self.routes.keys()) - set(os_routes.keys()))
         for key in stale_keys:
-            fwglobals.log.debug("stop on '%s'" % str(self.routes[key]))
+            '''
+            Commented till rpf access race with stun thread is resolved
+
+            # Put back the RPF value originally seen on the interface
+            if self.routes[key].prev_rpf is not None:
+                fwutils.set_linux_reverse_path_filter(self.routes[key].dev, self.routes[key].prev_rpf)
+            fwglobals.log.debug("Stop WAN Monitoring on '%s' (Restore RPF to: %s)" %
+                (str(self.routes[key]), str(self.routes[key].prev_rpf)))
+            '''
+            fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
         return self.routes.values()
@@ -255,7 +267,7 @@ class FwWanMonitor:
 
     def _check_connectivity(self, route, server):
 
-        cmd = "fping %s -C 1 -q -I %s > /dev/null 2>&1" % (server, route.dev)
+        cmd = "fping %s -C 1 -q -R -I %s > /dev/null 2>&1" % (server, route.dev)
         ok = not subprocess.call(cmd, shell=True)
 
         route.probes.append(ok)
@@ -272,8 +284,12 @@ class FwWanMonitor:
         new_metric = None
         if route.metric < self.WATERMARK and failures >= self.THRESHOLD:
             new_metric = route.metric + self.WATERMARK
+            fwglobals.log.debug("WAN Monitor: Link down Metric Update - From: %d To: %d" %
+                (route.metric, new_metric))
         elif route.metric >= self.WATERMARK and successes >= self.THRESHOLD:
             new_metric = route.metric - self.WATERMARK
+            fwglobals.log.debug("WAN Monitor: Link up Metric Update - From: %d To: %d" %
+                (route.metric, new_metric))
 
         if new_metric != None:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
@@ -309,6 +325,8 @@ class FwWanMonitor:
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
             return
 
+        fwutils.clear_linux_interfaces_cache()
+
         # If vpp runs and interface is under vpp control, i.e. assigned,
         # go and adjust vpp configuration to the newer metric.
         # Note the route does not have dev_id for virtual interfaces that are
@@ -340,10 +358,10 @@ class FwWanMonitor:
             # Update VPP NAT with the new default route interface.
             #
             if route.default:
-                success = fwutils.vpp_nat_add_remove_interface(False, route.dev_id, new_metric)
+                success = fwutils.vpp_nat_addr_update_on_metric_change(route.dev_id, new_metric)
                 if not success:
                     route.ok = prev_ok
-                    fwglobals.log.error("failed to update metric in VPP NAT")
+                    fwglobals.log.error("failed to reflect metric in VPP NAT Address")
                     fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.dev_id, ip, route.via, prev_metric, dhcp, 'WAN',

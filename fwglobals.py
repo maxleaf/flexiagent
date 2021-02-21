@@ -80,6 +80,7 @@ request_handlers = {
     'get-wifi-info':                     {'name': '_call_agent_api'},
     'get-lte-info':                      {'name': '_call_agent_api'},
     'reset-lte':                         {'name': '_call_agent_api'},
+    'modify-lte-pin':                    {'name': '_call_agent_api'},
 
     # Aggregated API
     'aggregated':                   {'name': '_call_aggregated', 'sign': True},
@@ -120,7 +121,7 @@ request_handlers = {
     # OS API
     'cpuutil':                      {'name': '_call_os_api'},
     'exec':                         {'name': '_call_os_api'},
-    'ifstats':                      {'name': '_call_os_api'},
+    'exec_timeout':                 {'name': '_call_os_api'},
 
     # VPP API
     'abf_itf_attach_add_del':       {'name': '_call_vpp_api'},
@@ -241,6 +242,8 @@ class Fwglobals:
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
+        self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
+        self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
         self.VPP_LOG_FILE        = '/var/log/vpp/vpp.log'
@@ -332,10 +335,12 @@ class Fwglobals:
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+
+        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
+
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
-        self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
         self.router_api.restore_vpp_if_needed()
 
         fwutils.get_linux_interfaces(cached=False) # Fill global interface cache
@@ -611,9 +616,7 @@ class Fwglobals:
         # Break the received aggregated request into aggregations by API type
         #
         # !!! IMPORTANT !!!
-        # Requests that belong to different api modules, e.g. router_api, system_api, etc.,
-        # should not depend on each others. So the order of the execution of aggregated messages
-        # grouped by api, is not important! Hence reuse dict for "aggregations"
+        # ATM we decided to run system-api requests before router-api requests.
         #
         aggregations = {}
         for _request in request['params']['requests']:
@@ -648,19 +651,20 @@ class Fwglobals:
 
         # Go over list of aggregations and execute their requests one by one.
         #
-        apis = aggregations.keys()
         executed_apis = []
-        for api in apis:
-            api_call_func = self._get_api_object_attr(api, 'call')
-            try:
-                api_call_func(aggregations[api])
-                executed_apis.append(api)
-            except Exception as e:
-                # Revert the previously executed aggregated requests
-                for api in executed_apis:
-                    rollback_func = self._get_api_object_attr(api, 'rollback')
-                    rollback_func(rollback_aggregations[api])
-                raise e
+
+        for api in ['_call_system_api', '_call_router_api']:
+            if api in aggregations:
+                api_call_func = self._get_api_object_attr(api, 'call')
+                try:
+                    api_call_func(aggregations[api])
+                    executed_apis.append(api)
+                except Exception as e:
+                    # Revert the previously executed aggregated requests
+                    for api in executed_apis:
+                        rollback_func = self._get_api_object_attr(api, 'rollback')
+                        rollback_func(rollback_aggregations[api])
+                    raise e
 
         return {'ok': 1}
 
@@ -715,7 +719,7 @@ class Fwglobals:
                     #
                     old_params = cfg_db.get_request_params(request)
                     for param_name in list(request['params']): #request['params'].keys() doesn't work in python 3
-                        if param_name in old_params:
+                        if old_params and param_name in old_params:
                             request['params'][param_name] = old_params[param_name]
                         else:
                             del request['params'][param_name]

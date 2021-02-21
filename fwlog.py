@@ -30,8 +30,9 @@ class Fwlog:
 
     :param level: Start logging from this severity level.
     """
-    FWLOG_LEVEL_INFO  = 0x1
-    FWLOG_LEVEL_DEBUG = 0xFF
+    FWLOG_LEVEL_INFO  = 0x01
+    FWLOG_LEVEL_DEBUG = 0x0F
+    FWLOG_LEVEL_TRACE = 0xFF
 
     def __init__(self, level=FWLOG_LEVEL_INFO):
         """Constructor method
@@ -123,7 +124,8 @@ class Fwlog:
 
         :returns: None.
         """
-        self._log(log_message, to_terminal, to_syslog)
+        if self.level >= self.FWLOG_LEVEL_INFO:
+            self._log(log_message, to_terminal, to_syslog)
 
     def debug(self, log_message, to_terminal=True, to_syslog=True):
         """Print debug message.
@@ -134,7 +136,19 @@ class Fwlog:
 
         :returns: None.
         """
-        if self.level == self.FWLOG_LEVEL_DEBUG:
+        if self.level >= self.FWLOG_LEVEL_DEBUG:
+            self._log(log_message, to_terminal, to_syslog)
+
+    def trace(self, log_message, to_terminal=True, to_syslog=True):
+        """Print debug message.
+
+        :param log_message:       Message contents.
+        :param to_terminal:       Print to terminal.
+        :param to_syslog:         Print to syslog.
+
+        :returns: None.
+        """
+        if self.level >= self.FWLOG_LEVEL_TRACE:
             self._log(log_message, to_terminal, to_syslog)
 
     def set_level(self, level):
