@@ -31,8 +31,6 @@ import sys
 import uuid
 import yaml
 import shutil
-import serial
-import time
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -1355,75 +1353,6 @@ class Checker:
                 if inf['driver'] == 'qmi_wwan':
                     if not fix:
                         return False
-
-                    try:
-                        device = fwutils.dev_id_to_usb_device(inf['dev_id'], 'qmi_wwan')
-                        try:
-                            output_vendor = subprocess.check_output('qmicli --device=/dev/%s --dms-get-manufacturer' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
-                        except:
-                            time.sleep(2)
-                            output_vendor = subprocess.check_output('qmicli --device=/dev/%s --dms-get-manufacturer' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
-
-                        output_model = subprocess.check_output('qmicli --device=/dev/%s --dms-get-model' % device, shell=True, stderr=subprocess.STDOUT).splitlines()
-                        vendor = output_vendor[-1].strip()
-                        model = output_model[-1].strip()
-
-                        at_commands = []
-                        if 'Quectel' in vendor and 'EM06-E' in model:
-                            print('Please wait...')
-                            at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
-                            at_serial_port = self.get_at_port(inf['dev_id'])
-                            if at_serial_port and len(at_serial_port) > 0:
-                                ser = serial.Serial(at_serial_port[0])
-                                for at in at_commands:
-                                    ser.write(at + '\r')
-                                    time.sleep(0.5)
-                                time.sleep(10)
-                                ser.close()
-                        elif 'Sierra Wireless' in vendor:
-                            print('Please wait...')
-                            subprocess.check_output('qmicli --device=/dev/%s --dms-swi-set-usb-composition=8' % device, shell=True, stderr=subprocess.STDOUT)
-                            subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=offline' % device, shell=True, stderr=subprocess.STDOUT)
-                            subprocess.check_output('qmicli --device=/dev/%s --dms-set-operating-mode=reset' % device, shell=True, stderr=subprocess.STDOUT)
-                            time.sleep(10)
-                        else:
-                            return False
-
-                    except:
-                        return False
+                    success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
+                    return success
         return True
-
-    def get_at_port(self, dev_id):
-        at_ports = []
-        try:
-            addr_type, addr = fwutils.dev_id_parse(dev_id)
-            search_dev = '/'.join(addr.split('/')[:-1])
-            output = subprocess.check_output('find /sys/bus/usb/devices/%s*/ -name dev' % search_dev, shell=True).splitlines()
-            pattern = '(ttyUSB[0-9])'
-            tty_devices = []
-
-            if output:
-                for line in output:
-                    match = re.search(pattern, line)
-                    if match:
-                        tty_devices.append(match.group(1))
-
-            if len(tty_devices) > 0:
-                for usb_port in tty_devices:
-                    try:
-                        with serial.Serial('/dev/%s' % usb_port, 115200, timeout=1) as ser:
-                            ser.write('AT\r')
-                            t_end = time.time() + 1
-                            while time.time() < t_end:
-                                response = ser.readline()
-                                if "OK" in response:
-                                    at_ports.append(ser.name)
-                                    break
-
-                            ser.close()
-                    except Exception as e:
-                        pass
-
-            return at_ports
-        except Exception as e:
-            return at_ports
