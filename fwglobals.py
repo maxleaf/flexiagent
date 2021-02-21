@@ -208,6 +208,7 @@ class Fwglobals:
                 'DEV_ID_TO_VPP_IF_NAME': {},
                 'DEV_ID_TO_VPP_TAP_NAME': {},
                 'STUN': {},
+                'SYMMETRIC_NAT': {},
                 'VPP_IF_NAME_TO_DEV_ID': {},
                 'LINUX_INTERFACES_BY_NAME': {},
                 'WAN_MONITOR': {
@@ -220,6 +221,7 @@ class Fwglobals:
             self.dev_id_to_vpp_if_name      = self.db['DEV_ID_TO_VPP_IF_NAME']
             self.dev_id_to_vpp_tap_name     = self.db['DEV_ID_TO_VPP_TAP_NAME']
             self.stun_cache                 = self.db['STUN']
+            self.sym_nat_cache              = self.db['SYMMETRIC_NAT']
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
