@@ -1606,12 +1606,12 @@ def reset_traffic_control():
 
     for term in search:
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s root' % term, shell=True)
+            subprocess.check_output('sudo tc -force qdisc del dev %s root 2>/dev/null' % term, shell=True, strerr=subprocess.STD)
         except:
             pass
 
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff:' % term, shell=True)
+            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff: 2>/dev/null' % term, shell=True)
         except:
             pass
 
