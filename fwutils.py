@@ -2484,6 +2484,9 @@ def configure_lte_interface(params):
     '''
     dev_id = params['dev_id']
     if vpp_does_run() and is_interface_assigned_to_vpp(dev_id):
+        # Make sure interface is up. It might be down due to suddenly disconnected
+        nicname = dev_id_to_linux_if(dev_id)
+        os.system('ifconfig %s up' % nicname)
         return (True, None)
 
     if not is_lte_interface_by_dev_id(dev_id):
@@ -3388,7 +3391,7 @@ def get_reconfig_hash():
     res = ''
 
     linux_interfaces = get_linux_interfaces()
-    for dev_id in linux_interfaces:
+    for dev_id in copy.deepcopy(linux_interfaces):
         name = linux_interfaces[dev_id]['name']
 
         is_lte = is_lte_interface(name)

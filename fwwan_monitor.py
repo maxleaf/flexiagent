@@ -32,6 +32,7 @@ import traceback
 import fwglobals
 import fwnetplan
 import fwutils
+import datetime
 
 class FwWanRoute:
     """The object that represents routing rule found in OS.
@@ -289,6 +290,15 @@ class FwWanMonitor:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
             fwglobals.log.debug("connectivity %s on %s" % (state, route.dev))
             self._update_metric(route, new_metric)
+
+        # lte wan monitoring
+        if not ok and datetime.datetime.now().second % 10 == 0:
+            if not fwutils.is_lte_interface_by_dev_id(route.dev_id):
+                return
+            connection_state = fwutils.mbim_query_connection_state(route.dev_id)
+            if not connection_state:
+                fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev))
+                fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
 
     def _update_metric(self, route, new_metric):
