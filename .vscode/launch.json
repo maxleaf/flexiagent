@@ -100,6 +100,21 @@
             }
         },
         {
+            "name": "Pytest",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-k",
+                "01",
+                "-s"
+            ],
+            "cwd": "${workspaceRoot}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+        {
             "name": "system_checker",
             "type": "python",
             "request": "launch",
