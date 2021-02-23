@@ -347,6 +347,7 @@ class Fwglobals:
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
 
+        self.router_api.thread_dhcpc.start()
         return self.fwagent
 
     def finalize_agent(self):

@@ -2118,6 +2118,15 @@ def fix_received_message(msg):
     def _fix_dhcp(msg):
 
         def _fix_dhcp_params(params):
+            # dhcp for LTE interface has special meaning. 
+            # Although that flexiManage looks at it as DHCP because the user can't set static IP
+            # but the agent looks at it as static IP from the modem.
+            # We take the IP from the modem via the mbimcli command.
+            # That's why we override the 'dhcp' as 'no'
+            #
+            if is_lte_interface_by_dev_id(params['dev_id']):
+                params['dhcp'] = 'no'
+                return
             if params.get('dhcp') == 'yes':
                 params['addr']    = ''
                 params['addr6']   = ''
@@ -2738,7 +2747,7 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
-def mbim_query_connection_state(dev_id):
+def mbim_is_connected(dev_id):
     output = _run_mbimcli_command(dev_id, '--query-connection-state')
     if output:
         lines = output.splitlines()
@@ -2756,72 +2765,73 @@ def reset_modem(dev_id):
     fwglobals.log.debug('reset_modem: reset finished')
 
 def lte_connect(params, reset=False):
-    dev_id = params['dev_id']
+    with fwglobals.g.cache.lock:
+        dev_id = params['dev_id']
 
-    if reset:
-        reset_modem(dev_id)
+        if reset:
+            reset_modem(dev_id)
 
-    if not lte_is_sim_inserted(dev_id):
-        qmi_sim_power_off(dev_id)
-        time.sleep(1)
-        qmi_sim_power_on(dev_id)
-        time.sleep(1)
-        inserted = lte_is_sim_inserted(dev_id)
-        if not inserted:
-            return (False, "Sim is not presented")
+        if not lte_is_sim_inserted(dev_id):
+            qmi_sim_power_off(dev_id)
+            time.sleep(1)
+            qmi_sim_power_on(dev_id)
+            time.sleep(1)
+            inserted = lte_is_sim_inserted(dev_id)
+            if not inserted:
+                return (False, "Sim is not presented")
 
-    # check PIN status
-    pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
-    if pin_state not in ['disabled', 'enabled-verified']:
-        pin = params.get('pin')
-        if not pin:
-            return (False, "PIN is required")
+        # check PIN status
+        pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
+        if pin_state not in ['disabled', 'enabled-verified']:
+            pin = params.get('pin')
+            if not pin:
+                return (False, "PIN is required")
 
-        updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
-        if updated_pin_state not in['disabled', 'enabled-verified']:
-            return (False, "PIN is wrong")
+            updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
+            if updated_pin_state not in['disabled', 'enabled-verified']:
+                return (False, "PIN is wrong")
 
-    try:
-        is_modem_connected = mbim_query_connection_state(dev_id)
-        if is_modem_connected:
+        try:
+            is_modem_connected = mbim_is_connected(dev_id)
+            if is_modem_connected:
+                return (True, None)
+
+            # make sure context is released
+            lte_disconnect(dev_id)
+
+            connection_params = lte_prepare_connection_params(params)
+
+            _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
+            _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
+            _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
+            output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close' % connection_params)
+            data = output.splitlines()
+
+            lte = fwglobals.g.db.get('lte', {})
+            if not 'interfaces' in lte:
+                lte['interfaces'] = {}
+            lte['interfaces'][dev_id] = {
+                'if_name': dev_id_to_linux_if(dev_id)
+            }
+
+            for line in data:
+                if 'Session ID:' in line:
+                    lte['interfaces'][dev_id]['Session'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'IP [0]:' in line:
+                    lte['interfaces'][dev_id]['IP'] = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'Gateway:' in line:
+                    lte['interfaces'][dev_id]['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
+                    break
+
+            fwglobals.g.db['lte'] = lte # db is SqlDict, so we have to replace all record
+
             return (True, None)
-
-        # make sure context is released
-        lte_disconnect(dev_id)
-
-        connection_params = lte_prepare_connection_params(params)
-
-        _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
-        _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
-        _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close' % connection_params)
-        data = output.splitlines()
-
-        lte = fwglobals.g.db.get('lte', {})
-        if not 'interfaces' in lte:
-            lte['interfaces'] = {}
-        lte['interfaces'][dev_id] = {
-            'if_name': dev_id_to_linux_if(dev_id)
-        }
-
-        for line in data:
-            if 'Session ID:' in line:
-                lte['interfaces'][dev_id]['Session'] = line.split(':')[-1].strip().replace("'", '')
-                continue
-            if 'IP [0]:' in line:
-                lte['interfaces'][dev_id]['IP'] = line.split(':')[-1].strip().replace("'", '')
-                continue
-            if 'Gateway:' in line:
-                lte['interfaces'][dev_id]['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
-                break
-
-        fwglobals.g.db['lte'] = lte # db is SqlDict, so we have to replace all record
-
-        return (True, None)
-    except Exception as e:
-        if not reset:
-            return lte_connect(params, True)
-        return (False, "Exception: %s" % str(e))
+        except Exception as e:
+            if not reset:
+                return lte_connect(params, True)
+            return (False, "Exception: %s" % str(e))
 
 def lte_get_system_info(dev_id):
     try:
@@ -2987,12 +2997,18 @@ def lte_get_radio_signals_state(dev_id):
 def mbim_get_ip_configuration(dev_id):
     try:
         output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
+        if not output:
+            lte_disconnect(dev_id)
+            fwglobals.g.system_api.restore_configuration(types=['add-lte'])
+            output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
         return output
     except subprocess.CalledProcessError as err:
         return False
 
 def lte_get_configuration_received_from_provider(dev_id, cache=True):
     try:
+        global x
+
         response = {
             'IP'      : '',
             'GATEWAY' : '',
@@ -3404,11 +3420,6 @@ def get_reconfig_hash():
 
         addr = get_interface_address(name, log=False)
         gw, metric = get_interface_gateway(name)
-
-        # We monitoring the lte IP to handle IP chandes
-        if is_lte:
-            addr = lte_get_provider_config(dev_id, 'IP', False)
-            gw = lte_get_provider_config(dev_id, 'GATEWAY', False)
 
         addr = addr.split('/')[0] if addr else ''
 
