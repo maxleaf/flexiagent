@@ -338,6 +338,9 @@ class Fwglobals:
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
+        # RPF set to Loose mode
+        fwutils.set_default_linux_reverse_path_filter(2)
+
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 

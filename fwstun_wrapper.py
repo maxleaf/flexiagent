@@ -327,13 +327,10 @@ class FwStunWrap:
             return '','','',''
 
         fwglobals.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
-        prev_rpf = fwutils.set_linux_reverse_path_filter(dev_name, fwutils.RPF_LOOSE_MODE)
 
         nat_type, nat_ext_ip, nat_ext_port, stun_index = \
             fwstun.get_ip_info(lcl_src_ip, lcl_src_port, None, None, dev_name, stun_idx)
 
-        if prev_rpf is not None:    # Restore RPF only if it was suppressed by us
-            fwutils.set_linux_reverse_path_filter(dev_name, prev_rpf)
         return nat_type, nat_ext_ip, nat_ext_port, stun_index
 
     def _stun_thread(self, *args):
