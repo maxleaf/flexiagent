@@ -51,9 +51,6 @@ from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
 
-RPF_DISABLE     = 0
-RPF_STRICT_MODE = 1
-RPF_LOOSE_MODE  = 2
 
 dpdk = __import__('dpdk-devbind')
 
@@ -3294,46 +3291,26 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
-def set_linux_reverse_path_filter(dev_name, rpf_value):
-    """ set rp_filter value of Linux property
+def set_default_linux_reverse_path_filter(rpf_value):
 
-    : param dev_name : device name to set the property for
+    """ set default and all (current) rp_filter value of Linux
+
     : param rpf_value: RPF value to be set using the sysctl command
     """
-    # Fetch current setting, so it could be restored later if needed.
-    #
-    current_val = None
-    try:
-        cmd = 'sysctl net.ipv4.conf.%s.rp_filter' % dev_name
-        out = subprocess.check_output(cmd, shell=True)  # 'net.ipv4.conf.enp0s9.rp_filter = 1'
-        current_val = int(out.split(' = ')[1])
-    except Exception as e:
-        fwglobals.log.warning("set_linux_reverse_path_filter(%s): failed to fetch current value: %s"
-             % (dev_name, str(e)))
-        return None
-
-    # Light optimization, no need to set the value
-    #
-    if current_val == rpf_value:
-        return current_val
-
-    # Finally set the value
-    #
-    sys_cmd = 'sysctl -w net.ipv4.conf.%s.rp_filter=%d > /dev/null' % (dev_name, rpf_value)
+    sys_cmd = 'sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (rpf_value)
     rc = os.system(sys_cmd)
-    if rc == 0:
-        fwglobals.log.debug("RPF set command successfully executed: %s" % (sys_cmd))
-    else:
+    if rc:
         fwglobals.log.error("RPF set command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("RPF set command successfully executed: %s" % (sys_cmd))
 
-    '''
-    Below global setting is not required if rpf access is setup correctly
-    Putting back the initial below code till rpf access is streamlined
-    '''
-    os.system('sysctl -w net.ipv4.conf.all.rp_filter=%d > /dev/null' % (rpf_value))
-    os.system('sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (rpf_value))
-
-    return current_val
+    sys_cmd = 'sysctl -w net.ipv4.conf.default.rp_filter=%d > /dev/null' % (rpf_value)
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("RPF set command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("RPF set command successfully executed: %s" % (sys_cmd))
+    return rc
 
 def update_linux_metric(prefix, dev, metric):
     """Invokes 'ip route' commands to update metric on the provide device.
