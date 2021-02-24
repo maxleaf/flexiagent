@@ -74,7 +74,7 @@ def update_stats():
                 if_bytes = {}
                 tunnel_stats = tunnel_stats_get()
                 fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
-                for intf, counts in stats['last'].items():
+                for intf, counts in list(stats['last'].items()):
                     if (intf.startswith('gre') or
                         intf.startswith('loop')): continue
                     prev_stats_if = prev_stats['last'].get(intf, None)
@@ -144,7 +144,7 @@ def get_system_health():
     try:
         temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
         all_temp = psutil.sensors_temperatures()
-        for ttype, templist in all_temp.items():
+        for ttype, templist in list(all_temp.items()):
             for temp in templist:
                 if temp.current > temp_stats['value']:
                     temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}

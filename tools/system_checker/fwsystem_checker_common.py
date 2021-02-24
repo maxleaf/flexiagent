@@ -409,7 +409,7 @@ class Checker:
             else:
                 metrics[metric] = [[dev,rip]]
 
-        for metric, gws in metrics.items():
+        for metric, gws in list(metrics.items()):
             if len(gws) > 1:
                 return metric, metrics
 
@@ -461,7 +461,7 @@ class Checker:
 
         files = fwnetplan.load_netplan_filenames(get_only=True)
         metric = 100
-        for fname, devices in files.items():
+        for fname, devices in list(files.items()):
             os.system('cp %s %s.fworig' % (fname, fname))
             fname_baseline = fname.replace('yaml', 'baseline.yaml')
             os.system('mv %s %s' % (fname, fname_baseline))
@@ -565,7 +565,7 @@ class Checker:
                                 interfaces[dev].append(fname)
 
         duplicates = {}
-        for dev, files in interfaces.items():
+        for dev, files in list(interfaces.items()):
             if len(files) > 1:
                 duplicates[dev] = files
         return duplicates
@@ -600,7 +600,7 @@ class Checker:
             duplicates = self._get_duplicate_interface_definitions()
             if duplicates:
                 message = "Found multiple interface definitions: "
-                for dev, files in duplicates.items():
+                for dev, files in list(duplicates.items()):
                     message += dev + ' in '
                     for file in files:
                         message += file + ', '
@@ -1316,7 +1316,7 @@ class Checker:
         return
 
     def lte_interfaces_exists(self):
-        for nicname, addrs in psutil.net_if_addrs().items():
+        for nicname, addrs in list(psutil.net_if_addrs().items()):
             driver = fwutils.get_interface_driver(nicname)
             if driver and driver in ['cdc_mbim', 'qmi_wwan']:
                 return True
@@ -1325,7 +1325,7 @@ class Checker:
 
     def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
         drivers = []
-        for nicname, addrs in psutil.net_if_addrs().items():
+        for nicname, addrs in list(psutil.net_if_addrs().items()):
             dev_id = fwutils.get_interface_dev_id(nicname)# fwutils.get_interface_dev_id(nicname)
             if dev_id:
                 driver = fwutils.get_interface_driver(nicname)

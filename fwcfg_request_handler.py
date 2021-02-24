@@ -362,7 +362,7 @@ class FwCfgRequestHandler:
                 (type(p)==dict and not 'substs' in p):  # Escape 'substs' element
                     self.substitute(cache, p)
         elif type(params)==dict:
-            for item in params.items():
+            for item in list(params.items()):
                 key = item[0]
                 p   = item[1]
                 if (type(p)==dict or type(p)==list) and \
@@ -413,7 +413,7 @@ class FwCfgRequestHandler:
                     raise Exception("fwutils.py:substitute: 'replace' is not supported for dictionary in '%s'" % format(params))
                 else:  # list
                     for (idx, p) in enumerate(params):
-                        if fwutils.is_str(p):
+                        if type(p) == str:
                             params.insert(idx, p.replace(old, new))
                             params.remove(p)
             else:
@@ -578,7 +578,7 @@ class FwCfgRequestHandler:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
 
     def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in self.translators, incoming_requests))
+        incoming_requests = list([x for x in incoming_requests if x['message'] in self.translators])
 
         if len(incoming_requests) == 0:
             return True

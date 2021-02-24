@@ -118,7 +118,7 @@ def tunnel_stats_get():
     tunnel_stats = {}
     cur_time = time.time()
 
-    for key, value in tunnel_stats_global.items():
+    for key, value in list(tunnel_stats_global.items()):
         tunnel_stats[key] = {}
         tunnel_stats[key]['rtt'] = value['rtt']
         tunnel_stats[key]['drop_rate'] = value['drop_rate']

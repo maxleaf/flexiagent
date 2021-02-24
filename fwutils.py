@@ -295,7 +295,7 @@ def get_all_interfaces():
     """
     dev_id_ip_gw = {}
     interfaces = psutil.net_if_addrs()
-    for nicname, addrs in interfaces.items():
+    for nicname, addrs in list(interfaces.items()):
         dev_id = get_interface_dev_id(nicname)
         if not dev_id:
             continue
@@ -475,7 +475,7 @@ def get_linux_interfaces(cached=True):
         interfaces.clear()
 
         linux_inf = psutil.net_if_addrs()
-        for (if_name, addrs) in linux_inf.items():
+        for (if_name, addrs) in list(linux_inf.items()):
 
             dev_id = get_interface_dev_id(if_name)
             if not dev_id:
@@ -1110,7 +1110,7 @@ def stop_vpp():
     dpdk.get_nic_details()
     os.system('sudo systemctl stop vpp')
     os.system('sudo systemctl stop frr')
-    for d,v in dpdk.devices.items():
+    for d,v in list(dpdk.devices.items()):
         if "Driver_str" in v:
             if v["Driver_str"] in dpdk.dpdk_drivers:
                 dpdk.unbind_one(v["Slot"], False)
@@ -1395,18 +1395,6 @@ def hex_str_to_bytes(hex_str):
     else:
         return bytes.fromhex(hex_str)
 
-def is_str(p):
-    """Check if it is a string.
-
-     :param p:          String.
-
-     :returns: 'True' if string and 'False' otherwise.
-     """
-    if is_python2():
-        return type(p)==str or type(p)==unicode
-    else:
-        return type(p)==str
-
 def yaml_dump(var):
     """Convert object into YAML string.
 
@@ -1447,7 +1435,7 @@ def obj_dump(obj, print_obj_dir=False):
 
      :returns: None.
      """
-    callers_local_vars = inspect.currentframe().f_back.f_locals.items()
+    callers_local_vars = list(inspect.currentframe().f_back.f_locals.items())
     obj_name = [var_name for var_name, var_val in callers_local_vars if var_val is obj][0]
     print('========================== obj_dump start ==========================')
     print("obj=%s" % obj_name)
@@ -1469,7 +1457,7 @@ def obj_dump_attributes(obj, level=1):
         if re.match('__.+__', a):   # Escape all special attributes, like __abstractmethods__, for which val = getattr(obj, a) might fail
             continue
         val = getattr(obj, a)
-        if isinstance(val, (int, float, str, unicode, list, dict, set, tuple)):
+        if isinstance(val, (int, float, str, list, dict, set, tuple)):
             print(level*' ' + a + '(%s): ' % str(type(val)) + str(val))
         else:
             print(level*' ' + a + ':')
@@ -1545,7 +1533,7 @@ def get_lte_interfaces_names():
     names = []
     interfaces = psutil.net_if_addrs()
 
-    for nicname, addrs in interfaces.items():
+    for nicname, addrs in list(interfaces.items()):
         dev_id = get_interface_dev_id(nicname)
         if dev_id and is_lte_interface(nicname):
             names.append(nicname)
@@ -1556,7 +1544,7 @@ def get_lte_interfaces_names():
     names = []
     interfaces = psutil.net_if_addrs()
 
-    for nicname, addrs in interfaces.items():
+    for nicname, addrs in list(interfaces.items()):
         dev_id = get_interface_dev_id(nicname)
         if dev_id and is_lte_interface(nicname):
             names.append(nicname)
@@ -1972,7 +1960,7 @@ def tunnel_change_postprocess(add, addr):
     policies = fwglobals.g.policies.policies_get()
     remove = not add
 
-    for policy_id, priority in policies.items():
+    for policy_id, priority in list(policies.items()):
         vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
 
 
@@ -2155,7 +2143,7 @@ def wifi_get_available_networks(dev_id):
         try:
             cmd = 'iwlist %s scan | grep ESSID' % linux_if
             networks = subprocess.check_output(cmd, shell=True).splitlines()
-            networks = map(clean, networks)
+            networks = list(map(clean, networks))
             return networks
         except subprocess.CalledProcessError:
             return networks
@@ -2454,7 +2442,7 @@ def get_inet6_by_linux_name(inf_name):
 def get_lte_interfaces_dev_ids():
     out = {}
     interfacaes = psutil.net_if_addrs()
-    for nicname, addrs in interfacaes.items():
+    for nicname, addrs in list(interfacaes.items()):
         if is_lte_interface(nicname):
             dev_id = get_interface_dev_id(nicname)
             if dev_id:
@@ -3551,7 +3539,7 @@ def netplan_set_mac_addresses():
     #Copy the coverted json string back to yaml file
     intf_mac_addr = {}
     interfaces = psutil.net_if_addrs()
-    for nicname, addrs in interfaces.items():
+    for nicname, addrs in list(interfaces.items()):
         for addr in addrs:
             if addr.family == psutil.AF_LINK:
                 intf_mac_addr[nicname] = addr.address
@@ -3735,8 +3723,8 @@ def linux_check_gateway_exist(gw):
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric)
-    if metric in routes.keys():
-        if addr in routes[metric].keys():
+    if metric in list(routes.keys()):
+        if addr in list(routes[metric].keys()):
             if via in routes[metric][addr]:
                 return True
     return False

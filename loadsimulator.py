@@ -72,7 +72,7 @@ class LoadSimulator:
         :returns: None.
         """
         self.started = False
-        for ws in self.simulate_websockets.values():
+        for ws in list(self.simulate_websockets.values()):
             ws.keep_running = False
 
     def enable(self, count):
@@ -198,7 +198,7 @@ class LoadSimulator:
             # Update info if previous stats valid
             if prev_stats['ok'] == 1:
                 if_bytes = {}
-                for intf, counts in fwstats.stats['last'].items():
+                for intf, counts in list(fwstats.stats['last'].items()):
                     prev_stats_if = prev_stats['last'].get(intf, None)
                     if prev_stats_if != None:
                         rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])

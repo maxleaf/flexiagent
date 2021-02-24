@@ -250,7 +250,7 @@ class FwWanMonitor:
             fwglobals.log.debug("stop on '%s'" % str(self.routes[key]))
             del self.routes[key]
 
-        return self.routes.values()
+        return list(self.routes.values())
 
 
     def _check_connectivity(self, route, server):

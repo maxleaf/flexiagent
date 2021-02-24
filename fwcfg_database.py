@@ -347,6 +347,6 @@ class FwCfgDatabase:
         # for new or for modified configuration items.
         # Just go and add them to the output list 'as-is'.
         #
-        output_requests += input_requests.values()
+        output_requests += list(input_requests.values())
 
         return output_requests

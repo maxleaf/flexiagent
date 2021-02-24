@@ -284,15 +284,14 @@ def get_nic_details():
     ssh_if = []
     route = check_output(["ip", "-o", "route"])
     # filter out all lines for 169.254 routes
-    route = "\n".join(filter(lambda ln: not ln.startswith("169.254"),
-                             route.splitlines()))
+    route = "\n".join([ln for ln in route.splitlines() if not ln.startswith("169.254")])
     rt_info = route.split()
     for i in range(len(rt_info) - 1):
         if rt_info[i] == "dev":
             ssh_if.append(rt_info[i+1])
 
     # based on the basic info, get extended text details
-    for d in devices.keys():
+    for d in list(devices.keys()):
         # get additional info and add it to existing data
         devices[d] = devices[d].copy()
         devices[d].update(get_pci_device_details(d))
@@ -346,7 +345,7 @@ def get_crypto_details():
             dev[name.rstrip(":")] = value
 
     # based on the basic info, get extended text details
-    for d in devices.keys():
+    for d in list(devices.keys()):
         # get additional info and add it to existing data
         devices[d] = devices[d].copy()
         devices[d].update(get_pci_device_details(d))
@@ -381,7 +380,7 @@ def dev_id_from_dev_name(dev_name):
         return "0000:" + dev_name
     else:
         # check if it's an interface name, e.g. eth1
-        for d in devices.keys():
+        for d in list(devices.keys()):
             if dev_name in devices[d]["Interface"].split(","):
                 return devices[d]["Slot"]
     # if nothing else matches - error
@@ -485,7 +484,7 @@ def bind_one(dev_id, driver, force):
 
 def unbind_all(dev_list, force=False):
     """Unbind method, takes a list of device locations"""
-    dev_list = map(dev_id_from_dev_name, dev_list)
+    dev_list = list(map(dev_id_from_dev_name, dev_list))
     for d in dev_list:
         unbind_one(d, force)
 
@@ -494,7 +493,7 @@ def bind_all(dev_list, driver, force=False):
     """Bind method, takes a list of device locations"""
     global devices
 
-    dev_list = map(dev_id_from_dev_name, dev_list)
+    dev_list = list(map(dev_id_from_dev_name, dev_list))
 
     for d in dev_list:
         bind_one(d, driver, force)
@@ -504,7 +503,7 @@ def bind_all(dev_list, driver, force=False):
     # be bound even if no one has asked them to. hence, we check the list of
     # drivers again, and see if some of the previously-unbound devices were
     # erroneously bound.
-    for d in devices.keys():
+    for d in list(devices.keys()):
         # skip devices that were already bound or that we know should be bound
         if "Driver_str" in devices[d] or d in dev_list:
             continue
@@ -549,7 +548,7 @@ def show_status():
     no_drv = []
 
     # split our list of network devices into the three categories above
-    for d in devices.keys():
+    for d in list(devices.keys()):
         if (NETWORK_BASE_CLASS in devices[d]["Class"]):
             if not has_driver(d):
                 no_drv.append(devices[d])
@@ -572,7 +571,7 @@ def show_status():
     dpdk_drv = []
     no_drv = []
 
-    for d in devices.keys():
+    for d in list(devices.keys()):
         if (CRYPTO_BASE_CLASS in devices[d]["Class"]):
             if not has_driver(d):
                 no_drv.append(devices[d])

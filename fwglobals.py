@@ -656,7 +656,7 @@ class Fwglobals:
 
         # Go over list of aggregations and execute their requests one by one.
         #
-        apis = aggregations.keys()
+        apis = list(aggregations.keys())
         executed_apis = []
         for api in apis:
             api_call_func = self._get_api_object_attr(api, 'call')
@@ -696,7 +696,7 @@ class Fwglobals:
         are replaced with the old parameters that are currently stored in the configuration database.
         '''
         rollbacks_aggregations = copy.deepcopy(aggregations)
-        for (api, aggregated) in rollbacks_aggregations.items():
+        for (api, aggregated) in list(rollbacks_aggregations.items()):
             cfg_db = self._get_api_object_attr(api, 'cfg_db')
             for request in aggregated['params']['requests']:
 

@@ -98,7 +98,7 @@ def add_acl_rule(rule, rules):
 
     ports = rule.get('ports', None)
     if ports:
-        ports_map = map(int, ports.split('-'))
+        ports_map = list(map(int, ports.split('-')))
         port_from = port_to = ports_map[0]
         if len(ports_map) > 1:
             port_to = ports_map[1]

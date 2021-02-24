@@ -106,8 +106,8 @@ def b2a_hexstr(abytes):
 
 def _initialize():
     global dictValToAttr, dictValToMsgType
-    dictValToAttr= {v: k for k, v in dictAttrToVal.items()}
-    dictValToMsgType = {v: k for k, v in dictMsgTypeToVal.items()}
+    dictValToAttr= {v: k for k, v in list(dictAttrToVal.items())}
+    dictValToMsgType = {v: k for k, v in list(dictMsgTypeToVal.items())}
 
 def set_log(log):
     global g_stun_log

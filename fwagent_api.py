@@ -269,7 +269,7 @@ class FWAGENT_API:
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        for module_name, module in fwglobals.modules.items():
+        for module_name, module in list(fwglobals.modules.items()):
             if module.get('sync', False) == True:
                 # get api module. e.g router_api, system_api
                 api_module = getattr(fwglobals.g, module.get('object'))
