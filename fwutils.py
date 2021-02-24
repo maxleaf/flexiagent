@@ -39,6 +39,7 @@ import traceback
 import yaml
 from netaddr import IPNetwork, IPAddress
 import threading
+import serial
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
 sys.path.append(common_tools)
@@ -1167,9 +1168,6 @@ def reset_device_config():
         db_policies.clean()
     fwnetplan.restore_linux_netplan_files()
 
-    if 'lte' in fwglobals.g.db:
-        fwglobals.g.db['lte'] = {}
-
     reset_dhcpd()
 
 def print_system_config(full=False):
@@ -1180,14 +1178,6 @@ def print_system_config(full=False):
     with FwSystemCfg(fwglobals.g.SYSTEM_CFG_FILE) as system_cfg:
         cfg = system_cfg.dumps(full=full)
         print(cfg)
-
-def print_global_config(full=False):
-    """Print global configuration.
-
-     :returns: None.
-     """
-    if 'lte' in fwglobals.g.db:
-        print(fwglobals.g.db['lte'])
 
 def print_device_config_signature():
     cfg = get_device_config_signature()
@@ -1616,12 +1606,12 @@ def reset_traffic_control():
 
     for term in search:
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s root' % term, shell=True)
+            subprocess.check_output('sudo tc -force qdisc del dev %s root 2>/dev/null' % term, shell=True)
         except:
             pass
 
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff:' % term, shell=True)
+            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff: 2>/dev/null' % term, shell=True)
         except:
             pass
 
@@ -2492,17 +2482,20 @@ def configure_lte_interface(params):
     This function is responsible for the second stage.
     If the vpp is running, we have special logic to configure LTE. This logic handled by the add_interface translator.
     '''
-    dev_id = params['dev_id']
-    if vpp_does_run() and is_interface_assigned_to_vpp(dev_id):
-        return (True, None)
+    try:
+        dev_id = params['dev_id']
+        if vpp_does_run() and is_interface_assigned_to_vpp(dev_id):
+            # Make sure interface is up. It might be down due to suddenly disconnected
+            nicname = dev_id_to_linux_if(dev_id)
+            os.system('ifconfig %s up' % nicname)
+            return (True, None)
 
-    if not is_lte_interface_by_dev_id(dev_id):
-        return (False, "dev_id %s is not a lte interface" % dev_id)
+        if not is_lte_interface_by_dev_id(dev_id):
+            return (False, "dev_id %s is not a lte interface" % dev_id)
 
-    ip_config = lte_get_configuration_received_from_provider(dev_id)
-    if ip_config['STATUS']:
-        ip = ip_config['IP']
-        gateway = ip_config['GATEWAY']
+        ip_config = lte_get_ip_configuration(dev_id)
+        ip = ip_config['ip']
+        gateway = ip_config['gateway']
         metric = params.get('metric', '0')
         if not metric:
             metric = '0'
@@ -2521,13 +2514,20 @@ def configure_lte_interface(params):
 
         clear_linux_interfaces_cache() # remove this code when move ip configuration to netplan
         return (True , None)
+    except Exception as e:
+        return (False, "Failed to configure lte for dev_id %s. (%s)" % (dev_id, str(e)))
 
-    return (False, "Failed to configure lte for dev_id %s" % dev_id)
-
-def dev_id_to_usb_device(dev_id, driver="cdc_mbim"):
+def dev_id_to_usb_device(dev_id):
     try:
+        usb_device = get_lte_cache(dev_id, 'usb_device')
+        if usb_device:
+            return usb_device
+
+        driver = get_interface_driver_by_dev_id(dev_id)
         usb_addr = dev_id.split('/')[-1]
         output = subprocess.check_output('ls /sys/bus/usb/drivers/%s/%s/usbmisc/' % (driver, usb_addr), shell=True).strip()
+
+        set_lte_cache(dev_id, 'usb_device', output)
         return output
     except subprocess.CalledProcessError as err:
         return None
@@ -2535,9 +2535,10 @@ def dev_id_to_usb_device(dev_id, driver="cdc_mbim"):
 def _run_qmicli_command(dev_id, flag):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
-        output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --device-open-mbim --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT)
         return output
     except subprocess.CalledProcessError as err:
+        fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output))
         return None
 
 def _run_mbimcli_command(dev_id, cmd):
@@ -2546,6 +2547,7 @@ def _run_mbimcli_command(dev_id, cmd):
         output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT)
         return output
     except subprocess.CalledProcessError as err:
+        fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output))
         return None
 
 def qmi_get_simcard_status(dev_id):
@@ -2571,11 +2573,25 @@ def qmi_get_connection_state(dev_id):
         return False
 
 def qmi_get_ip_configuration(dev_id):
-    '''
-    The function will return the connection status.
-    This is not about existsin session to the modem. But connectivity between modem to the cellular provider
-    '''
-    return _run_qmicli_command(dev_id, 'wds-get-current-settings')
+    try:
+        ip = None
+        gateway = None
+        cmd = 'wds-get-current-settings | grep "IPv4 address\|IPv4 subnet mask\|IPv4 gateway address"'
+        output = _run_qmicli_command(dev_id, cmd)
+        if output:
+            lines = output.splitlines()
+            for idx, line in enumerate(lines):
+                if 'IPv4 address:' in line:
+                    ip_without_mask = line.split(':')[-1].strip().replace("'", '')
+                    mask = lines[idx + 1].split(':')[-1].strip().replace("'", '')
+                    ip = ip_without_mask + '/' + str(IPAddress(mask).netmask_bits())
+                    continue
+                if 'IPv4 gateway address:' in line:
+                    gateway = line.split(':')[-1].strip().replace("'", '')
+                    break
+        return (ip, gateway)
+    except Exception as e:
+        return (None, None)
 
 def qmi_get_operator_name(dev_id):
     return _run_qmicli_command(dev_id, 'nas-get-operator-name')
@@ -2622,6 +2638,78 @@ def lte_get_phone_number(dev_id):
             if 'MSISDN:' in line:
                 return line.split(':')[-1].strip().replace("'", '')
     return ''
+
+def get_at_port(self, dev_id):
+    at_ports = []
+    try:
+        addr_type, addr = dev_id_parse(dev_id)
+        search_dev = '/'.join(addr.split('/')[:-1])
+        output = subprocess.check_output('find /sys/bus/usb/devices/%s*/ -name dev' % search_dev, shell=True).splitlines()
+        pattern = '(ttyUSB[0-9])'
+        tty_devices = []
+
+        if output:
+            for line in output:
+                match = re.search(pattern, line)
+                if match:
+                    tty_devices.append(match.group(1))
+
+        if len(tty_devices) > 0:
+            for usb_port in tty_devices:
+                try:
+                    with serial.Serial('/dev/%s' % usb_port, 115200, timeout=1) as ser:
+                        ser.write('AT\r')
+                        t_end = time.time() + 1
+                        while time.time() < t_end:
+                            response = ser.readline()
+                            if "OK" in response:
+                                at_ports.append(ser.name)
+                                break
+                        ser.close()
+                except:
+                    pass
+        return at_ports
+    except:
+        return at_ports
+
+def lte_set_modem_to_mbim(dev_id):
+    try:
+        if_name = dev_id_to_linux_if(dev_id)
+        lte_driver = get_interface_driver(if_name)
+        if lte_driver == 'cdc_mbim':
+            return (True, None)
+
+        hardware_info = lte_get_hardware_info(dev_id)
+
+        vendor = hardware_info['Vendor']
+        model =  hardware_info['Model']
+
+        at_commands = []
+        if 'Quectel' in vendor and 'EM06-E' in model:
+            print('Please wait...')
+            at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
+            at_serial_port = get_at_port(dev_id)
+            if at_serial_port and len(at_serial_port) > 0:
+                ser = serial.Serial(at_serial_port[0])
+                for at in at_commands:
+                    ser.write(at + '\r')
+                    time.sleep(0.5)
+                ser.close()
+                time.sleep(10)
+                return (True, None)
+            return (False, 'AT port not found. dev_id: %s' % dev_id)
+        elif 'Sierra Wireless' in vendor:
+            print('Please wait...')
+            _run_qmicli_command(dev_id, 'dms-swi-set-usb-composition=8')
+            _run_qmicli_command(dev_id, 'dms-set-operating-mode=offline')
+            _run_qmicli_command(dev_id, 'dms-set-operating-mode=reset')
+            time.sleep(10)
+            return (True, None)
+        else:
+            return (False, 'vendor or model are not supported. (vendor: %s, model: %s)' % (vendor, model))
+    except Exception as e:
+        return (False, str(e))
+
 
 def lte_get_default_settings(dev_id):
     default_settings = qmi_get_default_settings(dev_id)
@@ -2679,26 +2767,35 @@ def lte_sim_status(dev_id):
 def lte_is_sim_inserted(dev_id):
     return lte_sim_status(dev_id) == "present"
 
+def get_lte_cache(dev_id, key):
+    cache = fwglobals.g.cache.lte
+    lte_interface = cache.get(dev_id, {})
+    return lte_interface.get(key)
+
+def set_lte_cache(dev_id, key, value):
+    cache = fwglobals.g.cache.lte
+    lte_interface = cache.get(dev_id)
+    if not lte_interface:
+        fwglobals.g.cache.lte[dev_id] = {}
+        lte_interface = fwglobals.g.cache.lte[dev_id]
+
+    lte_interface[key] = value
+
 def lte_disconnect(dev_id, hard_reset_service=False):
     try:
-        lte_db = fwglobals.g.db.get('lte', {})
-        lte_interfaces = lte_db.get('interfaces', {})
-        lte_cache = lte_interfaces.get(dev_id, None)
-        if lte_cache:
-            session = lte_cache.get('Session', '0')
-            if_name = lte_cache.get('if_name', dev_id_to_linux_if(dev_id))
-        else:
+        session = get_lte_cache(dev_id, 'session')
+        if_name = get_lte_cache(dev_id, 'if_name')
+        if not session:
             session = '0' # defualt session
+        if not if_name:
             if_name = dev_id_to_linux_if(dev_id)
 
         output = _run_mbimcli_command(dev_id, '--disconnect=%s' % session)
         os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
 
         # update the cache
-        if lte_cache:
-            lte_cache['IP'] = ''
-            lte_cache['GATEWAY'] = ''
-            fwglobals.g.db['lte'] = lte_db # db is SqlDict, so we have to replace all record
+        set_lte_cache(dev_id, 'ip', '')
+        set_lte_cache(dev_id, 'gateway', '')
 
         if hard_reset_service:
             _run_qmicli_command(dev_id, 'wds-reset')
@@ -2745,7 +2842,7 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
-def mbim_query_connection_state(dev_id):
+def mbim_is_connected(dev_id):
     output = _run_mbimcli_command(dev_id, '--query-connection-state')
     if output:
         lines = output.splitlines()
@@ -2755,14 +2852,20 @@ def mbim_query_connection_state(dev_id):
     return False
 
 def reset_modem(dev_id):
-    fwglobals.log.debug('reset_modem: reset starting')
-    _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
-    _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
-    time.sleep(8)
-    _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
-    fwglobals.log.debug('reset_modem: reset finished')
+    set_lte_cache(dev_id, 'state', 'resetting')
+    try: # make sure we set 'resetting' cache to false
+        fwglobals.log.debug('reset_modem: reset starting')
+        _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
+        _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
+        time.sleep(10)
+        _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
+        fwglobals.log.debug('reset_modem: reset finished')
+    except Exception as e:
+        pass
+    set_lte_cache(dev_id, 'state', '')
 
 def lte_connect(params, reset=False):
+    # with fwglobals.g.cache.lock:
     dev_id = params['dev_id']
 
     if reset:
@@ -2789,9 +2892,11 @@ def lte_connect(params, reset=False):
             return (False, "PIN is wrong")
 
     try:
-        is_modem_connected = mbim_query_connection_state(dev_id)
+        is_modem_connected = mbim_is_connected(dev_id)
         if is_modem_connected:
             return (True, None)
+
+        set_lte_cache(dev_id, 'state', 'connecting')
 
         # make sure context is released
         lte_disconnect(dev_id)
@@ -2801,33 +2906,33 @@ def lte_connect(params, reset=False):
         _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
         _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
         _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close' % connection_params)
+        grep = '| grep "Session ID\|IP [0]\|Gateway"'
+        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
+
+        set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
+
         data = output.splitlines()
-
-        lte = fwglobals.g.db.get('lte', {})
-        if not 'interfaces' in lte:
-            lte['interfaces'] = {}
-        lte['interfaces'][dev_id] = {
-            'if_name': dev_id_to_linux_if(dev_id)
-        }
-
         for line in data:
             if 'Session ID:' in line:
-                lte['interfaces'][dev_id]['Session'] = line.split(':')[-1].strip().replace("'", '')
+                session = line.split(':')[-1].strip().replace("'", '')
+                set_lte_cache(dev_id, 'session', session)
                 continue
             if 'IP [0]:' in line:
-                lte['interfaces'][dev_id]['IP'] = line.split(':')[-1].strip().replace("'", '')
+                ip = line.split(':')[-1].strip().replace("'", '')
+                set_lte_cache(dev_id, 'ip', ip)
                 continue
             if 'Gateway:' in line:
-                lte['interfaces'][dev_id]['GATEWAY'] = line.split(':')[-1].strip().replace("'", '')
+                gateway = line.split(':')[-1].strip().replace("'", '')
+                set_lte_cache(dev_id, 'gateway', gateway)
                 break
 
-        fwglobals.g.db['lte'] = lte # db is SqlDict, so we have to replace all record
-
+        set_lte_cache(dev_id, 'state', '')
         return (True, None)
     except Exception as e:
+        fwglobals.log.debug('lte_connect: faild to connect lte. %s' % str(e))
         if not reset:
             return lte_connect(params, True)
+        set_lte_cache(dev_id, 'state', '')
         return (False, "Exception: %s" % str(e))
 
 def lte_get_system_info(dev_id):
@@ -2992,75 +3097,50 @@ def lte_get_radio_signals_state(dev_id):
         return result
 
 def mbim_get_ip_configuration(dev_id):
+    ip = None
+    gateway = None
     try:
         output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
-        return output
-    except subprocess.CalledProcessError as err:
-        return False
+        if output:
+            lines = output.splitlines()
+            for line in lines:
+                if 'IP [0]:' in line:
+                    ip = line.split(':')[-1].strip().replace("'", '')
+                    continue
+                if 'Gateway:' in line:
+                    gateway = line.split(':')[-1].strip().replace("'", '')
+                    break
+        return (ip, gateway)
+    except Exception as err:
+        return (ip, gateway)
 
-def lte_get_configuration_received_from_provider(dev_id, cache=True):
+def lte_get_ip_configuration(dev_id, key=None, cache=True):
     try:
         response = {
-            'IP'      : '',
-            'GATEWAY' : '',
-            'STATUS'  : ''
+            'ip'      : '',
+            'gateway' : '',
         }
 
-        ip = ''
-        gateway = ''
-
-        lte = fwglobals.g.db.get('lte', {})
-        if not 'interfaces' in lte:
-            lte['interfaces'] = {}
-        lte_dev_id_cache = lte['interfaces'].get(dev_id, None)
-
         # try to get it from cache
-        if cache and lte_dev_id_cache:
-            response['STATUS'] = True
-            ip = fwglobals.g.db['lte']['interfaces'][dev_id]['IP']
-            gateway = fwglobals.g.db['lte']['interfaces'][dev_id]['GATEWAY']
+        ip = get_lte_cache(dev_id, 'ip')
+        gateway =  get_lte_cache(dev_id, 'gateway')
 
         # if not exists in cache, take from modem and update cache
-        if not ip or not gateway:
-            ip_config = mbim_get_ip_configuration(dev_id)
-            if ip_config:
-                response['STATUS'] = True
-                lines = ip_config.splitlines()
-                for line in lines:
-                    if 'IP [0]:' in line:
-                        ip = line.split(':')[-1].strip().replace("'", '')
-                        continue
-                    if 'Gateway:' in line:
-                        gateway = line.split(':')[-1].strip().replace("'", '')
-                        break
+        if not ip or not gateway or cache == False:
+            ip, gateway = qmi_get_ip_configuration(dev_id)
 
-                if ip and gateway:
-                    if not dev_id in lte['interfaces']:
-                        lte['interfaces'][dev_id] = {}
+            if ip and gateway:
+                set_lte_cache(dev_id, 'ip', ip)
+                set_lte_cache(dev_id, 'gateway', gateway)
 
-                    lte['interfaces'][dev_id]['IP'] =  ip
-                    lte['interfaces'][dev_id]['GATEWAY'] =  gateway
-                    fwglobals.g.db['lte'] = lte
+        response['ip'] = ip
+        response['gateway'] = gateway
 
-        response['IP'] = ip
-        response['GATEWAY'] = gateway
+        if key:
+            return response[key]
         return response
     except Exception as e:
         return response
-
-def lte_get_provider_config(dev_id, key, cache=True):
-    """Get IP from LTE provider
-
-    :param ket: Filter info by key
-
-    :returns: ip address.
-    """
-    info = lte_get_configuration_received_from_provider(dev_id, cache)
-
-    if key in info:
-        return info[key]
-
-    return ''
 
 def is_wifi_interface_by_dev_id(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
@@ -3099,6 +3179,10 @@ def get_ethtool_value(linuxif, ethtool_key):
 
 def get_interface_bus_info(linux_if):
     return get_ethtool_value(linux_if, 'bus-info')
+
+def get_interface_driver_by_dev_id(dev_id):
+    if_name = dev_id_to_linux_if(dev_id)
+    return get_interface_driver(if_name)
 
 def get_interface_driver(if_name):
     """Get Linux interface driver.
@@ -3387,7 +3471,7 @@ def get_reconfig_hash():
     res = ''
 
     linux_interfaces = get_linux_interfaces()
-    for dev_id in linux_interfaces:
+    for dev_id in copy.deepcopy(linux_interfaces):
         name = linux_interfaces[dev_id]['name']
 
         is_lte = is_lte_interface(name)
@@ -3400,11 +3484,6 @@ def get_reconfig_hash():
 
         addr = get_interface_address(name, log=False)
         gw, metric = get_interface_gateway(name)
-
-        # We monitoring the lte IP to handle IP chandes
-        if is_lte:
-            addr = lte_get_provider_config(dev_id, 'IP', False)
-            gw = lte_get_provider_config(dev_id, 'GATEWAY', False)
 
         addr = addr.split('/')[0] if addr else ''
 

@@ -29,7 +29,6 @@ import threading
 import traceback
 import json
 import subprocess
-
 import fwagent
 import fwglobals
 import fwutils
@@ -90,8 +89,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.router_state    = FwRouterState.STOPPED
         self.thread_watchdog = None
         self.thread_tunnel_stats = None
-        self.thread_dhcpc    = None
         self.thread_static_route   = None
+        self.thread_dhcpc    = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
 
         FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
@@ -103,6 +102,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Destructor method
         """
         self._stop_threads()  # IMPORTANT! Do that before rest of finalizations!
+        self.thread_dhcpc.join()
+        self.thread_dhcpc = None
         self.vpp_api.finalize()
 
     def watchdog(self):
@@ -151,23 +152,51 @@ class FWROUTER_API(FwCfgRequestHandler):
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        while self.state_is_started():
-            time.sleep(1)  # 1 sec
-
+        while True:
             try:  # Ensure thread doesn't exit on exception
-                apply_netplan = False
+                while self.state_is_starting_stopping():
+                    fwglobals.log.debug("dhcpc_thread: vpp is being started/stopped")
+                    time.sleep(5)
+
                 wan_list = self.cfg_db.get_interfaces(type='wan')
+                apply_netplan = False
 
                 for wan in wan_list:
+                    device_type = wan.get('deviceType')
                     dhcp = wan.get('dhcp', 'no')
                     if dhcp == 'no':
                         continue
 
-                    name = fwutils.dev_id_to_tap(wan['dev_id'])
-                    addr = fwutils.get_interface_address(name, log=False)
-                    if not addr:
-                        fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
-                        apply_netplan = True
+                    if self.state_is_started():
+                        name = fwutils.dev_id_to_tap(wan['dev_id'])
+                        addr = fwutils.get_interface_address(name, log=False)
+                        if not addr:
+                            fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
+                            apply_netplan = True
+
+                    # monitor lte dhcp
+                    if device_type == 'lte' and int(time.time()) % 60 == 0:
+                        modem_mode = fwutils.get_lte_cache(wan['dev_id'], 'state')
+                        if modem_mode == 'resetting' or modem_mode == 'connecting':
+                            continue
+
+                        if not self.state_is_started():
+                            name = fwutils.dev_id_to_linux_if(wan['dev_id'])
+                            addr = fwutils.get_interface_address(name, log=False)
+
+                        modem_addr = fwutils.lte_get_ip_configuration(wan['dev_id'], 'ip', False)
+
+                        if modem_addr and addr != modem_addr:
+                            fwglobals.log.debug("dhcpc_thread: lte (%s) IP changed from %s to %s" % (wan['dev_id'], addr, modem_addr))
+                            fwutils.configure_lte_interface({
+                                'dev_id': wan['dev_id'],
+                                'metric': wan['metric']
+                            })
+
+                            old_params = self.cfg_db.get_interfaces(dev_id=wan['dev_id'])[0]
+                            old_params['addr'] = modem_addr
+                            old_params['gateway'] = fwutils.lte_get_ip_configuration(wan['dev_id'], 'gateway', True)
+                            fwglobals.g.handle_request({'message':'modify-interface','params': old_params})
 
                 if apply_netplan:
                     fwutils.netplan_apply('dhcpc_thread')
@@ -177,6 +206,8 @@ class FWROUTER_API(FwCfgRequestHandler):
                 fwglobals.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
+
+            time.sleep(1)  # 1 sec
 
     def static_route_thread(self):
         """Static route thread.
@@ -833,9 +864,6 @@ class FWROUTER_API(FwCfgRequestHandler):
         if self.thread_tunnel_stats is None:
             self.thread_tunnel_stats = threading.Thread(target=self.tunnel_stats_thread, name='Tunnel Stats Thread')
             self.thread_tunnel_stats.start()
-        if self.thread_dhcpc is None:
-            self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
-            self.thread_dhcpc.start()
         if self.thread_static_route is None:
             self.thread_static_route = threading.Thread(target=self.static_route_thread, name='Static route Thread')
             self.thread_static_route.start()
@@ -853,10 +881,6 @@ class FWROUTER_API(FwCfgRequestHandler):
         if self.thread_tunnel_stats:
             self.thread_tunnel_stats.join()
             self.thread_tunnel_stats = None
-
-        if self.thread_dhcpc:
-            self.thread_dhcpc.join()
-            self.thread_dhcpc = None
 
         if self.thread_static_route:
             self.thread_static_route.join()
