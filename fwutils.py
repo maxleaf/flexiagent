@@ -2563,7 +2563,8 @@ def qmi_get_ip_configuration(dev_id):
     try:
         ip = None
         gateway = None
-        output = _run_qmicli_command(dev_id, 'wds-get-current-settings')
+        cmd = 'wds-get-current-settings | grep "IPv4 address\|IPv4 subnet mask\|IPv4 gateway address"'
+        output = _run_qmicli_command(dev_id, cmd)
         if output:
             lines = output.splitlines()
             for idx, line in enumerate(lines):
@@ -2838,7 +2839,7 @@ def mbim_is_connected(dev_id):
     return False
 
 def reset_modem(dev_id):
-    set_lte_cache(dev_id, 'mode', 'resetting')
+    set_lte_cache(dev_id, 'state', 'resetting')
     try: # make sure we set 'resetting' cache to false
         fwglobals.log.debug('reset_modem: reset starting')
         _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
@@ -2848,7 +2849,7 @@ def reset_modem(dev_id):
         fwglobals.log.debug('reset_modem: reset finished')
     except Exception as e:
         pass
-    set_lte_cache(dev_id, 'mode', '')
+    set_lte_cache(dev_id, 'state', '')
 
 def lte_connect(params, reset=False):
     # with fwglobals.g.cache.lock:
@@ -2882,7 +2883,7 @@ def lte_connect(params, reset=False):
         if is_modem_connected:
             return (True, None)
 
-        set_lte_cache(dev_id, 'mode', 'connecting')
+        set_lte_cache(dev_id, 'state', 'connecting')
 
         # make sure context is released
         lte_disconnect(dev_id)
@@ -2892,11 +2893,12 @@ def lte_connect(params, reset=False):
         _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
         _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
         _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close' % connection_params)
-        data = output.splitlines()
+        grep = '| grep "Session ID\|IP [0]\|Gateway"'
+        output = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
 
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
 
+        data = output.splitlines()
         for line in data:
             if 'Session ID:' in line:
                 session = line.split(':')[-1].strip().replace("'", '')
@@ -2911,13 +2913,13 @@ def lte_connect(params, reset=False):
                 set_lte_cache(dev_id, 'gateway', gateway)
                 break
 
-        set_lte_cache(dev_id, 'mode', '')
+        set_lte_cache(dev_id, 'state', '')
         return (True, None)
     except Exception as e:
         fwglobals.log.debug('lte_connect: faild to connect lte. %s' % str(e))
         if not reset:
             return lte_connect(params, True)
-        set_lte_cache(dev_id, 'mode', '')
+        set_lte_cache(dev_id, 'state', '')
         return (False, "Exception: %s" % str(e))
 
 def lte_get_system_info(dev_id):

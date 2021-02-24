@@ -40,7 +40,6 @@ from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 from fwcfg_request_handler import FwCfgRequestHandler
-import datetime
 
 import fwtunnel_stats
 
@@ -176,8 +175,8 @@ class FWROUTER_API(FwCfgRequestHandler):
                             apply_netplan = True
 
                     # monitor lte dhcp
-                    if device_type == 'lte' and int(time.time()) % 20 == 0:
-                        modem_mode = fwutils.get_lte_cache(wan['dev_id'], 'mode')
+                    if device_type == 'lte' and int(time.time()) % 60 == 0:
+                        modem_mode = fwutils.get_lte_cache(wan['dev_id'], 'state')
                         if modem_mode == 'resetting' or modem_mode == 'connecting':
                             continue
 
