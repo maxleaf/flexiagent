@@ -213,7 +213,8 @@ class Fwglobals:
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
-                }
+                },
+                'LTE': {}
             }
             self.lock                       = threading.RLock()
             self.linux_interfaces           = self.db['LINUX_INTERFACES']
@@ -223,6 +224,7 @@ class Fwglobals:
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
+            self.lte                        = self.db['LTE']
 
 
     def __init__(self):

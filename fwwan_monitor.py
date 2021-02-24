@@ -283,12 +283,16 @@ class FwWanMonitor:
             self._update_metric(route, new_metric)
 
         # lte wan monitoring
-        if not ok and datetime.datetime.now().second % 10 == 0 \
+        if not ok and int(time.time()) % 10 == 0 \
            and fwutils.is_lte_interface_by_dev_id(route.dev_id):
+            # if modem now in reset proccess, no need to monitor at this time
+            mode = fwutils.get_lte_cache(route.dev_id, 'mode')
+            if mode == 'resetting' or mode == 'connecting':
+                return
 
             connected = fwutils.mbim_is_connected(route.dev_id)
             if not connected:
-                fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev))
+                fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev_id))
                 fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
 

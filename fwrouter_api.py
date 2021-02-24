@@ -156,7 +156,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         while True:
             try:  # Ensure thread doesn't exit on exception
                 while self.state_is_starting_stopping():
-                    fwglobals.log.debug("vpp is being started/stopped")
+                    fwglobals.log.debug("dhcpc_thread: vpp is being started/stopped")
                     time.sleep(5)
 
                 wan_list = self.cfg_db.get_interfaces(type='wan')
@@ -165,7 +165,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 for wan in wan_list:
                     device_type = wan.get('deviceType')
                     dhcp = wan.get('dhcp', 'no')
-                    if dhcp == 'no' and not device_type == 'lte':
+                    if dhcp == 'no':
                         continue
 
                     if self.state_is_started():
@@ -176,12 +176,16 @@ class FWROUTER_API(FwCfgRequestHandler):
                             apply_netplan = True
 
                     # monitor lte dhcp
-                    if device_type == 'lte' and datetime.datetime.now().second % 20 == 0:
+                    if device_type == 'lte' and int(time.time()) % 20 == 0:
+                        modem_mode = fwutils.get_lte_cache(wan['dev_id'], 'mode')
+                        if modem_mode == 'resetting' or modem_mode == 'connecting':
+                            continue
+
                         if not self.state_is_started():
                             name = fwutils.dev_id_to_linux_if(wan['dev_id'])
                             addr = fwutils.get_interface_address(name, log=False)
 
-                        modem_addr = fwutils.lte_get_provider_config(wan['dev_id'], 'IP', False)
+                        modem_addr = fwutils.lte_get_ip_configuration(wan['dev_id'], 'ip', False)
 
                         if modem_addr and addr != modem_addr:
                             fwglobals.log.debug("dhcpc_thread: lte (%s) IP changed from %s to %s" % (wan['dev_id'], addr, modem_addr))
@@ -192,7 +196,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                             old_params = self.cfg_db.get_interfaces(dev_id=wan['dev_id'])[0]
                             old_params['addr'] = modem_addr
-                            old_params['gateway'] = fwutils.lte_get_provider_config(wan['dev_id'], 'GATEWAY', True)
+                            old_params['gateway'] = fwutils.lte_get_ip_configuration(wan['dev_id'], 'gateway', True)
                             fwglobals.g.handle_request({'message':'modify-interface','params': old_params})
 
                 if apply_netplan:

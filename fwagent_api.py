@@ -342,11 +342,6 @@ class FWAGENT_API:
         :returns: Dictionary status code.
         """
         try:
-            is_success, error = fwutils.lte_disconnect(params['dev_id'], True)
-
-            fwutils.qmi_sim_power_off(params['dev_id'])
-            fwutils.qmi_sim_power_on(params['dev_id'])
-
             fwutils.reset_modem(params['dev_id'])
 
             # restore lte connection if needed
