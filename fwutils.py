@@ -266,7 +266,20 @@ def get_interface_gateway(if_name, if_dev_id=None):
     return rip, metric
 
 
-def get_binary_interface_gateway_by_dev_id(dev_id):
+def get_tunnel_gateway(dst, dev_id):
+    linux_interfaces = get_linux_interfaces()
+    if linux_interfaces:
+        interface = linux_interfaces.get(dev_id)
+        if interface:
+            try:
+                network = interface['IPv4'] + '/' + interface['IPv4Mask']
+                # If src and dst on the same network return an empty gw
+                # In this case the system uses default route as a gateway and connect the interfaces directly and not via the GW
+                if is_ip_in_subnet(dst,network): return ''
+            except Exception as e:
+                fwglobals.log.error("get_effective_gateway: failed to check networks: dst=%s, dev_id=%s, network=%s, error=%s" % (dst, dev_id, network, str(e)))
+
+    # If src, dst are not on same subnet or any error, use the gateway defined on the device
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
     return ip_str_to_bytes(gw_ip)[0] if gw_ip else ''
 
