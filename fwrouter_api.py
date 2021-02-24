@@ -184,6 +184,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                         modem_addr = fwutils.lte_get_provider_config(wan['dev_id'], 'IP', False)
 
                         if modem_addr and addr != modem_addr:
+                            fwglobals.log.debug("dhcpc_thread: lte (%s) IP changed from %s to %s" % (wan['dev_id'], addr, modem_addr))
                             fwutils.configure_lte_interface({
                                 'dev_id': wan['dev_id'],
                                 'metric': wan['metric']
