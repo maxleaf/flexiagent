@@ -1604,7 +1604,7 @@ def reset_traffic_control():
 
     for term in search:
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s root 2>/dev/null' % term, shell=True, strerr=subprocess.STD)
+            subprocess.check_output('sudo tc -force qdisc del dev %s root 2>/dev/null' % term, shell=True)
         except:
             pass
 
@@ -3088,19 +3088,26 @@ def lte_get_radio_signals_state(dev_id):
 
 def mbim_get_ip_configuration(dev_id):
     try:
-        output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
+        # Sometimes the mbim didn't reply properly for this request
+        # So we try it three times. if still there is no answer,
+        # we reconnect the network
+        cmd = '--query-ip-configuration --no-close --no-open=6'
+        for _ in range(3):
+            output = _run_mbimcli_command(dev_id, cmd)
+            if output:
+                break
+            time.sleep(3)
         if not output:
+            fwglobals.log.debug("mbimcli failed in response to the IP request. We reconnect lte network.")
             lte_disconnect(dev_id)
             fwglobals.g.system_api.restore_configuration(types=['add-lte'])
-            output = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
+            output = _run_mbimcli_command(dev_id, cmd)
         return output
     except subprocess.CalledProcessError as err:
         return False
 
 def lte_get_configuration_received_from_provider(dev_id, cache=True):
     try:
-        global x
-
         response = {
             'IP'      : '',
             'GATEWAY' : '',
@@ -3111,7 +3118,7 @@ def lte_get_configuration_received_from_provider(dev_id, cache=True):
         gateway =  get_lte_cache(dev_id, 'GATEWAY')
 
         # if not exists in cache, take from modem and update cache
-        if not ip or not gateway:
+        if not ip or not gateway or cache == False:
             ip_config = mbim_get_ip_configuration(dev_id)
             if ip_config:
                 lines = ip_config.splitlines()
