@@ -3151,9 +3151,6 @@ def get_ethtool_value(linuxif, ethtool_key):
 
     return val
 
-def get_interface_bus_info(linux_if):
-    return get_ethtool_value(linux_if, 'bus-info')
-
 def get_interface_driver_by_dev_id(dev_id):
     if_name = dev_id_to_linux_if(dev_id)
     return get_interface_driver(if_name)
@@ -3201,21 +3198,6 @@ def is_non_dpdk_interface(dev_id):
         return True
 
     return False
-
-def get_bus_info(interface_name):
-    """Get LTE device bus info.
-
-    :param interface_name: Interface name to check.
-
-    :returns: bus_info .
-    """
-    try:
-        cmd = 'ethtool -i %s' % interface_name
-        out = subprocess.check_output(cmd, shell=True).splitlines()
-        vals = out[4].decode().split("bus-info: ", 1)
-        return str(vals[-1])
-    except subprocess.CalledProcessError:
-        return ''
 
 def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
     '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
