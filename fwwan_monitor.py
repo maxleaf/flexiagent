@@ -47,7 +47,6 @@ class FwWanRoute:
         self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
         self.ok         = True      # If True there is connectivity to internet
         self.default    = False     # If True the route is the default one - has lowest metric
-        self.prev_rpf   = None      # To put back previous value on monitor disable
 
     def __str__(self):
         route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.dev_id)
@@ -229,13 +228,8 @@ class FwWanMonitor:
                 route.probes    = cached.probes
                 route.ok        = cached.ok
                 route.default   = cached.default
-                route.prev_rpf  = cached.prev_rpf
             else:
-                # Suppress RPF to prevent linux network stack from dropping ping responses
-                route.prev_rpf = fwutils.prev_rpf = fwutils.set_linux_reverse_path_filter(
-                    route.dev, fwutils.RPF_LOOSE_MODE)
-                fwglobals.log.debug("Start WAN Monitoring on '%s' (Previous RPF :%s)" %
-                    (str(route), str(route.prev_rpf)))
+                fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
 
             # Finally store the route into cache.
             #
@@ -250,15 +244,6 @@ class FwWanMonitor:
         #
         stale_keys = list(set(self.routes.keys()) - set(os_routes.keys()))
         for key in stale_keys:
-            '''
-            Commented till rpf access race with stun thread is resolved
-
-            # Put back the RPF value originally seen on the interface
-            if self.routes[key].prev_rpf is not None:
-                fwutils.set_linux_reverse_path_filter(self.routes[key].dev, self.routes[key].prev_rpf)
-            fwglobals.log.debug("Stop WAN Monitoring on '%s' (Restore RPF to: %s)" %
-                (str(self.routes[key]), str(self.routes[key].prev_rpf)))
-            '''
             fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
@@ -295,6 +280,19 @@ class FwWanMonitor:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
             fwglobals.log.debug("connectivity %s on %s" % (state, route.dev))
             self._update_metric(route, new_metric)
+
+        # lte wan monitoring
+        if not ok and int(time.time()) % 10 == 0 \
+           and fwutils.is_lte_interface_by_dev_id(route.dev_id):
+            # if modem now in reset proccess, no need to monitor at this time
+            mode = fwutils.get_lte_cache(route.dev_id, 'state')
+            if mode == 'resetting' or mode == 'connecting':
+                return
+
+            connected = fwutils.mbim_is_connected(route.dev_id)
+            if not connected:
+                fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev_id))
+                fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
 
     def _update_metric(self, route, new_metric):

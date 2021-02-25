@@ -213,7 +213,8 @@ class Fwglobals:
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
-                }
+                },
+                'LTE': {}
             }
             self.lock                       = threading.RLock()
             self.linux_interfaces           = self.db['LINUX_INTERFACES']
@@ -223,6 +224,7 @@ class Fwglobals:
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
+            self.lte                        = self.db['LTE']
 
 
     def __init__(self):
@@ -338,6 +340,9 @@ class Fwglobals:
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
+        # RPF set to Loose mode
+        fwutils.set_default_linux_reverse_path_filter(2)
+
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
@@ -347,6 +352,7 @@ class Fwglobals:
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
 
+        self.router_api.thread_dhcpc.start()
         return self.fwagent
 
     def finalize_agent(self):
