@@ -229,10 +229,7 @@ class FwWanMonitor:
                 route.ok        = cached.ok
                 route.default   = cached.default
             else:
-                # Suppress RPF permanently to avoid Linux to filter out
-                # responses for ping-s on not default route interfaces.
-                fwutils.set_linux_reverse_path_filter(route.dev, on=False)
-                fwglobals.log.debug("start on '%s'" % str(route))
+                fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
 
             # Finally store the route into cache.
             #
@@ -247,7 +244,7 @@ class FwWanMonitor:
         #
         stale_keys = list(set(self.routes.keys()) - set(os_routes.keys()))
         for key in stale_keys:
-            fwglobals.log.debug("stop on '%s'" % str(self.routes[key]))
+            fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
         return list(self.routes.values())
@@ -283,6 +280,19 @@ class FwWanMonitor:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
             fwglobals.log.debug("connectivity %s on %s" % (state, route.dev))
             self._update_metric(route, new_metric)
+
+        # lte wan monitoring
+        if not ok and int(time.time()) % 10 == 0 \
+           and fwutils.is_lte_interface_by_dev_id(route.dev_id):
+            # if modem now in reset proccess, no need to monitor at this time
+            mode = fwutils.get_lte_cache(route.dev_id, 'state')
+            if mode == 'resetting' or mode == 'connecting':
+                return
+
+            connected = fwutils.mbim_is_connected(route.dev_id)
+            if not connected:
+                fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev_id))
+                fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
 
     def _update_metric(self, route, new_metric):

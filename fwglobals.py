@@ -216,7 +216,8 @@ class Fwglobals:
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
-                }
+                },
+                'LTE': {}
             }
             self.lock                       = threading.RLock()
             self.linux_interfaces           = self.db['LINUX_INTERFACES']
@@ -226,6 +227,7 @@ class Fwglobals:
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
+            self.lte                        = self.db['LTE']
 
 
     def __init__(self):
@@ -341,6 +343,9 @@ class Fwglobals:
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
+        # RPF set to Loose mode
+        fwutils.set_default_linux_reverse_path_filter(2)
+
         self.stun_wrapper = FwStunWrap(standalone)
         self.stun_wrapper.initialize()
 
@@ -350,6 +355,7 @@ class Fwglobals:
 
         self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
 
+        self.router_api.thread_dhcpc.start()
         return self.fwagent
 
     def finalize_agent(self):
@@ -619,9 +625,7 @@ class Fwglobals:
         # Break the received aggregated request into aggregations by API type
         #
         # !!! IMPORTANT !!!
-        # Requests that belong to different api modules, e.g. router_api, system_api, etc.,
-        # should not depend on each others. So the order of the execution of aggregated messages
-        # grouped by api, is not important! Hence reuse dict for "aggregations"
+        # ATM we decided to run system-api requests before router-api requests.
         #
         aggregations = {}
         for _request in request['params']['requests']:
@@ -658,17 +662,19 @@ class Fwglobals:
         #
         apis = list(aggregations.keys())
         executed_apis = []
-        for api in apis:
-            api_call_func = self._get_api_object_attr(api, 'call')
-            try:
-                api_call_func(aggregations[api])
-                executed_apis.append(api)
-            except Exception as e:
-                # Revert the previously executed aggregated requests
-                for api in executed_apis:
-                    rollback_func = self._get_api_object_attr(api, 'rollback')
-                    rollback_func(rollback_aggregations[api])
-                raise e
+
+        for api in ['_call_system_api', '_call_router_api']:
+            if api in aggregations:
+                api_call_func = self._get_api_object_attr(api, 'call')
+                try:
+                    api_call_func(aggregations[api])
+                    executed_apis.append(api)
+                except Exception as e:
+                    # Revert the previously executed aggregated requests
+                    for api in executed_apis:
+                        rollback_func = self._get_api_object_attr(api, 'rollback')
+                        rollback_func(rollback_aggregations[api])
+                    raise e
 
         return {'ok': 1}
 

@@ -727,7 +727,6 @@ def show(agent, configuration, database, status):
         if configuration == 'all':
             fwutils.print_router_config()
             fwutils.print_system_config()
-            fwutils.print_global_config()
         elif configuration == 'router':
             fwutils.print_router_config()
         elif configuration == 'system':
@@ -736,8 +735,6 @@ def show(agent, configuration, database, status):
             fwutils.print_router_config(basic=False, multilink=True)
         elif configuration == 'signature':
             fwutils.print_device_config_signature()
-        elif configuration == 'global':
-            fwutils.print_global_config()
 
     if agent:
         out = daemon_rpc('show', what=agent)
@@ -1175,7 +1172,7 @@ if __name__ == '__main__':
     parser_show.add_argument('--agent', choices=['version', 'cache', 'threads'],
                         help="show various agent parameters")
     parser_show.add_argument('--configuration', const='all', nargs='?',
-                        choices=['all', 'router', 'system', 'multilink-policy', 'signature', 'global'],
+                        choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
     parser_show.add_argument('--database', const='all', nargs='?',
                         choices=['all', 'router', 'system'],
