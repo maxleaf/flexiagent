@@ -741,7 +741,7 @@ class Fwglobals:
         return rollbacks_aggregations
 
 
-def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):
+def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO, quiet=False):
     """Initialize global instances of LOG, and GLOBALS.
 
     :param log_level:    LOG severity level.
@@ -752,6 +752,8 @@ def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):
     if not g_initialized:
         global log
         log = Fwlog(log_level)
+        if quiet:
+            log.set_target(to_terminal=False)
         global g
         g = Fwglobals()
         g_initialized = True
