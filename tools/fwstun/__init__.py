@@ -335,15 +335,12 @@ def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
     It retrieves the remote IP and PORT as seen from incoming packets from the other side of the tunnel.
     : param source_ip   : the local source IP on behalf NAT request is sent
     : param source_port : the local source port on behalf NAT request is sent
-    : param dest_ip   : the stun server host name or IP address
-    : param dest_port   : the stun server port
     : param dev_name    : device name to bind() to
 
     """
-    remote_ip = ''
-    remote_port = ''
-    vni = 0
-
+    tunnels = {}
+    pkts_to_read = 10
+    
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(5)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -355,23 +352,28 @@ def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
     except Exception as e:
         stun_log("Tunnel: bind: %s" % str(e))
         sock.close()
-        return ('', '', '')
+        return tunnels
 
-    for _ in range (2):
+    for _ in range(pkts_to_read):
         try:
             buf, (address, port) = sock.recvfrom(2048)
             stun_log("Tunnel: recvfrom: %s:%s" %(str(address), str(port)))
+        except socket.timeout as e:
+            stun_log("Tunnel: There is no packets: %s" %(str(e)), 'warning')
+            break
         except Exception as e:
             stun_log("Tunnel: recvfrom: %s" %(str(e)), 'warning')
+            continue
+
+        if len(buf) < 8:
             continue
 
         msgtype = b2a_hexstr(buf[0:4])
         if msgtype == vxLanMsg:
             vni = int(b2a_hexstr(buf[4:7]), 16)
-            remote_ip = address
-            remote_port = port
+            if not tunnels.get(vni):
+                tunnels[vni] = {"dst" : address, "dstPort" : port}
             stun_log("Tunnel: msgtype: %s vni: %s" %(str(msgtype), str(vni)))
-            break
 
     sock.close()
-    return (remote_ip, remote_port, vni)
+    return tunnels

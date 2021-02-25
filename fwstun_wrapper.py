@@ -433,28 +433,21 @@ class FwStunWrap:
                         self.stun_cache[dev_id]['send_time'] = time.time() + 30
                 # Assume that remote edge is behind symmetric NAT
                 # Try to discover remote edge ip and port from incoming packets.
-                if self.sym_nat_cache.get(tunnel_id):
-                    if self.sym_nat_cache[tunnel_id]['success'] == True:
-                        fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d"%(tunnel_id))
-                        self.sym_nat_cache[tunnel_id]['success'] = False
-                        self.sym_nat_cache[tunnel_id]['probe_time'] = time.time() + 5
-                        self.sym_nat_cache[tunnel_id]['local_ip'] = tunnel['src']
+                if self.sym_nat_cache.get(dev_id):
+                    if self.sym_nat_cache[dev_id]['probe_time'] == 0:
+                        fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %d"%(tunnel_id, dev_id))
+                        self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
+                        self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
                 else:
-                    fwglobals.log.debug("Try to discover remote edge for tunnel: %d"%(tunnel_id))
-                    self.sym_nat_cache[tunnel_id] = {
+                    fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %d"%(tunnel_id, dev_id))
+                    self.sym_nat_cache[dev_id] = {
                                 'local_ip'    : tunnel['src'],
-                                'actual_ip'   : '',
-                                'actual_port' : '',
-                                'probe_time'  : time.time() + 30,
-                                'success'     : False,
+                                'probe_time'  : time.time() + 25,
                            }
             else:
                 if self.stun_cache.get(dev_id):
                     self.stun_cache[dev_id]['success'] = True
                     self.stun_cache[dev_id]['send_time'] = 0
-                if self.sym_nat_cache.get(tunnel_id):
-                    self.sym_nat_cache[tunnel_id]['success'] = True
-                    self.sym_nat_cache[tunnel_id]['probe_time'] = 0
 
     def _is_useStun(self, dev_id):
         """ check router DB for 'useStun' flag for an interface bus address
@@ -499,6 +492,9 @@ class FwStunWrap:
                 return dev_id
         return None
 
+    def _get_vni(self, tunnel_id):
+        return tunnel_id*2+1 
+
     def _probe_symmetric_nat(self):
         """ Assume that tunnel in down state has remote edge behind symmetric NAT.
             Try to discover the remote edge address/port from incoming packets.
@@ -506,78 +502,53 @@ class FwStunWrap:
         if not self.sym_nat_cache:
             return
 
-        for tunnel_id in self.sym_nat_cache:
-            cached_addr = self.sym_nat_cache.get(tunnel_id)
-            if not cached_addr or cached_addr.get('success', False) == True:
+        probe_tunnels = {}
+
+        for dev_id in self.sym_nat_cache:
+            cached_addr = self.sym_nat_cache.get(dev_id)
+            if not cached_addr or cached_addr.get('probe_time', 0) == 0:
                 continue
 
             if time.time() >= cached_addr['probe_time']:
-                local_ip = cached_addr['local_ip']
-                nat_actual_ip, nat_actual_port, nat_vni = \
-                    self._probe_symmetric_nat_test(tunnel_id, local_ip, 4789)
+                src_ip = cached_addr['local_ip']
+                src_port = 4789
+                dev_name = fwutils.get_interface_name(src_ip)
 
-                self._handle_symmetric_nat_response(tunnel_id, nat_actual_ip, nat_actual_port, nat_vni)
+                fwglobals.log.debug("Tunnel: discovering remote ip for tunnels with src %s:%s on device %s" \
+                    %(src_ip, src_port, dev_name))
+                probe_tunnels_dev = fwstun.get_remote_ip_info(src_ip, src_port, dev_name)
+                fwglobals.log.debug("Tunnel: discovered tunnels %s on dev %s" %(probe_tunnels_dev, dev_name))
+                probe_tunnels.update(probe_tunnels_dev)
 
-    def _probe_symmetric_nat_test(self, tunnel_id, src_ip, src_port):
-        """ Try to discover remote ip and port for vxLAN tunnel.
-        : param tunnel_id   : tunnel ID
-        : param src_ip      : local IP address
-        : param srt_port    : local port
-        : return :  
-                    nat_ext_ip   - the discovered remote IP address -> str
-                    nat_ext_port - the discovered remote port -> int
-                    vni          - the discovered tunnel vni -> int
-        """
-        dev_name = fwutils.get_interface_name(src_ip)
-        if dev_name == None:
-            return '',''
+        self._handle_symmetric_nat_response(probe_tunnels)
 
-        fwglobals.log.debug("Tunnel: discovering remote edge for tunnel %s src %s:%s for device %s" \
-            %(tunnel_id, src_ip, src_port, dev_name))
-        prev_rpf = fwutils.set_linux_reverse_path_filter(dev_name, False)
-
-        nat_ext_ip, nat_ext_port, vni = fwstun.get_remote_ip_info(src_ip, src_port, dev_name)
-
-        if prev_rpf:    # Restore RPF only if it was suppressed by us
-            fwutils.set_linux_reverse_path_filter(dev_name, True)
-        return nat_ext_ip, nat_ext_port, vni
-
-    def _get_vni(self, tunnel_id):
-        return tunnel_id*2+1 
-
-    def _handle_symmetric_nat_response(self, tunnel_id, nat_ip, nat_port, nat_vni):
+    def _handle_symmetric_nat_response(self, probe_tunnels):
         """ Handle response for symmetric NAT probe. Reset all the counters,
         update the results, and set the 'success' flag to True.
-        : param tunnel_id  : Tunnel ID
-        : param nat_ip     : the remote IP discovered from symmetric NAT probe
-        : param nat_port   : the remote port discovered from symmetric NAT probe
-        : param nat_vni    : discovered VNI from symmetric NAT probe
+        : param probe_tunnels  : List of discovered tunnels
         """
-        if nat_vni == self._get_vni(tunnel_id) and nat_ip != '' and nat_port != '':
-            tunnels = fwglobals.g.router_cfg.get_tunnels()
-            if not tunnels:
-                return
-            for tunnel in tunnels:
-                if tunnel_id == tunnel['tunnel-id']:
-                    break
-            if tunnel_id != tunnel['tunnel-id']:
-                return
+        tunnels       = fwglobals.g.router_cfg.get_tunnels()
+        tunnel_stats  = fwtunnel_stats.tunnel_stats_get()
+        if not tunnels or not probe_tunnels or not tunnel_stats:
+            return
+        
+        for tunnel in tunnels:
+            tunnel_id = tunnel['tunnel-id']
+            stats = tunnel_stats.get(tunnel_id)
+            if stats and stats.get('status') == 'down':
+                vni = self._get_vni(tunnel_id)
+                if vni in probe_tunnels:
+                    if tunnel['dst'] != probe_tunnels[vni]["dst"] or tunnel['dstPort'] != probe_tunnels[vni]["dstPort"]:
+                        fwglobals.log.debug("Remove tunnel: %s" %(tunnel))
+                        fwglobals.g.router_api._call_simple({'message':'remove-tunnel', "params": tunnel})
 
-            fwglobals.log.debug("Remove tunnel: %s" %(tunnel))
-            fwglobals.g.router_api._call_simple({'message':'remove-tunnel', "params": tunnel})
+                        tunnel['dst'] = probe_tunnels[vni]["dst"]
+                        tunnel['dstPort'] = probe_tunnels[vni]["dstPort"]
+                        fwglobals.log.debug("Add tunnel: %s" %(tunnel))
+                        fwglobals.g.router_api._call_simple({'message':'add-tunnel', "params": tunnel})
 
-            tunnel['dst'] = nat_ip
-            tunnel['dstPort'] = nat_port
-            fwglobals.log.debug("Add tunnel: %s" %(tunnel))
-            fwglobals.g.router_api._call_simple({'message':'add-tunnel', "params": tunnel})
-
-            cached_addr = self.sym_nat_cache.get(tunnel_id)
+        for dev_id in self.sym_nat_cache:
+            cached_addr = self.sym_nat_cache.get(dev_id)
             if not cached_addr:
-                return
-
-            cached_addr['success']       = True
-            cached_addr['probe_time']    = 0
-            cached_addr['actual_ip']     = nat_ip
-            cached_addr['actual_port']   = nat_port
-
-            fwglobals.log.debug("found remote %s:%s for tunnel %s" %(nat_ip, nat_port, tunnel_id))
+                continue
+            cached_addr['probe_time'] = 0
