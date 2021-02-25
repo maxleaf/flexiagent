@@ -3606,10 +3606,10 @@ def netplan_set_mac_addresses():
                 interface = netplan_json['network']['ethernets'][if_name]
                 if interface.get('match'):
                     interface['match']['macaddress'] = intf_mac_addr[if_name]
-	    netplan_str = yaml.dump(netplan_json)
-	    fd.seek(0)
-	    fd.write(netplan_str)
-	    fd.truncate()
+        netplan_str = yaml.dump(netplan_json)
+        fd.seek(0)
+        fd.write(netplan_str)
+        fd.truncate()
 
 def wifi_get_capabilities(dev_id):
 
