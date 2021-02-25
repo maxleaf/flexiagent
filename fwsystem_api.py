@@ -20,9 +20,13 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import fwglobals
-from fwcfg_request_handler import FwCfgRequestHandler
+import time
+import threading
 import traceback
+
+import fwglobals
+import fwutils
+from fwcfg_request_handler import FwCfgRequestHandler
 
 fwsystem_translators = {
     'add-lte':               {'module': __import__('fwtranslate_add_lte'),    'api':'add_lte'},
@@ -41,3 +45,77 @@ class FWSYSTEM_API(FwCfgRequestHandler):
         """Constructor method
         """
         FwCfgRequestHandler.__init__(self, fwsystem_translators, cfg, fwglobals.g.system_cfg)
+        self.thread_lte_watchdog = None
+
+    def initialize(self):
+        self.active = True
+        if self.thread_lte_watchdog is None:
+            self.thread_lte_watchdog = threading.Thread(target=self.lte_watchdog, name='LTE Watchdog')
+            self.thread_lte_watchdog.start()
+
+    def finalize(self):
+        if not self.active:
+            return
+        self.active = False
+        if self.thread_lte_watchdog:
+            self.thread_lte_watchdog.join()
+            self.thread_lte_watchdog = None
+
+    def lte_watchdog(self):
+        """LTE watchdog thread.
+        Monitors proper configuration of KTE modem. The modem is configured
+        and connected to provider by 'add-lte' request received from flexiManage
+        with no relation to vpp. As long as it was not removed by 'remove-lte',
+        it should stay connected and the IP address and other configuration
+        parameters received from provider should match these configured in linux
+        for the correspondent interface.
+        """
+        while self.active:
+            try:  # Ensure thread doesn't exit on exception
+
+                if int(time.time()) % 60 != 0:
+                    continue    # Check modem status once a minute, while checking self.active every second
+
+                wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+                for wan in wan_list:
+
+                    device_type = wan.get('deviceType')
+                    if device_type != 'lte':
+                        continue
+
+                    modem_mode = fwutils.get_lte_cache(wan['dev_id'], 'state')
+                    if modem_mode == 'resetting' or modem_mode == 'connecting':
+                        continue
+
+                    # Ensure that provider did not change IP provisioned to modem,
+                    # so the IP that we assigned to the modem interface is still valid.
+                    # If it was changed, go and update the interface, vpp, etc.
+                    #
+                    modem_addr = fwutils.lte_get_ip_configuration(wan['dev_id'], 'ip', False)
+                    if modem_addr:
+                        if fwglobals.g.router_api.state_is_started():
+                            name = fwutils.dev_id_to_tap(wan['dev_id'])
+                        else:
+                            name = fwutils.dev_id_to_linux_if(wan['dev_id'])
+                        iface_addr = fwutils.get_interface_address(name, log=False)
+
+                        if iface_addr != modem_addr:
+                            fwglobals.log.debug("%s: LTE IP change detected: %s -> %s" % (wan['dev_id'], iface_addr, modem_addr))
+
+                            fwutils.configure_lte_interface({
+                                'dev_id': wan['dev_id'],
+                                'metric': wan['metric']
+                            })
+                            params = self.cfg_db.get_interfaces(dev_id=wan['dev_id'])[0]
+                            params['addr'] = modem_addr
+                            params['gateway'] = fwutils.lte_get_ip_configuration(wan['dev_id'], 'gateway', True)
+                            fwglobals.g.router_api.call({'message':'modify-interface','params': params})
+
+                            fwglobals.log.debug("%s: LTE IP was changed: %s -> %s" % (wan['dev_id'], iface_addr, modem_addr))
+
+            except Exception as e:
+                fwglobals.log.error("%s: %s (%s)" %
+                    (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                pass
+            time.sleep(1)  # 1 sec
+
