@@ -63,7 +63,7 @@ class FWSYSTEM_API(FwCfgRequestHandler):
 
     def lte_watchdog(self):
         """LTE watchdog thread.
-        Monitors proper configuration of KTE modem. The modem is configured
+        Monitors proper configuration of LTE modem. The modem is configured
         and connected to provider by 'add-lte' request received from flexiManage
         with no relation to vpp. As long as it was not removed by 'remove-lte',
         it should stay connected and the IP address and other configuration
@@ -71,10 +71,15 @@ class FWSYSTEM_API(FwCfgRequestHandler):
         for the correspondent interface.
         """
         while self.active:
-            try:  # Ensure thread doesn't exit on exception
+            try: # Ensure thread doesn't exit on exception
+
+                time.sleep(1)
 
                 if int(time.time()) % 60 != 0:
                     continue    # Check modem status once a minute, while checking self.active every second
+
+                if  fwglobals.g.router_api.state_is_starting_stopping():
+                    continue
 
                 wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
                 for wan in wan_list:
@@ -117,5 +122,4 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                 fwglobals.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
-            time.sleep(1)  # 1 sec
 

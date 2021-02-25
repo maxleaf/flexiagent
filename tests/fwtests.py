@@ -391,7 +391,7 @@ def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
 
 def file_exists(filename, check_size=True):
     try:
-        file_size_str = subprocess.check_output("sudo stat -c %%s %s" % filename, shell=True).decode()
+        file_size_str = subprocess.check_output("sudo stat -c %%s %s 2>/dev/null" % filename, shell=True).decode()
     except subprocess.CalledProcessError:
         return False
     if check_size and int(file_size_str.rstrip()) == 0:
