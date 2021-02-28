@@ -2700,8 +2700,8 @@ def lte_get_pin_state(dev_id):
     for index, line in enumerate(lines):
         if 'PIN1 state:' in line:
             res['PIN1_STATUS']= line.split(':')[-1].strip().replace("'", '').split(' ')[0]
-            res['PIN1_RETRIES']= data[index + 1].split(':')[-1].strip().replace("'", '').split(' ')[0]
-            res['PUK1_RETRIES']= data[index + 2].split(':')[-1].strip().replace("'", '').split(' ')[0]
+            res['PIN1_RETRIES']= lines[index + 1].split(':')[-1].strip().replace("'", '').split(' ')[0]
+            res['PUK1_RETRIES']= lines[index + 2].split(':')[-1].strip().replace("'", '').split(' ')[0]
             break
     return res
 
