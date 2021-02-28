@@ -29,7 +29,6 @@ import threading
 import traceback
 import json
 import subprocess
-
 import fwagent
 import fwglobals
 import fwutils
@@ -88,10 +87,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.vpp_api         = VPP_API()
         self.multilink       = FwMultilink(multilink_db_file)
         self.router_state    = FwRouterState.STOPPED
-        self.thread_watchdog = None
+        self.thread_watchdog     = None
         self.thread_tunnel_stats = None
-        self.thread_dhcpc    = None
-        self.thread_static_route   = None
+        self.thread_dhcpc        = None
+        self.thread_static_route = None
 
         FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
         # Initialize global data that persists device reboot / daemon restart.
@@ -110,7 +109,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         Its function is to monitor if VPP process is alive.
         Otherwise it will start VPP and restore configuration from DB.
         """
-        while self.state_is_started():
+        while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
@@ -138,7 +137,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         It is implemented by pinging the other end of the tunnel.
         """
         self._fill_tunnel_stats_dict()
-        while self.state_is_started():
+        while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
                 fwtunnel_stats.tunnel_stats_test()
@@ -151,7 +150,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """DHCP client thread.
         Its function is to monitor state of WAN interfaces with DHCP.
         """
-        while self.state_is_started():
+        while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
 
             try:  # Ensure thread doesn't exit on exception
@@ -182,8 +181,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Static route thread.
         Its function is to monitor static routes.
         """
-        while self.state_is_started():
-            time.sleep(5)  # 5 sec
+        while self.state_is_started() and not fwglobals.g.teardown:
+            time.sleep(1)
+
+            if int(time.time()) % 5 != 0:
+                continue  # Check routes every 5 seconds, while checking teardown every second
 
             try:  # Ensure thread doesn't exit on exception
                 fwutils.check_reinstall_static_routes()

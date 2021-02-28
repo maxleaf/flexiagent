@@ -92,10 +92,6 @@ class FwWanMonitor:
         self.disabled_routes = fwglobals.g.cache.wan_monitor['disabled_routes']
         self.route_rule_re   = re.compile(r"(\w+) via ([0-9.]+) dev (\w+)(.*)") #  'default via 20.20.20.22 dev enp0s9 proto dhcp metric 100'
 
-        self.active           = True
-        self.thread_main_loop = threading.Thread(target=self.main_loop, name="FwWanMonitor")
-        self.thread_main_loop.start()
-
     def __enter__(self):
         return self
 
@@ -106,15 +102,20 @@ class FwWanMonitor:
         # arguments will be `None`.
         self.finalize()
 
+    def initialize(self):
+        if self.standalone:
+            return
+        self.thread_wan_monitor = threading.Thread(target=self.main_loop, name="FwWanMonitor")
+        self.thread_wan_monitor.start()
+
     def finalize(self):
         """Destructor method
         """
         if self.standalone:
             return
-        self.active = False
-        if self.thread_main_loop:
-            self.thread_main_loop.join()
-            self.thread_main_loop = None
+        if self.thread_wan_monitor:
+            self.thread_wan_monitor.join()
+            self.thread_wan_monitor = None
 
 
     def main_loop(self):
@@ -122,7 +123,7 @@ class FwWanMonitor:
 
         prev_time = time.time()
 
-        while self.active:
+        while not fwglobals.g.teardown:
 
             try: # Ensure thread doesn't exit on exception
 
@@ -280,6 +281,19 @@ class FwWanMonitor:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
             fwglobals.log.debug("connectivity %s on %s" % (state, route.dev))
             self._update_metric(route, new_metric)
+
+        # lte wan monitoring
+        if not ok and int(time.time()) % 10 == 0 \
+           and fwutils.is_lte_interface_by_dev_id(route.dev_id):
+            # if modem now in reset proccess, no need to monitor at this time
+            mode = fwutils.get_lte_cache(route.dev_id, 'state')
+            if mode == 'resetting' or mode == 'connecting':
+                return
+
+            connected = fwutils.mbim_is_connected(route.dev_id)
+            if not connected:
+                fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev_id))
+                fwglobals.g.system_api.restore_configuration(types=['add-lte'])
 
 
     def _update_metric(self, route, new_metric):

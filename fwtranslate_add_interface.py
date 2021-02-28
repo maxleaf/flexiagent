@@ -106,8 +106,6 @@ def add_interface(params):
     is_non_dpdk = is_wifi or is_lte
 
     if is_non_dpdk:
-        dhcp = 'no'
-
         # create tap for this interface in vpp and linux
         cmd = {}
         cmd['cmd'] = {}
@@ -196,6 +194,14 @@ def add_interface(params):
             cmd['cmd']['params']    = [ "sudo ip link set dev %s up" % bridge_name]
             cmd_list.append(cmd)
         elif is_lte:
+            # dhcp for LTE interface has special meaning.
+            # Although that flexiManage looks at it as DHCP because the user can't set static IP
+            # but the agent looks at it as static IP from the modem.
+            # We take the IP from the modem via the mbimcli command.
+            # That's why we override the the 'dhcp' to 'no'
+            #
+            dhcp = 'no'
+
             cmd = {}
             cmd['cmd'] = {}
             cmd['cmd']['name']      = "exec"
@@ -258,8 +264,8 @@ def add_interface(params):
 
     if is_lte:
         netplan_params['substs'] = [
-            { 'add_param':'ip', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'IP'] },
-            { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] }
+            { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
+            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] }
         ]
 
     cmd = {}
@@ -438,7 +444,7 @@ def add_interface(params):
                             'gw'      : '',
                             'mac'     : '00:00:00:00:00:00',
                     },
-                    'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_provider_config', 'arg':[dev_id, 'GATEWAY'] }]
+                    'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg':[dev_id, 'gateway'] }]
         }
         cmd['cmd']['descr']         = "create static arp entry for dev_id %s" % dev_id
         cmd_list.append(cmd)
@@ -446,13 +452,13 @@ def add_interface(params):
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name'] = "exec"
-        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] } ]},
+        cmd['cmd']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] } ]},
                                 "sudo arp -s DEV-STUB 00:00:00:00:00:00" ]
         cmd['cmd']['descr'] = "set arp entry on linux for lte interface"
         cmd['revert'] = {}
         cmd['revert']['name']   = "exec"
         cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
-        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_provider_config', 'arg': [dev_id, 'GATEWAY'] } ]},
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] } ]},
                                     "sudo arp -d DEV-STUB" ]
         cmd_list.append(cmd)
 

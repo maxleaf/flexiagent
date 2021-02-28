@@ -213,7 +213,8 @@ class Fwglobals:
                 'WAN_MONITOR': {
                     'enabled_routes':  {},
                     'disabled_routes': {},
-                }
+                },
+                'LTE': {}
             }
             self.lock                       = threading.RLock()
             self.linux_interfaces           = self.db['LINUX_INTERFACES']
@@ -223,6 +224,7 @@ class Fwglobals:
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
+            self.lte                        = self.db['LTE']
 
 
     def __init__(self):
@@ -292,6 +294,8 @@ class Fwglobals:
         self.signal_names = dict((getattr(signal, n), n) \
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
+        self.teardown = False   # Flag that stops all helper threads in parallel to speedup gracefull exit
+
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
@@ -335,20 +339,22 @@ class Fwglobals:
         self.os_api       = OS_API()
         self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
+        self.wan_monitor  = FwWanMonitor(standalone)
+        self.stun_wrapper = FwStunWrap(standalone)
+
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
-        # RPF set to Loose mode
-        fwutils.set_default_linux_reverse_path_filter(2)
+        fwutils.set_default_linux_reverse_path_filter(2)  # RPF set to Loose mode
 
-        self.stun_wrapper = FwStunWrap(standalone)
-        self.stun_wrapper.initialize()
+        self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
         self.router_api.restore_vpp_if_needed()
 
         fwutils.get_linux_interfaces(cached=False) # Fill global interface cache
 
-        self.wan_monitor = FwWanMonitor(standalone) # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
+        self.wan_monitor.initialize() # IMPORTANT! The WAN monitor should be initialized after restore_vpp_if_needed!
+        self.system_api.initialize()
 
         return self.fwagent
 
@@ -360,8 +366,11 @@ class Fwglobals:
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return
 
+        self.teardown = True   # Stop all helper threads in parallel to speedup gracefull exit
+
         self.wan_monitor.finalize()
         self.stun_wrapper.finalize()
+        self.system_api.finalize()
         self.router_api.finalize()
         self.fwagent.finalize()
         self.router_cfg.finalize() # IMPORTANT! Finalize database at the last place!
@@ -732,7 +741,7 @@ class Fwglobals:
         return rollbacks_aggregations
 
 
-def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):
+def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO, quiet=False):
     """Initialize global instances of LOG, and GLOBALS.
 
     :param log_level:    LOG severity level.
@@ -743,6 +752,8 @@ def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO):
     if not g_initialized:
         global log
         log = Fwlog(log_level)
+        if quiet:
+            log.set_target(to_terminal=False)
         global g
         g = Fwglobals()
         g_initialized = True
