@@ -3041,7 +3041,7 @@ def lte_get_radio_signals_state(dev_id):
         lines = qmi_get_signals_state(dev_id)
         for index, line in enumerate(lines):
             if 'RSSI' in line:
-                result['RSSI'] = data[index + 1].split(':')[-1].strip().replace("'", '')
+                result['RSSI'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
                 dbm_num = int(result['RSSI'].split(' ')[0])
                 if -95 >= dbm_num:
                     result['text'] = 'Marginal'
@@ -3060,13 +3060,13 @@ def lte_get_radio_signals_state(dev_id):
                 result['SINR'] = line.split(':')[-1].strip().replace("'", '')
                 continue
             if 'RSRQ' in line:
-                result['RSRQ'] = data[index + 1].split(':')[-1].strip().replace("'", '')
+                result['RSRQ'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
                 continue
             if 'SNR' in line:
-                result['SNR'] = data[index + 1].split(':')[-1].strip().replace("'", '')
+                result['SNR'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
                 continue
             if 'RSRP' in line:
-                result['RSRP'] = data[index + 1].split(':')[-1].strip().replace("'", '')
+                result['RSRP'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
                 continue
         return result
     except Exception as e:
