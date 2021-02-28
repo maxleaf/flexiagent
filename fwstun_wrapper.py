@@ -63,7 +63,6 @@ class FwStunWrap:
         """
         self.stun_cache    = fwglobals.g.cache.stun_cache
         self.thread_stun   = None
-        self.is_running    = False
         self.standalone    = standalone
         self.stun_retry    = 60
         fwstun.set_log(fwglobals.log)
@@ -98,15 +97,10 @@ class FwStunWrap:
             self._send_stun_requests()
             self._log_address_cache()
 
-        self.is_running = True
-        fwglobals.log.debug("Starting STUN thread")
-        if self.thread_stun is None:
-            self.thread_stun = threading.Thread(target=self._stun_thread, name='STUN Thread')
-            self.thread_stun.start()
+        self.thread_stun = threading.Thread(target=self._stun_thread, name='STUN Thread')
+        self.thread_stun.start()
 
     def finalize(self):
-        """ Stop the STUN thread """
-        self.is_running = False
         if self.thread_stun:
             self.thread_stun.join()
             self.thread_stun = None
@@ -343,7 +337,7 @@ class FwStunWrap:
         update_cache_from_os_timeout = 2 * 60
         send_stun_timeout = 3
 
-        while self.is_running == True:
+        while not fwglobals.g.teardown:
 
             try:  # Ensure thread doesn't exit on exception
 

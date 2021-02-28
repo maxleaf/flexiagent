@@ -294,6 +294,8 @@ class Fwglobals:
         self.signal_names = dict((getattr(signal, n), n) \
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
+        self.teardown = False   # Flag that stops all helper threads in parallel to speedup gracefull exit
+
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
@@ -363,6 +365,8 @@ class Fwglobals:
             global log
             log.warning('Fwglobals.finalize_agent: agent does not exists')
             return
+
+        self.teardown = True   # Stop all helper threads in parallel to speedup gracefull exit
 
         self.wan_monitor.finalize()
         self.stun_wrapper.finalize()
