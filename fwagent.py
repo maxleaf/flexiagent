@@ -58,6 +58,7 @@ import fwutils
 from fwlog import Fwlog
 import loadsimulator
 import pprint
+import jwt
 
 # Global signal handler for clean exit
 def global_signal_handler(signum, frame):
@@ -174,6 +175,17 @@ class FwAgent:
             fwglobals.log.error(err)
             return False
 
+        try:
+            parsed_token = jwt.decode(self.token, options={"verify_signature": False})
+            server = parsed_token.get('server')
+            if server:
+                # User server from token
+                fwglobals.g.cfg.MANAGEMENT_URL = server
+                fwglobals.log.info("Using management url from token: %s" % (server))
+        except Exception as e:
+                fwglobals.log.error("Failed to decode token: " + str(e))
+                return False
+
         if fwutils.vpp_does_run():
             fwglobals.log.error("register: router is running, it by 'fwagent stop' and retry by 'fwagent start'")
             return False
@@ -207,7 +219,7 @@ class FwAgent:
                 'default_dev': dr_dev,
                 'interfaces': interfaces
         }
-        fwglobals.log.debug("registering with: %s" % json.dumps(data))
+        fwglobals.log.debug("Registering to %s with: %s" % (url, json.dumps(data)))
         data.update({'interfaces': json.dumps(interfaces)})
         data = uparse.urlencode(data).encode()
         req = ureq.Request(url, data)

@@ -174,7 +174,7 @@ class Fwglobals:
             global log
             DEFAULT_BYPASS_CERT    = False
             DEFAULT_DEBUG          = False
-            DEFAULT_MANAGEMENT_URL = 'https://app.flexiwan.com:443'
+            DEFAULT_MANAGEMENT_URL = 'https://manage.flexiwan.com:443'
             DEFAULT_TOKEN_FILE     = data_path + 'token.txt'
             DEFAULT_UUID           = None
             DEFAULT_MONITOR_UNASSIGNED_INTERFACES = True
