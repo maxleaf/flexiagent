@@ -118,7 +118,7 @@ class Checker:
         :returns: 'True' if supported and 'False' otherwise.
         """
         try:
-            subprocess.check_output('cat /proc/cpuinfo | grep sse4_2', shell=True)
+            subprocess.check_call('cat /proc/cpuinfo | grep sse4_2', shell=True)
         except subprocess.CalledProcessError:
             return False
         return True
@@ -228,10 +228,10 @@ class Checker:
                 #     Kernel modules: e1000
                 for device in out:
                     params = device.split('\n', 1)
-                    match = re.search('\[02..\]:', params[0])   # [02XX] stands for Network Base Class
+                    match = re.search('\\[02..\\]:', params[0])   # [02XX] stands for Network Base Class
                     if not match:
                         continue
-                    match = re.search('([^ ]+) .*\[02..\]: ([^ ]+)', params[0])
+                    match = re.search('([^ ]+) .*\\[02..\\]: ([^ ]+)', params[0])
                     if not match:
                         print("device: %s" % (str(device)))
                         print("params[0]: %s" % (str(params[0])))
@@ -739,13 +739,13 @@ class Checker:
         thp_filename = '/sys/kernel/mm/transparent_hugepage/enabled'
         with open(thp_filename, "r") as f:
             first_line = f.readlines()[0]
-            if re.search('\[never\]', first_line):
+            if re.search('\\[never\\]', first_line):
                 return True
         # Ensure that the /etc/default/grub file includes the "transparent_hugepage=never"
         # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
         grub_filename = '/etc/default/grub'
         try:
-            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).decode().strip()
+            subprocess.check_call("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True)
             return True   # No exception - grep found the pattern
         except subprocess.CalledProcessError:
             pass

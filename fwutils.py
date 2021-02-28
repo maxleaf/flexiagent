@@ -43,9 +43,7 @@ from netaddr import IPNetwork, IPAddress
 import threading
 import serial
 
-common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools' , 'common')
-sys.path.append(common_tools)
-from fw_vpp_startupconf import FwStartupConf
+from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
@@ -85,14 +83,14 @@ def get_device_packet_traces(num_of_packets, timeout):
     """
     try:
         cmd = 'sudo vppctl clear trace'
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_call(cmd, shell=True)
         cmd = 'sudo vppctl show vmxnet3'
-        shif_vmxnet3 = subprocess.check_output(cmd, shell=True)
+        shif_vmxnet3 = subprocess.check_output(cmd, shell=True).decode()
         if shif_vmxnet3 is '':
             cmd = 'sudo vppctl trace add dpdk-input %s && sudo vppctl trace add tapcli-rx %s' % (num_of_packets, num_of_packets)
         else:
             cmd = 'sudo vppctl trace add vmxnet3-input %s && sudo vppctl trace add tapcli-rx %s' % (num_of_packets, num_of_packets)
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_call(cmd, shell=True)
         time.sleep(timeout)
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
         res = subprocess.check_output(cmd, shell=True).decode().splitlines()
@@ -152,7 +150,7 @@ def pid_of(proccess_name):
     :returns:           process identifier.
     """
     try:
-        pid = subprocess.check_output(['pidof', proccess_name])
+        pid = subprocess.check_output(['pidof', proccess_name]).decode()
     except:
         pid = None
     return pid
@@ -684,8 +682,8 @@ def dev_id_is_vmxnet3(dev_id):
         # When vpp does run, we get:
         #   0000:03:00.0 'VMXNET3 Ethernet Controller' if=ens160 drv=vfio-pci unused=vmxnet3,uio_pci_generic
         #
-        #output = subprocess.check_output("sudo ls -l /sys/bus/pci/devices/%s/driver | grep vmxnet3" % pci, shell=True)
-        output = subprocess.check_output("sudo dpdk-devbind -s | grep -E '%s .*vmxnet3'" % addr, shell=True)
+        #output = subprocess.check_output("sudo ls -l /sys/bus/pci/devices/%s/driver | grep vmxnet3" % pci, shell=True).decode()
+        output = subprocess.check_output("sudo dpdk-devbind -s | grep -E '%s .*vmxnet3'" % addr, shell=True).decode()
     except:
         return False
     if output is None:
@@ -752,7 +750,7 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
         dev_name = tap.dev_name.rstrip(' \t\r\n\0')           # fetch tap_wwan0
         linux_dev_name = dev_name.split('_')[-1]              # fetch wwan0
         cmd =  "ls -l /sys/class/net | grep -v %s | grep %s" % (dev_name, linux_dev_name)
-        linux_dev_name = subprocess.check_output(cmd, shell=True).strip().split('/')[-1]
+        linux_dev_name = subprocess.check_output(cmd, shell=True).decode().strip().split('/')[-1]
         bus = build_interface_dev_id(linux_dev_name)   # fetch bus address of wwan0
         vpp_name = vpp_sw_if_index_to_name(tap.sw_if_index)     # fetch tapcli-1
         if vpp_name and bus:
@@ -953,9 +951,7 @@ def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
 
 def linux_tap_by_interface_name(linux_if_name):
     try:
-        links = subprocess.check_output("sudo ip link | grep %s" % generate_linux_interface_short_name("tap", linux_if_name), shell=True)
-        lines = links.splitlines()
-
+        lines = subprocess.check_output("sudo ip link | grep %s" % generate_linux_interface_short_name("tap", linux_if_name), shell=True).decode().splitlines()
         for line in lines:
             words = line.split(': ')
             return words[1]
@@ -993,14 +989,14 @@ def vpp_tap_connect(linux_tap_if_name):
 
     vppctl_cmd = "tap connect %s" % linux_tap_if_name
     fwglobals.log.debug("vppctl " + vppctl_cmd)
-    subprocess.check_output("sudo vppctl %s" % vppctl_cmd, shell=True).splitlines()
+    subprocess.check_call("sudo vppctl %s" % vppctl_cmd, shell=True)
 
 def vpp_add_static_arp(dev_id, gw, mac):
     try:
         vpp_if_name = dev_id_to_vpp_if_name(dev_id)
         vppctl_cmd = "set ip arp static %s %s %s" % (vpp_if_name, gw, mac)
         fwglobals.log.debug("vppctl " + vppctl_cmd)
-        subprocess.check_output("sudo vppctl %s" % vppctl_cmd, shell=True).splitlines()
+        subprocess.check_call("sudo vppctl %s" % vppctl_cmd, shell=True)
         return (True, None)
     except Exception as e:
         return (False, "Failed to add static arp in vpp for dev_id: %s\nOutput: %s" % (dev_id, str(e)))
@@ -1536,18 +1532,7 @@ def get_lte_interfaces_names():
     names = []
     interfaces = psutil.net_if_addrs()
 
-    for nicname, addrs in list(interfaces.items()):
-        dev_id = get_interface_dev_id(nicname)
-        if dev_id and is_lte_interface(nicname):
-            names.append(nicname)
-
-    return names
-
-def get_lte_interfaces_names():
-    names = []
-    interfaces = psutil.net_if_addrs()
-
-    for nicname, addrs in list(interfaces.items()):
+    for nicname, _ in list(interfaces.items()):
         dev_id = get_interface_dev_id(nicname)
         if dev_id and is_lte_interface(nicname):
             names.append(nicname)
@@ -1556,21 +1541,21 @@ def get_lte_interfaces_names():
 
 def traffic_control_add_del_dev_ingress(dev_name, is_add):
     try:
-        subprocess.check_output('sudo tc -force qdisc %s dev %s ingress handle ffff:' % ('add' if is_add else 'delete', dev_name), shell=True)
+        subprocess.check_call('sudo tc -force qdisc %s dev %s ingress handle ffff:' % ('add' if is_add else 'delete', dev_name), shell=True)
         return (True, None)
     except Exception as e:
         return (True, None)
 
 def traffic_control_replace_dev_root(dev_name):
     try:
-        subprocess.check_output('sudo tc -force qdisc replace dev %s root handle 1: htb' % dev_name, shell=True)
+        subprocess.check_call('sudo tc -force qdisc replace dev %s root handle 1: htb' % dev_name, shell=True)
         return (True, None)
     except Exception as e:
         return (True, None)
 
 def traffic_control_remove_dev_root(dev_name):
     try:
-        subprocess.check_output('sudo tc -force qdisc del dev %s root' % dev_name, shell=True)
+        subprocess.check_call('sudo tc -force qdisc del dev %s root' % dev_name, shell=True)
         return (True, None)
     except Exception as e:
         return (True, None)
@@ -1585,12 +1570,12 @@ def reset_traffic_control():
 
     for term in search:
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s root 2>/dev/null' % term, shell=True)
+            subprocess.check_call('sudo tc -force qdisc del dev %s root 2>/dev/null' % term, shell=True)
         except:
             pass
 
         try:
-            subprocess.check_output('sudo tc -force qdisc del dev %s ingress handle ffff: 2>/dev/null' % term, shell=True)
+            subprocess.check_call('sudo tc -force qdisc del dev %s ingress handle ffff: 2>/dev/null' % term, shell=True)
         except:
             pass
 
@@ -1598,17 +1583,15 @@ def reset_traffic_control():
 
 def remove_linux_bridges():
     try:
-        lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).splitlines()
-
+        lines = subprocess.check_output('ls -l /sys/class/net/ | grep br_', shell=True).decode().splitlines()
         for line in lines:
             bridge_name = line.rstrip().split('/')[-1]
             try:
-                output = subprocess.check_output("sudo ip link set %s down " % bridge_name, shell=True)
+                subprocess.check_call("sudo ip link set %s down " % bridge_name, shell=True)
             except:
                 pass
-
             try:
-                subprocess.check_output('sudo brctl delbr %s' % bridge_name, shell=True)
+                subprocess.check_call('sudo brctl delbr %s' % bridge_name, shell=True)
             except:
                 pass
         return True
@@ -1619,10 +1602,8 @@ def reset_dhcpd():
     if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
         shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
 
-    cmd = 'sudo systemctl stop isc-dhcp-server'
-
     try:
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_call('sudo systemctl stop isc-dhcp-server', shell=True)
     except:
         return False
 
@@ -2142,11 +2123,11 @@ def wifi_get_available_networks(dev_id):
 
         # make sure the interface is up
         cmd = 'ip link set dev %s up' % linux_if
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_call(cmd, shell=True)
 
         try:
             cmd = 'iwlist %s scan | grep ESSID' % linux_if
-            networks = subprocess.check_output(cmd, shell=True).splitlines()
+            networks = subprocess.check_output(cmd, shell=True).decode().splitlines()
             networks = list(map(clean, networks))
             return networks
         except subprocess.CalledProcessError:
@@ -2170,16 +2151,13 @@ def connect_to_wifi(params):
         subprocess.check_output('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
 
         try:
-            output = subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
+            subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
             time.sleep(3)
 
-            is_success = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True)
-
-            if is_success.strip() == 'COMPLETED':
-
+            output = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True).decode().strip()
+            if output == 'COMPLETED':
                 if params['useDHCP']:
                     subprocess.check_output('dhclient %s' % interface_name, shell=True)
-
                 return True
             else:
                 return False
@@ -2209,7 +2187,7 @@ def is_lte_interface(if_name):
 def lte_get_saved_apn():
     cmd = 'cat /etc/mbim-network.conf'
     try:
-        out = subprocess.check_output(cmd, shell=True).strip()
+        out = subprocess.check_output(cmd, shell=True).decode().strip()
         configs = out.split('=')
         if configs[0] == "APN":
             return configs[1]
@@ -2372,7 +2350,7 @@ def wifi_ap_get_clients(interface_name):
                     ip = ''
 
                     try:
-                        arp_output = subprocess.check_output('arp -a -n | grep %s' % mac, shell=True)
+                        arp_output = subprocess.check_output('arp -a -n | grep %s' % mac, shell=True).decode()
                     except:
                         arp_output = None
 
@@ -2404,7 +2382,7 @@ def start_hostapd():
             files = ' '.join(files)
 
             # Start hostapd in background
-            proc = subprocess.check_output('sudo hostapd %s -B -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
+            subprocess.check_call('sudo hostapd %s -B -t -f %s' % (files, fwglobals.g.HOSTAPD_LOG_FILE), stderr=subprocess.STDOUT, shell=True)
             time.sleep(2)
 
             pid = pid_of('hostapd')
@@ -2504,8 +2482,7 @@ def dev_id_to_usb_device(dev_id):
 
         driver = get_interface_driver_by_dev_id(dev_id)
         usb_addr = dev_id.split('/')[-1]
-        output = subprocess.check_output('ls /sys/bus/usb/drivers/%s/%s/usbmisc/' % (driver, usb_addr), shell=True).strip()
-
+        output = subprocess.check_output('ls /sys/bus/usb/drivers/%s/%s/usbmisc/' % (driver, usb_addr), shell=True).decode().strip()
         set_lte_cache(dev_id, 'usb_device', output)
         return output
     except subprocess.CalledProcessError as err:
@@ -2618,10 +2595,10 @@ def lte_get_phone_number(dev_id):
             return line.split(':')[-1].strip().replace("'", '')
     return ''
 
-def get_at_port(self, dev_id):
+def get_at_port(dev_id):
     at_ports = []
     try:
-        addr_type, addr = dev_id_parse(dev_id)
+        _, addr = dev_id_parse(dev_id)
         search_dev = '/'.join(addr.split('/')[:-1])
         output = subprocess.check_output('find /sys/bus/usb/devices/%s*/ -name dev' % search_dev, shell=True).decode().splitlines()
         pattern = '(ttyUSB[0-9])'
@@ -2691,13 +2668,13 @@ def lte_set_modem_to_mbim(dev_id):
 
 
 def lte_get_default_settings(dev_id):
-    default_settings = qmi_get_default_settings(dev_id)
     res = {
         'APN'     : '',
         'UserName': '',
         'Password': '',
         'Auth'    : ''
     }
+    lines = qmi_get_default_settings(dev_id)
     for line in lines:
         if 'APN' in line:
             res['APN'] = line.split(':')[-1].strip().replace("'", '')
@@ -3107,7 +3084,7 @@ def is_wifi_interface(if_name):
     :returns: Boolean.
     """
     try:
-        lines = subprocess.check_output('iwconfig', shell=True, stderr=subprocess.STDOUT).splitlines()
+        lines = subprocess.check_output('iwconfig', shell=True, stderr=subprocess.STDOUT).decode().splitlines()
         for line in lines:
             if if_name in line and not 'no wireless extensions' in line:
                 return True
@@ -3628,15 +3605,15 @@ def wifi_get_capabilities(dev_id):
         return res
 
     try:
-        output = subprocess.check_output('iw dev', shell=True).splitlines()
+        output = subprocess.check_output('iw dev', shell=True).decode().splitlines()
         linux_if = dev_id_to_linux_if(dev_id)
         if linux_if in output[1]:
             phy_name = output[0].replace('#', '')
-            #output = subprocess.check_output('cat /tmp/jaga', shell=True).replace('\\\\t', '\\t').replace('\\\\n', '\\n')
+            #output = subprocess.check_output('cat /tmp/jaga', shell=True).replace('\\\\t', '\\t').replace('\\\\n', '\\n').decode()
             # banda1 = _get_band(output2, 1)
             # banda2 = _get_band(output2, 2)
 
-            output = subprocess.check_output('iw %s info' % phy_name, shell=True).replace('\t', '\\t').replace('\n', '\\n')
+            output = subprocess.check_output('iw %s info' % phy_name, shell=True).replace('\t', '\\t').replace('\n', '\\n').decode()
             result['SupportedModes'] = _parse_key_data('Supported interface modes', output)
 
 
@@ -3788,9 +3765,11 @@ def exec_with_timeout(cmd, timeout=60):
     """
     state = {'output':'', 'error':'', 'returncode':0}
     def target():
+        output = ''
         try:
             state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (output, error) = state['proc'].communicate()
+            output = output.decode()
         except OSError as err:
             state['error'] = str(err)
         except Exception as err:

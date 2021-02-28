@@ -147,7 +147,7 @@ class TestFwagent:
                 while out.strip() != 'running' and timeout > 0:
                     time.sleep(1)
                     timeout -= 1
-                    out = subprocess.check_output(cmd, shell=True)
+                    out = subprocess.check_output(cmd, shell=True).decode()
                 if timeout == 0:
                     return (False, "timeout (%s seconds) on wainting for daemon to start" % (timeout))
             except Exception as e:

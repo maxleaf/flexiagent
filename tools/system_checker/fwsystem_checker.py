@@ -72,7 +72,6 @@ soft_checkers = [
     {'soft_check_multiple_interface_definitions': {'severity': 'critical'}},
     {'soft_check_duplicate_netplan_sections': {'severity': 'critical'}},
     { 'soft_check_default_routes_metric'         : { 'severity': 'critical' }},
-    { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
@@ -361,7 +360,7 @@ if __name__ == '__main__':
     # no reason. Note it is too late to check system, if router was started :)
     #
     try:
-        subprocess.check_output(['pidof', 'vpp'])
+        subprocess.check_call(['pidof', 'vpp'])
         # If we reached this point, i.e. if no exception occurred, the vpp pid was found
         print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
         sys.exit(FW_EXIT_CODE_OK)

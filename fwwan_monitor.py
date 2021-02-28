@@ -105,19 +105,17 @@ class FwWanMonitor:
     def initialize(self):
         if self.standalone:
             return
-        self.active           = True
-        self.thread_main_loop = threading.Thread(target=self.main_loop, name="FwWanMonitor")
-        self.thread_main_loop.start()
+        self.thread_wan_monitor = threading.Thread(target=self.main_loop, name="FwWanMonitor")
+        self.thread_wan_monitor.start()
 
     def finalize(self):
         """Destructor method
         """
         if self.standalone:
             return
-        self.active = False
-        if self.thread_main_loop:
-            self.thread_main_loop.join()
-            self.thread_main_loop = None
+        if self.thread_wan_monitor:
+            self.thread_wan_monitor.join()
+            self.thread_wan_monitor = None
 
 
     def main_loop(self):
@@ -125,7 +123,7 @@ class FwWanMonitor:
 
         prev_time = time.time()
 
-        while self.active:
+        while not fwglobals.g.teardown:
 
             try: # Ensure thread doesn't exit on exception
 

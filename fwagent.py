@@ -442,7 +442,7 @@ class FwAgent:
         def run(*args):
             slept = 0
 
-            while self.connected:
+            while self.connected and not fwglobals.g.teardown:
                 # Every 30 seconds ensure that connection to management is alive.
                 # Management should send 'get-device-stats' request every 10 sec.
                 # Note the WebSocket Ping-Pong (see ping_interval=25, ping_timeout=20)

@@ -31,7 +31,6 @@ import datetime
 import getopt
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -158,16 +157,12 @@ class FwDump:
         # Create temporary folder
         #
         if os.path.exists(self.temp_folder):
-            if self.quiet:
-                shutil.rmtree(self.temp_folder)
+            choice = raw_input(self.prompt + "the temporary folder '%s' exists, overwrite? [Y/n]: " % self.temp_folder) \
+                     if not self.quiet else 'y'
+            if choice == 'y' or choice == 'Y' or choice == '':
+                os.system("rm -rf %s" % self.temp_folder)   # shutil.rmtree() fails sometimes on VBox shared folders!
                 time.sleep(1)  # Give system a time to remove fd
                 os.mkdir(self.temp_folder)
-            else:
-                choice = input(self.prompt + "the temporary folder '%s' exists, overwrite? [Y/n]: " % self.temp_folder)
-                if choice == 'y' or choice == 'Y' or choice == '':
-                    shutil.rmtree(self.temp_folder)
-                    time.sleep(1)  # Give system a time to remove fd
-                    os.mkdir(self.temp_folder)
         else:
             os.mkdir(self.temp_folder)
 
@@ -180,7 +175,7 @@ class FwDump:
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         if self.zip_file:   # If zip was created, delete temporary folder
-            shutil.rmtree(self.temp_folder)
+            os.system("rm -rf %s" % self.temp_folder)   # shutil.rmtree() fails sometimes on VBox shared folders!
 
     def _dump(self, dumpers):
         '''Run dumpers provided by the 'dumpers' list argument.

@@ -48,15 +48,11 @@ class FWSYSTEM_API(FwCfgRequestHandler):
         self.thread_lte_watchdog = None
 
     def initialize(self):
-        self.active = True
         if self.thread_lte_watchdog is None:
             self.thread_lte_watchdog = threading.Thread(target=self.lte_watchdog, name='LTE Watchdog')
             self.thread_lte_watchdog.start()
 
     def finalize(self):
-        if not self.active:
-            return
-        self.active = False
         if self.thread_lte_watchdog:
             self.thread_lte_watchdog.join()
             self.thread_lte_watchdog = None
@@ -70,13 +66,13 @@ class FWSYSTEM_API(FwCfgRequestHandler):
         parameters received from provider should match these configured in linux
         for the correspondent interface.
         """
-        while self.active:
+        while not fwglobals.g.teardown:
             try: # Ensure thread doesn't exit on exception
 
                 time.sleep(1)
 
                 if int(time.time()) % 60 != 0:
-                    continue    # Check modem status once a minute, while checking self.active every second
+                    continue    # Check modem status once a minute, while checking teardown every second
 
                 if  fwglobals.g.router_api.state_is_starting_stopping():
                     continue
