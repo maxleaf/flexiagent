@@ -2552,28 +2552,24 @@ def qmi_get_simcard_status(dev_id):
 def qmi_get_signals_state(dev_id):
     return _run_qmicli_command(dev_id, 'nas-get-signal-strength')
 
-def qmi_get_connection_state(dev_id):
-    '''
-    The function will return the connection status.
-    This is not about existsin session to the modem. But connectivity between modem to the cellular provider
-    '''
-    try:
-        output = _run_qmicli_command(dev_id, 'wds-get-packet-service-status')
-        if output:
-            data = output.splitlines()
-            for line in data:
-                if 'Connection status' in line:
-                    status = line.split(':')[-1].strip().replace("'", '')
-                    return status == "connected"
-    except subprocess.CalledProcessError as err:
-        return False
-
 def qmi_get_ip_configuration(dev_id):
-    '''
-    The function will return the connection status.
-    This is not about existsin session to the modem. But connectivity between modem to the cellular provider
-    '''
-    return _run_qmicli_command(dev_id, 'wds-get-current-settings')
+    try:
+        ip = None
+        gateway = None
+        cmd = 'wds-get-current-settings | grep "IPv4 address\|IPv4 subnet mask\|IPv4 gateway address"'
+        lines = _run_qmicli_command(dev_id, cmd)
+        for idx, line in enumerate(lines):
+            if 'IPv4 address:' in line:
+                ip_without_mask = line.split(':')[-1].strip().replace("'", '')
+                mask = lines[idx + 1].split(':')[-1].strip().replace("'", '')
+                ip = ip_without_mask + '/' + str(IPAddress(mask).netmask_bits())
+                continue
+            if 'IPv4 gateway address:' in line:
+                gateway = line.split(':')[-1].strip().replace("'", '')
+                break
+        return (ip, gateway)
+    except Exception as e:
+        return (None, None)
 
 def qmi_get_operator_name(dev_id):
     return _run_qmicli_command(dev_id, 'nas-get-operator-name')
@@ -2667,7 +2663,7 @@ def lte_set_modem_to_mbim(dev_id):
         model =  hardware_info['Model']
 
         at_commands = []
-        if 'Quectel' in vendor and 'EM06-E' in model:
+        if 'Quectel' in vendor or 'Quectel' in model:
             print('Please wait...')
             at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
             at_serial_port = get_at_port(dev_id)
@@ -2688,6 +2684,7 @@ def lte_set_modem_to_mbim(dev_id):
             time.sleep(10)
             return (True, None)
         else:
+            print("Your card is not officially supported. It might work, But you have to switch manually to the MBIM modem")
             return (False, 'vendor or model are not supported. (vendor: %s, model: %s)' % (vendor, model))
     except Exception as e:
         return (False, str(e))
@@ -3004,27 +3001,6 @@ def lte_get_packets_state(dev_id):
                     continue
                 if 'Max RX rate' in line:
                     result['Downlink_speed'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
-        return result
-    except Exception as e:
-        return result
-
-def lte_get_connection_state(dev_id):
-    try:
-        result = {
-            'Activation_state' : 0,
-            'IP_type'  : 0,
-        }
-
-        modem_info = qmi_get_connection_state(dev_id)
-        if modem_info:
-            data = modem_info.splitlines()
-            for line in data:
-                if 'Activation state:' in line:
-                    result['Activation_state'] = line.split(':')[-1].strip().replace("'", '')
-                    continue
-                if 'IP type' in line:
-                    result['IP_type'] = line.split(':')[-1].strip().replace("'", '')
                     continue
         return result
     except Exception as e:
