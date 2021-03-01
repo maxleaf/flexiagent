@@ -5,7 +5,7 @@
   "params": {
     "interfaces": [
       "__INTERFACE_1__",
-      "__INTERFACE_2__
+      "__INTERFACE_2__"
     ],
     "routes": [
       {
