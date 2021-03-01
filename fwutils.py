@@ -2667,7 +2667,7 @@ def lte_set_modem_to_mbim(dev_id):
         model =  hardware_info['Model']
 
         at_commands = []
-        if 'Quectel' in vendor or 'Quectel' in model:
+        if 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE): # Special fix for Quectel ec25 mini pci card
             print('Please wait...')
             at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
             at_serial_port = get_at_port(dev_id)
