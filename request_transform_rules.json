@@ -1,0 +1,269 @@
+{
+    "start-router": {
+        "add-to-output": {
+            "as-value": [
+                {
+                    "add-name": "reconnect_agent",
+                    "value": true
+                }
+            ]
+        },
+        "noop-check-function": "__fw_check_is_vpp_running"
+    },
+    "stop-router": {
+        "add-to-output": {
+            "as-value": [
+                {
+                    "add-name": "reconnect_agent",
+                    "value": true
+                }
+            ]
+        }
+    },
+    "modify-interface": {
+        "dependencies": {
+            "replace-as": [
+                {
+                    "message": "remove-interface",
+                    "add-params": {
+                        "by-request-key": [
+                            {
+                                "add-name": "params",
+                                "find-in-cache-using-transforming-request": true
+                            }
+                        ]
+                    }
+                },
+                {
+                    "message": "add-interface",
+                    "add-params": {
+                        "by-request-key": [
+                            {
+                                "add-name": "params",
+                                "find-in-transforming-request": true
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "add-to-output": {
+            "by-func": [
+                {
+                    "add-name": "reconnect_agent",
+                    "func": "_should_reconnect_agent_on_modify_interface"
+                },
+                {
+                    "add-name": "gateway",
+                    "func": "_get_modify_interface_gateway_param"
+                }
+            ]
+        }
+    },
+    "add-interface": {
+        "dependencies": {
+            "pre-processing": {
+                "requests": [
+                    {
+                        "message": "remove-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "post-processing": {
+                "requests": [
+                    {
+                        "message": "add-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params",
+                                    "find-in-request-list": true
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "duplicate-suppression": {
+            "remove-previous-requests": [
+                {
+                    "message": "add-multilink-policy"
+                }
+            ]
+        },
+        "add-to-output": {
+            "as-value": [
+                {
+                    "add-name": "reconnect_agent",
+                    "value": true
+                },
+                {
+                    "add-name": "restart_router",
+                    "value": true
+                }
+            ]
+        }
+    },
+    "remove-interface": {
+        "dependencies": {
+            "pre-processing": {
+                "requests": [
+                    {
+                        "message": "remove-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "post-processing": {
+                "requests": [
+                    {
+                        "message": "add-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params",
+                                    "find-in-request-list": true
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "duplicate-suppression": {
+            "remove-previous-requests": [
+                {
+                    "message": "add-multilink-policy"
+                }
+            ]
+        },
+        "add-to-output": {
+            "as-value": [
+                {
+                    "add-name": "reconnect_agent",
+                    "value": true
+                },
+                {
+                    "add-name": "restart_router",
+                    "value": true
+                }
+            ]
+        }
+    },
+    "add-application": {
+        "dependencies": {
+            "pre-processing": {
+                "on-condition-function": "__fw_is_router_state_stopped",
+                "requests": [
+                    {
+                        "message": "remove-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "message": "remove-application",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "post-processing": {
+                "requests": [
+                    {
+                        "message": "add-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params",
+                                    "find-in-request-list": true
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "duplicate-suppression": {
+            "remove-previous-requests": [
+                {
+                    "message": "add-multilink-policy"
+                }
+            ],
+            "retains": "last-in-order"
+        }
+    },
+    "remove-application": {
+        "dependencies": {
+            "pre-processing": {
+                "requests": [
+                    {
+                        "message": "remove-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "add-multilink-policy": {
+        "dependencies": {
+            "pre-processing": {
+                "on-condition-function": "__fw_is_router_state_stopped",
+                "requests": [
+                    {
+                        "message": "remove-multilink-policy",
+                        "add-params": {
+                            "by-request-key": [
+                                {
+                                    "add-name": "params"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "duplicate-suppression": {
+            "retains": "last-in-order"
+        }
+    },
+    "remove-multilink-policy": {
+        "duplicate-suppression": {
+            "remove-previous-requests": [
+                {
+                    "message": "add-multilink-policy"
+                }
+            ],
+            "retains": "first-in-order"
+        }
+    }
+}

@@ -40,6 +40,7 @@ from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 from fwcfg_request_handler import FwCfgRequestHandler
+from fw_request_transform import Fw_Request_Transformer
 
 import fwtunnel_stats
 
@@ -342,40 +343,27 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         :returns: dictionary with status code and optional error message.
         """
-        # First of all strip out requests that have no impact on configuration,
-        # like 'remove-X' for not existing configuration items and 'add-X' for
-        # existing configuration items.
-        #
-        new_request = self._strip_noop_request(request)
-        if not new_request:
-            fwglobals.log.debug("call: ignore no-op request: %s" % json.dumps(request))
-            return { 'ok': 1, 'message':'request has no impact' }
-        request = new_request
+        params = {
+            'is_router_state_stopped': self.router_state == FwRouterState.STOPPED,
+            'is_vpp_running': fwutils.vpp_does_run()
+        }
+        with Fw_Request_Transformer(self.cfg_db, request, params) as request_transformer:
+            request, output_info = request_transformer.fw_transform_request()
 
-        # Now find out if:
-        # 1. VPP should be restarted as a result of request execution.
-        #    It should be restarted on addition/removal interfaces in order
-        #    to capture new interface /release old interface back to Linux.
-        # 2. Agent should reconnect proactively to flexiManage.
-        #    It should reconnect on add-/remove-/modify-interface, as they might
-        #    impact on connection under the connection legs. So it might take
-        #    a time for connection to detect the change, to report error and to
-        #    reconnect again by the agent infinite connection loop with random
-        #    sleep between retrials.
-        # 3. Gateway of WAN interfaces are going to be modified.
-        #    In this case we have to ping the GW-s after modification.
-        #    See explanations on that workaround later in this function.
-        #
-        (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
+            if request['message'] == 'aggregated':
+                request_transformer.fw_log_requests(request['params']['requests'], "Out from Transformer")
+            else:
+                request_transformer.fw_log_requests([request], "Out from Transformer")
 
-        # Some requests require preprocessing.
-        # For example before handling 'add-application' the currently configured
-        # applications should be removed. The simplest way to do that is just
-        # to simulate 'remove-application' receiving. Hence need in preprocessing.
-        # The preprocessing adds the simulated 'remove-application' request to the
-        # the real received 'add-application' forming thus new aggregation request.
-        #
-        request = self._preprocess_request(request)
+        restart_router = output_info.get('restart_router')
+        if restart_router:
+            restart_router = any(entry == True for entry in restart_router)
+
+        reconnect_agent = output_info.get('reconnect_agent')
+        if reconnect_agent:
+            reconnect_agent = any(entry == True for entry in reconnect_agent)
+
+        gateways = output_info.get('gateways')
 
         # Stop vpp if it should be restarted.
         #
