@@ -99,15 +99,15 @@ def get_device_packet_traces(num_of_packets, timeout):
     except (OSError, subprocess.CalledProcessError) as err:
         raise err
 
-def get_device_versions(fname):
+def get_device_versions(filename):
     """Get agent version.
 
-    :param fname:           Versions file name.
+    :param filename:           Versions file name.
 
     :returns: Version value.
     """
     try:
-        with open(fname, 'r') as stream:
+        with open(filename, 'r') as stream:
             versions = yaml.load(stream, Loader=yaml.BaseLoader)
             return versions
     except:
@@ -307,18 +307,18 @@ def get_all_interfaces():
     """
     dev_id_ip_gw = {}
     interfaces = psutil.net_if_addrs()
-    for nicname, addrs in list(interfaces.items()):
-        dev_id = get_interface_dev_id(nicname)
+    for nic_name, addrs in list(interfaces.items()):
+        dev_id = get_interface_dev_id(nic_name)
         if not dev_id:
             continue
 
-        if is_lte_interface(nicname) and fwglobals.g.router_api.state_is_started():
+        if is_lte_interface(nic_name) and fwglobals.g.router_api.state_is_started():
             is_assigned = is_interface_assigned_to_vpp(dev_id)
             if is_assigned:
                 tap_name = dev_id_to_tap(dev_id)
                 if tap_name:
-                    nicname = tap_name
-                    addrs = interfaces.get(nicname)
+                    nic_name = tap_name
+                    addrs = interfaces.get(nic_name)
 
         dev_id_ip_gw[dev_id] = {}
         dev_id_ip_gw[dev_id]['addr'] = ''
@@ -327,7 +327,7 @@ def get_all_interfaces():
             if addr.family == socket.AF_INET:
                 ip = addr.address.split('%')[0]
                 dev_id_ip_gw[dev_id]['addr'] = ip
-                gateway, _ = get_interface_gateway(nicname)
+                gateway, _ = get_interface_gateway(nic_name)
                 dev_id_ip_gw[dev_id]['gw'] = gateway if gateway else ''
                 break
 
@@ -761,10 +761,10 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
     if shif == None:
         fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps: Error reading interface info")
     data = shif.splitlines()
-    for intf in _get_group_delimiter(data, r"^\w.*?\d"):
+    for interface in _get_group_delimiter(data, r"^\w.*?\d"):
         # Contains data for a given interface
-        ifdata = ''.join(intf)
-        (k,v) = _parse_vppname_map(ifdata,
+        data = ''.join(interface)
+        (k,v) = _parse_vppname_map(data,
             valregex=r"^(\w[^\s]+)\s+\d+\s+(\w+)",
             keyregex=r"\s+pci:.*\saddress\s(.*?)\s")
         if k and v:
@@ -1320,12 +1320,12 @@ def _parse_add_if(s, res):
     else: return    # Interface not found, don't add and return
     # rx packets
     r = re.search(r" rx packets\s+(\d+)?",s)
-    if r!=None: rx_pkts = r.group(1)
-    else: rx_pkts = 0
+    if r!=None: rx_packets = r.group(1)
+    else: rx_packets = 0
     # tx packets
     r = re.search(r" tx packets\s+(\d+)?",s)
-    if r!=None: tx_pkts = r.group(1)
-    else: tx_pkts = 0
+    if r!=None: tx_packets = r.group(1)
+    else: tx_packets = 0
     # rx bytes
     r = re.search(r" rx bytes\s+(\d+)?",s)
     if r!=None: rx_bytes = r.group(1)
@@ -1335,7 +1335,7 @@ def _parse_add_if(s, res):
     if r!=None: tx_bytes = r.group(1)
     else: tx_bytes = 0
     # Add data to res
-    res[if_name] = {'rx_pkts':int(rx_pkts), 'tx_pkts':int(tx_pkts), 'rx_bytes':int(rx_bytes), 'tx_bytes':int(tx_bytes)}
+    res[if_name] = {'rx_packets':int(rx_packets), 'tx_packets':int(tx_packets), 'rx_bytes':int(rx_bytes), 'tx_bytes':int(tx_bytes)}
 
 def get_vpp_if_count():
     """Get number of VPP interfaces.
@@ -1347,10 +1347,10 @@ def get_vpp_if_count():
         return None
     data = shif.splitlines()
     res = {}
-    for intf in _get_group_delimiter(data, r"^\w.*?\s"):
+    for interface in _get_group_delimiter(data, r"^\w.*?\s"):
         # Contains data for a given interface
-        ifdata = ''.join(intf)
-        _parse_add_if(ifdata, res)
+        data = ''.join(interface)
+        _parse_add_if(data, res)
     return res
 
 def ip_str_to_bytes(ip_str):
@@ -1519,7 +1519,7 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
         return
     for dev in devices:
         dev = dev_id_to_short(dev)
-        addr_type, addr = dev_id_parse(dev)
+        _, addr = dev_id_parse(dev)
         config_param = 'dev %s' % addr
         key = p.get_element(config['dpdk'],config_param)
         if key:
@@ -1532,10 +1532,10 @@ def get_lte_interfaces_names():
     names = []
     interfaces = psutil.net_if_addrs()
 
-    for nicname, _ in list(interfaces.items()):
-        dev_id = get_interface_dev_id(nicname)
-        if dev_id and is_lte_interface(nicname):
-            names.append(nicname)
+    for nic_name, _ in list(interfaces.items()):
+        dev_id = get_interface_dev_id(nic_name)
+        if dev_id and is_lte_interface(nic_name):
+            names.append(nic_name)
 
     return names
 
@@ -1543,21 +1543,21 @@ def traffic_control_add_del_dev_ingress(dev_name, is_add):
     try:
         subprocess.check_call('sudo tc -force qdisc %s dev %s ingress handle ffff:' % ('add' if is_add else 'delete', dev_name), shell=True)
         return (True, None)
-    except Exception as e:
+    except Exception:
         return (True, None)
 
 def traffic_control_replace_dev_root(dev_name):
     try:
         subprocess.check_call('sudo tc -force qdisc replace dev %s root handle 1: htb' % dev_name, shell=True)
         return (True, None)
-    except Exception as e:
+    except Exception:
         return (True, None)
 
 def traffic_control_remove_dev_root(dev_name):
     try:
         subprocess.check_call('sudo tc -force qdisc del dev %s root' % dev_name, shell=True)
         return (True, None)
-    except Exception as e:
+    except Exception:
         return (True, None)
 
 def reset_traffic_control():
@@ -2095,7 +2095,7 @@ def fix_received_message(msg):
 
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     # Order of functions is important, as the first one (_fix_aggregation_format())
-    # creates clone of the recieved message, so the rest functions can simply
+    # creates clone of the received message, so the rest functions can simply
     # modify it as they wish!
     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     msg = _fix_aggregation_format(msg)
@@ -2200,7 +2200,7 @@ def lte_get_saved_apn():
 def configure_hostapd(dev_id, configuration):
     try:
 
-        for index, band in enumerate(configuration):
+        for band in configuration:
             config = configuration[band]
 
             if config['enable'] == False:
@@ -2338,8 +2338,8 @@ def configure_hostapd(dev_id, configuration):
         return (False, "Exception: %s" % str(e))
 
 def wifi_ap_get_clients(interface_name):
+    response = []
     try:
-        response = list()
         output = subprocess.check_output('iw dev %s station dump' % interface_name, shell=True).decode()
         if output:
             data = output.splitlines()
@@ -2363,10 +2363,8 @@ def wifi_ap_get_clients(interface_name):
                         'signal': signal
                     }
                     response.append(entry)
-            a = "a"
-    except Exception as e:
-        return response
-
+    except Exception:
+        pass
     return response
 
 def start_hostapd():
@@ -2410,9 +2408,9 @@ def stop_hostapd():
         return (False, "Exception: %s" % str(e))
 
 def get_inet6_by_linux_name(inf_name):
-    interfacaes = psutil.net_if_addrs()
-    if inf_name in interfacaes:
-        for addr in interfacaes[inf_name]:
+    interfaces = psutil.net_if_addrs()
+    if inf_name in interfaces:
+        for addr in interfaces[inf_name]:
             if addr.family == socket.AF_INET6:
                 inet6 = addr.address.split('%')[0]
                 if addr.netmask != None:
@@ -2423,12 +2421,12 @@ def get_inet6_by_linux_name(inf_name):
 
 def get_lte_interfaces_dev_ids():
     out = {}
-    interfacaes = psutil.net_if_addrs()
-    for nicname, addrs in list(interfacaes.items()):
-        if is_lte_interface(nicname):
-            dev_id = get_interface_dev_id(nicname)
+    interfaces = psutil.net_if_addrs()
+    for nic_name, _ in list(interfaces.items()):
+        if is_lte_interface(nic_name):
+            dev_id = get_interface_dev_id(nic_name)
             if dev_id:
-                out[dev_id] = nicname
+                out[dev_id] = nic_name
     return out
 
 def configure_lte_interface(params):
@@ -2443,8 +2441,8 @@ def configure_lte_interface(params):
         dev_id = params['dev_id']
         if vpp_does_run() and is_interface_assigned_to_vpp(dev_id):
             # Make sure interface is up. It might be down due to suddenly disconnected
-            nicname = dev_id_to_linux_if(dev_id)
-            os.system('ifconfig %s up' % nicname)
+            nic_name = dev_id_to_linux_if(dev_id)
+            os.system('ifconfig %s up' % nic_name)
             return (True, None)
 
         if not is_lte_interface_by_dev_id(dev_id):
@@ -2457,11 +2455,11 @@ def configure_lte_interface(params):
         if not metric:
             metric = '0'
 
-        nicname = dev_id_to_linux_if(dev_id)
-        os.system('ifconfig %s %s up' % (nicname, ip))
+        nic_name = dev_id_to_linux_if(dev_id)
+        os.system('ifconfig %s %s up' % (nic_name, ip))
 
         # remove old default router
-        output = os.popen('ip route list match default | grep %s' % nicname).read().decode()
+        output = os.popen('ip route list match default | grep %s' % nic_name).read().decode()
         if output:
             routes = output.splitlines()
             for r in routes:
@@ -2485,7 +2483,7 @@ def dev_id_to_usb_device(dev_id):
         output = subprocess.check_output('ls /sys/bus/usb/drivers/%s/%s/usbmisc/' % (driver, usb_addr), shell=True).decode().strip()
         set_lte_cache(dev_id, 'usb_device', output)
         return output
-    except subprocess.CalledProcessError as err:
+    except subprocess.CalledProcessError:
         return None
 
 def _run_qmicli_command(dev_id, flag):
@@ -2527,14 +2525,14 @@ def qmi_get_connection_state(dev_id):
                 if 'Connection status' in line:
                     status = line.split(':')[-1].strip().replace("'", '')
                     return status == "connected"
-    except subprocess.CalledProcessError as err:
+    except subprocess.CalledProcessError:
         return False
 
 def qmi_get_ip_configuration(dev_id):
     try:
         ip = None
         gateway = None
-        cmd = 'wds-get-current-settings | grep "IPv4 address\|IPv4 subnet mask\|IPv4 gateway address"'
+        cmd = 'wds-get-current-settings | grep "IPv4 address\\|IPv4 subnet mask\\|IPv4 gateway address"'
         output = _run_qmicli_command(dev_id, cmd)
         if output:
             lines = output.splitlines()
@@ -2548,7 +2546,7 @@ def qmi_get_ip_configuration(dev_id):
                     gateway = line.split(':')[-1].strip().replace("'", '')
                     break
         return (ip, gateway)
-    except Exception as e:
+    except Exception:
         return (None, None)
 
 def qmi_get_operator_name(dev_id):
@@ -2735,7 +2733,7 @@ def lte_disconnect(dev_id, hard_reset_service=False):
         session = get_lte_cache(dev_id, 'session')
         if_name = get_lte_cache(dev_id, 'if_name')
         if not session:
-            session = '0' # defualt session
+            session = '0' # default session
         if not if_name:
             if_name = dev_id_to_linux_if(dev_id)
 
@@ -2807,7 +2805,7 @@ def reset_modem(dev_id):
         time.sleep(10)
         _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
         fwglobals.log.debug('reset_modem: reset finished')
-    except Exception as e:
+    except Exception:
         pass
     set_lte_cache(dev_id, 'state', '')
 
@@ -2853,7 +2851,7 @@ def lte_connect(params, reset=False):
         _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
         _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
         _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        grep = '| grep "Session ID\|IP [0]\|Gateway"'
+        grep = '| grep "Session ID\\|IP [0]\\|Gateway"'
         lines = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
 
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
@@ -2882,14 +2880,13 @@ def lte_connect(params, reset=False):
         return (False, "Exception: %s" % str(e))
 
 def lte_get_system_info(dev_id):
+    result = {
+        'Cell_Id'        : '',
+        'Operator_Name'  : '',
+        'MCC'            : '',
+        'MNC'            : ''
+    }
     try:
-        result = {
-            'Cell_Id'        : '',
-            'Operator_Name'  : '',
-            'MCC'            : '',
-            'MNC'            : ''
-        }
-
         lines = qmi_get_system_info(dev_id)
         for line in lines:
             if 'Cell ID' in line:
@@ -2909,18 +2906,17 @@ def lte_get_system_info(dev_id):
                 result['Operator_Name'] = name if bool(re.match("^[a-zA-Z0-9_ ]*$", name)) else ''
                 break
 
-        return result
-    except Exception as e:
-         return result
+    except Exception:
+        pass
+    return result
 
 def lte_get_hardware_info(dev_id):
+    result = {
+        'Vendor'   : '',
+        'Model'    : '',
+        'Imei': '',
+    }
     try:
-        result = {
-            'Vendor'   : '',
-            'Model'    : '',
-            'Imei': '',
-        }
-
         lines = qmi_get_manufacturer(dev_id)
         for line in lines:
             if 'Manufacturer' in line:
@@ -2939,18 +2935,16 @@ def lte_get_hardware_info(dev_id):
                 result['Imei'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-
-        return result
-    except Exception as e:
-        return result
+    except Exception:
+        pass
+    return result
 
 def lte_get_packets_state(dev_id):
+    result = {
+        'Uplink_speed'  : 0,
+        'Downlink_speed': 0
+    }
     try:
-        result = {
-            'Uplink_speed'  : 0,
-            'Downlink_speed': 0
-        }
-
         lines = qmi_get_packet_service_state(dev_id)
         for line in lines:
             if 'Max TX rate' in line:
@@ -2959,17 +2953,16 @@ def lte_get_packets_state(dev_id):
             if 'Max RX rate' in line:
                 result['Downlink_speed'] = line.split(':')[-1].strip().replace("'", '')
                 continue
-        return result
-    except Exception as e:
-        return result
+    except Exception:
+        pass
+    return result
 
 def lte_get_connection_state(dev_id):
+    result = {
+        'Activation_state' : 0,
+        'IP_type'  : 0,
+    }
     try:
-        result = {
-            'Activation_state' : 0,
-            'IP_type'  : 0,
-        }
-
         modem_info = qmi_get_connection_state(dev_id)
         if modem_info:
             data = modem_info.splitlines()
@@ -2980,20 +2973,20 @@ def lte_get_connection_state(dev_id):
                 if 'IP type' in line:
                     result['IP_type'] = line.split(':')[-1].strip().replace("'", '')
                     continue
-        return result
-    except Exception as e:
-        return result
+    except Exception:
+        pass
+    return result
 
 def lte_get_radio_signals_state(dev_id):
+    result = {
+        'RSSI' : 0,
+        'RSRP' : 0,
+        'RSRQ' : 0,
+        'SINR' : 0,
+        'SNR'  : 0,
+        'text' : ''
+    }
     try:
-        result = {
-            'RSSI' : 0,
-            'RSRP' : 0,
-            'RSRQ' : 0,
-            'SINR' : 0,
-            'SNR'  : 0,
-            'text' : ''
-        }
         lines = qmi_get_signals_state(dev_id)
         for index, line in enumerate(lines):
             if 'RSSI' in line:
@@ -3024,9 +3017,9 @@ def lte_get_radio_signals_state(dev_id):
             if 'RSRP' in line:
                 result['RSRP'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
                 continue
-        return result
-    except Exception as e:
-        return result
+    except Exception:
+        pass
+    return result
 
 def mbim_get_ip_configuration(dev_id):
     ip = None
@@ -3041,16 +3034,15 @@ def mbim_get_ip_configuration(dev_id):
                 gateway = line.split(':')[-1].strip().replace("'", '')
                 break
         return (ip, gateway)
-    except Exception as err:
+    except Exception:
         return (ip, gateway)
 
 def lte_get_ip_configuration(dev_id, key=None, cache=True):
+    response = {
+        'ip'      : '',
+        'gateway' : '',
+    }
     try:
-        response = {
-            'ip'      : '',
-            'gateway' : '',
-        }
-
         # try to get it from cache
         ip = get_lte_cache(dev_id, 'ip')
         gateway =  get_lte_cache(dev_id, 'gateway')
@@ -3068,9 +3060,9 @@ def lte_get_ip_configuration(dev_id, key=None, cache=True):
 
         if key:
             return response[key]
-        return response
-    except Exception as e:
-        return response
+    except Exception:
+        pass
+    return response
 
 def is_wifi_interface_by_dev_id(dev_id):
     linux_if = dev_id_to_linux_if(dev_id)
@@ -3088,7 +3080,7 @@ def is_wifi_interface(if_name):
         for line in lines:
             if if_name in line and not 'no wireless extensions' in line:
                 return True
-    except Exception as e:
+    except Exception:
         return False
 
     return False
@@ -3102,7 +3094,7 @@ def get_ethtool_value(linuxif, ethtool_key):
             if ethtool_key in line:
                 val = line.split("%s: " % ethtool_key, 1)[-1]
                 break
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         pass
 
     return val
@@ -3548,19 +3540,19 @@ def netplan_set_mac_addresses():
     #Changing mac addresses in all netplan files
     #Copy the current yaml into json variable, change the mac addr
     #Copy the coverted json string back to yaml file
-    intf_mac_addr = {}
+    interface_mac_addr = {}
     interfaces = psutil.net_if_addrs()
-    for nicname, addrs in list(interfaces.items()):
+    for nic_name, addrs in list(interfaces.items()):
         for addr in addrs:
             if addr.family == psutil.AF_LINK:
-                intf_mac_addr[nicname] = addr.address
+                interface_mac_addr[nic_name] = addr.address
     for netplan in netplan_paths:
         with open(netplan, "r+") as fd:
             netplan_json = yaml.load(fd)
             for if_name in netplan_json['network']['ethernets']:
                 interface = netplan_json['network']['ethernets'][if_name]
                 if interface.get('match'):
-                    interface['match']['macaddress'] = intf_mac_addr[if_name]
+                    interface['match']['macaddress'] = interface_mac_addr[if_name]
             netplan_str = yaml.dump(netplan_json)
             fd.seek(0)
             fd.write(netplan_str)
@@ -3633,7 +3625,7 @@ def wifi_get_capabilities(dev_id):
                 # result['Band 2']['Capabilities'] = _parse_key_data('Capabilities', band2, 2)
 
         return result
-    except Exception as e:
+    except Exception:
         return result
 
 def dump(filename=None, path=None, clean_log=False):

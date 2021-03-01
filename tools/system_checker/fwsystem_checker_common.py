@@ -624,7 +624,7 @@ class Checker:
         # Note standard requires all small letters, but Amazon uses capital letters too,
         # so we enable them.
         # ===========================================================================
-        pattern = '^[a-zA-Z0-9\-_.]{1,253}$'
+        pattern = '^[a-zA-Z0-9\\-_.]{1,253}$'
         try:
             hostname = subprocess.check_output(['hostname']).decode().split('\n')[0].strip()
             if not hostname:
@@ -826,9 +826,9 @@ class Checker:
         try:
             with open(vpp_hugepages_file, 'r') as f:
                 for line in f.readlines():
-                    if re.match('^[#\s]', line):    # skip commented lines
+                    if re.match(r'^[#\s]', line):    # skip commented lines
                         continue
-                    match = re.search('hugepages[\s]*=[\s]*([0-9]+)', line)
+                    match = re.search(r'hugepages[\s]*=[\s]*([0-9]+)', line)
                     if match:
                         num_hugepages = int(match.group(1))
                         break
@@ -853,7 +853,7 @@ class Checker:
                 if ret != 0:
                     print(prompt + "failed to write hugepages=%d into %s" % (default_hugepages, vpp_hugepages_file))
                     return False
-                    os.system('sysctl -p %s' %(vpp_hugepages_file))
+                os.system('sysctl -p %s' %(vpp_hugepages_file))
                 return True
             return True
 

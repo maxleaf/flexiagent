@@ -29,7 +29,7 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
-from netaddr import *
+import netaddr
 
 # add-application
 # --------------------------------------
@@ -92,7 +92,7 @@ def add_acl_rule(rule, rules):
 
     ip = rule.get('ip', None)
     if ip:
-        ip_network = IPNetwork(rule['ip'])
+        ip_network = netaddr.IPNetwork(rule['ip'])
         ip_bytes, _ = fwutils.ip_str_to_bytes(str(ip_network.ip))
         ip_prefix = ip_network.prefixlen
 
