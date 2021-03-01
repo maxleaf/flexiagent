@@ -3,7 +3,7 @@
   "entity": "agent",
   "message": "add-interface",
   "params": {
-        "dev_id":"__INTERFACE_2__",
+        "dev_id":"__INTERFACE_2__dev_id",
 		"dhcp":"yes",
         "type":"wan"
   }
@@ -15,7 +15,7 @@
   "params": {
     "interfaces": [
       {
-        "dev_id":"__INTERFACE_1__",
+        "dev_id":"__INTERFACE_1__dev_id",
 		"dhcp":"yes",
         "type":"wan"
       }
