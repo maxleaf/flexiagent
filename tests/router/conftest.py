@@ -7,6 +7,7 @@ import json
 import subprocess
 import re
 from datetime import datetime
+import copy
 
 @pytest.fixture
 def netplan_backup():
@@ -17,9 +18,9 @@ def netplan_backup():
     for file in orig_yamls:
         orig_yaml = file.replace('yaml', 'yaml.backup_pytest')
         shutil.move(file, orig_yaml)
-    
+
     yield
-    
+
     os.system('rm -f /etc/netplan/*.yaml')
     orig_yamls = glob.glob("/etc/netplan/*.backup_pytest")+ \
                 glob.glob("/lib/netplan/*.backup_pytest") + \
@@ -29,14 +30,14 @@ def netplan_backup():
         shutil.move(file, orig_yaml)
     os.system('sudo fwkill')
 
-@pytest.fixture
-def fixture_globals():
+@pytest.fixture(autouse=True)
+def fixture_globals(currpath):
     start_time = datetime.now()
 
     yield
 
     end_time = datetime.now()
-    print("Elapsed: " + str(end_time - start_time))
+    print("Test: %s. Elapsed: %s" % (currpath, str(end_time - start_time)))
 
 
 def pytest_addoption(parser):
@@ -78,27 +79,35 @@ def prepare_cli_files(currpath):
                 data = info['devices'][env]
 
     tests_path = currpath.replace('.py', '')
-    # get original tests files
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     expected_files = sorted(glob.glob('%s/*configuration_dump.json' % tests_path))
     original_files = test_cases + expected_files
 
-    def _replace(item):
-        # use template
-        if isinstance(item, str) or isinstance(item, unicode):
-            return data[item]
+    def _replace_val(val):
+        if isinstance(val, str) or isinstance(val, unicode):
+            match = re.search('(__INTERFACE_[1-3]__)(.*)', val)
+            if match:
+                interface, field = match.groups()
+                if field:
+                    return data[interface][field]
+                return data[interface]
+        return val
 
-        # use specific field
-        elif type(item) == dict:
-            for key, value in item.items():
-                match = re.search('(__INTERFACE_[1-3]__)(.*)', value)
-                if match:
-                    interface, field = match.groups()
-                    item[key] = data[interface][field]
+    def _replace(item):
+        try:
+            # use specific field
+            if type(item) == dict:
+                for key, value in item.items():
+                    item[key] =  _replace_val(value)
+            else:
+                # use template
+                item =  _replace_val(item)
+            return item
+        except Exception as e:
+            pass
         return item
 
     for file in original_files:
-        # copy original file and save
         if 'json' in file:
             copy_path = file.replace('.json', '.orig_json')
         else:
@@ -113,40 +122,43 @@ def prepare_cli_files(currpath):
                     continue
 
                 msg = req['message']
-                if msg == 'start-router':
-                    interfaces = req['params']['interfaces'] if 'interfaces' in req['params'] else None
-                    if interfaces:
-                        for idx, interface in enumerate(interfaces):
-                            updated_interface = _replace(interface)
-                            interfaces[idx] = updated_interface
+                params = req['params']
 
-                with open(file, 'w+') as json_file:
-                    json.dump(requests, json_file, sort_keys=True, indent=1)
-            # print(cfg)
-        
-        a = 'a'
+                if type(params) == list:
+                    for idx, value in enumerate(params):
+                        params[idx] = _replace(value)
+                    continue
 
-        # os.system("sed -i 's/%s/%s/g' %s" % ("__INTERFACE_1__", interface_1, file))
-        # os.system("sed -i 's/%s/%s/g' %s" % ("__INTERFACE_2__", interface_2, file))
-        # os.system("sed -i 's/%s/%s/g' %s" % ("__INTERFACE_3__", interface_3, file))
+                for key in params:
+                    value = params[key]
 
-    # yield
+                    if type(value) == list:
+                        for idx, nested_value in enumerate(value):
+                            value[idx] = _replace(copy.deepcopy(nested_value))
+                        continue
 
-    # # get modified files
-    # modified_test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
-    # modified_expected_files = sorted(glob.glob('%s/*.json' % tests_path))
-    # modified_files = modified_test_cases + modified_expected_files
+                    params[key] = _replace(value)
 
-    # # remove all modified files
-    # for file in modified_files:
-    #     os.remove(file)
+            with open(file, 'w+') as json_file:
+                json.dump(requests, json_file, sort_keys=True, indent=1)
 
-    # # get original tests files and restored them
-    # original_files = sorted(glob.glob('%s/*orig_*' % tests_path))
-    # for file in original_files:
-    #     # copy original file and save
-    #     if 'orig_json' in file:
-    #         copy_path = file.replace('.orig_json', '.json')
-    #     else:
-    #         copy_path = file.replace('.orig_cli', '.cli')
-    #     shutil.move(file, copy_path)
+    yield
+
+    # get modified files
+    modified_test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
+    modified_expected_files = sorted(glob.glob('%s/*.json' % tests_path))
+    modified_files = modified_test_cases + modified_expected_files
+
+    # remove all modified files
+    for file in modified_files:
+        os.remove(file)
+
+    # get original tests files and restored them
+    original_files = sorted(glob.glob('%s/*orig_*' % tests_path))
+    for file in original_files:
+        # copy original file and save
+        if 'orig_json' in file:
+            copy_path = file.replace('.orig_json', '.json')
+        else:
+            copy_path = file.replace('.orig_cli', '.cli')
+        shutil.move(file, copy_path)

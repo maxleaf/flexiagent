@@ -10,7 +10,7 @@
     "routes": [
       {
         "addr": "default",
-        "via": "10.0.0.10"
+        "via": "__INTERFACE_1__gateway"
       }
 	]
   }
