@@ -63,7 +63,6 @@ class FwStunWrap:
         """
         self.stun_cache    = fwglobals.g.cache.stun_cache
         self.thread_stun   = None
-        self.is_running    = False
         self.standalone    = standalone
         self.stun_retry    = 60
         fwstun.set_log(fwglobals.log)
@@ -98,15 +97,10 @@ class FwStunWrap:
             self._send_stun_requests()
             self._log_address_cache()
 
-        self.is_running = True
-        fwglobals.log.debug("Starting STUN thread")
-        if self.thread_stun is None:
-            self.thread_stun = threading.Thread(target=self._stun_thread, name='STUN Thread')
-            self.thread_stun.start()
+        self.thread_stun = threading.Thread(target=self._stun_thread, name='STUN Thread')
+        self.thread_stun.start()
 
     def finalize(self):
-        """ Stop the STUN thread """
-        self.is_running = False
         if self.thread_stun:
             self.thread_stun.join()
             self.thread_stun = None
@@ -327,13 +321,10 @@ class FwStunWrap:
             return '','','',''
 
         fwglobals.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
-        prev_rpf = fwutils.set_linux_reverse_path_filter(dev_name, fwutils.RPF_LOOSE_MODE)
 
         nat_type, nat_ext_ip, nat_ext_port, stun_index = \
             fwstun.get_ip_info(lcl_src_ip, lcl_src_port, None, None, dev_name, stun_idx)
 
-        if prev_rpf is not None:    # Restore RPF only if it was suppressed by us
-            fwutils.set_linux_reverse_path_filter(dev_name, prev_rpf)
         return nat_type, nat_ext_ip, nat_ext_port, stun_index
 
     def _stun_thread(self, *args):
@@ -346,7 +337,7 @@ class FwStunWrap:
         update_cache_from_os_timeout = 2 * 60
         send_stun_timeout = 3
 
-        while self.is_running == True:
+        while not fwglobals.g.teardown:
 
             try:  # Ensure thread doesn't exit on exception
 
