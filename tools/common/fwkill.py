@@ -66,7 +66,7 @@ def main():
 
     if not arg_quiet:
         print ("Shutting down flexiwan-router...")
-    fwglobals.initialize()
+    fwglobals.initialize(quiet=arg_quiet)
     os.system('systemctl stop flexiwan-router')
     fwutils.stop_vpp()
     fwutils.remove_linux_bridges()
