@@ -3511,7 +3511,7 @@ def netplan_set_mac_addresses():
                 interface_mac_addr[nic_name] = addr.address
     for netplan in netplan_paths:
         with open(netplan, "r+") as fd:
-            netplan_json = yaml.load(fd)
+            netplan_json = yaml.load(fd, Loader=yaml.BaseLoader)
             for if_name in netplan_json['network']['ethernets']:
                 interface = netplan_json['network']['ethernets'][if_name]
                 if interface.get('match'):

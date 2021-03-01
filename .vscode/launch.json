@@ -88,11 +88,11 @@
             "name": "Test: Inject One Cli Request",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
+            "program": "fwagent.py",
             "args": [
                 "cli",
                 "-f",
-                "/home/shneor/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
+                "/media/sf_shared_folder/flexiagent.21.01/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
