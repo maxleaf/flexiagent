@@ -303,7 +303,6 @@ class FWAGENT_API:
         sim_status = fwutils.lte_sim_status(params['dev_id'])
         signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
         hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
-        connection_state = fwutils.lte_get_connection_state(params['dev_id'])
         packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
         system_info = fwutils.lte_get_system_info(params['dev_id'])
         default_settings = fwutils.lte_get_default_settings(params['dev_id'])
@@ -320,7 +319,6 @@ class FWAGENT_API:
         response = {
             'address'             : addr,
             'signals'             : signals,
-            'connection_state'    : connection_state,
             'connectivity'        : connectivity,
             'packet_service_state': packet_service_state,
             'hardware_info'       : hardware_info,
