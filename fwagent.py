@@ -1147,7 +1147,7 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
                 requests = json.loads(f.read())
 
                 # helper methods to replace values
-                # IMPORTANT! at the moment, this logic supports replacement until two nested levels but not more
+                # IMPORTANT! at the moment, this logic supports replacement until three nested levels but not more
                 def _replace_val(val, data):
                     match = re.search('(__INTERFACE_[1-3]__)(.*)', str(val))
                     if match:
@@ -1161,7 +1161,11 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
                     # replace specific field
                     if type(item) == dict:
                         for key, value in item.items():
-                            item[key] =  _replace_val(value, data)
+                            if type(value) == dict:
+                                for nested_key, nested_value in value.items():
+                                    item[key][nested_key] = _replace_val(nested_value, data)
+                            else:
+                                item[key] =  _replace_val(value, data)
                         return item
 
                     # replace template

@@ -92,7 +92,7 @@
             "args": [
                 "cli",
                 "-f",
-                "/root/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli",
+                "/root/flexiagent/tests/router/01_cli_basic_requests_test/14_modify_no_running_vpp.cli",
                 "-t",
                 "/root/flexiagent/tests/fwtemplates.yaml"
             ],
