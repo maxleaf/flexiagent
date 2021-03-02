@@ -92,7 +92,9 @@
             "args": [
                 "cli",
                 "-f",
-                "/home/shneor/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli"
+                "/root/flexiagent/tests/router/01_cli_basic_requests_test/03_start-router_add-tunnel_remove-tunnel_stop-router.cli",
+                "-t",
+                "/root/flexiagent/tests/fwtemplates.yaml"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
@@ -100,7 +102,20 @@
             }
         },
         {
-            "name": "Pytest",
+            "name": "fwagent_without_flexiManage",
+            "type": "python",
+            "request": "launch",
+            "module": "${workspaceFolder}/fwagent",
+            "args": [
+                "daemon", "--dont_connect"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "pytest",
             "type": "python",
             "request": "launch",
             "module": "pytest",
@@ -132,6 +147,12 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Pytest + Agent",
+            "configurations": ["fwagent_without_flexiManage", "Test: Inject One Cli Request"]
         }
     ]
 }

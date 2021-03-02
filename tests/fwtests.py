@@ -158,7 +158,7 @@ class TestFwagent:
         # If there is no fwagent in background, the local instance of it will be
         # created, API command will be run on it, and instance will be destroyed.
         #
-        cmd = '%s cli %s' % (self.fwagent_py, args)
+        cmd = '%s cli %s -t %s' % (self.fwagent_py, args, os.path.abspath('./fwtemplates.yaml'))
         out = subprocess.check_output(cmd, shell=True).strip()
 
         # Deserialize object printed by CLI onto STDOUT

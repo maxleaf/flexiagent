@@ -592,7 +592,7 @@ class FwAgent:
         self.handling_request = False
         return reply
 
-    def inject_requests(self, filename, ignore_errors=False):
+    def inject_requests(self, filename, ignore_errors=False, json_requests=None):
         """Injects requests loaded from within 'file' JSON file,
         thus simulating receiving requests over network from the flexiManage.
         This function is used for Unit Testing.
@@ -607,21 +607,25 @@ class FwAgent:
         fwglobals.log.debug("inject_requests(filename=%s, ignore_errors=%s)" % \
             (filename, str(ignore_errors)))
 
-        with open(filename, 'r') as f:
-            requests = json.loads(f.read())
-            if type(requests) is list:   # Take care of file with list of requests
-                for (idx, req) in enumerate(requests):
-                    reply = self.handle_received_request(req)
-                    if reply['ok'] == 0 and ignore_errors == False:
-                        raise Exception('failed to inject request #%d in %s: %s' % \
-                                        ((idx+1), filename, reply['message']))
-                return None
-            else:   # Take care of file with single request
-                reply = self.handle_received_request(requests)
-                if reply['ok'] == 0:
-                    raise Exception('failed to inject request from within %s: %s' % \
-                                    (filename, reply['message']))
-                return reply
+        if json_requests:
+            requests = json.loads(json_requests)
+        else:
+            with open(filename, 'r') as f:
+                requests = json.loads(f.read())
+
+        if type(requests) is list:   # Take care of file with list of requests
+            for (idx, req) in enumerate(requests):
+                reply = self.handle_received_request(req)
+                if reply['ok'] == 0 and ignore_errors == False:
+                    raise Exception('failed to inject request #%d in %s: %s' % \
+                                    ((idx+1), filename, reply['message']))
+            return None
+        else:   # Take care of file with single request
+            reply = self.handle_received_request(requests)
+            if reply['ok'] == 0:
+                raise Exception('failed to inject request from within %s: %s' % \
+                                (filename, reply['message']))
+            return reply
 
 def version():
     """Handles 'fwagent version' command.
@@ -1075,7 +1079,7 @@ def daemon_rpc(func, **kwargs):
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
 
-def cli(clean_request_db=True, api=None, script_fname=None):
+def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None):
     """Handles 'fwagent cli' command.
     This command is not used in production. It assists unit testing.
     The 'fwagent cli' reads function names and their arguments from prompt and
@@ -1096,6 +1100,7 @@ def cli(clean_request_db=True, api=None, script_fname=None):
                                 If provided, no prompt loop will be run.
     :param script_fname:        Shortcat for --api==inject_requests(<script_fname>)
                                 command. Is kept for backward compatibility.
+    :param template_fname:      Path to template file that includes variables to replace in the cli request.
     :returns: None.
     """
     fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s)" % \
@@ -1110,6 +1115,84 @@ def cli(clean_request_db=True, api=None, script_fname=None):
         api = ['inject_requests' , 'filename=%s' % script_fname ]
         fwglobals.log.debug(
             "cli: generate 'api' out of 'script_fname': " + str(api))
+
+    if script_fname and template_fname:
+        system_info = subprocess.check_output('lshw -c system', shell=True).strip()
+        match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
+        if len(match) > 0:
+            product = match[0].strip()
+            vendor = match[1].strip()
+            vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+
+        with open(os.path.abspath(template_fname), 'r') as stream:
+            info = yaml.load(stream, Loader=yaml.BaseLoader)
+            shared = info['devices']['globals']
+            # firstly, we will try to search for specific variables for the vendor and specific model
+            # if it does not exist, we will try to get variables for the vendor
+            vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+            if vendor_product and vendor_product in info['devices']:
+                data = info['devices'][search]
+            elif vendor and vendor in info['devices']:
+                data = info['devices'][vendor]
+            else:
+                data = shared
+
+            # loop on global fields and override them with specific device values
+            for k, v in shared.items():
+                v.update(data[k])
+            data = shared
+
+            # loop on the requests and replace the variables
+            with open(script_fname, 'r') as f:
+                requests = json.loads(f.read())
+
+                # helper methods to replace values
+                # IMPORTANT! at the moment, this logic supports replacement until two nested levels but not more
+                def _replace_val(val, data):
+                    match = re.search('(__INTERFACE_[1-3]__)(.*)', str(val))
+                    if match:
+                        interface, field = match.groups()
+                        if field:
+                            return data[interface][field]
+                        return data[interface]
+                    return val
+
+                def _replace(item, data):
+                    # replace specific field
+                    if type(item) == dict:
+                        for key, value in item.items():
+                            item[key] =  _replace_val(value, data)
+                        return item
+
+                    # replace template
+                    item =  _replace_val(item, data)
+                    return item
+
+                for req in requests:
+                    if not 'params' in req:
+                        continue
+
+                    msg = req['message']
+                    params = req['params']
+
+                    if type(params) == list:
+                        for idx, value in enumerate(params):
+                            params[idx] = _replace(value, data)
+
+                    if type(params) == dict:
+                        for key in params:
+                            value = params[key]
+                            if type(value) == list:
+                                for idx, nested_value in enumerate(value):
+                                    value[idx] = _replace(nested_value, data)
+                                continue
+
+                            params[key] = _replace(value, data)
+
+        api.append('json_requests=%s' % json.dumps(requests))
+        fwglobals.log.debug(
+            "cli: generate 'api' out of 'script_fname' and 'template_fname': " + str(api))
+
 
     import fwagent_cli
     with fwagent_cli.FwagentCli() as cli:
@@ -1156,7 +1239,8 @@ if __name__ == '__main__':
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
-                        api=args.api)}
+                        api=args.api,
+                        template_fname=args.template_fname)}
 
     parser = argparse.ArgumentParser(
         description="Device Agent for FlexiWan orchestrator\n" + \
@@ -1203,6 +1287,8 @@ if __name__ == '__main__':
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read flexiManage requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
+    parser_cli.add_argument('-t', '--template', dest='template_fname', default=None,
+                        help="File with cli variables")
     parser_cli.add_argument('-c', '--clean', action='store_true',
                         help="clean request database on exit")
     parser_cli.add_argument('-i', '--api', dest='api', default=None, nargs='+',
