@@ -482,7 +482,12 @@ class FwAgent:
                         else:
                             break
                     else:
-                        fwstats.update_stats()
+                        try:
+                            fwstats.update_stats()
+                        except Exception as e:
+                            fwglobals.log.excep("failed to update stats %s" % str(e))
+                            raise e
+
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
