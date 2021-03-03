@@ -1146,52 +1146,31 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
             with open(script_fname, 'r') as f:
                 requests = json.loads(f.read())
 
-                # helper methods to replace values
-                # IMPORTANT! at the moment, this logic supports replacement until three nested levels but not more
-                def _replace_val(val, data):
-                    match = re.search('(__INTERFACE_[1-3]__)(.*)', str(val))
-                    if match:
-                        interface, field = match.groups()
-                        if field:
-                            return data[interface][field]
-                        return data[interface]
-                    return val
+                # helper methods to replace values                
+                def replace(input):
+                    if type(input) == list:
+                        for idx, value in enumerate(input):
+                            input[idx] = replace(value, data)
 
-                def _replace(item, data):
-                    # replace specific field
-                    if type(item) == dict:
-                        for key, value in item.items():
-                            if type(value) == dict:
-                                for nested_key, nested_value in value.items():
-                                    item[key][nested_key] = _replace_val(nested_value, data)
-                            else:
-                                item[key] =  _replace_val(value, data)
-                        return item
+                    elif type(input) == dict:
+                        for key in input:
+                            value = input[key]
+                            input[key] = replace(value, data) 
 
-                    # replace template
-                    item =  _replace_val(item, data)
-                    return item
+                    elif fwutils.is_str(input):
+                        match = re.search('(__INTERFACE_[1-3]__)(.*)', str(input))
+                        if match:
+                            interface, field = match.groups()
+                            if field:
+                                return data[interface][field]
+                            return data[interface]
+
+                    return input
 
                 for req in requests:
                     if not 'params' in req:
                         continue
-
-                    msg = req['message']
-                    params = req['params']
-
-                    if type(params) == list:
-                        for idx, value in enumerate(params):
-                            params[idx] = _replace(value, data)
-
-                    if type(params) == dict:
-                        for key in params:
-                            value = params[key]
-                            if type(value) == list:
-                                for idx, nested_value in enumerate(value):
-                                    value[idx] = _replace(nested_value, data)
-                                continue
-
-                            params[key] = _replace(value, data)
+                    req['params'] = new_replace(req['params'])
 
         api.append('json_requests=%s' % json.dumps(requests))
         fwglobals.log.debug(
