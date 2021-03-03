@@ -1150,12 +1150,12 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
                 def replace(input):
                     if type(input) == list:
                         for idx, value in enumerate(input):
-                            input[idx] = replace(value, data)
+                            input[idx] = replace(value)
 
                     elif type(input) == dict:
                         for key in input:
                             value = input[key]
-                            input[key] = replace(value, data) 
+                            input[key] = replace(value) 
 
                     elif fwutils.is_str(input):
                         match = re.search('(__INTERFACE_[1-3]__)(.*)', str(input))
@@ -1170,7 +1170,7 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
                 for req in requests:
                     if not 'params' in req:
                         continue
-                    req['params'] = new_replace(req['params'])
+                    req['params'] = replace(req['params'])
 
         api.append('json_requests=%s' % json.dumps(requests))
         fwglobals.log.debug(
