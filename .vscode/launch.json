@@ -92,7 +92,7 @@
             "args": [
                 "cli",
                 "-f",
-                "/root/flexiagent/tests/router/02_persistent_configuration_test/add-config.cli",
+                "/root/flexiagent/tests/router/04_revert_on_list_request_failure_test/01_list_interfaces.cli",
                 "-t",
                 "/root/flexiagent/tests/fwtemplates.yaml"
             ],
@@ -121,7 +121,7 @@
             "module": "pytest",
             "args": [
                 "-k",
-                "01",
+                "04",
                 "-s"
             ],
             "cwd": "${workspaceRoot}/tests",

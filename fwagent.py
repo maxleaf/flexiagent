@@ -1079,7 +1079,7 @@ def daemon_rpc(func, **kwargs):
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
 
-def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None):
+def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None, ignore_errors=False):
     """Handles 'fwagent cli' command.
     This command is not used in production. It assists unit testing.
     The 'fwagent cli' reads function names and their arguments from prompt and
@@ -1103,8 +1103,8 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
     :param template_fname:      Path to template file that includes variables to replace in the cli request.
     :returns: None.
     """
-    fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s)" % \
-                        (str(clean_request_db), str(api)))
+    fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s, ignore_errors=%s)" % \
+                        (str(clean_request_db), str(api), ignore_errors))
 
     # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
@@ -1113,6 +1113,8 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None)
         # working directory other than the typed 'fwagent cli -f' command.
         script_fname = os.path.abspath(script_fname)
         api = ['inject_requests' , 'filename=%s' % script_fname ]
+        if ignore_errors:
+            api.append('ignore_errors=True')
         fwglobals.log.debug(
             "cli: generate 'api' out of 'script_fname': " + str(api))
 
@@ -1223,7 +1225,8 @@ if __name__ == '__main__':
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
                         api=args.api,
-                        template_fname=args.template_fname)}
+                        template_fname=args.template_fname,
+                        ignore_errors=args.ignore_errors)}
 
     parser = argparse.ArgumentParser(
         description="Device Agent for FlexiWan orchestrator\n" + \
@@ -1272,6 +1275,8 @@ if __name__ == '__main__':
                         help="File with requests to be executed")
     parser_cli.add_argument('-t', '--template', dest='template_fname', default=None,
                         help="File with cli variables")
+    parser_cli.add_argument('-I', '--ignore_errors', dest='ignore_errors', action='store_true',
+                        help="Ignore errors")
     parser_cli.add_argument('-c', '--clean', action='store_true',
                         help="clean request database on exit")
     parser_cli.add_argument('-i', '--api', dest='api', default=None, nargs='+',
