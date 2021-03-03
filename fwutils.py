@@ -2532,25 +2532,27 @@ def dev_id_to_usb_device(dev_id):
     except subprocess.CalledProcessError as err:
         return None
 
-def _run_qmicli_command(dev_id, flag):
+def _run_qmicli_command(dev_id, flag, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT)
         if output:
             return output.splitlines()
     except subprocess.CalledProcessError as err:
-        fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output))
+        if print_error:
+            fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output))
     return []
 
-def _run_mbimcli_command(dev_id, cmd):
+def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT)
         if output:
-            return output.splitlines()
+            return (output.splitlines(), None)
     except subprocess.CalledProcessError as err:
-        fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output))
-    return []
+        if print_error:
+            fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output))
+    return ([], err.output)
 
 def qmi_get_simcard_status(dev_id):
     return _run_qmicli_command(dev_id, 'uim-get-card-status')
@@ -2819,7 +2821,7 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     return lte_get_pin_state(dev_id)
 
 def mbim_is_connected(dev_id):
-    lines = _run_mbimcli_command(dev_id, '--query-connection-state')
+    lines, err = _run_mbimcli_command(dev_id, '--query-connection-state')
     for line in lines:
         if 'Activation state' in line:
             return line.split(':')[-1].strip().replace("'", '') == 'activated'
@@ -2876,12 +2878,21 @@ def lte_connect(params, reset=False):
         lte_disconnect(dev_id)
 
         connection_params = lte_prepare_connection_params(params)
-
-        _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
-        _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
-        _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        grep = '| grep "Session ID\|IP [0]\|Gateway"'
-        lines = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
+        mbim_commands = [
+            '--query-subscriber-ready-status --no-close',
+            '--query-registration-state --no-open=3 --no-close',
+            '--attach-packet-service --no-open=4 --no-close',
+            '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway"' % connection_params
+        ]
+        for cmd in mbim_commands:
+            lines, err = _run_mbimcli_command(dev_id, cmd)
+            if err:
+                return (False, err)
+        # _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
+        # _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
+        # _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
+        # grep = '| grep "Session ID\|IP [0]\|Gateway"'
+        # lines, err = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
 
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
 
@@ -3038,7 +3049,7 @@ def mbim_get_ip_configuration(dev_id):
     ip = None
     gateway = None
     try:
-        lines = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
+        lines, err = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
         for line in lines:
             if 'IP [0]:' in line:
                 ip = line.split(':')[-1].strip().replace("'", '')
