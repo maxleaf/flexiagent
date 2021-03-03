@@ -7,11 +7,11 @@
   ], 
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:__INTERFACE_1__", 
+      "Key": "add-interface:__INTERFACE_1__dev_id", 
       "Params": {
-        "addr": "10.0.0.4/24", 
-        "dev_id": "__INTERFACE_1__", 
-        "gateway": "10.0.0.10", 
+        "addr": "__INTERFACE_1__addr", 
+        "dev_id": "__INTERFACE_1__dev_id", 
+        "gateway": "__INTERFACE_1__gateway", 
         "multilink": {
           "labels": [
             "green", 
@@ -23,10 +23,10 @@
       }
     }, 
     {
-      "Key": "add-interface:__INTERFACE_2__", 
+      "Key": "add-interface:__INTERFACE_2__dev_id", 
       "Params": {
-        "addr": "192.168.56.101/24", 
-        "dev_id": "__INTERFACE_2__", 
+        "addr": "__INTERFACE_2__addr", 
+        "dev_id": "__INTERFACE_2__dev_id", 
         "routing": "ospf", 
         "type": "lan"
       }
@@ -36,7 +36,7 @@
     {
       "Key": "add-tunnel:1", 
       "Params": {
-        "dev_id": "__INTERFACE_1__", 
+        "dev_id": "__INTERFACE_1__dev_id", 
         "dst": "20.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -73,7 +73,7 @@
     {
       "Key": "add-tunnel:2", 
       "Params": {
-        "dev_id": "__INTERFACE_1__", 
+        "dev_id": "__INTERFACE_1__dev_id", 
         "dst": "30.0.0.4", 
         "ipsec": {
           "local-sa": {
@@ -110,7 +110,7 @@
     {
       "Key": "add-tunnel:7", 
       "Params": {
-        "dev_id": "__INTERFACE_1__", 
+        "dev_id": "__INTERFACE_1__dev_id", 
         "dst": "70.0.0.7", 
         "ipsec": {
           "local-sa": {
@@ -146,19 +146,17 @@
   ], 
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config __INTERFACE_2__", 
+      "Key": "add-dhcp-config __INTERFACE_2__dev_id", 
       "Params": {
         "dns": [
           "8.8.8.8"
         ], 
-        "interface": "__INTERFACE_2__", 
+        "interface": "__INTERFACE_2__dev_id", 
         "range_end": "20.20.20.150", 
         "range_start": "20.20.20.100"
       }
     }
-  ]
-}
-{
+  ],
   "============ APPLICATIONS ============": [
     {
       "Key": "add-application", 

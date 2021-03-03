@@ -1119,62 +1119,8 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None,
             "cli: generate 'api' out of 'script_fname': " + str(api))
 
     if script_fname and template_fname:
-        system_info = subprocess.check_output('lshw -c system', shell=True).strip()
-        match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
-        if len(match) > 0:
-            product = match[0].strip()
-            vendor = match[1].strip()
-            vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
-
-        with open(os.path.abspath(template_fname), 'r') as stream:
-            info = yaml.load(stream, Loader=yaml.BaseLoader)
-            shared = info['devices']['globals']
-            # firstly, we will try to search for specific variables for the vendor and specific model
-            # if it does not exist, we will try to get variables for the vendor
-            vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
-            if vendor_product and vendor_product in info['devices']:
-                data = info['devices'][search]
-            elif vendor and vendor in info['devices']:
-                data = info['devices'][vendor]
-            else:
-                data = shared
-
-            # loop on global fields and override them with specific device values
-            for k, v in shared.items():
-                v.update(data[k])
-            data = shared
-
-            # loop on the requests and replace the variables
-            with open(script_fname, 'r') as f:
-                requests = json.loads(f.read())
-
-                # helper methods to replace values                
-                def replace(input):
-                    if type(input) == list:
-                        for idx, value in enumerate(input):
-                            input[idx] = replace(value)
-
-                    elif type(input) == dict:
-                        for key in input:
-                            value = input[key]
-                            input[key] = replace(value) 
-
-                    elif fwutils.is_str(input):
-                        match = re.search('(__INTERFACE_[1-3]__)(.*)', str(input))
-                        if match:
-                            interface, field = match.groups()
-                            if field:
-                                return data[interface][field]
-                            return data[interface]
-
-                    return input
-
-                for req in requests:
-                    if not 'params' in req:
-                        continue
-                    req['params'] = replace(req['params'])
-
-        api.append('json_requests=%s' % json.dumps(requests))
+        requests = fwutils.replace_file_variables(template_fname, script_fname)
+        api.append('json_requests=%s' % json.dumps(requests, sort_keys=True))
         fwglobals.log.debug(
             "cli: generate 'api' out of 'script_fname' and 'template_fname': " + str(api))
 

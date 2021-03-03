@@ -3801,3 +3801,69 @@ def exec_with_timeout(cmd, timeout=60):
             fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
+def replace_file_variables(template_fname, replace_fname):
+    system_info = subprocess.check_output('lshw -c system', shell=True).strip()
+    match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
+    if len(match) > 0:
+        product = match[0].strip()
+        vendor = match[1].strip()
+        vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+
+    with open(template_fname, 'r') as stream:
+        info = yaml.load(stream, Loader=yaml.BaseLoader)
+        shared = info['devices']['globals']
+        # firstly, we will try to search for specific variables for the vendor and specific model
+        # if it does not exist, we will try to get variables for the vendor
+        vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+        if vendor_product and vendor_product in info['devices']:
+            data = info['devices'][search]
+        elif vendor and vendor in info['devices']:
+            data = info['devices'][vendor]
+        else:
+            data = shared
+
+        # loop on global fields and override them with specific device values
+        for k, v in shared.items():
+            v.update(data[k])
+        data = shared
+
+        def replace(input):
+            if type(input) == list:
+                for idx, value in enumerate(input):
+                    input[idx] = replace(value)
+
+            elif type(input) == dict:
+                for key in input:
+                    value = input[key]
+                    input[key] = replace(value) 
+
+            elif is_str(input):
+                match = re.search('(__INTERFACE_[1-3]__)(.*)', str(input))
+                if match:
+                    interface, field = match.groups()
+                    if field:
+                        new_input = re.sub('__INTERFACE_[1-3]__.*', data[interface][field], input)
+                        return new_input
+                    
+                    # replace with the template, but remove unused keys, They break the expected JSON files
+                    del data[interface]['addr_no_mask']
+                    return data[interface]
+            return input
+
+        # loop on the requests and replace the variables
+        with open(replace_fname, 'r') as f:
+            requests = json.loads(f.read())
+
+            # cli requests
+            if type(requests) == list:
+                for req in requests:
+                    if not 'params' in req:
+                        continue
+                    req['params'] = replace(req['params'])
+            
+            # json expected files
+            elif type(requests) == dict:
+                for req in requests:
+                    requests[req] = replace(requests[req])
+
+        return requests

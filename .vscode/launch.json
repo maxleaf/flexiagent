@@ -121,7 +121,7 @@
             "module": "pytest",
             "args": [
                 "-k",
-                "04",
+                "08",
                 "-s"
             ],
             "cwd": "${workspaceRoot}/tests",

@@ -32,9 +32,13 @@ import sys
 import time
 import traceback as tb
 
+
+code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
+sys.path.append(code_root)
+import fwutils
+
 class TestFwagent:
     def __init__(self):
-        code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
         self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
         self.fwkill_py  = 'python ' + os.path.join(code_root, 'tools', 'common', 'fwkill.py')
         self.set_log_start_marker()
@@ -404,15 +408,32 @@ def router_is_configured(expected_cfg_dump_filename,
     # Dumps current agent configuration into temporary file and checks
     # if the dump file is equal to the provided expected dump file.
     actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
-    dump_configuration_cmd = "sudo %s show --configuration router > %s" % (fwagent_py, actual_cfg_dump_filename)
-    subprocess.call(dump_configuration_cmd, shell=True)
-    dump_multilink_cmd = "sudo %s show --configuration multilink-policy >> %s" % (fwagent_py, actual_cfg_dump_filename)
-    subprocess.call(dump_multilink_cmd, shell=True)
-    ok = filecmp.cmp(expected_cfg_dump_filename, actual_cfg_dump_filename)
+    replaced_expected_cfg_dump_filename = expected_cfg_dump_filename + ".replaced.txt"
+
+    dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True)
+    dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True)
+    
+    actual_json = json.loads(dump_configuration)
+    actual_json.update(json.loads(dump_multilink))
+
+    expected_json = fwutils.replace_file_variables(os.path.abspath('./fwtemplates.yaml'), expected_cfg_dump_filename)
+
+    actual_json_dump = json.dumps(actual_json, indent=2, sort_keys=True)
+    expected_json_dump = json.dumps(expected_json, indent=2, sort_keys=True)
+
+    ok = actual_json_dump == expected_json_dump
     if ok:
-        os.remove(actual_cfg_dump_filename)
-    elif print_error:
-        print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
+        if os.path.exists(actual_cfg_dump_filename):
+            os.remove(actual_cfg_dump_filename)
+        if os.path.exists(replaced_expected_cfg_dump_filename):
+            os.remove(replaced_expected_cfg_dump_filename)
+    else:
+        with open(actual_cfg_dump_filename, 'w+') as f:
+            f.write(actual_json_dump)
+        with open(replaced_expected_cfg_dump_filename, 'w+') as f:
+            f.write(expected_json_dump)
+        if print_error:
+            print("ERROR: %s does not match %s" % (replaced_expected_cfg_dump_filename, actual_cfg_dump_filename))
     return ok
 
 def get_log_line_time(log_line):
