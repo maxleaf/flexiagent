@@ -3,18 +3,8 @@
   "entity": "agent",
   "message": "add-interface",
   "params": [
-    {
-      "dev_id":"__INTERFACE_1__",
-      "addr":"10.0.0.4/24",
-      "gateway": "10.0.0.10",
-      "type":"wan"
-    },
-    {
-      "dev_id":"__INTERFACE_2__",
-      "addr":"192.168.56.101/24",
-      "routing":"ospf",
-      "type":"lan"
-    }
+    "__INTERFACE_1__",
+    "__INTERFACE_2__"
   ]
 }
 ,
@@ -22,8 +12,8 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-      "src": "10.0.0.4",
-      "dev_id":"__INTERFACE_1__",
+      "src": "__INTERFACE_1__addr_no_mask",
+      "dev_id":"__INTERFACE_1__dev_id",
       "dst": "20.0.0.4",
       "tunnel-id": 1,
       "ipsec": {
@@ -72,12 +62,12 @@
   "message": "remove-interface",
   "params": [
     {
-      "dev_id":"__INTERFACE_1__",
-      "addr":"10.0.0.4/24"
+      "dev_id":"__INTERFACE_1__dev_id",
+      "addr":"__INTERFACE_1__addr"
     },
     {
-      "dev_id":"__INTERFACE_2__",
-      "addr":"192.168.56.101/24",
+      "dev_id":"__INTERFACE_2__dev_id",
+      "addr":"__INTERFACE_2__addr",
       "routing":"ospf"
     }
   ]
