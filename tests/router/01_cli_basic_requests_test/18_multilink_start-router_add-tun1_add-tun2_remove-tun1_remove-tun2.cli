@@ -6,8 +6,8 @@
     "interfaces": [
       {
         "dev_id":"__INTERFACE_1__dev_id",
-        "addr":"10.0.0.4/24",
-        "gateway": "10.0.0.10",
+        "addr":"__INTERFACE_1__addr",
+        "gateway": "__INTERFACE_1__gateway",
         "type":"wan",
         "multilink": {
             "labels": [

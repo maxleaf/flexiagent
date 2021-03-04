@@ -7,7 +7,7 @@
 		  "entity": "agent",
 		  "message": "add-dhcp-config",
 		  "params": {
-			"interface": "__INTERFACE_2__",
+			"interface": "__INTERFACE_2__dev_id",
 		    "range_start": "20.20.20.150",
 		    "range_end": "20.20.20.200",
 		    "dns": [
@@ -298,8 +298,8 @@
 		  "entity":  "agent",
 		  "message": "add-tunnel",
 		  "params": {
-			"src": "10.0.0.4",
-            "dev_id":"__INTERFACE_1__",
+			"src": "__INTERFACE_1__addr_no_mask",
+            "dev_id":"__INTERFACE_1__dev_id",
 			"dst": "20.0.0.4",
 			"tunnel-id": 1,
 			"ipsec": {
@@ -334,8 +334,8 @@
 		  "entity":  "agent",
 		  "message": "add-tunnel",
 		  "params": {
-			"src": "10.0.0.4",
-            "dev_id":"__INTERFACE_1__",
+			"src": "__INTERFACE_1__addr_no_mask",
+            "dev_id":"__INTERFACE_1__dev_id",
 			"dst": "30.0.0.4",
 			"tunnel-id": 2,
 			"ipsec": {
@@ -370,8 +370,8 @@
 		  "entity":  "agent",
 		  "message": "add-tunnel",
 		  "params": {
-			"src": "10.0.0.4",
-            "dev_id":"__INTERFACE_1__",
+			"src": "__INTERFACE_1__addr_no_mask",
+            "dev_id":"__INTERFACE_1__dev_id",
 			"dst": "70.0.0.7",
 			"tunnel-id": 7,
 			"ipsec": {
@@ -406,7 +406,7 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "dev_id":"__INTERFACE_3__",
+			  "dev_id":"__INTERFACE_3__dev_id",
 			  "addr":"1.0.0.4/24",
 			  "gateway": "1.0.0.1",
 			  "type":"wan",
@@ -420,9 +420,9 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "dev_id":"__INTERFACE_1__",
-			  "addr":"10.0.0.4/24",
-			  "gateway": "10.0.0.10",
+			  "dev_id":"__INTERFACE_1__dev_id",
+			  "addr":"__INTERFACE_1__addr",
+			  "gateway": "__INTERFACE_1__gateway",
 			  "type":"wan",
 			  "multilink": {
 				  "labels": [ "green" ]
@@ -434,7 +434,7 @@
 		  "entity":  "agent",
 		  "message": "add-interface",
 		  "params": {
-			  "dev_id":"__INTERFACE_2__",
+			  "dev_id":"__INTERFACE_2__dev_id",
 			  "addr":"192.168.56.100/24",
 			  "routing":"ospf",
 			  "type":"lan"

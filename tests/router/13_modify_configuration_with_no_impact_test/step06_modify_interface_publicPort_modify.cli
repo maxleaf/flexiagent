@@ -8,9 +8,9 @@
           "message": "modify-interface",
           "params":
           {
-            "dev_id":"__INTERFACE_1__",
-            "addr":"10.0.0.4/24",
-            "gateway": "10.0.0.10",
+            "dev_id":"__INTERFACE_1__dev_id",
+            "addr":"__INTERFACE_1__addr",
+            "gateway": "__INTERFACE_1__gateway",
             "PublicPort": 6666,
             "type":"wan",
             "multilink": {

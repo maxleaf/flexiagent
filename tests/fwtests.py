@@ -412,9 +412,10 @@ def router_is_configured(expected_cfg_dump_filename,
 
     dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True)
     dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True)
-    
+
     actual_json = json.loads(dump_configuration)
-    actual_json.update(json.loads(dump_multilink))
+    if dump_multilink.strip():
+        actual_json.update(json.loads(dump_multilink))
 
     expected_json = fwutils.replace_file_variables(os.path.abspath('./fwtemplates.yaml'), expected_cfg_dump_filename)
 

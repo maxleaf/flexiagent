@@ -6,7 +6,7 @@
     "interfaces": [
       {
         "dev_id":"__INTERFACE_1__dev_id",
-        "addr":"10.0.0.4/24",
+        "addr":"__INTERFACE_1__addr",
 		    "type": "wan"
       },
       "__INTERFACE_2__"

@@ -66,7 +66,7 @@
           }, 
           "routing": "ospf"
         }, 
-        "src": "10.0.0.4", 
+        "src": "__INTERFACE_1__addr_no_mask", 
         "tunnel-id": 2
       }
     }

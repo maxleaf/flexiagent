@@ -3,7 +3,7 @@
         "entity": "agent",
         "message": "add-interface",
         "params": {
-            "dev_id": "__INTERFACE_3__",
+            "dev_id": "__INTERFACE_3__dev_id",
             "dhcp": "yes",
             "addr": "10.0.1.10/24",
             "gateway": "10.0.1.1",
@@ -19,7 +19,7 @@
         "entity": "agent",
         "message": "add-interface",
         "params": {
-            "dev_id": "__INTERFACE_1__",
+            "dev_id": "__INTERFACE_1__dev_id",
             "dhcp": "no",
             "addr": "192.168.1.10/24",
             "routing": "NONE",
