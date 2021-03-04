@@ -45,6 +45,6 @@ devices:
     __INTERFACE_1__:
       dev_id:       pci:0000:03:00.0
     __INTERFACE_2__:
-      dev_id:       pci:0000:13:00.00
+      dev_id:       pci:0000:13:00.0
     __INTERFACE_3__:
-      dev_id:       pci:0000:0b:00.00
+      dev_id:       pci:0000:0b:00.0
