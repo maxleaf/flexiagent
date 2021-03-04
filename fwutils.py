@@ -3835,7 +3835,7 @@ def replace_file_variables(template_fname, replace_fname):
             elif type(input) == dict:
                 for key in input:
                     value = input[key]
-                    input[key] = replace(value) 
+                    input[key] = replace(value)
 
             elif is_str(input):
                 match = re.search('(__INTERFACE_[1-3]__)(.*)', str(input))
@@ -3844,10 +3844,11 @@ def replace_file_variables(template_fname, replace_fname):
                     if field:
                         new_input = re.sub('__INTERFACE_[1-3]__.*', data[interface][field], input)
                         return new_input
-                    
+
                     # replace with the template, but remove unused keys, They break the expected JSON files
-                    del data[interface]['addr_no_mask']
-                    return data[interface]
+                    template = copy.deepcopy(data[interface])
+                    del template['addr_no_mask']
+                    return template
             return input
 
         # loop on the requests and replace the variables

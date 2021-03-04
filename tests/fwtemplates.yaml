@@ -1,3 +1,5 @@
+# device type: lshw -c system
+# IMPORTANT! The list of dev_ids must be ordered alphabetically (0000:00:03.0, pci:0000:00:08.0, pci:0000:00:09.0)
 devices:
   globals:
     __INTERFACE_1__:
@@ -13,18 +15,18 @@ devices:
     __INTERFACE_3__: {}
   virtualbox:
     __INTERFACE_1__:
-      dev_id:       pci:0000:00:08.0
-    __INTERFACE_2__:
-      dev_id:       pci:0000:00:09.0
-    __INTERFACE_3__:
       dev_id:       pci:0000:00:03.0
+    __INTERFACE_2__:
+      dev_id:       pci:0000:00:08.0
+    __INTERFACE_3__:
+      dev_id:       pci:0000:00:09.0
   Silicom:
     __INTERFACE_1__:
         dev_id:     pci:0000:02:00.1
     __INTERFACE_2__:
-      dev_id:       pci:0000:04:00.1
-    __INTERFACE_3__:
       dev_id:       pci:0000:03:00.0
+    __INTERFACE_3__:
+      dev_id:       pci:0000:04:00.1
   Silicom__90500-0151-G01:
     __INTERFACE_1__:
       dev_id:       pci:0000:02:00.0
@@ -34,8 +36,8 @@ devices:
       dev_id:       pci:0000:05:00.0
   Advantech: # lshw -c system | awk '/vendor|product/{print tolower($2)}
     __INTERFACE_1__:
-        dev_id:     pci:0000:08:00.0
+        dev_id:     pci:0000:06:00.0
     __INTERFACE_2__:
-      dev_id:       pci:0000:08:00.1
+      dev_id:       pci:0000:08:00.0
     __INTERFACE_3__:
-      dev_id:       pci:0000:0a:00.0
+      dev_id:       pci:0000:08:00.1
