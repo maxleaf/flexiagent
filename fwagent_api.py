@@ -33,19 +33,19 @@ import fwsystem_api
 import fwrouter_api
 
 fwagent_api = {
-    'get-device-info':               '_get_device_info',
-    'get-device-stats':              '_get_device_stats',
-    'get-device-logs':               '_get_device_logs',
-    'get-device-packet-traces':      '_get_device_packet_traces',
-    'get-device-os-routes':          '_get_device_os_routes',
     'get-device-config':             '_get_device_config',
-    'upgrade-device-sw':             '_upgrade_device_sw',
-    'reset-device':                  '_reset_device_soft',
-    'sync-device':                   '_sync_device',
-    'get-wifi-info':                 '_get_wifi_info',
+    'get-device-info':               '_get_device_info',
+    'get-device-logs':               '_get_device_logs',
+    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-packet-traces':      '_get_device_packet_traces',
+    'get-device-stats':              '_get_device_stats',
     'get-lte-info':                  '_get_lte_info',
-    'reset-lte':                     '_reset_lte',
+    'get-wifi-info':                 '_get_wifi_info',
     'modify-lte-pin':                '_modify_lte_pin',
+    'reset-device':                  '_reset_device_soft',
+    'reset-lte':                     '_reset_lte',
+    'sync-device':                   '_sync_device',
+    'upgrade-device-sw':             '_upgrade_device_sw',
 }
 
 class FWAGENT_API:
