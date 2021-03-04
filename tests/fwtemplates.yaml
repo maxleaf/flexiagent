@@ -13,7 +13,7 @@ devices:
       type:         lan
       routing:      ospf
     __INTERFACE_3__: {}
-  virtualbox:
+  VirtualBox:
     __INTERFACE_1__:
       dev_id:       pci:0000:00:03.0
     __INTERFACE_2__:
