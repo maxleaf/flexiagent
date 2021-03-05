@@ -1,6 +1,6 @@
 argcomplete
 getmac
-jwt
+pyjwt
 netaddr
 Pyro4
 psutil
