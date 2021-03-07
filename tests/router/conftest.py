@@ -3,6 +3,12 @@ import os
 import glob
 import shutil
 from datetime import datetime
+import psutil
+import sys, select
+
+CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
+sys.path.append(CODE_ROOT)
+import fwutils
 
 @pytest.fixture
 def netplan_backup():
@@ -37,3 +43,17 @@ def fixture_globals(currpath):
 @pytest.fixture
 def currpath(request):
     return str(request.node.fspath)
+
+@pytest.fixture(autouse=True)
+def run_lte(currpath):
+    if 'lte_' in currpath:
+        exists = False
+        for nicname, addrs in psutil.net_if_addrs().items():
+            driver = fwutils.get_ethtool_value(nicname, 'driver')
+            if driver and driver in ['cdc_mbim', 'qmi_wwan']:
+                exists = True
+                break
+        if not exists:
+            pytest.skip('LTE card does not exist on the current machine')
+        else:
+            yield

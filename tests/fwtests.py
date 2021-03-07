@@ -32,15 +32,16 @@ import sys
 import time
 import traceback as tb
 
-
-code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
-sys.path.append(code_root)
+CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
+TEST_ROOT = CODE_ROOT + '/tests/'
+sys.path.append(CODE_ROOT)
+sys.path.append(TEST_ROOT)
 import fwutils
 
 class TestFwagent:
     def __init__(self):
-        self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
-        self.fwkill_py  = 'python ' + os.path.join(code_root, 'tools', 'common', 'fwkill.py')
+        self.fwagent_py = 'python ' + os.path.join(CODE_ROOT, 'fwagent.py')
+        self.fwkill_py  = 'python ' + os.path.join(CODE_ROOT, 'tools', 'common', 'fwkill.py')
         self.set_log_start_marker()
 
     def __enter__(self):
@@ -262,6 +263,18 @@ def fwagent_daemon_pid():
         pid = None
     return pid
 
+def linux_interfaces_count():
+    cmd = 'ls -A /sys/class/net | wc -l'
+    count = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).strip()
+    return int(count)
+
+def linux_interfaces_are_configured(expected_count, print_error=True):
+    current = linux_interfaces_count()
+    is_equal = current == expected_count
+    if not is_equal and print_error:
+        print("ERROR: current: %s, expected: %s" % (current, expected_count))
+    return is_equal
+
 def vpp_is_configured(config_entities, print_error=True):
 
     def _run_command(cmd, print_error=True):
@@ -298,8 +311,8 @@ def vpp_is_configured(config_entities, print_error=True):
         output = str(amount)
         if e == 'interfaces':
             # Count number of interfaces that are UP
-            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
-            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3).* \(up\)'"
+            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tapcli).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
+            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tapcli).* \(up\)'"
             if not _check_command_output(cmd, output, 'UP interfaces', cmd_on_error, print_error):
                 return False
         if e == 'tunnels':
@@ -412,10 +425,13 @@ def router_is_configured(expected_cfg_dump_filename,
 
     dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True)
     dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True)
+    dump_system = subprocess.check_output("sudo %s show --configuration system" % fwagent_py, shell=True)
 
     actual_json = json.loads(dump_configuration)
     if dump_multilink.strip():
         actual_json.update(json.loads(dump_multilink))
+    if dump_system.strip():
+        actual_json.update(json.loads(dump_system))
 
     expected_json = fwutils.replace_file_variables(os.path.abspath('./fwtemplates.yaml'), expected_cfg_dump_filename)
 

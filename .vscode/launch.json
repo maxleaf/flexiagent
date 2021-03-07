@@ -92,7 +92,7 @@
             "args": [
                 "cli",
                 "-f",
-                "/root/flexiagent/tests/router/04_revert_on_list_request_failure_test/01_list_interfaces.cli",
+                "/root/flexiagent/tests/router/16_lte_watchdog_test/add-lte.cli",
                 "-t",
                 "/root/flexiagent/tests/fwtemplates.yaml"
             ],
@@ -121,8 +121,8 @@
             "module": "pytest",
             "args": [
                 "-k",
-                "08",
-                "-s"
+                "17",
+                "-rs"
             ],
             "cwd": "${workspaceRoot}/tests",
             "env": {

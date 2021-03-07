@@ -3825,7 +3825,7 @@ def replace_file_variables(template_fname, replace_fname):
         # loop on global fields and override them with specific device values
         for k, v in shared.items():
             v.update(data[k])
-        data = shared
+        data.update(shared)
 
         def replace(input):
             if type(input) == list:
@@ -3838,11 +3838,11 @@ def replace_file_variables(template_fname, replace_fname):
                     input[key] = replace(value)
 
             elif is_str(input):
-                match = re.search('(__INTERFACE_[1-3]__)(.*)', str(input))
+                match = re.search('(__.*__)(.*)', str(input))
                 if match:
                     interface, field = match.groups()
                     if field:
-                        new_input = re.sub('__INTERFACE_[1-3]__.*', data[interface][field], input)
+                        new_input = re.sub('__.*__.*', data[interface][field], input)
                         return new_input
 
                     # replace with the template, but remove unused keys, They break the expected JSON files
