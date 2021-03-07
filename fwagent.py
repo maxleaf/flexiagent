@@ -168,7 +168,7 @@ class FwAgent:
 
         try:
             with open(fwglobals.g.cfg.TOKEN_FILE, 'r') as f:
-                self.token = f.readline()
+                self.token = f.readline().strip()
         except:
             err = "register: failed to load token from %s: %s (%s)" % \
                 (fwglobals.g.cfg.TOKEN_FILE, format(sys.exc_info()[1]),  format(sys.exc_info()[0]))
