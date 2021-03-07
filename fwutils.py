@@ -2537,11 +2537,11 @@ def _run_qmicli_command(dev_id, flag, print_error=False):
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT)
         if output:
-            return output.splitlines()
+            return (output.splitlines(), None)
     except subprocess.CalledProcessError as err:
         if print_error:
-            fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output))
-    return []
+            fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output.strip()))
+    return ([], err.output.strip())
 
 def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
@@ -2551,8 +2551,8 @@ def _run_mbimcli_command(dev_id, cmd, print_error=False):
             return (output.splitlines(), None)
     except subprocess.CalledProcessError as err:
         if print_error:
-            fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output))
-    return ([], err.output)
+            fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output.strip()))
+    return ([], err.output.strip())
 
 def qmi_get_simcard_status(dev_id):
     return _run_qmicli_command(dev_id, 'uim-get-card-status')
@@ -2565,7 +2565,7 @@ def qmi_get_ip_configuration(dev_id):
         ip = None
         gateway = None
         cmd = 'wds-get-current-settings | grep "IPv4 address\|IPv4 subnet mask\|IPv4 gateway address"'
-        lines = _run_qmicli_command(dev_id, cmd)
+        lines, _ = _run_qmicli_command(dev_id, cmd)
         for idx, line in enumerate(lines):
             if 'IPv4 address:' in line:
                 ip_without_mask = line.split(':')[-1].strip().replace("'", '')
@@ -2617,7 +2617,7 @@ def qmi_get_phone_number(dev_id):
     return _run_qmicli_command(dev_id, 'dms-get-msisdn')
 
 def lte_get_phone_number(dev_id):
-    lines = qmi_get_phone_number(dev_id)
+    lines, _ = qmi_get_phone_number(dev_id)
     for line in lines:
         if 'MSISDN:' in line:
             return line.split(':')[-1].strip().replace("'", '')
@@ -2697,27 +2697,30 @@ def lte_set_modem_to_mbim(dev_id):
 
 
 def lte_get_default_settings(dev_id):
-    lines = qmi_get_default_settings(dev_id)
-    res = {
-        'APN'     : '',
-        'UserName': '',
-        'Password': '',
-        'Auth'    : ''
-    }
-    for line in lines:
-        if 'APN' in line:
-            res['APN'] = line.split(':')[-1].strip().replace("'", '')
-            continue
-        if 'UserName' in line:
-            res['UserName'] = line.split(':')[-1].strip().replace("'", '')
-            continue
-        if 'Password' in line:
-            res['Password'] = line.split(':')[-1].strip().replace("'", '')
-            continue
-        if 'Auth' in line:
-            res['Auth'] = line.split(':')[-1].strip().replace("'", '')
-            continue
-    return res
+    default_settings = get_lte_cache(dev_id, 'default_settings')
+    if not default_settings:
+        lines, _ = qmi_get_default_settings(dev_id)
+        default_settings = {
+            'APN'     : '',
+            'UserName': '',
+            'Password': '',
+            'Auth'    : ''
+        }
+        for line in lines:
+            if 'APN' in line:
+                default_settings['APN'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'UserName' in line:
+                default_settings['UserName'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Password' in line:
+                default_settings['Password'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'Auth' in line:
+                default_settings['Auth'] = line.split(':')[-1].strip().replace("'", '')
+                continue
+        set_lte_cache(dev_id, 'default_settings', default_settings)
+    return default_settings
 
 def lte_get_pin_state(dev_id):
     res = {
@@ -2725,7 +2728,7 @@ def lte_get_pin_state(dev_id):
         'PIN1_RETRIES': '',
         'PUK1_RETRIES': '',
     }
-    lines = qmi_get_simcard_status(dev_id)
+    lines, _ = qmi_get_simcard_status(dev_id)
     for index, line in enumerate(lines):
         if 'PIN1 state:' in line:
             res['PIN1_STATUS']= line.split(':')[-1].strip().replace("'", '').split(' ')[0]
@@ -2735,7 +2738,7 @@ def lte_get_pin_state(dev_id):
     return res
 
 def lte_sim_status(dev_id):
-    lines = qmi_get_simcard_status(dev_id)
+    lines, _ = qmi_get_simcard_status(dev_id)
     for line in lines:
         if 'Card state:' in line:
             state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
@@ -2821,7 +2824,7 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     return lte_get_pin_state(dev_id)
 
 def mbim_is_connected(dev_id):
-    lines, err = _run_mbimcli_command(dev_id, '--query-connection-state')
+    lines, _ = _run_mbimcli_command(dev_id, '--query-connection-state')
     for line in lines:
         if 'Activation state' in line:
             return line.split(':')[-1].strip().replace("'", '') == 'activated'
@@ -2885,14 +2888,9 @@ def lte_connect(params, reset=False):
             '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway"' % connection_params
         ]
         for cmd in mbim_commands:
-            lines, err = _run_mbimcli_command(dev_id, cmd)
+            lines, err = _run_mbimcli_command(dev_id, cmd, True)
             if err:
                 return (False, err)
-        # _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
-        # _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
-        # _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        # grep = '| grep "Session ID\|IP [0]\|Gateway"'
-        # lines, err = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
 
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
 
@@ -2928,7 +2926,7 @@ def lte_get_system_info(dev_id):
             'MNC'            : ''
         }
 
-        lines = qmi_get_system_info(dev_id)
+        lines, _ = qmi_get_system_info(dev_id)
         for line in lines:
             if 'Cell ID' in line:
                 result['Cell_Id'] = line.split(':')[-1].strip().replace("'", '')
@@ -2940,7 +2938,7 @@ def lte_get_system_info(dev_id):
                 result['MNC'] = line.split(':')[-1].strip().replace("'", '')
                 continue
 
-        lines = qmi_get_operator_name(dev_id)
+        lines, _ = qmi_get_operator_name(dev_id)
         for line in lines:
             if '\tName' in line:
                 name = line.split(':')[-1].strip().replace("'", '')
@@ -2959,19 +2957,19 @@ def lte_get_hardware_info(dev_id):
             'Imei': '',
         }
 
-        lines = qmi_get_manufacturer(dev_id)
+        lines, _ = qmi_get_manufacturer(dev_id)
         for line in lines:
             if 'Manufacturer' in line:
                 result['Vendor'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines = qmi_get_model(dev_id)
+        lines, _ = qmi_get_model(dev_id)
         for line in lines:
             if 'Model' in line:
                 result['Model'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines = qmi_get_imei(dev_id)
+        lines, _ = qmi_get_imei(dev_id)
         for line in lines:
             if 'IMEI' in line:
                 result['Imei'] = line.split(':')[-1].strip().replace("'", '')
@@ -2989,7 +2987,7 @@ def lte_get_packets_state(dev_id):
             'Downlink_speed': 0
         }
 
-        lines = qmi_get_packet_service_state(dev_id)
+        lines, _ = qmi_get_packet_service_state(dev_id)
         for line in lines:
             if 'Max TX rate' in line:
                 result['Uplink_speed'] = line.split(':')[-1].strip().replace("'", '')
@@ -3011,7 +3009,7 @@ def lte_get_radio_signals_state(dev_id):
             'SNR'  : 0,
             'text' : ''
         }
-        lines = qmi_get_signals_state(dev_id)
+        lines, _ = qmi_get_signals_state(dev_id)
         for index, line in enumerate(lines):
             if 'RSSI' in line:
                 result['RSSI'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
@@ -3049,7 +3047,7 @@ def mbim_get_ip_configuration(dev_id):
     ip = None
     gateway = None
     try:
-        lines, err = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
+        lines, _ = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
         for line in lines:
             if 'IP [0]:' in line:
                 ip = line.split(':')[-1].strip().replace("'", '')
