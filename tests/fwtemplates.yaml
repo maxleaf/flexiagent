@@ -15,14 +15,14 @@ devices:
     __INTERFACE_3__: {}
   VirtualBox:
     __INTERFACE_1__:
-      dev_id:       pci:0000:00:03.0
-      name:         enp0s3
-    __INTERFACE_2__:
       dev_id:       pci:0000:00:08.0
       name:         enp0s8
-    __INTERFACE_3__:
+    __INTERFACE_2__:
       dev_id:       pci:0000:00:09.0
       name:         enp0s9
+    __INTERFACE_3__:
+      dev_id:       pci:0000:00:03.0
+      name:         enp0s3
   Silicom:
     __INTERFACE_1__:
         dev_id:     pci:0000:02:00.1
