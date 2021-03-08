@@ -7,6 +7,21 @@
   ],
   "======== INTERFACES ========": [
     {
+      "Key": "add-interface:__INTERFACE_3__dev_id",
+      "Params": {
+        "addr": "1.0.0.4/24",
+        "dev_id": "__INTERFACE_3__dev_id",
+        "gateway": "1.0.0.1",
+        "multilink": {
+          "labels": [
+            "yellow",
+            "blue"
+          ]
+        },
+        "type": "wan"
+      }
+    },
+    {
       "Key": "add-interface:__INTERFACE_1__dev_id",
       "Params": {
         "addr": "__INTERFACE_1__addr",
@@ -29,21 +44,6 @@
         "dev_id": "__INTERFACE_2__dev_id",
         "routing": "ospf",
         "type": "lan"
-      }
-    },
-    {
-      "Key": "add-interface:__INTERFACE_3__dev_id",
-      "Params": {
-        "addr": "1.0.0.4/24",
-        "dev_id": "__INTERFACE_3__dev_id",
-        "gateway": "1.0.0.1",
-        "multilink": {
-          "labels": [
-            "yellow",
-            "blue"
-          ]
-        },
-        "type": "wan"
       }
     }
   ],
