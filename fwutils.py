@@ -3794,6 +3794,8 @@ def get_template_data_by_hw(template_fname=os.path.abspath('./fwtemplates.yaml')
             data = info['devices'][search]
         elif vendor and vendor in info['devices']:
             data = info['devices'][vendor]
+        elif product and product in info['devices']:
+            data = info['devices'][product]
         else:
             data = shared
 
