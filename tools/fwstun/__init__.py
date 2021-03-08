@@ -331,7 +331,7 @@ def stun_log(string, level = 'debug'):
 
 def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
     """
-    This function is the outside API to the stun client module.
+    This function is the outside API to the symmetric nat traversal.
     It retrieves the remote IP and PORT as seen from incoming packets from the other side of the tunnel.
     : param source_ip   : the local source IP on behalf NAT request is sent
     : param source_port : the local source port on behalf NAT request is sent
@@ -359,7 +359,7 @@ def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
             buf, (address, port) = sock.recvfrom(2048)
             stun_log("Tunnel: recvfrom: %s:%s" %(str(address), str(port)))
         except socket.timeout as e:
-            stun_log("Tunnel: There is no packets: %s" %(str(e)), 'warning')
+            stun_log("Tunnel: There are no packets: %s" %(str(e)), 'warning')
             break
         except Exception as e:
             stun_log("Tunnel: recvfrom: %s" %(str(e)), 'warning')
