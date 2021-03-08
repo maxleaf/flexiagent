@@ -33,7 +33,7 @@
         "entity": "agent",
         "message": "add-interface",
         "params": {
-            "dev_id": "__INTERFACE_2__",
+            "dev_id": "__INTERFACE_2__dev_id",
             "dhcp": "yes",
             "addr": "10.0.2.10/24",
             "gateway": "10.0.2.1",

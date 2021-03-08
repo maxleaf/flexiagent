@@ -55,5 +55,4 @@ def run_lte(currpath):
                 break
         if not exists:
             pytest.skip('LTE card does not exist on the current machine')
-        else:
-            yield
+    yield

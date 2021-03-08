@@ -30,6 +30,8 @@ import re
 import subprocess
 import sys
 import time
+import glob
+import yaml
 import traceback as tb
 
 CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
@@ -463,3 +465,35 @@ def get_log_line_time(log_line):
     else:
         log_time = "%s %s %s" % (tokens[0], tokens[1], tokens[2])
     return datetime.datetime.strptime(log_time, '%b %d %H:%M:%S')
+
+def adjust_environment_variables():
+    '''
+    This function replaces the netplan files variables and macaddr with the actual macaddr
+    '''
+    netplan_paths = glob.glob('/etc/netplan/*.yaml')
+    #Changing mac addresses in all netplan files
+    #Copy the current yaml into json variable, change the mac addr
+    #Copy the coverted json string back to yaml file
+    data = fwutils.get_template_data_by_hw()
+
+    intf_mac_addr = {}
+    interfaces = psutil.net_if_addrs()
+    for nicname, addrs in interfaces.items():
+        for addr in addrs:
+            if addr.family == psutil.AF_LINK:
+                intf_mac_addr[nicname] = addr.address
+    for netplan in netplan_paths:
+        with open(netplan, "r+") as fd:
+            netplan_json = yaml.load(fd)
+            for if_name, val in netplan_json['network']['ethernets'].items():
+                replaced_name = str(data[if_name.split('name')[0]]['name'])
+                netplan_json['network']['ethernets'][replaced_name] = netplan_json['network']['ethernets'].pop(if_name)
+                interface = netplan_json['network']['ethernets'][replaced_name]
+                if interface.get('match'):
+                    interface['match']['macaddress'] = intf_mac_addr[replaced_name]
+                if interface.get('set-name'):
+                    interface['set-name'] = replaced_name
+            netplan_str = yaml.dump(netplan_json)
+            fd.seek(0)
+            fd.write(netplan_str)
+            fd.truncate()

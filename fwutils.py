@@ -3547,32 +3547,6 @@ def vpp_nat_addr_update_on_interface_add(dev_id, metric, remove):
     success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
     return success
 
-def netplan_set_mac_addresses():
-    '''
-    This function replaces the netplan files macaddr with the actual macaddr
-    '''
-    netplan_paths = glob.glob('/etc/netplan/*.yaml')
-    #Changing mac addresses in all netplan files
-    #Copy the current yaml into json variable, change the mac addr
-    #Copy the coverted json string back to yaml file
-    intf_mac_addr = {}
-    interfaces = psutil.net_if_addrs()
-    for nicname, addrs in interfaces.items():
-        for addr in addrs:
-            if addr.family == psutil.AF_LINK:
-                intf_mac_addr[nicname] = addr.address
-    for netplan in netplan_paths:
-        with open(netplan, "r+") as fd:
-            netplan_json = yaml.load(fd)
-            for if_name in netplan_json['network']['ethernets']:
-                interface = netplan_json['network']['ethernets'][if_name]
-                if interface.get('match'):
-                    interface['match']['macaddress'] = intf_mac_addr[if_name]
-            netplan_str = yaml.dump(netplan_json)
-            fd.seek(0)
-            fd.write(netplan_str)
-            fd.truncate()
-
 def wifi_get_capabilities(dev_id):
 
     result = {
@@ -3801,7 +3775,8 @@ def exec_with_timeout(cmd, timeout=60):
             fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
-def replace_file_variables(template_fname, replace_fname):
+
+def get_template_data_by_hw(template_fname=os.path.abspath('./fwtemplates.yaml')):
     system_info = subprocess.check_output('lshw -c system', shell=True).strip()
     match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
     if len(match) > 0:
@@ -3827,6 +3802,10 @@ def replace_file_variables(template_fname, replace_fname):
             v.update(data[k])
         data.update(shared)
 
+        return data
+
+def replace_file_variables(template_fname, replace_fname):
+        data = get_template_data_by_hw(template_fname)
         def replace(input):
             if type(input) == list:
                 for idx, value in enumerate(input):
@@ -3848,6 +3827,8 @@ def replace_file_variables(template_fname, replace_fname):
                     # replace with the template, but remove unused keys, They break the expected JSON files
                     template = copy.deepcopy(data[interface])
                     del template['addr_no_mask']
+                    if 'name' in template:
+                        del template['name']
                     return template
             return input
 
@@ -3861,7 +3842,7 @@ def replace_file_variables(template_fname, replace_fname):
                     if not 'params' in req:
                         continue
                     req['params'] = replace(req['params'])
-            
+
             # json expected files
             elif type(requests) == dict:
                 for req in requests:
