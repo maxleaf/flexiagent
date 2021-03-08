@@ -1,22 +1,22 @@
 network:
     version: 2
     ethernets:
-        __INTERFACE_1__name:
+        __INTERFACE_3__name:
             dhcp4: true
             match:
                 macaddress: 08:00:27:a6:02:29
-            set-name: __INTERFACE_1__name
-        __INTERFACE_2__name:
+            set-name: __INTERFACE_3__name
+        __INTERFACE_1__name:
             dhcp4: true
             dhcp4-overrides:
                 route-metric: 200
             match:
                 macaddress: 08:00:27:f9:1a:e9
-            set-name: __INTERFACE_2__name
-        __INTERFACE_3__name:
+            set-name: __INTERFACE_1__name
+        __INTERFACE_2__name:
             dhcp4: true
             dhcp4-overrides:
                 route-metric: 300
             match:
                 macaddress: 08:00:27:60:fa:10
-            set-name: __INTERFACE_3__name
+            set-name: __INTERFACE_2__name

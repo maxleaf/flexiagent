@@ -1,8 +1,8 @@
 network:
     version: 2
     ethernets:
-        __INTERFACE_1__name:
+        __INTERFACE_3__name:
             dhcp4: true
             match:
                 macaddress: 08:00:27:97:c2:8d
-            set-name: __INTERFACE_1__name
+            set-name: __INTERFACE_3__name
