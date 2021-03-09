@@ -2266,7 +2266,7 @@ def configure_hostapd(dev_id, configuration):
             }
 
             if band == '5GHz':
-                data['uapsd_advertisement_enabled=1'] = 1
+                data['uapsd_advertisement_enabled'] = 1
                 data['wmm_ac_bk_cwmin'] = 4
                 data['wmm_ac_bk_cwmax'] = 10
                 data['wmm_ac_bk_aifs'] = 7
@@ -2341,9 +2341,10 @@ def configure_hostapd(dev_id, configuration):
                 data['hw_mode']       = 'a'
                 data['ieee80211ac']   = 1
                 data['ieee80211n']    = 1
+                data['ht_capab']      = '[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]'
                 data['wmm_enabled']   = 1
                 data['vht_oper_chwidth=0']   = 0
-                data['ht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
+                data['vht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
 
             security_mode = config.get('securityMode', 'wpa2-psk')
 
