@@ -56,3 +56,15 @@ def run_lte(currpath):
         if not exists:
             pytest.skip('LTE card does not exist on the current machine')
     yield
+
+@pytest.fixture(autouse=True)
+def run_wifi(currpath):
+    if 'wifi_' in currpath:
+        exists = False
+        for nicname, addrs in psutil.net_if_addrs().items():
+            if fwutils.is_wifi_interface(nicname):
+                exists = True
+                break
+        if not exists:
+            pytest.skip('WiFi card does not exist on the current machine')
+    yield
