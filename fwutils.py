@@ -1167,7 +1167,6 @@ def reset_device_config():
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
 
-    fwglobals.g.cache = fwglobals.g.FwCache()
     fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
