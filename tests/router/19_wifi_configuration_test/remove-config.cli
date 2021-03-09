@@ -1,0 +1,23 @@
+[
+  {
+    "entity": "agent",
+    "message": "remove-interface",
+    "params": {
+      "dev_id":"__WIFI_1__dev_id"
+    }
+  },
+  {
+    "entity": "agent",
+    "message": "remove-dhcp-config",
+    "params": {
+        "interface": "__WIFI_1__dev_id",
+        "range_start": "__WIFI_1__range_start",
+        "range_end": "__WIFI_1__range_end",
+        "dns": [
+            "8.8.8.8",
+            "8.8.4.4"
+        ],
+        "mac_assign": []
+    }
+  }
+]

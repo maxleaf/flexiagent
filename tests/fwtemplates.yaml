@@ -17,6 +17,8 @@ devices:
     __INTERFACE_3__: {}
     __WIFI_1__:
       addr:         192.168.60.1/24
+      range_start:  192.168.60.77
+      range_end:    192.168.60.100
   VirtualBox:
     __INTERFACE_1__:
       dev_id:       pci:0000:00:08.0
