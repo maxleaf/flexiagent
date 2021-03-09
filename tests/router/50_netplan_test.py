@@ -71,8 +71,8 @@ def test_netplan(netplan_backup):
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     yaml_config = sorted(glob.glob('%s/*.yaml' % tests_path))
     for yaml in yaml_config:
-        if '07' in yaml:
-            continue
+        # if '07' in yaml:
+        #     continue
         print "Netplan :: %s" % yaml.split('/')[-1]
         for test in [t for t in test_cases if t not in \
             [CLI_STOP_ROUTER, CLI_START_ROUTER]]:
