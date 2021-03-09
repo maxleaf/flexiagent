@@ -15,6 +15,8 @@ devices:
       type:         lan
       routing:      ospf
     __INTERFACE_3__: {}
+    __WIFI_1__:
+      addr:         192.168.60.1/24
   VirtualBox:
     __INTERFACE_1__:
       dev_id:       pci:0000:00:08.0
