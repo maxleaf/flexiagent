@@ -2343,7 +2343,7 @@ def configure_hostapd(dev_id, configuration):
                 data['ieee80211n']    = 1
                 data['ht_capab']      = '[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]'
                 data['wmm_enabled']   = 1
-                data['vht_oper_chwidth=0']   = 0
+                data['vht_oper_chwidth']   = 0
                 data['vht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
 
             security_mode = config.get('securityMode', 'wpa2-psk')
