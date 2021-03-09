@@ -2264,7 +2264,8 @@ def configure_hostapd(dev_id, configuration):
                 'logger_stdout_level'  : 2,
                 'max_num_sta'          : 128,
                 'ctrl_interface'       : '/var/run/hostapd',
-                'ctrl_interface_group' : 0
+                'ctrl_interface_group' : 0,
+                'wmm_enabled'          : 1
             }
 
             if band == '5GHz':
@@ -2306,8 +2307,6 @@ def configure_hostapd(dev_id, configuration):
                 data['tx_queue_data0_cwmin'] = 3
                 data['tx_queue_data0_cwmax'] = 7
                 data['tx_queue_data0_burst'] = 1.5
-            else:
-                data['wmm_enabled'] = 0
 
             # Channel
             channel = config.get('channel', '0')
