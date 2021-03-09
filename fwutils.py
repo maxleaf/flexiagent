@@ -2828,12 +2828,30 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
-def mbim_is_connected(dev_id):
+def mbim_connection_state(dev_id):
     lines, _ = _run_mbimcli_command(dev_id, '--query-connection-state')
     for line in lines:
         if 'Activation state' in line:
-            return line.split(':')[-1].strip().replace("'", '') == 'activated'
-    return False
+            return line.split(':')[-1].strip().replace("'", '')
+    return ''
+
+def mbim_is_connected(dev_id):
+    return mbim_connection_state(dev_id) == 'activated'
+
+def mbim_registration_state(dev_id):
+    res = {
+        'register_state': '',
+        'network_error' : '',
+    }
+    lines, _ = _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
+    for line in lines:
+        if 'Network error:' in line:
+            res['network_error'] = line.split(':')[-1].strip().replace("'", '')
+            continue
+        if 'Register state:' in line:
+            res['register_state'] = line.split(':')[-1].strip().replace("'", '')
+            break
+    return res
 
 def reset_modem(dev_id):
     set_lte_cache(dev_id, 'state', 'resetting')

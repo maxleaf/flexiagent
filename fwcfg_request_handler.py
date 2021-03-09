@@ -245,7 +245,7 @@ class FwCfgRequestHandler:
                 # On failure go back to the begining of list and revert executed commands.
                 self._revert(cmd_list, idx)
                 fwglobals.log.debug("=== finished revert of %s ===" % (req))
-                raise Exception('failed to ' + cmd['descr'])
+                raise Exception('failed to %s. (error: %s)' % (cmd['descr'], str(e)))
 
             # At this point the execution succeeded.
             # Now substitute the revert command, as it will be needed for complement request, e.g. for remove-tunnel.
