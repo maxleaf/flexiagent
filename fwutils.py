@@ -2262,7 +2262,9 @@ def configure_hostapd(dev_id, configuration):
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
                 'logger_stdout_level'  : 2,
-                'max_num_sta'          : 128
+                'max_num_sta'          : 128,
+                'ctrl_interface'       : '/var/run/hostapd',
+                'ctrl_interface_group' : 0
             }
 
             if band == '5GHz':
@@ -2315,7 +2317,10 @@ def configure_hostapd(dev_id, configuration):
             data['country_code'] = country_code
             if channel == '0':
                 data['ieee80211d'] = 1
-                data['ieee80211h'] = 1
+            data['ieee80211h'] = 0
+
+            subprocess.check_output('iw reg set %s' % country_code, shell=True)
+            subprocess.check_output('iw dev %s scan' % if_name, shell=True)
 
             ap_mode = config.get('operationMode', 'g')
 
