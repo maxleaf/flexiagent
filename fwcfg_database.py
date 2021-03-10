@@ -112,7 +112,7 @@ class FwCfgDatabase:
         key_func = getattr(self.translators[src_req]['module'], 'get_request_key')
         return key_func(params)
 
-    def update(self, request, cmd_list=None, executed=False):
+    def update(self, request, cmd_list=None, executed=False, whitelist=None):
         """Save configuration request into DB.
         The 'add-X' configuration requests are stored in DB, the 'remove-X'
         requests are not stored but remove the correspondent 'add-X' requests.
@@ -125,6 +125,7 @@ class FwCfgDatabase:
         :param executed:    The 'executed' flag - True if the configuration
                             request was translated and executed, False if it was
                             translated but was not executed.
+        :param whitelist:   White list of parameters allowed to be modified.
         :returns: None.
         """
         req     = request['message']
@@ -134,10 +135,19 @@ class FwCfgDatabase:
         try:
             if re.match('add-', req):
                 self.db[req_key] = { 'request' : req , 'params' : params , 'cmd_list' : cmd_list , 'executed' : executed }
-            elif re.match('modify-', req):
+            elif re.match('modify-interface', req):
                 entry = self.db[req_key]
                 entry.update({'params' : params})
                 self.db[req_key] = entry
+            elif re.match('modify-', req):
+                if whitelist:
+                    entry = self.db[req_key]
+                    for key, value in params.items():
+                        if isinstance(value, dict):
+                            for key2, value2 in value.items():
+                                if key2 in whitelist:
+                                    entry['params'][key][key2] = value2
+                    self.db[req_key] = entry  # Can't update self.db[req_key] directly, sqldict will ignore such modification
             else:
                 del self.db[req_key]
 

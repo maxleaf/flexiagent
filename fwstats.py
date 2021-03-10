@@ -21,6 +21,7 @@
 ################################################################################
 
 # Handle device statistics
+import fwikev2
 import fwutils
 import time
 import loadsimulator
@@ -162,6 +163,7 @@ def get_stats():
     del updates_list[:]
 
     reconfig = fwutils.get_reconfig_hash()
+    ikev2_certificate_expiration = fwglobals.g.ikev2.get_certificate_expiration()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
@@ -171,6 +173,7 @@ def get_stats():
         state = 'running'
         reason = ''
         reconfig = ''
+        ikev2_certificate_expiration = ''
     else:
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()
@@ -185,13 +188,15 @@ def get_stats():
             'health': {},
             'period': 0,
             'utc': time.time(),
-            'reconfig': reconfig
+            'reconfig': reconfig,
+            'ikev2': ikev2_certificate_expiration,
         })
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
+        res_update_list[-1]['ikev2'] = ikev2_certificate_expiration
         res_update_list[-1]['health'] = get_system_health()
 
     return {'message': res_update_list, 'ok': 1}
@@ -211,4 +216,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False, 'ikev2':''}

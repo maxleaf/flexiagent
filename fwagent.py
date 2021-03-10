@@ -23,6 +23,7 @@
 import json
 import loadsimulator
 import os
+import shutil
 
 from urllib import request as ureq
 from urllib import parse as uparse
@@ -44,6 +45,7 @@ import threading
 import traceback
 import yaml
 import fwglobals
+import fwikev2
 import fwstats
 import fwutils
 from fwlog import Fwlog
@@ -665,6 +667,9 @@ def reset(soft=False, quiet=False):
 
     if soft:
         return
+
+    with fwikev2.FwIKEv2() as ike:
+        ike.reset()
 
     daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
     reset_device = True

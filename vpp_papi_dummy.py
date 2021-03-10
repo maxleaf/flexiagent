@@ -60,7 +60,7 @@ class _VPP_API:
 class VPPApiClient:
     """This is Dummy VPP class representation.
     """
-    def __init__(self, apifiles, use_socket):
+    def __init__(self, apifiles, use_socket=False, read_timeout=5):
         """Constructor method
         """
         self.api = _VPP_API()

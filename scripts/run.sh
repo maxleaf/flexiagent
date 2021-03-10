@@ -20,12 +20,6 @@ fi
 
 SCRIPT_PATH=$1
 
-trap stop INT
-
-function stop() {
-  python ../fwagent.py stop -s
-}
-
 /sbin/modprobe uio_pci_generic
 
 ip link set dev enp0s3 down
@@ -33,4 +27,3 @@ ip link set dev enp0s8 down
 
 fwagent cli -f $SCRIPT_PATH
 
-stop

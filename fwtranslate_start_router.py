@@ -25,6 +25,7 @@ import re
 
 import fwnetplan
 import fwglobals
+import fwikev2
 import fwutils
 
 # start_router
@@ -238,6 +239,15 @@ def start_router(params=None):
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
     cmd['cmd']['descr'] = "punt ip broadcast"
     cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_set_local_key (...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_set_local_key"
+    cmd['cmd']['params']    = { 'key_file':fwglobals.g.ikev2.IKEV2_PRIVATE_KEY_FILE }
+    cmd['cmd']['descr']     = "set IKEv2 local key"
+    cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"

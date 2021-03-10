@@ -46,6 +46,7 @@ from fwrouter_cfg import FwRouterCfg
 from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
+from fwikev2 import FwIKEv2
 
 # sync flag indicated if module implement sync logic. 
 # IMPORTANT! Please keep the list order. It indicates the sync priorities
@@ -81,6 +82,7 @@ request_handlers = {
     'get-lte-info':                      {'name': '_call_agent_api'},
     'reset-lte':                         {'name': '_call_agent_api'},
     'modify-lte-pin':                    {'name': '_call_agent_api'},
+    'get-device-certificate':            {'name': '_call_agent_api'},
 
     # Aggregated API
     'aggregated':                   {'name': '_call_aggregated', 'sign': True},
@@ -95,6 +97,7 @@ request_handlers = {
     'remove-route':                 {'name': '_call_router_api', 'sign': True},
     'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
     'remove-tunnel':                {'name': '_call_router_api', 'sign': True},
+    'modify-tunnel':                {'name': '_call_router_api', 'sign': True},
     'add-dhcp-config':              {'name': '_call_router_api', 'sign': True},
     'remove-dhcp-config':           {'name': '_call_router_api', 'sign': True},
     'add-application':              {'name': '_call_router_api', 'sign': True},
@@ -132,6 +135,17 @@ request_handlers = {
     'create_loopback_instance':     {'name': '_call_vpp_api'},
     'delete_loopback':              {'name': '_call_vpp_api'},
     'gre_tunnel_add_del':           {'name': '_call_vpp_api'},
+    'ikev2_initiate_sa_init':       {'name': '_call_vpp_api'},
+    'ikev2_profile_add_del':        {'name': '_call_vpp_api'},
+    'ikev2_profile_set_auth':       {'name': '_call_vpp_api'},
+    'ikev2_profile_set_id':         {'name': '_call_vpp_api'},
+    'ikev2_profile_set_ts':         {'name': '_call_vpp_api'},
+    'ikev2_set_esp_transforms':     {'name': '_call_vpp_api'},
+    'ikev2_set_ike_transforms':     {'name': '_call_vpp_api'},
+    'ikev2_set_local_key':          {'name': '_call_vpp_api'},
+    'ikev2_set_responder':          {'name': '_call_vpp_api'},
+    'ikev2_set_sa_lifetime':        {'name': '_call_vpp_api'},
+    'ikev2_set_tunnel_interface':   {'name': '_call_vpp_api'},
     'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
     'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
@@ -246,6 +260,7 @@ class Fwglobals:
         self.SYSTEM_CFG_FILE     = self.DATA_PATH + '.system.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
+        self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
@@ -344,6 +359,7 @@ class Fwglobals:
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
+        self.ikev2        = FwIKEv2()
 
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
@@ -484,6 +500,8 @@ class Fwglobals:
                 func = getattr(self.router_api.vpp_api, params['func'])
             elif params['object'] == 'fwglobals.g.apps':
                 func = getattr(self.apps, params['func'])
+            elif params['object'] == 'fwglobals.g.ikev2':
+                func = getattr(self.ikev2, params['func'])
             else:
                 raise Exception("object '%s' is not supported" % (params['object']))
         else:
