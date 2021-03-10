@@ -64,6 +64,9 @@ SharedSecretRequestMsg = '0002'
 SharedSecretResponseMsg = '0102'
 SharedSecretErrorResponseMsg = '0112'
 
+# type for a vxLAN message
+vxLanMsg = '08000000'
+
 dictAttrToVal = {'MappedAddress': MappedAddress,
                  'ResponseAddress': ResponseAddress,
                  'ChangeRequest': ChangeRequest,
@@ -325,3 +328,52 @@ def stun_log(string, level = 'debug'):
     func = getattr(g_stun_log, level)
     if func:
         func(string)
+
+def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
+    """
+    This function is the outside API to the symmetric nat traversal.
+    It retrieves the remote IP and PORT as seen from incoming packets from the other side of the tunnel.
+    : param source_ip   : the local source IP on behalf NAT request is sent
+    : param source_port : the local source port on behalf NAT request is sent
+    : param dev_name    : device name to bind() to
+
+    """
+    tunnels = {}
+    pkts_to_read = 10
+    
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(5)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        stun_log("Tunnel: binding to %s:%d" %(source_ip, source_port))
+        if dev_name != None:
+            sock.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
+        sock.bind((source_ip, source_port))
+    except Exception as e:
+        stun_log("Tunnel: bind: %s" % str(e))
+        sock.close()
+        return tunnels
+
+    for _ in range(pkts_to_read):
+        try:
+            buf, (address, port) = sock.recvfrom(2048)
+            stun_log("Tunnel: recvfrom: %s:%s" %(str(address), str(port)))
+        except socket.timeout as e:
+            stun_log("Tunnel: There are no packets: %s" %(str(e)), 'warning')
+            break
+        except Exception as e:
+            stun_log("Tunnel: recvfrom: %s" %(str(e)), 'warning')
+            continue
+
+        if len(buf) < 8:
+            continue
+
+        msgtype = b2a_hexstr(buf[0:4])
+        if msgtype == vxLanMsg:
+            vni = int(b2a_hexstr(buf[4:7]), 16)
+            if not tunnels.get(vni):
+                tunnels[vni] = {"dst" : address, "dstPort" : port}
+            stun_log("Tunnel: msgtype: %s vni: %s" %(str(msgtype), str(vni)))
+
+    sock.close()
+    return tunnels
