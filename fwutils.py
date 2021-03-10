@@ -282,7 +282,7 @@ def get_tunnel_gateway(dst, dev_id):
 
     # If src, dst are not on same subnet or any error, use the gateway defined on the device
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
-    return ip_str_to_bytes(gw_ip)[0] if gw_ip else ''
+    return ipaddress.ip_address(gw_ip) if gw_ip else ipaddress.ip_address('0.0.0.0')
 
 def is_interface_assigned_to_vpp(dev_id):
     """ Check if dev_id is assigned to vpp.
