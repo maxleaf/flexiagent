@@ -31,8 +31,10 @@ import platform
 import subprocess
 import psutil
 import socket
+import threading
 import re
 import fwglobals
+import fwikev2
 import fwnetplan
 import fwstats
 import shutil
@@ -51,6 +53,7 @@ from fwsystem_cfg   import FwSystemCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
+from fwikev2        import FwIKEv2
 
 
 dpdk = __import__('dpdk-devbind')
@@ -1139,6 +1142,8 @@ def stop_vpp():
                 break
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
+    with FwIKEv2() as ike:
+        ike.clean()
 
 def reset_device_config():
     """Reset router config by cleaning DB and removing config files.
@@ -1165,7 +1170,10 @@ def reset_device_config():
         db_multilink.clean()
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
+
     fwnetplan.restore_linux_netplan_files()
+    with FwIKEv2() as ike:
+        ike.clean()
 
     reset_dhcpd()
 
@@ -3750,4 +3758,3 @@ def exec_with_timeout(cmd, timeout=60):
             state['error'] = "Error killing command '%s', error %s" % (str(cmd), str(err))
             fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
-

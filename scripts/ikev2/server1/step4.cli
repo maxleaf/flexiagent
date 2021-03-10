@@ -1,0 +1,25 @@
+[
+{
+  "entity":  "agent",
+  "message": "remove-tunnel",
+  "params": {
+    "encryption-mode": "ikev2",
+    "src": "192.168.0.105",
+    "dst": "192.168.0.104",
+    "dstPort": "4789",
+    "dev_id": "0000:00:03.00",
+    "tunnel-id": 1,
+    "loopback-iface": {
+      "addr":"10.100.0.7/31",
+      "mac":"02:00:27:fd:00:04",
+      "mtu":1350,
+      "routing":"ospf"
+    },
+    "ikev2": {
+      "role": "initiator",
+      "remote-device-id": "AFF9E8C5-D02A-4AF9-96E6-B8E3F6A12A75",
+      "lifetime": 3600
+    }
+  }
+}
+]
