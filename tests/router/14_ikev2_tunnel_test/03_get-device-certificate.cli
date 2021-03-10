@@ -1,0 +1,17 @@
+[
+{
+  "entity":  "agent",
+  "message": "get-device-certificate",
+  "params": {"days": 30}
+},
+{
+  "entity":  "agent",
+  "message": "get-device-certificate",
+  "params": {"days": 120}
+},
+{
+  "entity":  "agent",
+  "message": "get-device-certificate",
+  "params": {"days": 360}
+}
+]
