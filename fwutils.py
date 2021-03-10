@@ -734,27 +734,41 @@ def vpp_if_name_to_dev_id(vpp_if_name):
 #
 def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
 
-    # Note, tap interfaces created by "tap connect" are handled as follows:
-    # the commands "tap connect tap_wwan0" and "enable tap-inject" create three interfaces:
-    # Two on Linux (tap_wwan0, vpp1) and one on vpp (tapcli-1).
+    # Note, tap interfaces created by "create tap" are handled as follows:
+    # the commands "create tap host-if-name tap_wwan0" and "enable tap-inject" create three interfaces:
+    # Two on Linux (tap_wwan0, vpp1) and one on vpp (tap1).
     # Note, we use "tap_" prefix in "tap_wwan0" in order to be able to associate the wwan0 physical interface
-    # with the tapcli-1 interface. This is done as follows:
-    # 1. "sw_interface_tap_dump" vpp api command brings following mapping:
-    #         dev_name         sw_if_index
-    #         tap_wwan0            3
+    # with the tap1 interface. This is done as follows:
+    # 1. "show tap" vpp command brings following dump:
+    #         interface tap1
+    #            name "tap_wwan0"
+    #            ....         
     # Then we can substr the dev_name and get back the linux interface name. Then we can get the dev_id of this interface.
     #
-    vpp_tap_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_tap_dump()
-    for tap in vpp_tap_interfaces:
-        dev_name = tap.dev_name.rstrip(' \t\r\n\0')           # fetch tap_wwan0
-        linux_dev_name = dev_name.split('_')[-1]              # fetch wwan0
-        cmd =  "ls -l /sys/class/net | grep -v %s | grep %s" % (dev_name, linux_dev_name)
-        linux_dev_name = subprocess.check_output(cmd, shell=True).strip().split('/')[-1]
-        bus = build_interface_dev_id(linux_dev_name)   # fetch bus address of wwan0
-        vpp_name = vpp_sw_if_index_to_name(tap.sw_if_index)     # fetch tapcli-1
-        if vpp_name and bus:
-            fwglobals.g.cache.dev_id_to_vpp_if_name[bus] = vpp_name
-            fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_name] = bus
+    shif = _vppctl_read('show tap')
+    if shif == None:
+        fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps: Error reading tap info")
+    regex = r'(interface[\s\S]*?(?<=name )\".*?\")'
+    matches = re.findall(regex, shif)
+    if len(matches) > 0:
+        for match in matches:
+            tap = match.splitlines()
+            vpp_tap = tap[0].strip().split(' ')[-1]                 # fetch tap0
+            linux_tap = tap[1].strip().split(' ')[-1].strip('"')    # fetch tap_wwan0
+            linux_dev_name = linux_tap.split('_')[-1]               # tap_wwan0 - > wwan0
+
+            # if the lte/wifi interface name is long (more than 15 letters),
+            # It's not enough to slice tap_wwan0 and get the linux interface name from the last part.
+            # So we take it from the /sys/class/net by filter out the tap_wwan0, 
+            # then we can get the complete name
+            #
+            cmd =  "ls -l /sys/class/net | grep -v %s | grep %s" % (linux_tap, linux_dev_name)
+            linux_dev_name = subprocess.check_output(cmd, shell=True).strip().split('/')[-1]
+
+            bus = build_interface_dev_id(linux_dev_name)            # fetch bus address of wwan0
+            if bus:
+                fwglobals.g.cache.dev_id_to_vpp_if_name[bus] = vpp_tap
+                fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_tap] = bus
 
     shif = _vppctl_read('show hardware-interfaces')
     if shif == None:
@@ -970,15 +984,8 @@ def configure_tap_in_linux_and_vpp(linux_if_name):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
-
-    # length = str(len(vpp_if_name_to_pci))
     linux_tap_name = generate_linux_interface_short_name("tap", linux_if_name)
-
-    try:
-        vpp_tap_connect(linux_tap_name)
-        return (True, None)
-    except Exception as e:
-        return (False, "Failed to create tap interface for %s\nOutput: %s" % (linux_if_name, str(e)))
+    return linux_tap_name
 
 def vpp_tap_connect(linux_tap_if_name):
     """Run vpp tap connect command.

@@ -109,13 +109,9 @@ def add_interface(params):
         # create tap for this interface in vpp and linux
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'configure_tap_in_linux_and_vpp',
-                    'args': { 'linux_if_name': iface_name }
-        }
-        cmd['cmd']['descr'] = "create tap interface in linux and vpp"
+        cmd['cmd']['name']    = "exec"
+        cmd['cmd']['descr']   = "create tap interface in vpp and linux"
+        cmd['cmd']['params']  = ["sudo vppctl create tap host-if-name %s" % fwutils.configure_tap_in_linux_and_vpp(iface_name)]
         cmd_list.append(cmd)
 
         if is_wifi:
