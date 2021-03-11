@@ -956,6 +956,19 @@ def vpp_if_name_to_tap(vpp_if_name):
     return tap
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
+    """
+    The interface name in Linux cannot be more than 15 letters.
+    So, we calculate the length of the prefix plus the interface name.
+    If they are more the 15 letters, we cutting the needed letters from the beginning of the Linux interface name.
+    We cut from the begging because the start of the interface name might be the same as other interfaces (eth1, eth2),
+    They usually different by the end of the name
+
+    :param prefix: prefix to add to the interface name
+
+    :param linux_if_name: name of the linux interface to create interface for
+
+    :returns: interface name to use.
+    """
     new_name = '%s_%s' % (prefix, linux_if_name)
     if len(new_name) > max_length:
         letters_to_cat = len(new_name) - 15
@@ -972,20 +985,6 @@ def linux_tap_by_interface_name(linux_if_name):
             return words[1]
     except:
         return None
-
-def configure_tap_in_linux_and_vpp(linux_if_name):
-    """Create tap interface in linux and vpp.
-      This function will create three interfaces:
-        1. linux tap interface.
-        2. vpp tap interface in vpp.
-        3. linux interface for tap-inject.
-
-    :param linux_if_name: name of the linux interface to create tap for
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-    linux_tap_name = generate_linux_interface_short_name("tap", linux_if_name)
-    return linux_tap_name
 
 def vpp_tap_connect(linux_tap_if_name):
     """Run vpp tap connect command.
