@@ -3834,7 +3834,8 @@ def get_template_data_by_hw(template_fname):
 
         # loop on global fields and override them with specific device values
         for k, v in shared.items():
-            v.update(data[k])
+            if k in data:
+                v.update(data[k])
         data.update(shared)
 
         return data
