@@ -308,6 +308,8 @@ class FWAGENT_API:
         default_settings = fwutils.lte_get_default_settings(params['dev_id'])
         phone_number = fwutils.lte_get_phone_number(params['dev_id'])
         pin_state = fwutils.lte_get_pin_state(params['dev_id'])
+        connection_state = fwutils.mbim_connection_state(params['dev_id'])
+        registration_network = fwutils.mbim_registration_state(params['dev_id'])
 
         is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
         if fwutils.vpp_does_run() and is_assigned:
@@ -326,7 +328,9 @@ class FWAGENT_API:
             'sim_status'          : sim_status,
             'default_settings'    : default_settings,
             'phone_number'        : phone_number,
-            'pin_state'           : pin_state
+            'pin_state'           : pin_state,
+            'connection_state'    : connection_state,
+            'registration_network': registration_network
         }
 
         return {'message': response, 'ok': 1}
