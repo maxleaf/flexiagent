@@ -921,6 +921,43 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                         params['ikev2']['esp']
                         )
 
+def _add_loop0_bridge_l2gre(cmd_list, params, l2gre_tunnel_ips, bridge_id):
+    """Add unprotected tunnel, loopback and bridge commands into the list.
+
+    :param cmd_list:            List of commands.
+    :param params:              Parameters from flexiManage.
+    :param l2gre_tunnel_ips:    GRE tunnel src and dst ip addresses.
+    :param bridge_id:           Bridge identifier.
+
+    :returns: None.
+    """
+    _add_loopback(
+                cmd_list,
+                'loop0_sw_if_index',
+                params['loopback-iface'],
+                id=bridge_id)
+    _add_bridge(
+                cmd_list, bridge_id)
+    _add_gre_tunnel(
+                cmd_list,
+                'gre_tunnel_sw_if_index',
+                l2gre_tunnel_ips['src'],
+                l2gre_tunnel_ips['dst'])
+    _add_interface_to_bridge(
+                cmd_list,
+                iface_description='loop0_' + params['loopback-iface']['addr'],
+                bridge_id=bridge_id,
+                bvi=1,
+                shg=0,
+                cache_key='loop0_sw_if_index')
+    _add_interface_to_bridge(
+                cmd_list,
+                iface_description='l2gre_tunnel',
+                bridge_id=bridge_id,
+                bvi=0,
+                shg=1,
+                cache_key='gre_tunnel_sw_if_index')
+
 def _add_loop1_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, l2gre_tunnel_ips, bridge_id):
     """Add VxLAN tunnel, loopback and bridge commands into the list.
 
@@ -1023,6 +1060,9 @@ def add_tunnel(params):
     elif encryption_mode == "ikev2":
         # Add loop0-bridge-l2gre-ikev2
         _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_ips, params['tunnel-id']*2)
+    elif encryption_mode == "none":
+        # Add loop0-bridge-l2gre
+        _add_loop0_bridge_l2gre(cmd_list, params, l2gre_ips, params['tunnel-id']*2)
 
     # --------------------------------------------------------------------------
     # Add following section to frr ospfd.conf
