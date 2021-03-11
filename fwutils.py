@@ -3809,7 +3809,7 @@ def exec_with_timeout(cmd, timeout=60):
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
 
-def get_template_data_by_hw(template_fname=os.path.abspath('./fwtemplates.yaml')):
+def get_template_data_by_hw(template_fname):
     system_info = subprocess.check_output('lshw -c system', shell=True).strip()
     match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
     if len(match) > 0:

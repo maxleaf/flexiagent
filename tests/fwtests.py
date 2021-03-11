@@ -40,6 +40,8 @@ sys.path.append(CODE_ROOT)
 sys.path.append(TEST_ROOT)
 import fwutils
 
+template_path = os.path.abspath(TEST_ROOT + '/fwtemplates.yaml')
+
 class TestFwagent:
     def __init__(self):
         self.fwagent_py = 'python ' + os.path.join(CODE_ROOT, 'fwagent.py')
@@ -165,7 +167,7 @@ class TestFwagent:
         # If there is no fwagent in background, the local instance of it will be
         # created, API command will be run on it, and instance will be destroyed.
         #
-        cmd = '%s cli %s -t %s' % (self.fwagent_py, args, os.path.abspath('./fwtemplates.yaml'))
+        cmd = '%s cli %s -t %s' % (self.fwagent_py, args, template_path)
         out = subprocess.check_output(cmd, shell=True).strip()
 
         # Deserialize object printed by CLI onto STDOUT
@@ -435,7 +437,7 @@ def router_is_configured(expected_cfg_dump_filename,
     if dump_system.strip():
         actual_json.update(json.loads(dump_system))
 
-    expected_json = fwutils.replace_file_variables(os.path.abspath('./fwtemplates.yaml'), expected_cfg_dump_filename)
+    expected_json = fwutils.replace_file_variables(template_path, expected_cfg_dump_filename)
 
     actual_json_dump = json.dumps(actual_json, indent=2, sort_keys=True)
     expected_json_dump = json.dumps(expected_json, indent=2, sort_keys=True)
@@ -474,7 +476,7 @@ def adjust_environment_variables():
     #Changing mac addresses in all netplan files
     #Copy the current yaml into json variable, change the mac addr
     #Copy the coverted json string back to yaml file
-    data = fwutils.get_template_data_by_hw()
+    data = fwutils.get_template_data_by_hw(template_path)
 
     intf_mac_addr = {}
     interfaces = psutil.net_if_addrs()
