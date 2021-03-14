@@ -1,4 +1,3 @@
-
 import threading
 import sys
 import os
@@ -429,11 +428,11 @@ class FwStunWrap:
                 # Try to discover remote edge ip and port from incoming packets.
                 if self.sym_nat_cache.get(dev_id):
                     if self.sym_nat_cache[dev_id]['probe_time'] == 0:
-                        fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %d"%(tunnel_id, dev_id))
+                        fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
                         self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
                         self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
                 else:
-                    fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %d"%(tunnel_id, dev_id))
+                    fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
                     self.sym_nat_cache[dev_id] = {
                                 'local_ip'    : tunnel['src'],
                                 'probe_time'  : time.time() + 25,
