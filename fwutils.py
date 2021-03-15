@@ -496,7 +496,7 @@ def get_linux_interfaces(cached=True):
             interface = {
                 'name':             if_name,
                 'devId':            dev_id,
-                'driver':           get_interface_driver(if_name),
+                'driver':           get_interface_driver(if_name, False),
                 'MAC':              '',
                 'IPv4':             '',
                 'IPv4Mask':         '',
@@ -3149,7 +3149,7 @@ def get_interface_driver_by_dev_id(dev_id):
     if_name = dev_id_to_linux_if(dev_id)
     return get_interface_driver(if_name)
 
-def get_interface_driver(if_name):
+def get_interface_driver(if_name, cache=True):
     """Get Linux interface driver.
 
     :param if_name: interface name in Linux.
@@ -3158,7 +3158,7 @@ def get_interface_driver(if_name):
     """
     with fwglobals.g.cache.lock:
         interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
-        if not interface:
+        if not interface or cache == False:
             fwglobals.g.cache.linux_interfaces_by_name[if_name] = {}
             interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
 
