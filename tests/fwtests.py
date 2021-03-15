@@ -30,13 +30,22 @@ import re
 import subprocess
 import sys
 import time
+import glob
+import yaml
 import traceback as tb
+
+CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
+TEST_ROOT = CODE_ROOT + '/tests/'
+sys.path.append(CODE_ROOT)
+sys.path.append(TEST_ROOT)
+import fwutils
+
+template_path = os.path.abspath(TEST_ROOT + '/fwtemplates.yaml')
 
 class TestFwagent:
     def __init__(self):
-        code_root = os.path.realpath(__file__).replace('\\','/').split('/tests/')[0]
-        self.fwagent_py = 'python ' + os.path.join(code_root, 'fwagent.py')
-        self.fwkill_py  = 'python ' + os.path.join(code_root, 'tools', 'common', 'fwkill.py')
+        self.fwagent_py = 'python ' + os.path.join(CODE_ROOT, 'fwagent.py')
+        self.fwkill_py  = 'python ' + os.path.join(CODE_ROOT, 'tools', 'common', 'fwkill.py')
         self.set_log_start_marker()
 
     def __enter__(self):
@@ -158,7 +167,7 @@ class TestFwagent:
         # If there is no fwagent in background, the local instance of it will be
         # created, API command will be run on it, and instance will be destroyed.
         #
-        cmd = '%s cli %s' % (self.fwagent_py, args)
+        cmd = '%s cli %s -t %s' % (self.fwagent_py, args, template_path)
         out = subprocess.check_output(cmd, shell=True).strip()
 
         # Deserialize object printed by CLI onto STDOUT
@@ -258,6 +267,18 @@ def fwagent_daemon_pid():
         pid = None
     return pid
 
+def linux_interfaces_count():
+    cmd = 'ls -A /sys/class/net | wc -l'
+    count = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).strip()
+    return int(count)
+
+def linux_interfaces_are_configured(expected_count, print_error=True):
+    current = linux_interfaces_count()
+    is_equal = current == expected_count
+    if not is_equal and print_error:
+        print("ERROR: current: %s, expected: %s" % (current, expected_count))
+    return is_equal
+
 def vpp_is_configured(config_entities, print_error=True):
 
     def _run_command(cmd, print_error=True):
@@ -294,8 +315,8 @@ def vpp_is_configured(config_entities, print_error=True):
         output = str(amount)
         if e == 'interfaces':
             # Count number of interfaces that are UP
-            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure of not found!
-            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit).* \(up\)'"
+            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tapcli).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure if not found!
+            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tapcli).* \(up\)'"
             if not _check_command_output(cmd, output, 'UP interfaces', cmd_on_error, print_error):
                 return False
         if e == 'tunnels':
@@ -404,15 +425,36 @@ def router_is_configured(expected_cfg_dump_filename,
     # Dumps current agent configuration into temporary file and checks
     # if the dump file is equal to the provided expected dump file.
     actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
-    dump_configuration_cmd = "sudo %s show --configuration router > %s" % (fwagent_py, actual_cfg_dump_filename)
-    subprocess.call(dump_configuration_cmd, shell=True)
-    dump_multilink_cmd = "sudo %s show --configuration multilink-policy >> %s" % (fwagent_py, actual_cfg_dump_filename)
-    subprocess.call(dump_multilink_cmd, shell=True)
-    ok = filecmp.cmp(expected_cfg_dump_filename, actual_cfg_dump_filename)
+    replaced_expected_cfg_dump_filename = expected_cfg_dump_filename + ".replaced.txt"
+
+    dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True)
+    dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True)
+    dump_system = subprocess.check_output("sudo %s show --configuration system" % fwagent_py, shell=True)
+
+    actual_json = json.loads(dump_configuration)
+    if dump_multilink.strip():
+        actual_json.update(json.loads(dump_multilink))
+    if dump_system.strip():
+        actual_json.update(json.loads(dump_system))
+
+    expected_json = fwutils.replace_file_variables(template_path, expected_cfg_dump_filename)
+
+    actual_json_dump = json.dumps(actual_json, indent=2, sort_keys=True)
+    expected_json_dump = json.dumps(expected_json, indent=2, sort_keys=True)
+
+    ok = actual_json_dump == expected_json_dump
     if ok:
-        os.remove(actual_cfg_dump_filename)
-    elif print_error:
-        print("ERROR: %s does not match %s" % (expected_cfg_dump_filename, actual_cfg_dump_filename))
+        if os.path.exists(actual_cfg_dump_filename):
+            os.remove(actual_cfg_dump_filename)
+        if os.path.exists(replaced_expected_cfg_dump_filename):
+            os.remove(replaced_expected_cfg_dump_filename)
+    else:
+        with open(actual_cfg_dump_filename, 'w+') as f:
+            f.write(actual_json_dump)
+        with open(replaced_expected_cfg_dump_filename, 'w+') as f:
+            f.write(expected_json_dump)
+        if print_error:
+            print("ERROR: %s does not match %s" % (replaced_expected_cfg_dump_filename, actual_cfg_dump_filename))
     return ok
 
 def get_log_line_time(log_line):
@@ -425,3 +467,35 @@ def get_log_line_time(log_line):
     else:
         log_time = "%s %s %s" % (tokens[0], tokens[1], tokens[2])
     return datetime.datetime.strptime(log_time, '%b %d %H:%M:%S')
+
+def adjust_environment_variables():
+    '''
+    This function replaces the netplan files variables and macaddr with the actual macaddr
+    '''
+    netplan_paths = glob.glob('/etc/netplan/*.yaml')
+    #Changing mac addresses in all netplan files
+    #Copy the current yaml into json variable, change the mac addr
+    #Copy the coverted json string back to yaml file
+    data = fwutils.get_template_data_by_hw(template_path)
+
+    intf_mac_addr = {}
+    interfaces = psutil.net_if_addrs()
+    for nicname, addrs in interfaces.items():
+        for addr in addrs:
+            if addr.family == psutil.AF_LINK:
+                intf_mac_addr[nicname] = addr.address
+    for netplan in netplan_paths:
+        with open(netplan, "r+") as fd:
+            netplan_json = yaml.load(fd)
+            for if_name, val in netplan_json['network']['ethernets'].items():
+                replaced_name = str(data[if_name.split('name')[0]]['name'])
+                netplan_json['network']['ethernets'][replaced_name] = netplan_json['network']['ethernets'].pop(if_name)
+                interface = netplan_json['network']['ethernets'][replaced_name]
+                if interface.get('match'):
+                    interface['match']['macaddress'] = intf_mac_addr[replaced_name]
+                if interface.get('set-name'):
+                    interface['set-name'] = replaced_name
+            netplan_str = yaml.dump(netplan_json)
+            fd.seek(0)
+            fd.write(netplan_str)
+            fd.truncate()

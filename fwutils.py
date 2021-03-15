@@ -1166,6 +1166,7 @@ def reset_device_config():
         db_multilink.clean()
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
+
     fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
@@ -3579,32 +3580,6 @@ def vpp_nat_addr_update_on_interface_add(dev_id, metric, remove):
     success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
     return success
 
-def netplan_set_mac_addresses():
-    '''
-    This function replaces the netplan files macaddr with the actual macaddr
-    '''
-    netplan_paths = glob.glob('/etc/netplan/*.yaml')
-    #Changing mac addresses in all netplan files
-    #Copy the current yaml into json variable, change the mac addr
-    #Copy the coverted json string back to yaml file
-    intf_mac_addr = {}
-    interfaces = psutil.net_if_addrs()
-    for nicname, addrs in interfaces.items():
-        for addr in addrs:
-            if addr.family == psutil.AF_LINK:
-                intf_mac_addr[nicname] = addr.address
-    for netplan in netplan_paths:
-        with open(netplan, "r+") as fd:
-            netplan_json = yaml.load(fd)
-            for if_name in netplan_json['network']['ethernets']:
-                interface = netplan_json['network']['ethernets'][if_name]
-                if interface.get('match'):
-                    interface['match']['macaddress'] = intf_mac_addr[if_name]
-            netplan_str = yaml.dump(netplan_json)
-            fd.seek(0)
-            fd.write(netplan_str)
-            fd.truncate()
-
 def wifi_get_capabilities(dev_id):
 
     result = {
@@ -3833,3 +3808,125 @@ def exec_with_timeout(cmd, timeout=60):
             fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
+
+def get_template_data_by_hw(template_fname):
+    system_info = subprocess.check_output('lshw -c system', shell=True).strip()
+    match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
+    if len(match) > 0:
+        product = match[0].strip()
+        vendor = match[1].strip()
+        vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+
+    with open(template_fname, 'r') as stream:
+        info = yaml.load(stream, Loader=yaml.BaseLoader)
+        shared = info['devices']['globals']
+        # firstly, we will try to search for specific variables for the vendor and specific model
+        # if it does not exist, we will try to get variables for the vendor
+        vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+        if vendor_product and vendor_product in info['devices']:
+            data = info['devices'][search]
+        elif vendor and vendor in info['devices']:
+            data = info['devices'][vendor]
+        elif product and product in info['devices']:
+            data = info['devices'][product]
+        else:
+            data = shared
+
+        # loop on global fields and override them with specific device values
+        for k, v in shared.items():
+            if k in data:
+                v.update(data[k])
+        data.update(shared)
+
+        return data
+
+def replace_file_variables(template_fname, replace_fname):
+    """Replace variables in the json file with the data from the template file.
+
+    For example, assuming we are in Virtualbox, the data from the template file looks:
+        VirtualBox:
+            __INTERFACE_1__:
+            dev_id:       pci:0000:00:08.0
+            name:         enp0s8
+            __INTERFACE_2__:
+            dev_id:       pci:0000:00:09.0
+            name:         enp0s9
+            __INTERFACE_3__:
+            dev_id:       pci:0000:00:03.0
+            name:         enp0s3
+
+    The file to replace looks:
+        [
+            {
+                "entity": "agent",
+                "message": "start-router",
+                "params": {
+                    "interfaces": [
+                        "__INTERFACE_1__",
+                        {
+                            "dev_id":"__INTERFACE_2__dev_id",
+                            "addr":"__INTERFACE_2__addr",
+                            "gateway": "192.168.56.1",
+                            "type":"wan",
+                            "routing":"ospf"
+                        }
+                    ]
+                }
+            }
+        ]
+    
+    The function loops on the requests and replaces the variables.
+    There are two types of variables. template and specific field.
+    If we want to use all the data for a given interface (addr, gateway, dev_id etc.), we can use __INTERFACE_1__ only.
+    If we want to get specifc value from a given interface, we can use __INTERFACE_1__{field_name} (__INTERFACE_1__addr)
+    In the example above, we use template variable for interface 1, and specific interfaces values for interface 2.
+
+    :param template_fname:    Path to template file
+    :param replace_fname:     Path to json file to replace
+
+    :returns: replaced json file
+    """
+    data = get_template_data_by_hw(template_fname)
+    def replace(input):
+        if type(input) == list:
+            for idx, value in enumerate(input):
+                input[idx] = replace(value)
+
+        elif type(input) == dict:
+            for key in input:
+                value = input[key]
+                input[key] = replace(value)
+
+        elif is_str(input):
+            match = re.search('(__.*__)(.*)', str(input))
+            if match:
+                interface, field = match.groups()
+                if field:
+                    new_input = re.sub('__.*__.*', data[interface][field], input)
+                    return new_input
+
+                # replace with the template, but remove unused keys, They break the expected JSON files
+                template = copy.deepcopy(data[interface])
+                del template['addr_no_mask']
+                if 'name' in template:
+                    del template['name']
+                return template
+        return input
+
+    # loop on the requests and replace the variables
+    with open(replace_fname, 'r') as f:
+        requests = json.loads(f.read())
+
+        # cli requests
+        if type(requests) == list:
+            for req in requests:
+                if not 'params' in req:
+                    continue
+                req['params'] = replace(req['params'])
+
+        # json expected files
+        elif type(requests) == dict:
+            for req in requests:
+                requests[req] = replace(requests[req])
+
+    return requests

@@ -1,14 +1,13 @@
 network:
     version: 2
     ethernets:
-        enp0s3:
+        __INTERFACE_3__name:
             dhcp4: true
-        enp0s8:
+        __INTERFACE_1__name:
             dhcp4: true
             dhcp4-overrides:
                 route-metric: 200
-        enp0s9:
+        __INTERFACE_2__name:
             dhcp4: true
             dhcp4-overrides:
                 route-metric: 300
-            

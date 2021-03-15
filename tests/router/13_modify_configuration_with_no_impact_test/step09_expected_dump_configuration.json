@@ -1,110 +1,110 @@
 {
   "======= START COMMAND =======": [
     {
-      "Key": "start-router", 
+      "Key": "start-router",
       "Params": {}
     }
-  ], 
+  ],
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:pci:0000:00:08.00", 
+      "Key": "add-interface:__INTERFACE_1__dev_id",
       "Params": {
-        "addr": "10.0.0.4/24", 
-        "dev_id": "pci:0000:00:08.00", 
-        "gateway": "10.0.0.10", 
+        "addr": "__INTERFACE_1__addr",
+        "dev_id": "__INTERFACE_1__dev_id",
+        "gateway": "__INTERFACE_1__gateway",
         "multilink": {
           "labels": [
-            "green", 
-            "blue", 
+            "green",
+            "blue",
             "red"
           ]
-        }, 
-        "type": "wan", 
+        },
+        "type": "wan",
         "useStun": false
       }
-    }, 
+    },
     {
-      "Key": "add-interface:pci:0000:00:09.00", 
+      "Key": "add-interface:__INTERFACE_2__dev_id",
       "Params": {
-        "addr": "192.168.56.101/24", 
-        "dev_id": "pci:0000:00:09.00", 
-        "routing": "ospf", 
+        "addr": "__INTERFACE_2__addr",
+        "dev_id": "__INTERFACE_2__dev_id",
+        "routing": "ospf",
         "type": "lan"
       }
     }
-  ], 
+  ],
   "========== TUNNELS ==========": [
     {
-      "Key": "add-tunnel:1", 
+      "Key": "add-tunnel:1",
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
-        "dst": "20.0.0.4", 
+        "dev_id": "__INTERFACE_1__dev_id",
+        "dst": "20.0.0.4",
         "ipsec": {
           "local-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "1020aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "1020aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58",
             "spi": 1020
-          }, 
+          },
           "remote-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "2010aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "2010ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "2010aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "2010ff4b55523947594d6d3547666b45764e6a58",
             "spi": 2010
           }
-        }, 
+        },
         "loopback-iface": {
-          "addr": "10.100.0.1/31", 
-          "mac": "08:00:27:fd:00:02", 
-          "mtu": 1420, 
+          "addr": "10.100.0.1/31",
+          "mac": "08:00:27:fd:00:02",
+          "mtu": 1420,
           "multilink": {
             "labels": [
-              "brown", 
+              "brown",
               "gray"
             ]
-          }, 
+          },
           "routing": "ospf"
-        }, 
-        "src": "10.0.0.4", 
+        },
+        "src": "__INTERFACE_1__addr_no_mask",
         "tunnel-id": 1
       }
-    }, 
+    },
     {
-      "Key": "add-tunnel:2", 
+      "Key": "add-tunnel:2",
       "Params": {
-        "dev_id": "pci:0000:00:08.00", 
-        "dst": "30.0.0.4", 
+        "dev_id": "__INTERFACE_1__dev_id",
+        "dst": "30.0.0.4",
         "ipsec": {
           "local-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "1030aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "1030ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "1030aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "1030ff4b55523947594d6d3547666b45764e6a58",
             "spi": 1030
-          }, 
+          },
           "remote-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "3010aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "3010ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "3010aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "3010ff4b55523947594d6d3547666b45764e6a58",
             "spi": 3010
           }
-        }, 
+        },
         "loopback-iface": {
-          "addr": "10.100.0.3/31", 
-          "mac": "08:00:27:fd:00:03", 
-          "mtu": 1420, 
+          "addr": "10.100.0.3/31",
+          "mac": "08:00:27:fd:00:03",
+          "mtu": 1420,
           "multilink": {
             "labels": [
-              "gray", 
+              "gray",
               "black"
             ]
-          }, 
+          },
           "routing": "ospf"
-        }, 
-        "src": "10.0.0.4", 
+        },
+        "src": "__INTERFACE_1__addr_no_mask",
         "tunnel-id": 2
       }
     }

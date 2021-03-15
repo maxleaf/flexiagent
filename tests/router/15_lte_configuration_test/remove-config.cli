@@ -1,0 +1,16 @@
+[
+  {
+    "entity": "agent",
+    "message": "remove-interface",
+    "params": {
+      "dev_id":"__LTE_1__dev_id"
+    }
+  },
+  {
+    "entity": "agent",
+    "message": "remove-lte",
+    "params": {
+      "dev_id": "__LTE_1__dev_id"
+    }
+  }
+]

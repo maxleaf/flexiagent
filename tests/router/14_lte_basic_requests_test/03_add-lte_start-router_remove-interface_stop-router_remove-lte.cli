@@ -1,0 +1,57 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-lte",
+        "params": {
+            "apn": "__LTE_1__apn",
+            "enable": true,
+            "pin": "__LTE_1__pin",
+            "password": "",
+            "user": "",
+            "dev_id": "__LTE_1__dev_id",
+            "metric": "0"
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "start-router",
+        "params": {
+            "interfaces": [
+                "__INTERFACE_1__",
+                "__INTERFACE_2__",
+                {
+                    "dev_id": "__LTE_1__dev_id",
+                    "metric": "0",
+                    "type": "wan",
+                    "configuration": {
+                        "apn": "__LTE_1__apn",
+                        "enable": true,
+                        "pin": "__LTE_1__pin",
+                        "password": "",
+                        "user": "",
+                        "dev_id": "__LTE_1__dev_id",
+                        "metric": "0"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "remove-interface",
+        "params": {
+            "dev_id":"__LTE_1__dev_id"
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "stop-router"
+    },
+    {
+        "entity": "agent",
+        "message": "remove-lte",
+        "params": {
+            "dev_id": "__LTE_1__dev_id"
+        }
+    }
+]

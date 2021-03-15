@@ -43,7 +43,7 @@ def test():
             print("   " + os.path.basename(t))
 
             # Load router configuration with spoiled lists
-            ok, err_str = agent.cli('--api inject_requests filename=%s ignore_errors=True' % t,
+            ok, err_str = agent.cli('-f %s -I' % t,
                                     expected_vpp_cfg=[('interfaces', 0),('tunnels', 0)])
             assert ok, err_str
 

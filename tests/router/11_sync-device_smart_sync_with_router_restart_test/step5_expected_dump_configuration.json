@@ -1,245 +1,243 @@
 {
   "======= START COMMAND =======": [
     {
-      "Key": "start-router", 
+      "Key": "start-router",
       "Params": {}
     }
-  ]
-}
-{
+  ],
   "============ APPLICATIONS ============": [
     {
-      "Key": "add-application", 
+      "Key": "add-application",
       "Params": {
         "applications": [
           {
-            "category": "management", 
-            "description": "Daytime Protocol", 
-            "id": "3", 
-            "importance": "high", 
-            "modified": true, 
-            "name": "daytime", 
+            "category": "management",
+            "description": "Daytime Protocol",
+            "id": "3",
+            "importance": "high",
+            "modified": true,
+            "name": "daytime",
             "rules": [
               {
-                "ports": "18", 
+                "ports": "18",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "28", 
+                "ports": "28",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "remote_access", 
-            "description": "New Secure Shell (NSSH)", 
-            "id": "55", 
-            "importance": "low", 
-            "modified": false, 
-            "name": "new_ssh", 
+            "category": "remote_access",
+            "description": "New Secure Shell (NSSH)",
+            "id": "55",
+            "importance": "low",
+            "modified": false,
+            "name": "new_ssh",
             "rules": [
               {
-                "ports": "22", 
+                "ports": "22",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "remote_access", 
-            "description": "Telnet protocol", 
-            "id": "6", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "telnet", 
+            "category": "remote_access",
+            "description": "Telnet protocol",
+            "id": "6",
+            "importance": "medium",
+            "modified": false,
+            "name": "telnet",
             "rules": [
               {
-                "ports": "22", 
+                "ports": "22",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Simple Mail Transfer Protocol (SMTP)", 
-            "id": "7", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "smtp", 
+            "category": "email",
+            "description": "Simple Mail Transfer Protocol (SMTP)",
+            "id": "7",
+            "importance": "high",
+            "modified": false,
+            "name": "smtp",
             "rules": [
               {
-                "ports": "25", 
+                "ports": "25",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "management", 
-            "description": "Domain Name System (DNS)", 
-            "id": "11", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "dns", 
+            "category": "management",
+            "description": "Domain Name System (DNS)",
+            "id": "11",
+            "importance": "high",
+            "modified": false,
+            "name": "dns",
             "rules": [
               {
-                "ports": "53", 
+                "ports": "53",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "53", 
+                "ports": "53",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Post Office Protocol, version 3 (POP3)", 
-            "id": "15", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "pop3", 
+            "category": "email",
+            "description": "Post Office Protocol, version 3 (POP3)",
+            "id": "15",
+            "importance": "high",
+            "modified": false,
+            "name": "pop3",
             "rules": [
               {
-                "ports": "110", 
+                "ports": "110",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "management", 
-            "description": "Network News Transfer Protocol (NNTP)", 
-            "id": "16", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "nntp", 
+            "category": "management",
+            "description": "Network News Transfer Protocol (NNTP)",
+            "id": "16",
+            "importance": "medium",
+            "modified": false,
+            "name": "nntp",
             "rules": [
               {
-                "ports": "119", 
+                "ports": "119",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Internet Message Access Protocol (IMAP)", 
-            "id": "17", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "imap2", 
+            "category": "email",
+            "description": "Internet Message Access Protocol (IMAP)",
+            "id": "17",
+            "importance": "high",
+            "modified": false,
+            "name": "imap2",
             "rules": [
               {
-                "ports": "143", 
+                "ports": "143",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "remote_access", 
-            "description": "X Display Manager Control Protocol (XDMCP)", 
-            "id": "18", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "xdmcp", 
+            "category": "remote_access",
+            "description": "X Display Manager Control Protocol (XDMCP)",
+            "id": "18",
+            "importance": "medium",
+            "modified": false,
+            "name": "xdmcp",
             "rules": [
               {
-                "ports": "177", 
+                "ports": "177",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "177", 
+                "ports": "177",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "internet", 
-            "description": "Hypertext Transfer Protocol over TLS/SSL (HTTPS)", 
-            "id": "20", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "https", 
+            "category": "internet",
+            "description": "Hypertext Transfer Protocol over TLS/SSL (HTTPS)",
+            "id": "20",
+            "importance": "medium",
+            "modified": false,
+            "name": "https",
             "rules": [
               {
-                "ports": "443", 
+                "ports": "443",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "internet", 
-            "description": "Simple Network Paging Protocol (SNPP), RFC 1568", 
-            "id": "21", 
-            "importance": "low", 
-            "modified": false, 
-            "name": "snpp", 
+            "category": "internet",
+            "description": "Simple Network Paging Protocol (SNPP), RFC 1568",
+            "id": "21",
+            "importance": "low",
+            "modified": false,
+            "name": "snpp",
             "rules": [
               {
-                "ports": "444", 
+                "ports": "444",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "auth-service", 
-            "description": "Microsoft-DS (Directory Services) Active Directory, Windows shares", 
-            "id": "22", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "active-directory", 
+            "category": "auth-service",
+            "description": "Microsoft-DS (Directory Services) Active Directory, Windows shares",
+            "id": "22",
+            "importance": "high",
+            "modified": false,
+            "name": "active-directory",
             "rules": [
               {
-                "ports": "445", 
+                "ports": "445",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "445", 
+                "ports": "445",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Internet Message Access Protocol over TLS/SSL (IMAPS)", 
-            "id": "31", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "imaps", 
+            "category": "email",
+            "description": "Internet Message Access Protocol over TLS/SSL (IMAPS)",
+            "id": "31",
+            "importance": "medium",
+            "modified": false,
+            "name": "imaps",
             "rules": [
               {
-                "ports": "993", 
+                "ports": "993",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Post Office Protocol 3 over TLS/SSL (POP3S)", 
-            "id": "32", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "pop3s", 
+            "category": "email",
+            "description": "Post Office Protocol 3 over TLS/SSL (POP3S)",
+            "id": "32",
+            "importance": "medium",
+            "modified": false,
+            "name": "pop3s",
             "rules": [
               {
-                "ports": "995", 
+                "ports": "995",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "995", 
+                "ports": "995",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "default"
           }
         ]

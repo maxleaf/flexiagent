@@ -592,7 +592,7 @@ class FwAgent:
         self.handling_request = False
         return reply
 
-    def inject_requests(self, filename, ignore_errors=False):
+    def inject_requests(self, filename, ignore_errors=False, json_requests=None):
         """Injects requests loaded from within 'file' JSON file,
         thus simulating receiving requests over network from the flexiManage.
         This function is used for Unit Testing.
@@ -607,21 +607,25 @@ class FwAgent:
         fwglobals.log.debug("inject_requests(filename=%s, ignore_errors=%s)" % \
             (filename, str(ignore_errors)))
 
-        with open(filename, 'r') as f:
-            requests = json.loads(f.read())
-            if type(requests) is list:   # Take care of file with list of requests
-                for (idx, req) in enumerate(requests):
-                    reply = self.handle_received_request(req)
-                    if reply['ok'] == 0 and ignore_errors == False:
-                        raise Exception('failed to inject request #%d in %s: %s' % \
-                                        ((idx+1), filename, reply['message']))
-                return None
-            else:   # Take care of file with single request
-                reply = self.handle_received_request(requests)
-                if reply['ok'] == 0:
-                    raise Exception('failed to inject request from within %s: %s' % \
-                                    (filename, reply['message']))
-                return reply
+        if json_requests:
+            requests = json.loads(json_requests)
+        else:
+            with open(filename, 'r') as f:
+                requests = json.loads(f.read())
+
+        if type(requests) is list:   # Take care of file with list of requests
+            for (idx, req) in enumerate(requests):
+                reply = self.handle_received_request(req)
+                if reply['ok'] == 0 and ignore_errors == False:
+                    raise Exception('failed to inject request #%d in %s: %s' % \
+                                    ((idx+1), filename, reply['message']))
+            return None
+        else:   # Take care of file with single request
+            reply = self.handle_received_request(requests)
+            if reply['ok'] == 0:
+                raise Exception('failed to inject request from within %s: %s' % \
+                                (filename, reply['message']))
+            return reply
 
 def version():
     """Handles 'fwagent version' command.
@@ -1075,7 +1079,7 @@ def daemon_rpc(func, **kwargs):
         Pyro4.util.excepthook(ex_type, ex_value, ex_tb)
         return None
 
-def cli(clean_request_db=True, api=None, script_fname=None):
+def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None, ignore_errors=False):
     """Handles 'fwagent cli' command.
     This command is not used in production. It assists unit testing.
     The 'fwagent cli' reads function names and their arguments from prompt and
@@ -1096,10 +1100,11 @@ def cli(clean_request_db=True, api=None, script_fname=None):
                                 If provided, no prompt loop will be run.
     :param script_fname:        Shortcat for --api==inject_requests(<script_fname>)
                                 command. Is kept for backward compatibility.
+    :param template_fname:      Path to template file that includes variables to replace in the cli request.
     :returns: None.
     """
-    fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s)" % \
-                        (str(clean_request_db), str(api)))
+    fwglobals.log.info("started in cli mode (clean_request_db=%s, api=%s, ignore_errors=%s)" % \
+                        (str(clean_request_db), str(api), ignore_errors))
 
     # Preserve historical 'fwagent cli -f' option, as it involve less typing :)
     # Generate the 'api' value out of '-f/--script_file' value.
@@ -1108,8 +1113,17 @@ def cli(clean_request_db=True, api=None, script_fname=None):
         # working directory other than the typed 'fwagent cli -f' command.
         script_fname = os.path.abspath(script_fname)
         api = ['inject_requests' , 'filename=%s' % script_fname ]
-        fwglobals.log.debug(
-            "cli: generate 'api' out of 'script_fname': " + str(api))
+        if ignore_errors:
+            api.append('ignore_errors=True')
+
+        if template_fname:
+            requests = fwutils.replace_file_variables(template_fname, script_fname)
+            api.append('json_requests=%s' % json.dumps(requests, sort_keys=True))
+            fwglobals.log.debug(
+                "cli: generate 'api' out of 'script_fname' and 'template_fname': " + str(api))
+        else:
+            fwglobals.log.debug(
+                "cli: generate 'api' out of 'script_fname': " + str(api))
 
     import fwagent_cli
     with fwagent_cli.FwagentCli() as cli:
@@ -1156,7 +1170,9 @@ if __name__ == '__main__':
                     'cli': lambda args: cli(
                         script_fname=args.script_fname,
                         clean_request_db=args.clean,
-                        api=args.api)}
+                        api=args.api,
+                        template_fname=args.template_fname,
+                        ignore_errors=args.ignore_errors)}
 
     parser = argparse.ArgumentParser(
         description="Device Agent for FlexiWan orchestrator\n" + \
@@ -1203,6 +1219,10 @@ if __name__ == '__main__':
     parser_cli = subparsers.add_parser('cli', help='runs agent in CLI mode: read flexiManage requests from command line')
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
+    parser_cli.add_argument('-t', '--template', dest='template_fname', default=None,
+                        help="File with substitutions for the script file, see -f")
+    parser_cli.add_argument('-I', '--ignore_errors', dest='ignore_errors', action='store_true',
+                        help="Ignore errors")
     parser_cli.add_argument('-c', '--clean', action='store_true',
                         help="clean request database on exit")
     parser_cli.add_argument('-i', '--api', dest='api', default=None, nargs='+',
