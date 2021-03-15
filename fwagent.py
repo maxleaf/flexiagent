@@ -1115,15 +1115,15 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None,
         api = ['inject_requests' , 'filename=%s' % script_fname ]
         if ignore_errors:
             api.append('ignore_errors=True')
-        fwglobals.log.debug(
-            "cli: generate 'api' out of 'script_fname': " + str(api))
 
-    if script_fname and template_fname:
-        requests = fwutils.replace_file_variables(template_fname, script_fname)
-        api.append('json_requests=%s' % json.dumps(requests, sort_keys=True))
-        fwglobals.log.debug(
-            "cli: generate 'api' out of 'script_fname' and 'template_fname': " + str(api))
-
+        if template_fname:
+            requests = fwutils.replace_file_variables(template_fname, script_fname)
+            api.append('json_requests=%s' % json.dumps(requests, sort_keys=True))
+            fwglobals.log.debug(
+                "cli: generate 'api' out of 'script_fname' and 'template_fname': " + str(api))
+        else:
+            fwglobals.log.debug(
+                "cli: generate 'api' out of 'script_fname': " + str(api))
 
     import fwagent_cli
     with fwagent_cli.FwagentCli() as cli:
@@ -1220,7 +1220,7 @@ if __name__ == '__main__':
     parser_cli.add_argument('-f', '--script_file', dest='script_fname', default=None,
                         help="File with requests to be executed")
     parser_cli.add_argument('-t', '--template', dest='template_fname', default=None,
-                        help="File with cli variables")
+                        help="File with substitutions for the script file, see -f")
     parser_cli.add_argument('-I', '--ignore_errors', dest='ignore_errors', action='store_true',
                         help="Ignore errors")
     parser_cli.add_argument('-c', '--clean', action='store_true',
