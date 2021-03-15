@@ -3841,47 +3841,92 @@ def get_template_data_by_hw(template_fname):
         return data
 
 def replace_file_variables(template_fname, replace_fname):
-        data = get_template_data_by_hw(template_fname)
-        def replace(input):
-            if type(input) == list:
-                for idx, value in enumerate(input):
-                    input[idx] = replace(value)
+    """Replace variables in the json file with the data from the template file.
 
-            elif type(input) == dict:
-                for key in input:
-                    value = input[key]
-                    input[key] = replace(value)
+    For example, assuming we are in Virtualbox, the data from the template file looks:
+        VirtualBox:
+            __INTERFACE_1__:
+            dev_id:       pci:0000:00:08.0
+            name:         enp0s8
+            __INTERFACE_2__:
+            dev_id:       pci:0000:00:09.0
+            name:         enp0s9
+            __INTERFACE_3__:
+            dev_id:       pci:0000:00:03.0
+            name:         enp0s3
 
-            elif is_str(input):
-                match = re.search('(__.*__)(.*)', str(input))
-                if match:
-                    interface, field = match.groups()
-                    if field:
-                        new_input = re.sub('__.*__.*', data[interface][field], input)
-                        return new_input
+    The file to replace looks:
+        [
+            {
+                "entity": "agent",
+                "message": "start-router",
+                "params": {
+                    "interfaces": [
+                        "__INTERFACE_1__",
+                        {
+                            "dev_id":"__INTERFACE_2__dev_id",
+                            "addr":"__INTERFACE_2__addr",
+                            "gateway": "192.168.56.1",
+                            "type":"wan",
+                            "routing":"ospf"
+                        }
+                    ]
+                }
+            }
+        ]
+    
+    The function loops on the requests and replaces the variables.
+    There are two types of variables. template and specific field.
+    If we want to use all the data for a given interface (addr, gateway, dev_id etc.), we can use __INTERFACE_1__ only.
+    If we want to get specifc value from a given interface, we can use __INTERFACE_1__{field_name} (__INTERFACE_1__addr)
+    In the example above, we use template variable for interface 1, and specific interfaces values for interface 2.
 
-                    # replace with the template, but remove unused keys, They break the expected JSON files
-                    template = copy.deepcopy(data[interface])
-                    del template['addr_no_mask']
-                    if 'name' in template:
-                        del template['name']
-                    return template
-            return input
+    :param template_fname:    Path to template file
+    :param replace_fname:     Path to json file to replace
 
-        # loop on the requests and replace the variables
-        with open(replace_fname, 'r') as f:
-            requests = json.loads(f.read())
+    :returns: replaced json file
+    """
+    data = get_template_data_by_hw(template_fname)
+    def replace(input):
+        if type(input) == list:
+            for idx, value in enumerate(input):
+                input[idx] = replace(value)
 
-            # cli requests
-            if type(requests) == list:
-                for req in requests:
-                    if not 'params' in req:
-                        continue
-                    req['params'] = replace(req['params'])
+        elif type(input) == dict:
+            for key in input:
+                value = input[key]
+                input[key] = replace(value)
 
-            # json expected files
-            elif type(requests) == dict:
-                for req in requests:
-                    requests[req] = replace(requests[req])
+        elif is_str(input):
+            match = re.search('(__.*__)(.*)', str(input))
+            if match:
+                interface, field = match.groups()
+                if field:
+                    new_input = re.sub('__.*__.*', data[interface][field], input)
+                    return new_input
 
-        return requests
+                # replace with the template, but remove unused keys, They break the expected JSON files
+                template = copy.deepcopy(data[interface])
+                del template['addr_no_mask']
+                if 'name' in template:
+                    del template['name']
+                return template
+        return input
+
+    # loop on the requests and replace the variables
+    with open(replace_fname, 'r') as f:
+        requests = json.loads(f.read())
+
+        # cli requests
+        if type(requests) == list:
+            for req in requests:
+                if not 'params' in req:
+                    continue
+                req['params'] = replace(req['params'])
+
+        # json expected files
+        elif type(requests) == dict:
+            for req in requests:
+                requests[req] = replace(requests[req])
+
+    return requests
