@@ -2944,7 +2944,7 @@ def lte_connect(params, reset=False):
 def lte_get_system_info(dev_id):
     try:
         result = {
-            'cell_Id'        : '',
+            'cell_id'        : '',
             'operator_name'  : '',
             'mcc'            : '',
             'mnc'            : ''
@@ -2953,7 +2953,7 @@ def lte_get_system_info(dev_id):
         lines, _ = qmi_get_system_info(dev_id)
         for line in lines:
             if 'Cell ID' in line:
-                result['cell_Id'] = line.split(':')[-1].strip().replace("'", '')
+                result['cell_id'] = line.split(':')[-1].strip().replace("'", '')
                 continue
             if 'MCC' in line:
                 result['mcc'] = line.split(':')[-1].strip().replace("'", '')
