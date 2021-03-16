@@ -65,7 +65,7 @@ class TestFwagent:
         if daemon_pid:
             os.system('kill -9 %s' % daemon_pid)                # Ensure daemon by previous failed test does not run
         if vpp_does_run():
-            os.system('%s --quiet' % self.fwkill_py)            # The kill shot - ensure vpp does not run
+            self.kill()         # The kill shot - ensure vpp does not run
         os.system('%s reset --soft --quiet' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
 
         # Print exception if it is not caused by 'assert' statement
@@ -79,10 +79,24 @@ class TestFwagent:
                 for l in lines:
                     print(l)
 
+    def kill(self, args=None):
+        os.system('%s --quiet %s' % (self.fwkill_py, args if args else ''))
+        return (True, None)
+
     def set_log_start_marker(self):
         self.start_time = datetime.datetime.now()
         time.sleep(1)   # Ensure that all further log times are greater than now()
                         # The now() uses microseconds, when log uses seconds only.
+
+    def cmd(self, args):
+        try:
+            state = {'output':'', 'error':'', 'returncode':0}
+            cmd = '%s %s' % (self.fwagent_py, args)
+            state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (output, error) = state['proc'].communicate()
+            return (True, None)
+        except Exception as e:
+            return (False, str(e))
 
     def cli(self, args, daemon=False, expected_vpp_cfg=None, expected_router_cfg=None, check_log=False):
         '''Invokes fwagent API.

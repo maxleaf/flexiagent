@@ -1,0 +1,26 @@
+[
+{
+  "entity":  "agent",
+  "message": "remove-tunnel",
+  "params": { "tunnel-id": 1 }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-interface",
+  "params": {
+      "dev_id":"__INTERFACE_1__dev_id",
+      "addr":"__INTERFACE_1__addr"
+  }
+}
+,
+{
+  "entity": "agent",
+  "message": "remove-interface",
+  "params": {
+      "dev_id":"__INTERFACE_2__dev_id",
+      "addr":"__INTERFACE_2__addr",
+      "routing":"ospf"
+  }
+}
+]
