@@ -665,12 +665,11 @@ def reset(soft=False, quiet=False):
         print("Router must be stopped in order to reset the configuration")
         return
 
-    fwutils.reset_device_config()
-
     if soft:
+        fwutils.reset_device_config()
         return
 
-    daemon_rpc('stop')          # Stop daemon main loop if daemon is alive
+    daemon_rpc('stop', stop_router=False)          # Stop daemon main loop if daemon is alive
     reset_device = True
     if not quiet:
         CSTART = "\x1b[0;30;43m"
@@ -681,8 +680,15 @@ def reset(soft=False, quiet=False):
             reset_device = False
 
     if reset_device:
+        # If vpp is run, we need to stop the router, and reset the device configuration
+        if fwutils.vpp_does_run()
+            print("Please wait while we are stopping the router...")
+            daemon_rpc('stop', stop_router=True)
+        fwutils.reset_device_config()
+
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
             os.remove(fwglobals.g.DEVICE_TOKEN_FILE)
+
 
         # stop LTE connections
         lte_interfaces = fwutils.get_lte_interfaces_dev_ids()
