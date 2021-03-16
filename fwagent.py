@@ -679,7 +679,6 @@ def reset(soft=False, quiet=False):
             reset_device = False
 
     if reset_device:
-        # If vpp is run, we need to stop the router, and reset the device configuration
         if fwutils.vpp_does_run():
             print("stopping the router...")
         daemon_rpc('stop', stop_router=True)
