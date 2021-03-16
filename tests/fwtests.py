@@ -90,10 +90,8 @@ class TestFwagent:
 
     def cmd(self, args):
         try:
-            state = {'output':'', 'error':'', 'returncode':0}
             cmd = '%s %s' % (self.fwagent_py, args)
-            state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            (output, error) = state['proc'].communicate()
+            output = subprocess.check_output(cmd, shell=True)
             return (True, None)
         except Exception as e:
             return (False, str(e))
