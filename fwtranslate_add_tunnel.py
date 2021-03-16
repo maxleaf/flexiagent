@@ -589,6 +589,14 @@ def _add_ikev2_common_profile(cmd_list, name, tunnel_id, remote_device_id, certi
     """
     machine_id = fwutils.get_machine_id()
 
+    # ikev2.api.json: ikev2_set_local_key (...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_set_local_key"
+    cmd['cmd']['params']    = { 'key_file':fwglobals.g.ikev2.IKEV2_PRIVATE_KEY_FILE }
+    cmd['cmd']['descr']     = "set IKEv2 local key"
+    cmd_list.append(cmd)
+
     # Add public certificate file
     cmd = {}
     cmd['cmd'] = {}

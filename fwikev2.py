@@ -30,6 +30,7 @@ class FwIKEv2:
     def __init__(self):
         self.IKEV2_PRIVATE_KEY_FILE = self.private_key_filename_get()
         self.IKEV2_PUBLIC_CERTIFICATE_FILE = self.certificate_filename_get()
+        self.private_key_created = False
 
     def __enter__(self):
         return self
@@ -46,6 +47,15 @@ class FwIKEv2:
 
     def finalize(self):
         return
+
+    def is_private_key_created(self):
+        if self.private_key_created:
+            return True
+
+        if os.path.exists(self.IKEV2_PRIVATE_KEY_FILE):
+            return True
+
+        return False
 
     def private_key_filename_get(self):
         machine_id = fwutils.get_machine_id()
@@ -82,7 +92,7 @@ class FwIKEv2:
         if res != "RSA key ok":
             return {'certificateExpiration': '', 'error': 'RSA key is not ok'}
 
-        return {'certificateExpiration': end_date, 'error': ''}
+        return {'certificateExpiration': end_date}
 
     def modify_private_key(self, private_pem):
         '''This function modifies private key.
@@ -104,31 +114,34 @@ class FwIKEv2:
         if os.path.exists(fwglobals.g.IKEV2_FOLDER):
             os.system("rm -rf %s" % fwglobals.g.IKEV2_FOLDER) # shutil.rmtree() fails sometimes on VBox shared folders!
 
-    def create_private_key(self, days):
+    def create_private_key(self, days, new):
         machine_id = fwutils.get_machine_id()
         public_pem = self.IKEV2_PUBLIC_CERTIFICATE_FILE
         private_pem = self.IKEV2_PRIVATE_KEY_FILE
 
-        if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
-            os.makedirs(fwglobals.g.IKEV2_FOLDER)
+        if new:
+            if not os.path.exists(fwglobals.g.IKEV2_FOLDER):
+                os.makedirs(fwglobals.g.IKEV2_FOLDER)
 
-        cmd = "openssl req -new -newkey rsa:4096 -days %u -nodes -x509 -subj '/CN=%s' -keyout %s -out %s" % (days, machine_id, private_pem, public_pem)
-        fwglobals.log.debug(cmd)
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            return {'ok': 0, 'message': 'Cannot create certificate'}
+            cmd = "openssl req -new -newkey rsa:4096 -days %u -nodes -x509 -subj '/CN=%s' -keyout %s -out %s" % (days, machine_id, private_pem, public_pem)
+            fwglobals.log.debug(cmd)
+            ok = not subprocess.call(cmd, shell=True)
+            if not ok:
+                return {'ok': 0, 'message': 'Cannot create certificate'}
+
+            if fwutils.vpp_does_run():
+                ok = self.modify_private_key(private_pem)
+                if not ok:
+                    return {'ok': 0, 'message': 'Cannot set private key in VPP'}
+
+            self.private_key_created = True
 
         with open(public_pem) as public_pem_file:
             certificate = public_pem_file.read().rstrip("\n")
 
         expiration = self.get_certificate_expiration()
-        if expiration['error'] != '':
+        if 'error' in expiration and expiration['error'] != '':
             return {'ok': 0, 'message': 'Cannot get certificate expiration date'}
-
-        if fwutils.vpp_does_run():
-            ok = self.modify_private_key(private_pem)
-            if not ok:
-                return {'ok': 0, 'message': 'Cannot set private key in VPP'}
 
         return {'message': {'certificate': certificate, 'expiration': expiration['certificateExpiration']}, 'ok': 1}
 
