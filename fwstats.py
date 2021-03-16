@@ -173,12 +173,11 @@ def get_stats():
         state = 'running'
         reason = ''
         reconfig = ''
-        ikev2_certificate_expiration = ''
     else:
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()
     if not res_update_list:
-        res_update_list.append({
+        info = {
             'ok': stats['ok'],
             'running': status,
             'state': state,
@@ -188,16 +187,19 @@ def get_stats():
             'health': {},
             'period': 0,
             'utc': time.time(),
-            'reconfig': reconfig,
-            'ikev2': ikev2_certificate_expiration,
-        })
+            'reconfig': reconfig
+        }
+        if fwglobals.g.ikev2.is_private_key_created():
+            info['ikev2'] = ikev2_certificate_expiration
+        res_update_list.append(info)
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
-        res_update_list[-1]['ikev2'] = ikev2_certificate_expiration
         res_update_list[-1]['health'] = get_system_health()
+        if fwglobals.g.ikev2.is_private_key_created():
+            res_update_list[-1]['ikev2'] = ikev2_certificate_expiration
 
     return {'message': res_update_list, 'ok': 1}
 

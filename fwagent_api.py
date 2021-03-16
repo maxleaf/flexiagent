@@ -125,7 +125,8 @@ class FWAGENT_API:
             info['network'] = {}
             info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
-            info['ikev2'] = '' if loadsimulator.g.enabled() else fwglobals.g.ikev2.get_certificate_expiration()
+            if fwglobals.g.ikev2.is_private_key_created():
+                info['ikev2'] = fwglobals.g.ikev2.get_certificate_expiration()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
@@ -421,4 +422,4 @@ class FWAGENT_API:
 
         :returns: Dictionary with status code.
         """
-        return fwglobals.g.ikev2.create_private_key(params['days'])
+        return fwglobals.g.ikev2.create_private_key(params['days'], params['new'])
