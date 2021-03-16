@@ -363,19 +363,19 @@ class FWAGENT_API:
             puk = params.get('puk')
 
             current_pin_state = fwutils.lte_get_pin_state(dev_id)
-            is_currently_enabled = current_pin_state.get('PIN1_STATUS') != 'disabled'
-            retries_left = current_pin_state.get('PIN1_RETRIES', '3')
+            is_currently_enabled = current_pin_state.get('pin1_status') != 'disabled'
+            retries_left = current_pin_state.get('pin1_retries', '3')
 
             # check if blocked and puk isn't provided
             if retries_left == '0' and not puk:
                 return {'ok': 0, 'message': 'The PIN is locked. Please unblocked it with PUK code'}
 
-            if current_pin_state.get('PIN1_STATUS') == 'blocked':
+            if current_pin_state.get('pin1_status') == 'blocked':
                 if not puk or not new_pin:
                     return {'ok': 0, 'message': 'The PIN is locked. Please provide PUK code and new PIN number'}
                 # unblock
                 updated_status = fwutils.qmi_unblocked_pin(dev_id, puk, new_pin)
-                updated_pin_state = updated_status.get('PIN1_STATUS')
+                updated_pin_state = updated_status.get('pin1_status')
                 if updated_pin_state not in['disabled', 'enabled-verified']:
                     return {'ok': 0, 'message': 'PUK is wrong'}
 
@@ -386,8 +386,8 @@ class FWAGENT_API:
 
             # verify pin first
             updated_status = fwutils.qmi_verify_pin(dev_id, current_pin)
-            updated_pin_state = updated_status.get('PIN1_STATUS')
-            updated_retries_left = updated_status.get('PIN1_RETRIES', 3)
+            updated_pin_state = updated_status.get('pin1_status')
+            updated_retries_left = updated_status.get('pin1_retries', 3)
             if updated_retries_left != '3' and retries_left != updated_retries_left:
                 return {'ok': 0, 'message': 'PIN is wrong'}
             if updated_pin_state not in['disabled', 'enabled-verified']:

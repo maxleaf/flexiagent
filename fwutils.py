@@ -2671,8 +2671,8 @@ def lte_set_modem_to_mbim(dev_id):
 
         hardware_info = lte_get_hardware_info(dev_id)
 
-        vendor = hardware_info['Vendor']
-        model =  hardware_info['Model']
+        vendor = hardware_info['vendor']
+        model =  hardware_info['model']
 
         at_commands = []
         if 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE): # Special fix for Quectel ec25 mini pci card
@@ -2730,16 +2730,16 @@ def lte_get_default_settings(dev_id):
 
 def lte_get_pin_state(dev_id):
     res = {
-        'PIN1_STATUS': '',
-        'PIN1_RETRIES': '',
-        'PUK1_RETRIES': '',
+        'pin1_status': '',
+        'pin1_retries': '',
+        'puk1_retires': '',
     }
     lines, _ = qmi_get_simcard_status(dev_id)
     for index, line in enumerate(lines):
         if 'PIN1 state:' in line:
-            res['PIN1_STATUS']= line.split(':')[-1].strip().replace("'", '').split(' ')[0]
-            res['PIN1_RETRIES']= lines[index + 1].split(':')[-1].strip().replace("'", '').split(' ')[0]
-            res['PUK1_RETRIES']= lines[index + 2].split(':')[-1].strip().replace("'", '').split(' ')[0]
+            res['pin1_status']= line.split(':')[-1].strip().replace("'", '').split(' ')[0]
+            res['pin1_retries']= lines[index + 1].split(':')[-1].strip().replace("'", '').split(' ')[0]
+            res['puk1_retires']= lines[index + 2].split(':')[-1].strip().replace("'", '').split(' ')[0]
             break
     return res
 
@@ -2884,13 +2884,13 @@ def lte_connect(params, reset=False):
             return (False, "Sim is not presented")
 
     # check PIN status
-    pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
+    pin_state = lte_get_pin_state(params['dev_id']).get('pin1_status', 'disabled')
     if pin_state not in ['disabled', 'enabled-verified']:
         pin = params.get('pin')
         if not pin:
             return (False, "PIN is required")
 
-        updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
+        updated_pin_state = qmi_verify_pin(dev_id, pin).get('pin1_status')
         if updated_pin_state not in['disabled', 'enabled-verified']:
             return (False, "PIN is wrong")
 
@@ -2944,29 +2944,29 @@ def lte_connect(params, reset=False):
 def lte_get_system_info(dev_id):
     try:
         result = {
-            'Cell_Id'        : '',
-            'Operator_Name'  : '',
-            'MCC'            : '',
-            'MNC'            : ''
+            'cell_Id'        : '',
+            'operator_name'  : '',
+            'mcc'            : '',
+            'mnc'            : ''
         }
 
         lines, _ = qmi_get_system_info(dev_id)
         for line in lines:
             if 'Cell ID' in line:
-                result['Cell_Id'] = line.split(':')[-1].strip().replace("'", '')
+                result['cell_Id'] = line.split(':')[-1].strip().replace("'", '')
                 continue
             if 'MCC' in line:
-                result['MCC'] = line.split(':')[-1].strip().replace("'", '')
+                result['mcc'] = line.split(':')[-1].strip().replace("'", '')
                 continue
             if 'MNC' in line:
-                result['MNC'] = line.split(':')[-1].strip().replace("'", '')
+                result['mnc'] = line.split(':')[-1].strip().replace("'", '')
                 continue
 
         lines, _ = qmi_get_operator_name(dev_id)
         for line in lines:
             if '\tName' in line:
                 name = line.split(':')[-1].strip().replace("'", '')
-                result['Operator_Name'] = name if bool(re.match("^[a-zA-Z0-9_ ]*$", name)) else ''
+                result['operator_name'] = name if bool(re.match("^[a-zA-Z0-9_ ]*$", name)) else ''
                 break
 
         return result
@@ -2976,27 +2976,27 @@ def lte_get_system_info(dev_id):
 def lte_get_hardware_info(dev_id):
     try:
         result = {
-            'Vendor'   : '',
-            'Model'    : '',
-            'Imei': '',
+            'vendor'   : '',
+            'model'    : '',
+            'imei': '',
         }
 
         lines, _ = qmi_get_manufacturer(dev_id)
         for line in lines:
             if 'Manufacturer' in line:
-                result['Vendor'] = line.split(':')[-1].strip().replace("'", '')
+                result['vendor'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
         lines, _ = qmi_get_model(dev_id)
         for line in lines:
             if 'Model' in line:
-                result['Model'] = line.split(':')[-1].strip().replace("'", '')
+                result['model'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
         lines, _ = qmi_get_imei(dev_id)
         for line in lines:
             if 'IMEI' in line:
-                result['Imei'] = line.split(':')[-1].strip().replace("'", '')
+                result['imei'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
 
@@ -3007,17 +3007,17 @@ def lte_get_hardware_info(dev_id):
 def lte_get_packets_state(dev_id):
     try:
         result = {
-            'Uplink_speed'  : 0,
-            'Downlink_speed': 0
+            'uplink_speed'  : 0,
+            'downlink_speed': 0
         }
 
         lines, _ = qmi_get_packet_service_state(dev_id)
         for line in lines:
             if 'Max TX rate' in line:
-                result['Uplink_speed'] = line.split(':')[-1].strip().replace("'", '')
+                result['uplink_speed'] = line.split(':')[-1].strip().replace("'", '')
                 continue
             if 'Max RX rate' in line:
-                result['Downlink_speed'] = line.split(':')[-1].strip().replace("'", '')
+                result['downlink_speed'] = line.split(':')[-1].strip().replace("'", '')
                 continue
         return result
     except Exception as e:
