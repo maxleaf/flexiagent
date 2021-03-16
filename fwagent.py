@@ -669,7 +669,6 @@ def reset(soft=False, quiet=False):
         fwutils.reset_device_config()
         return
 
-    daemon_rpc('stop', stop_router=False)          # Stop daemon main loop if daemon is alive
     reset_device = True
     if not quiet:
         CSTART = "\x1b[0;30;43m"
@@ -682,8 +681,8 @@ def reset(soft=False, quiet=False):
     if reset_device:
         # If vpp is run, we need to stop the router, and reset the device configuration
         if fwutils.vpp_does_run()
-            print("Please wait while we are stopping the router...")
-            daemon_rpc('stop', stop_router=True)
+            print("stopping the router ...")
+        daemon_rpc('stop', stop_router=True)
         fwutils.reset_device_config()
 
         if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
