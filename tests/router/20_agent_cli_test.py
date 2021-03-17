@@ -36,14 +36,18 @@ cli_start_router_file = os.path.join(cli_path, 'start-router.cli')
 cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 
 tests = [
-    { 'api': 'cmd',     'args': 'reset -q -d',  'vpp_should_run': False, 'database_expected_empty': True },
-    { 'api': 'cmd',     'args': 'reset -s',     'vpp_should_run': True,  'database_expected_empty': False },
-    { 'api': 'kill',    'args': None,           'vpp_should_run': False, 'database_expected_empty': False },
-    { 'api': 'kill',    'args': '--clean_cfg',  'vpp_should_run': False, 'database_expected_empty': True }
+    { 'api': 'fwagent_cmd', 'args': 'reset -q -d',  'vpp_should_run': False, 'database_expected_empty': True },
+    { 'api': 'fwagent_cmd', 'args': 'reset -s',     'vpp_should_run': True,  'database_expected_empty': False },
+    { 'api': 'fwkill',      'args': None,           'vpp_should_run': False, 'database_expected_empty': False },
+    { 'api': 'fwkill',      'args': '--clean_cfg',  'vpp_should_run': False, 'database_expected_empty': True }
 ]
 
 def test():
     for (idx,test) in enumerate(tests):
+        if idx == 0:
+                print("")
+        print("   api: %s, args: %s" % (test['api'], test['args']))
+
         daemon = True if idx == 0 else False
         def call(agent):
             handler_func = getattr(agent, test['api'])

@@ -65,7 +65,7 @@ class TestFwagent:
         if daemon_pid:
             os.system('kill -9 %s' % daemon_pid)                # Ensure daemon by previous failed test does not run
         if vpp_does_run():
-            self.kill()         # The kill shot - ensure vpp does not run
+            self.fwkill()         # The kill shot - ensure vpp does not run
         os.system('%s reset --soft --quiet' % self.fwagent_py)  # Clean fwagent files like persistent configuration database
 
         # Print exception if it is not caused by 'assert' statement
@@ -79,7 +79,7 @@ class TestFwagent:
                 for l in lines:
                     print(l)
 
-    def kill(self, args=None):
+    def fwkill(self, args=None):
         os.system('%s --quiet %s' % (self.fwkill_py, args if args else ''))
         return (True, None)
 
@@ -88,7 +88,7 @@ class TestFwagent:
         time.sleep(1)   # Ensure that all further log times are greater than now()
                         # The now() uses microseconds, when log uses seconds only.
 
-    def cmd(self, args):
+    def fwagent_cmd(self, args):
         try:
             cmd = '%s %s' % (self.fwagent_py, args)
             output = subprocess.check_output(cmd, shell=True)

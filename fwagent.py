@@ -652,7 +652,7 @@ def version():
 def dump(filename, path, clean_log):
     fwutils.dump(filename=filename, path=path, clean_log=clean_log)
 
-def reset(soft=False, quiet=False, dont_start_daemon=False):
+def reset(soft=False, quiet=False, start_daemon=True):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
@@ -701,9 +701,8 @@ def reset(soft=False, quiet=False, dont_start_daemon=False):
     else:
         fwglobals.log.info("Reset operation aborted")
 
-    if dont_start_daemon:
-        return
-    daemon_rpc('start')     # Start daemon main loop if daemon is alive
+    if start_daemon:
+        daemon_rpc('start')     # Start daemon main loop if daemon is alive
 
 def stop(reset_device_config, stop_router):
     """Handles 'fwagent stop' command.
@@ -1163,7 +1162,7 @@ if __name__ == '__main__':
 
     command_functions = {
                     'version':lambda args: version(),
-                    'reset': lambda args: reset(soft=args.soft, quiet=args.quiet, dont_start_daemon=args.dont_start_daemon),
+                    'reset': lambda args: reset(soft=args.soft, quiet=args.quiet, start_daemon=(not args.dont_start_daemon)),
                     'stop': lambda args: stop(reset_device_config=args.reset_softly, stop_router=(not args.dont_stop_vpp)),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
