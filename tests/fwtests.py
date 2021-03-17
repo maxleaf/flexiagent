@@ -90,9 +90,8 @@ class TestFwagent:
 
     def fwagent_cmd(self, args):
         try:
-            cmd = '%s %s' % (self.fwagent_py, args)
-            output = subprocess.check_output(cmd, shell=True)
-            return (True, None)
+            ret = os.system('%s %s' % (self.fwagent_py, args))
+            return (ret == 0, None)
         except Exception as e:
             return (False, str(e))
 
