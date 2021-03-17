@@ -2319,6 +2319,7 @@ def configure_hostapd(dev_id, configuration):
                 data['ieee80211d'] = 1
             data['ieee80211h'] = 0
 
+            subprocess.check_output('ifconfig %s up' % if_name, shell=True)
             subprocess.check_output('iw reg set %s' % country_code, shell=True)
             subprocess.check_output('iw dev %s scan' % if_name, shell=True)
 
