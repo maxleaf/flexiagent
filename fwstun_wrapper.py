@@ -443,6 +443,8 @@ class FwStunWrap:
                 if self.stun_cache.get(dev_id):
                     self.stun_cache[dev_id]['success'] = True
                     self.stun_cache[dev_id]['send_time'] = 0
+                if self.sym_nat_cache.get(dev_id):
+                    self.sym_nat_cache['probe_time'] = 0
 
     def _is_useStun(self, dev_id):
         """ check router DB for 'useStun' flag for an interface bus address
