@@ -1194,7 +1194,7 @@ if __name__ == '__main__':
                         help="clean router configuration only, device remains registered")
     parser_reset.add_argument('-q', '--quiet', action='store_true',
                         help="don't print info onto screen, print into syslog only")
-    parser_reset.add_argument('-n', '--dont_start_daemon', action='store_true',
+    parser_reset.add_argument('-d', '--dont_start_daemon', action='store_true',
                         help="don't start the daemon after the reset")
     parser_stop = subparsers.add_parser('stop', help='Stop router and reset interfaces')
     parser_stop.add_argument('-s', '--reset_softly', action='store_true',
