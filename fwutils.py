@@ -481,7 +481,7 @@ def get_linux_interfaces(cached=True):
         interfaces = fwglobals.g.cache.linux_interfaces
 
         if cached and interfaces:
-            return interfaces
+            return copy.deepcopy(interfaces)
 
         fwglobals.log.debug("get_linux_interfaces: Start to build Linux interfaces cache")
         interfaces.clear()
@@ -570,7 +570,7 @@ def get_linux_interfaces(cached=True):
             interfaces[dev_id] = interface
 
         fwglobals.log.debug("get_linux_interfaces: Finished to build Linux interfaces cache")
-        return interfaces
+        return copy.deepcopy(interfaces)
 
 def get_interface_dev_id(if_name):
     """Convert  interface name into bus address.
@@ -3423,7 +3423,7 @@ def get_reconfig_hash():
     res = ''
 
     linux_interfaces = get_linux_interfaces()
-    for dev_id in copy.deepcopy(linux_interfaces):
+    for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]['name']
 
         is_lte = is_lte_interface(name)
