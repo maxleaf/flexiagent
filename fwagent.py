@@ -652,7 +652,7 @@ def version():
 def dump(filename, path, clean_log):
     fwutils.dump(filename=filename, path=path, clean_log=clean_log)
 
-def reset(soft=False, quiet=False):
+def reset(soft=False, quiet=False, dont_start_daemon=False):
     """Handles 'fwagent reset' command.
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
@@ -661,6 +661,7 @@ def reset(soft=False, quiet=False):
                   No re-registration is needed.
     :param quiet: Quiet reset: resets router configuration without confirmation
                   of device deletion in management.
+    :param no_start: Don't start the daemon after reset.
 
     :returns: None.
     """
@@ -699,6 +700,9 @@ def reset(soft=False, quiet=False):
         fwglobals.log.info("Reset operation done")
     else:
         fwglobals.log.info("Reset operation aborted")
+
+    if dont_start_daemon:
+        return
     daemon_rpc('start')     # Start daemon main loop if daemon is alive
 
 def stop(reset_device_config, stop_router):
@@ -1159,7 +1163,7 @@ if __name__ == '__main__':
 
     command_functions = {
                     'version':lambda args: version(),
-                    'reset': lambda args: reset(soft=args.soft, quiet=args.quiet),
+                    'reset': lambda args: reset(soft=args.soft, quiet=args.quiet, dont_start_daemon=args.dont_start_daemon),
                     'stop': lambda args: stop(reset_device_config=args.reset_softly, stop_router=(not args.dont_stop_vpp)),
                     'start': lambda args: start(start_router=args.start_router),
                     'daemon': lambda args: daemon(standalone=args.dont_connect),
@@ -1190,6 +1194,8 @@ if __name__ == '__main__':
                         help="clean router configuration only, device remains registered")
     parser_reset.add_argument('-q', '--quiet', action='store_true',
                         help="don't print info onto screen, print into syslog only")
+    parser_reset.add_argument('-n', '--dont_start_daemon', action='store_true',
+                        help="don't start the daemon after the reset")
     parser_stop = subparsers.add_parser('stop', help='Stop router and reset interfaces')
     parser_stop.add_argument('-s', '--reset_softly', action='store_true',
                         help="reset router softly: clean router configuration")

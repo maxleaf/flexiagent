@@ -36,7 +36,7 @@ cli_start_router_file = os.path.join(cli_path, 'start-router.cli')
 cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 
 tests = [
-    { 'api': 'cmd',     'args': 'reset -q',     'vpp_should_run': False, 'database_expected_empty': True },
+    { 'api': 'cmd',     'args': 'reset -q -n',  'vpp_should_run': False, 'database_expected_empty': True },
     { 'api': 'cmd',     'args': 'reset -s',     'vpp_should_run': True,  'database_expected_empty': False },
     { 'api': 'kill',    'args': None,           'vpp_should_run': False, 'database_expected_empty': False },
     { 'api': 'kill',    'args': '--clean_cfg',  'vpp_should_run': False, 'database_expected_empty': True }
