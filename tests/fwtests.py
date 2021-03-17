@@ -89,11 +89,8 @@ class TestFwagent:
                         # The now() uses microseconds, when log uses seconds only.
 
     def fwagent_cmd(self, args):
-        try:
-            ret = os.system('%s %s' % (self.fwagent_py, args))
-            return (ret == 0, None)
-        except Exception as e:
-            return (False, str(e))
+        ret = os.system('%s %s' % (self.fwagent_py, args))
+        return (ret == 0, None)
 
     def cli(self, args, daemon=False, expected_vpp_cfg=None, expected_router_cfg=None, check_log=False):
         '''Invokes fwagent API.

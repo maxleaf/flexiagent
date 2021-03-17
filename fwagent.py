@@ -657,11 +657,11 @@ def reset(soft=False, quiet=False, start_daemon=True):
     Resets device to the initial state. Once reset, the device MUST go through
     the registration procedure.
 
-    :param soft:  Soft reset: resets router configuration only.
-                  No re-registration is needed.
-    :param quiet: Quiet reset: resets router configuration without confirmation
-                  of device deletion in management.
-    :param no_start: Don't start the daemon after reset.
+    :param soft:        Soft reset: resets router configuration only.
+                            No re-registration is needed.
+    :param quiet:       Quiet reset: resets router configuration without confirmation
+                            of device deletion in management.
+    :param start_daemon: Indicates if need to start the daemon after reset.
 
     :returns: None.
     """

@@ -42,25 +42,26 @@ tests = [
     { 'api': 'fwkill',      'args': '--clean_cfg',  'vpp_should_run': False, 'database_expected_empty': True }
 ]
 
+def call(agent, test):
+    handler_func = getattr(agent, test['api'])
+    if test['args']:
+        (ok, _) = handler_func(test['args'])
+    else:
+        (ok, _) = handler_func()
+    return (ok, _)
+
 def test():
     for (idx,test) in enumerate(tests):
+
         if idx == 0:
                 print("")
         print("   api: %s, args: %s" % (test['api'], test['args']))
 
         daemon = True if idx == 0 else False
-        def call(agent):
-            handler_func = getattr(agent, test['api'])
-            if test['args']:
-                (ok, _) = handler_func(test['args'])
-            else:
-                (ok, _) = handler_func()
-            return (ok, _)
-
         with fwtests.TestFwagent() as agent:
 
             # cmd when vpp isn't running
-            (ok, _) = call(agent)
+            (ok, _) = call(agent, test)
             assert ok
 
             (ok, _) = agent.cli('-f %s' % cli_add_config_file, daemon=daemon)
@@ -68,7 +69,7 @@ def test():
             (ok, _) = agent.cli('-f %s' % cli_start_router_file)
 
             # cmd when vpp is running
-            (ok, _) = call(agent)
+            (ok, _) = call(agent, test)
             assert ok
 
             is_run = fwutils.vpp_does_run()
