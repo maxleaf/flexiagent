@@ -65,6 +65,7 @@ def test():
             (ok, _) = agent.cli('-f %s' % cli_add_config_file, daemon=daemon)
             assert ok
             (ok, _) = agent.cli('-f %s' % cli_start_router_file)
+            assert ok
 
             # cmd when vpp is running
             (ok, _) = call(agent, test)
