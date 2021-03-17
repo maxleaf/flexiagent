@@ -52,18 +52,16 @@ def call(agent, test):
 
 def test():
     for (idx,test) in enumerate(tests):
-
-        if idx == 0:
-                print("")
-        print("   api: %s, args: %s" % (test['api'], test['args']))
-
-        daemon = True if idx == 0 else False
         with fwtests.TestFwagent() as agent:
+            if idx == 0:
+                print("")
+            print("   api: %s, args: %s" % (test['api'], test['args']))
 
             # cmd when vpp isn't running
             (ok, _) = call(agent, test)
             assert ok
 
+            daemon = True if idx == 0 else False
             (ok, _) = agent.cli('-f %s' % cli_add_config_file, daemon=daemon)
             assert ok
             (ok, _) = agent.cli('-f %s' % cli_start_router_file)
