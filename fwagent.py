@@ -247,14 +247,19 @@ class FwAgent:
         except uerr.URLError as e:
             if hasattr(e, 'code'):
                 server_response = e.read().decode()
+                latestVersion = e.headers.get('latestVersion','None')
                 fwglobals.log.error('register: got %s - %s' % (str(e.code), hsvr.BaseHTTPRequestHandler.responses[e.code][0]))
                 fwglobals.log.error('register: Server response: %s' % server_response)
+                fwglobals.log.error('latestVersion: %s' % (latestVersion))
                 try:
                     register_response = json.loads(server_response)
                     if 'error' in register_response:
                         self.register_error = register_response['error'].lower()
                 except:
                     pass
+                if e.code == 403: # version too low, try to upgrade immediately
+                    fwglobals.log.error('Trying device auto upgrade...')
+                    reply = fwglobals.g.handle_request({'message':'upgrade-device-sw','params':{'version':latestVersion}})
             elif hasattr(e, 'reason'):
                 fwglobals.log.error('register: failed to connect to %s: %s' % (fwglobals.g.cfg.MANAGEMENT_URL, e.reason))
             return False
