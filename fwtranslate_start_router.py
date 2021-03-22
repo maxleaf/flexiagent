@@ -26,6 +26,7 @@ import re
 import fwnetplan
 import fwglobals
 import fwutils
+import fw_nat_command_helpers
 
 # start_router
 # --------------------------------------
@@ -241,9 +242,9 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
-    cmd['cmd']['descr']   = "enable NAT forwarding"
-    cmd['cmd']['params']  = { 'enable':1 }
+    cmd['cmd']['name']    = "exec"
+    cmd['cmd']['params']  = [ "sudo vppctl tap-inject enable-nat44-output" ]
+    cmd['cmd']['descr']   = "enable nat44 output on tap-inject path"
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
@@ -267,6 +268,10 @@ def start_router(params=None):
         'func'  : 'restore_linux_netplan_files'
     }
     cmd_list.append(cmd)
+
+    # Setup Global VPP NAT parameters
+    # Post VPP NAT/Firewall changes - The param need to be false
+    cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(False))
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)

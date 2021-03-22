@@ -51,7 +51,9 @@ from fwsystem_cfg   import FwSystemCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
+from fw_traffic_identification import FwTrafficIdentifications
 
+proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
 
@@ -836,6 +838,7 @@ def pci_bytes_to_str(pci_bytes):
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
+
 def dev_id_to_vpp_sw_if_index(dev_id):
     """Convert device bus address into VPP sw_if_index.
 
@@ -1167,6 +1170,8 @@ def reset_device_config():
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
 
+    with FwTrafficIdentifications(fwglobals.g.TRAFFIC_ID_DB_FILE) as traffic_db:
+        traffic_db.clean()
     fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
@@ -1365,6 +1370,19 @@ def ip_str_to_bytes(ip_str):
     addr_ip = ip_str.split('/')[0]
     addr_len = int(ip_str.split('/')[1]) if len(ip_str.split('/')) > 1 else 32
     return socket.inet_pton(socket.AF_INET, addr_ip), addr_len
+
+def ports_str_to_range(ports_str):
+    """Convert Ports string range into ports_from and ports_to
+
+     :param ports_str:         Ports range string.
+
+     :returns: port_from and port_to
+     """
+    ports_map = map(int, ports_str.split('-'))
+    port_from = port_to = ports_map[0]
+    if len(ports_map) > 1:
+        port_to = ports_map[1]
+    return port_from, port_to
 
 def mac_str_to_bytes(mac_str):      # "08:00:27:fd:12:01" -> bytes
     """Convert MAC address string into bytes.
@@ -3450,27 +3468,18 @@ def get_reconfig_hash():
     fwglobals.log.debug("get_reconfig_hash: %s: %s" % (hash, res))
     return hash
 
-def _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add):
+def vpp_nat_interface_add(dev_id, remove):
 
-    if vpp_if_name_remove is not None:
-        fwglobals.log.debug("NAT Address Remove- (%s)" % (vpp_if_name_remove))
-        vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name_remove
-        out = _vppctl_read(vppctl_cmd, wait=False)
-        if out is None:
-            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
-
-    if vpp_if_name_add is not None:
-        fwglobals.log.debug("NAT Address Add- (%s)" % (vpp_if_name_add))
-        vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_add
-        out = _vppctl_read(vppctl_cmd, wait=False)
-        if out is None:
-            # revert 'nat44 add interface address del'
-            if vpp_if_name_remove:
-                vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name_remove
-                _vppctl_read(vppctl_cmd, wait=False)
-            return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
-
-    return (True, None)
+    vpp_if_name = dev_id_to_vpp_if_name(dev_id)
+    fwglobals.log.debug("NAT Interface Address - (%s is_delete: %s)" % (vpp_if_name, remove))
+    if remove:
+        vppctl_cmd = 'nat44 add interface address %s del' % vpp_if_name
+    else:
+        vppctl_cmd = 'nat44 add interface address %s' % vpp_if_name
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        fwglobals.log.debug("failed vppctl_cmd=%s" % vppctl_cmd)
+        return False
 
 def get_min_metric_device(skip_dev_id):
 
@@ -3506,80 +3515,6 @@ def vpp_nat_add_del_identity_mapping(vpp_if_name, protocol, port, is_add):
         fwglobals.log.error("Failed vppctl command: %s" % vppctl_cmd)
     else:
         fwglobals.log.debug("Executed nat44 mapping command: %s" % vppctl_cmd)
-
-def vpp_nat_addr_update_on_metric_change(dev_id, new_metric):
-
-    vpp_if_name_remove = None
-    vpp_if_name_add = None
-
-    # Find interface with lowest metric - excluding the passed dev_id
-    (metric_min_dev_id, metric_min) = get_min_metric_device(dev_id)
-    fwglobals.log.debug("NAT Address - Metric change Device Id:%s New Metric: %d \
-        Min Dev id: %s Min Metric: %d" % (dev_id, new_metric, metric_min_dev_id, metric_min))
-
-    if metric_min_dev_id is None:
-        return True
-
-    # One other WAN link exist
-    if (new_metric > metric_min):
-        # Case of device route metric Increased i.e Move to lower priority
-        vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
-        vpp_if_name_add = dev_id_to_vpp_if_name(metric_min_dev_id)
-    elif (new_metric < metric_min):
-        # Case of device route metric Decreased i.e. Move to higher priority
-        vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
-        vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
-
-    '''
-    On removing NAT interface address - Identity mapping on the interface gets to a partially
-    removed state in VPP. So, removing and re-adding identity mapping on interface address deletion.
-    A good fix would be to root cause and modify VPP and ensure the identity mappings do not need
-    deletion and addition (addition needed for vxlan tunnel) on nat44 address removal.
-    '''
-    if vpp_if_name_remove:
-        vpp_nat_add_del_identity_mapping(vpp_if_name_remove, 'udp', 4789, 0)
-
-    success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
-
-    if vpp_if_name_remove:
-        vpp_nat_add_del_identity_mapping(vpp_if_name_remove, 'udp', 4789, 1)
-
-    return success
-
-
-def vpp_nat_addr_update_on_interface_add(dev_id, metric, remove):
-
-    vpp_if_name_remove = None
-    vpp_if_name_add = None
-
-    metric = get_wan_failover_metric(dev_id, metric)
-    #Find interface with lowest metric - excluding the passed dev_id
-    (metric_min_dev_id, metric_min) = get_min_metric_device(dev_id)
-
-    fwglobals.log.debug("NAT Address - Interface Add/Remove Device Id:%s (Remove: %d): Metric: %d\
-        Min Dev id: %s Min Metric: %d" % (dev_id, remove, metric, metric_min_dev_id, metric_min))
-
-    if remove:
-        if metric_min_dev_id is None:
-            # Remove self
-            vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
-        else:
-            if (metric < metric_min):
-                # Remove self and Add next min
-                vpp_if_name_remove = dev_id_to_vpp_if_name(dev_id)
-                vpp_if_name_add = dev_id_to_vpp_if_name(metric_min_dev_id)
-    else:
-        if metric_min_dev_id is None:
-            # Add self
-            vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
-        else:
-            if metric < metric_min:
-                # Add self and Remove previous min
-                vpp_if_name_remove = dev_id_to_vpp_if_name(metric_min_dev_id)
-                vpp_if_name_add = dev_id_to_vpp_if_name(dev_id)
-
-    success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
-    return success
 
 def wifi_get_capabilities(dev_id):
 
@@ -3931,3 +3866,11 @@ def replace_file_variables(template_fname, replace_fname):
                 requests[req] = replace(requests[req])
 
     return requests
+def map_keys_to_acl_ids(acl_ids, arg):
+    # arg carries command cache
+    keys = acl_ids['keys']
+    i = 0
+    while i < len(keys):
+        keys[i] = arg[keys[i]]
+        i += 1
+    return keys
