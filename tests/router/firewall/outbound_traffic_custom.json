@@ -1,0 +1,35 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "outbound": {
+                "rules": [
+                    {
+                        "id": "1",
+                        "classification": {
+                            "destination": {
+                                "ipProtoPort": {
+                                    "ip": "172.16.0.0/16",
+                                    "protocol": "tcp",
+                                    "ports": "666-777"
+                                }
+                            },
+                            "source": {
+                                "ipPort": {
+                                    "ports": "888"
+                                }
+                            }
+                        },
+                        "action": {
+                            "permit": true,
+                            "interfaces": [
+                                "pci:0000:00:03.00"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    }
+]

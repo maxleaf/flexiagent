@@ -51,7 +51,9 @@ from fwsystem_cfg   import FwSystemCfg
 from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
+from fw_traffic_identification import FwTrafficIdentifications
 
+proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
 
@@ -836,6 +838,7 @@ def pci_bytes_to_str(pci_bytes):
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
+
 def dev_id_to_vpp_sw_if_index(dev_id):
     """Convert device bus address into VPP sw_if_index.
 
@@ -1167,6 +1170,8 @@ def reset_device_config():
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
 
+    with FwTrafficIdentifications(fwglobals.g.TRAFFIC_ID_DB_FILE) as traffic_db:
+        traffic_db.clean()
     fwnetplan.restore_linux_netplan_files()
 
     reset_dhcpd()
@@ -1365,6 +1370,19 @@ def ip_str_to_bytes(ip_str):
     addr_ip = ip_str.split('/')[0]
     addr_len = int(ip_str.split('/')[1]) if len(ip_str.split('/')) > 1 else 32
     return socket.inet_pton(socket.AF_INET, addr_ip), addr_len
+
+def ports_str_to_range(ports_str):
+    """Convert Ports string range into ports_from and ports_to
+
+     :param ports_str:         Ports range string.
+
+     :returns: port_from and port_to
+     """
+    ports_map = map(int, ports_str.split('-'))
+    port_from = port_to = ports_map[0]
+    if len(ports_map) > 1:
+        port_to = ports_map[1]
+    return port_from, port_to
 
 def mac_str_to_bytes(mac_str):      # "08:00:27:fd:12:01" -> bytes
     """Convert MAC address string into bytes.
@@ -3931,3 +3949,11 @@ def replace_file_variables(template_fname, replace_fname):
                 requests[req] = replace(requests[req])
 
     return requests
+def map_keys_to_acl_ids(acl_ids, arg):
+    # arg carries command cache
+    keys = acl_ids['keys']
+    i = 0
+    while i < len(keys):
+        keys[i] = arg[keys[i]]
+        i += 1
+    return keys
