@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -169,8 +169,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, if_name=%s, wan_failover=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type, if_name, str(wan_failover)))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
+         staticDnsServers=%s, staticDnsDomains=%s if_name=%s, wan_failover=%s" % \
+        (is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -255,6 +256,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
                     config_section['routes'] = routes   # Handle case where there is no 'routes' section
                 if 'gateway4' in config_section:
                     del config_section['gateway4']
+
+                if staticDnsServers:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['addresses'] = staticDnsServers
+                    config_section['nameservers'] = nameservers
+                if staticDnsDomains:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['search'] = staticDnsDomains
+                    config_section['nameservers'] = nameservers
 
         if is_add == 1:
             if old_ifname in ethernets:

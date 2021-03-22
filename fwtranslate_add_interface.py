@@ -100,6 +100,8 @@ def add_interface(params):
     metric    = 0 if not params.get('metric', '') else int(params.get('metric', '0'))
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
+    staticDnsServers  = params.get('staticDnsServers', ['8.8.8.8', '8.8.4.4'])
+    staticDnsDomains  = params.get('staticDnsDomains', None)
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
@@ -252,20 +254,23 @@ def add_interface(params):
     netplan_params = {
         'module': 'fwnetplan',
         'func': 'add_remove_netplan_interface',
-        'args': {   'is_add'   : 1,
-                    'dev_id'   : dev_id,
-                    'ip'       : iface_addr,
-                    'gw'       : gw,
-                    'metric'   : metric,
-                    'dhcp'     : dhcp,
-                    'type'     : int_type
+        'args': {   'is_add'          : 1,
+                    'dev_id'          : dev_id,
+                    'ip'              : iface_addr,
+                    'gw'              : gw,
+                    'metric'          : metric,
+                    'dhcp'            : dhcp,
+                    'type'            : int_type,
+                    'staticDnsServers': staticDnsServers,
+                    'staticDnsDomains': staticDnsDomains
         }
     }
 
     if is_lte:
         netplan_params['substs'] = [
             { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
-            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] }
+            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] },
+            { 'add_param':'staticDnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] }
         ]
 
     cmd = {}
