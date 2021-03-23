@@ -371,7 +371,7 @@ def _add_interface_to_bridge(cmd_list, iface_description, bridge_id, bvi, shg, c
                               'bd_id':bridge_id , 'enable':0 }
     cmd_list.append(cmd)
 
-def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa_id = None):
+def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa_id = None, up = True):
     """Add GRE tunnel command into the list.
 
     :param cmd_list:             List of commands.
@@ -380,6 +380,7 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa
     :param dst:                  Destination ip address.
     :param local_sa_id:          Local SA identifier.
     :param remote_sa_id:         Remote SA identifier.
+    :param up:                   Interface state is UP/DOWN.
 
     :returns: None.
     """
@@ -427,15 +428,16 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa
         cmd['revert']['descr']      = "delete tunnel ipsec protect %s -> %s" % (src, dst)
         cmd_list.append(cmd)
 
-    # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "sw_interface_set_flags"
-    cmd['cmd']['descr']   = "UP GRE tunnel %s -> %s" % (src, dst)
-    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                              'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
-                            }
-    cmd_list.append(cmd)
+    if up:
+        # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "sw_interface_set_flags"
+        cmd['cmd']['descr']   = "UP GRE tunnel %s -> %s" % (src, dst)
+        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                  'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
+                                }
+        cmd_list.append(cmd)
 
 def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     """Add VxLAN tunnel command into the list.
@@ -893,7 +895,8 @@ def _add_loop0_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id)
                 cmd_list,
                 'gre_tunnel_sw_if_index',
                 l2gre_tunnel_ips['src'],
-                l2gre_tunnel_ips['dst'])
+                l2gre_tunnel_ips['dst'],
+                up = False)
     _add_interface_to_bridge(
                 cmd_list,
                 iface_description='loop0_' + params['loopback-iface']['addr'],
