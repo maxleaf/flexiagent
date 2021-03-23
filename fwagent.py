@@ -579,7 +579,8 @@ class FwAgent:
         if print_message:
             fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
-        reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
+        with fwglobals.g.cache.request_lock:
+            reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
 
         if not 'entity' in reply and 'entity' in msg:
             reply.update({'entity': msg['entity'] + 'Reply'})

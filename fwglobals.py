@@ -218,6 +218,7 @@ class Fwglobals:
                 'LTE': {}
             }
             self.lock                       = threading.RLock()
+            self.request_lock               = threading.RLock()
             self.linux_interfaces           = self.db['LINUX_INTERFACES']
             self.dev_id_to_vpp_if_name      = self.db['DEV_ID_TO_VPP_IF_NAME']
             self.dev_id_to_vpp_tap_name     = self.db['DEV_ID_TO_VPP_TAP_NAME']
