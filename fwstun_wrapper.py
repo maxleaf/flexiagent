@@ -354,7 +354,6 @@ class FwStunWrap:
                     # probe tunnels in down state to see if we could find remote edge
                     # address/port from incoming packets for symmetric NAT traversal
 
-                    # TBD: Temp removal of symmetric NAT fix until we add message queue
                     if slept % probe_sym_nat_timeout == 0:
                         self._probe_symmetric_nat()
 
