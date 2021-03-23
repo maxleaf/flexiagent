@@ -259,7 +259,7 @@ class FwAgent:
                     pass
                 if e.code == 403: # version too low, try to upgrade immediately
                     fwglobals.log.error('Trying device auto upgrade...')
-                    reply = fwglobals.g.handle_request({'message':'upgrade-device-sw','params':{'version':latestVersion}})
+                    fwglobals.g.handle_request({'message':'upgrade-device-sw','params':{'version':latestVersion}})
             elif hasattr(e, 'reason'):
                 fwglobals.log.error('register: failed to connect to %s: %s' % (fwglobals.g.cfg.MANAGEMENT_URL, e.reason))
             return False
