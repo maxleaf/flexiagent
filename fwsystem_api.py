@@ -121,7 +121,7 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                                 params = self.cfg_db.get_interfaces(dev_id=dev_id)[0]
                                 params['addr'] = modem_addr
                                 params['gateway'] = fwutils.lte_get_ip_configuration(dev_id, 'gateway', True)
-                                fwglobals.g.router_api.call({'message':'modify-interface','params': params})
+                                fwglobals.g.handle_request({'message':'modify-interface','params': params})
 
                                 fwglobals.log.debug("%s: LTE IP was changed: %s -> %s" % (dev_id, iface_addr, modem_addr))
 

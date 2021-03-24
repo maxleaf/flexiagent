@@ -245,7 +245,7 @@ class FWAGENT_API:
         :returns: Dictionary with status code.
         """
         if fwglobals.g.router_api.state_is_started():
-            fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
+            fwglobals.g.handle_request({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_device_config()
         return {'ok': 1}
 

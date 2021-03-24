@@ -249,7 +249,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             #
             fwnetplan.restore_linux_netplan_files()
 
-            self.call({'message':'start-router'})
+            fwglobals.g.handle_request({'message': 'start-router'})
         except Exception as e:
             fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
             self.state_change(FwRouterState.FAILED, "failed to restore vpp configuration")
@@ -260,7 +260,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         fwglobals.log.info("start_router")
         if self.router_state == FwRouterState.STOPPED or self.router_state == FwRouterState.STOPPING:
-            self.call({'message':'start-router'})
+            fwglobals.g.handle_request({'message': 'start-router'})
         fwglobals.log.info("start_router: started")
 
     def stop_router(self):
@@ -268,7 +268,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         fwglobals.log.info("stop_router")
         if self.router_state == FwRouterState.STARTED or self.router_state == FwRouterState.STARTING:
-            self.call({'message':'stop-router'})
+            fwglobals.g.handle_request({'message':'stop-router'})
         fwglobals.log.info("stop_router: stopped")
 
     def state_change(self, new_state, reason=''):
@@ -944,11 +944,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         if self.state_is_started():
             fwglobals.log.debug("_sync_device: restart_router=True")
             restart_router = True
-            self.call({'message': 'stop-router'})
+            fwglobals.g.handle_request({'message':'stop-router'})
 
         FwCfgRequestHandler.sync_full(self, incoming_requests)
 
         if restart_router:
-            self.call({'message': 'start-router'})
+            fwglobals.g.handle_request({'message': 'start-router'})
 
         fwglobals.log.debug("_sync_device: router full sync succeeded")

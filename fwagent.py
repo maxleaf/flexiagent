@@ -923,7 +923,7 @@ class FwagentDaemon(object):
         # Stop vpp ASAP, as no more requests can arrive on connection
         if stop_router:
             try:
-                fwglobals.g.router_api.call({'message':'stop-router'})
+                fwglobals.g.handle_request({'message':'stop-router'})
                 fwglobals.log.debug("router stopped")
             except Exception as e:
                 fwglobals.log.excep("failed to stop router: " + str(e))
