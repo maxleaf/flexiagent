@@ -365,7 +365,7 @@ class Checker:
         """
         try:
             # Find all default routes and ensure that there is exactly one default route
-            default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
+            default_routes = subprocess.check_output('ip route | grep default || true', shell=True).strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
             return True

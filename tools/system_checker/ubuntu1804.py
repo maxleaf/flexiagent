@@ -42,13 +42,13 @@ class Checker(fwsystem_checker_common.Checker):
         installed = False
         config_filename = '/etc/resolvconf/resolv.conf.d/tail'
         try: # Refresh self.nameservers on every invocation
-            out = subprocess.check_output("grep '^nameserver ' %s" % config_filename, shell=True).strip().split('\n')
+            out = subprocess.check_output("grep '^nameserver ' %s 2>/dev/null" % config_filename, shell=True).strip().split('\n')
             self.nameservers = [ line.split(' ')[1] for line in out ]  # 'line' format is 'nameserver 127.0.0.53'
         except:
             self.nameservers = []
 
         try:
-            out = subprocess.check_output('dpkg -l | grep resolvconf', shell=True).strip()
+            out = subprocess.check_output('dpkg -l | grep resolvconf || true', shell=True).strip()
             if len(out) == 0:
                 raise Exception(prompt + 'resolvconf is not installed')
             else:
@@ -65,7 +65,7 @@ class Checker(fwsystem_checker_common.Checker):
                 if silently:
                     # Install the daemon if not installed
                     if not installed:
-                        ret = os.system('apt -y install resolvconf > /dev/null 2>&1')
+                        ret = os.system('apt -y install resolvconf >/dev/null 2>&1')
                         if ret != 0:
                             print(prompt + 'failed to install resolvconf')
                             return False
