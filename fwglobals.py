@@ -279,7 +279,7 @@ class Fwglobals:
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
         self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
-
+        self.request_lock                  = threading.RLock()   # lock to syncronize message processing
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -532,6 +532,9 @@ class Fwglobals:
             handler = request_handlers.get(req)
             assert handler, 'fwglobals: "%s" request is not supported' % req
 
+            # received_msg indicate that request is received from flexiManage
+            received_from_server = (received_msg != None)
+
             # Keep copy of the request aside for signature purposes,
             # as the original request might by modified by preprocessing.
             #
@@ -540,10 +543,11 @@ class Fwglobals:
 
             handler_func = getattr(self, handler.get('name'))
 
-            if result is None:
-                reply = handler_func(request)
-            else:
-                reply = handler_func(request, result)
+            with self.request_lock:
+                if result is None:
+                    reply = handler_func(request)
+                else:
+                    reply = handler_func(request, result)
             if reply['ok'] == 0:
                 myCmd = 'sudo vppctl api trace save error.api'
                 os.system(myCmd)
@@ -554,11 +558,11 @@ class Fwglobals:
             # signature. This is needed to assists the database synchronization
             # feature that keeps the configuration set by user on the flexiManage
             # in sync with the one stored on the flexiEdge device.
-            # Note we update signature on configuration requests only, but
-            # retrieve it into replies for all requests. This is to simplify
+            # Note we update signature on configuration requests received from flexiManage only,
+            # but retrieve it into replies for all requests. This is to simplify
             # flexiManage code.
             #
-            if reply['ok'] == 1 and handler.get('sign', False) == True:
+            if reply['ok'] == 1 and handler.get('sign', False) == True and received_from_server:
                 fwutils.update_device_config_signature(received_msg)
             reply['router-cfg-hash'] = fwutils.get_device_config_signature()
 
