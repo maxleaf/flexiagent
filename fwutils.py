@@ -3341,7 +3341,7 @@ def check_root_access():
     return False
 
 def disable_ipv6():
-    """ disable default and all (current) ipv6 value of Linux
+    """ disable default and all ipv6
     """
     sys_cmd = 'sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null'
     rc = os.system(sys_cmd)
