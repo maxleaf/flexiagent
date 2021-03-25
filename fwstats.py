@@ -23,6 +23,7 @@
 # Handle device statistics
 import fwikev2
 import fwutils
+import math
 import time
 import loadsimulator
 import psutil
@@ -92,7 +93,7 @@ def update_stats():
                             }
                         if (intf.startswith('vxlan_tunnel')):
                             vxlan_id = int(intf[12:])
-                            tunnel_id = vxlan_id/2
+                            tunnel_id = math.floor(vxlan_id/2)
                             t_stats = tunnel_stats.get(tunnel_id)
                             if t_stats:
                                 t_stats.update(calc_stats)
