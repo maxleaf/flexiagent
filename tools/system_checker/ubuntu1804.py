@@ -65,6 +65,7 @@ class Checker(fwsystem_checker_common.Checker):
                 if silently:
                     # Install the daemon if not installed
                     if not installed:
+                        os.system('apt-get update > /dev/null 2>&1')
                         ret = os.system('apt -y install resolvconf > /dev/null 2>&1')
                         if ret != 0:
                             print(prompt + 'failed to install resolvconf')
@@ -82,6 +83,7 @@ class Checker(fwsystem_checker_common.Checker):
                     if not installed:
                         choice = raw_input(prompt + "download and install resolvconf? [Y/n]: ")
                         if choice == 'y' or choice == 'Y' or choice == '':
+                            os.system('apt-get update')
                             ret = os.system('apt -y install resolvconf')
                             if ret != 0:
                                 print(prompt + 'failed to install resolvconf')
