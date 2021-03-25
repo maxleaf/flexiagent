@@ -3340,6 +3340,23 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
+def disable_ipv6():
+    """ disable default and all ipv6
+    """
+    sys_cmd = 'sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null'
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Disable IPv6 all command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Disable IPv6 all command successfully executed: %s" % (sys_cmd))
+
+    sys_cmd = 'sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null'
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Disable IPv6 default command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Disable IPv6 default command successfully executed: %s" % (sys_cmd))
+
 def set_default_linux_reverse_path_filter(rpf_value):
 
     """ set default and all (current) rp_filter value of Linux
