@@ -4,13 +4,13 @@
         "message": "add-firewall-policy",
         "params": {
             "inbound": {
-                "Port_Forward": {
+                "portForward": {
                     "rules": [
                         {
                             "id": "1",
                             "classification": {
                                 "destination": {
-                                    "interface": "pci:0000:00:09.00",
+                                    "interface": "pci:0000:00:08.00",
                                     "protocols": [
                                         "tcp",
                                         "udp"

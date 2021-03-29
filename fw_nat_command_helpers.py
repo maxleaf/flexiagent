@@ -29,8 +29,8 @@ import fwutils
 # Example:
 # Uncomment when DHCP server feature is added on WAN interface
 # {
-#    "name": "DHCP",
-#    "port": 67,
+#    "name": "DHCP Client",
+#    "port": 68,
 #    "protocol": "udp"
 # }
 WAN_INTERFACE_SERVICES = [
@@ -39,7 +39,11 @@ WAN_INTERFACE_SERVICES = [
         "port": 4789,
         "protocol": "udp"
     },
-
+    {
+        "name": "DHCP Client",
+        "port": 68,
+        "protocol": "udp"
+    }
 ]
 
 def get_nat_forwarding_config(enable):
@@ -59,46 +63,17 @@ def get_nat_forwarding_config(enable):
     cmd['cmd']['params'] = {'enable': enable}
     return cmd
 
-def get_nat_wan_setup_config(dev_id, metric):
+def get_nat_wan_setup_config(dev_id):
     """
     Generates command to enable NAT and required default identity mappings
     on WAN interfaces
 
     :param dev_id: device identifier of the WAN interface
     :type dev_id: String
-    :param metric: Default route metric on the WAN interface
-    :type metric: Integer
     :return: Command params carrying the generated config
     :rtype: list
     """
     cmd_list = []
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "enable NAT for interface address %s" % dev_id
-    cmd['cmd']['params'] = {
-        'module': 'fwutils',
-        'func':   'vpp_nat_addr_update_on_interface_add',
-        'args':   {
-            'dev_id': dev_id,
-            'metric': metric,
-            'remove': False
-        }
-    }
-    cmd['revert'] = {}
-    cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "disable NAT for interface %s" % dev_id
-    cmd['revert']['params'] = {
-        'module': 'fwutils',
-        'func':   'vpp_nat_addr_update_on_interface_add',
-        'args':   {
-            'dev_id': dev_id,
-            'metric': metric,
-            'remove': True
-        }
-    }
-    cmd_list.append(cmd)
 
     cmd = {}
     cmd['cmd'] = {}
@@ -122,6 +97,31 @@ def get_nat_wan_setup_config(dev_id, metric):
              'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg': dev_id}
         ],
         'is_add': 0
+    }
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "enable NAT for interface address %s" % dev_id
+    cmd['cmd']['params'] = {
+        'module': 'fwutils',
+        'func':   'vpp_nat_interface_add',
+        'args':   {
+            'dev_id': dev_id,
+            'remove': False
+        }
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "disable NAT for interface %s" % dev_id
+    cmd['revert']['params'] = {
+        'module': 'fwutils',
+        'func':   'vpp_nat_interface_add',
+        'args':   {
+            'dev_id': dev_id,
+            'remove': True
+        }
     }
     cmd_list.append(cmd)
 

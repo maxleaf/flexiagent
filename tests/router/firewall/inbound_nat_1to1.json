@@ -4,7 +4,7 @@
         "message": "add-firewall-policy",
         "params": {
             "inbound": {
-                "NAT_1to1": {
+                "nat1to1": {
                     "rules": [
                         {
                             "id": "1",

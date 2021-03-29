@@ -11,7 +11,7 @@
                             "destination": {
                                 "ipProtoPort": {
                                     "ip": "172.16.0.0/16",
-                                    "protocol": "tcp",
+                                    "protocols": ["tcp"],
                                     "ports": "666-777"
                                 }
                             },

@@ -39,21 +39,26 @@ def _convert_match_to_acl_param(rule):
         ip_bytes = '\x00\x00\x00\x00'
         ip_prefix = 0
 
-    proto = rule.get('protocol')
     ports = rule.get('ports')
-
     if ports:
         port_from, port_to = fwutils.ports_str_to_range(ports)
-        if proto:
-            if (fwutils.proto_map[proto] != fwutils.proto_map['tcp'] and
-                    fwutils.proto_map[proto] != fwutils.proto_map['udp']):
-                raise Exception('Invalid input with ports but Protocol is not tcp or udp ' % proto)
-            proto = [fwutils.proto_map[proto]]
-        else:
-            proto = [fwutils.proto_map['tcp'], fwutils.proto_map['udp']]
-        return ip_bytes, ip_prefix, port_from, port_to, proto
     else:
-        return ip_bytes, ip_prefix, 0, 0, [fwutils.proto_map[proto]] if proto else None
+        port_from = port_to = 0
+    protocols = rule.get('protocols')
+    protocols_map = []
+    if protocols:
+        for protocol in protocols:
+            if ports:
+                if (fwutils.proto_map[protocol] != fwutils.proto_map['tcp'] and
+                        fwutils.proto_map[protocol] != fwutils.proto_map['udp']):
+                    raise Exception('Invalid input with ports but Protocol \
+                        is not  tcp or udp ' % protocol)
+            protocols_map.append(fwutils.proto_map[protocol])
+    elif ports:
+        protocols_map.append(fwutils.proto_map['tcp'])
+        protocols_map.append(fwutils.proto_map['udp'])
+
+    return ip_bytes, ip_prefix, port_from, port_to, protocols_map if protocols_map else None
 
 def _build_vpp_acl_params(source_match, dest_match, permit, is_ingress):
 

@@ -242,6 +242,12 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
+    cmd['cmd']['name']    = "exec"
+    cmd['cmd']['params']  = [ "sudo vppctl tap-inject enable-nat44-output" ]
+    cmd['cmd']['descr']   = "enable nat44 output on tap-inject path"
+    cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
     cmd['cmd']['descr'] = "punt ip broadcast"
@@ -265,7 +271,7 @@ def start_router(params=None):
 
     # Setup Global VPP NAT parameters
     # Post VPP NAT/Firewall changes - The param need to be false
-    cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(False))
+    cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(True))
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)

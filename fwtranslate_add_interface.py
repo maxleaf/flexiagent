@@ -321,7 +321,7 @@ def add_interface(params):
 
     # Setup NAT config on WAN interface
     if 'type' not in params or params['type'].lower() == 'wan':
-        cmd_list.extend(fw_nat_command_helpers.get_nat_wan_setup_config(dev_id, metric))
+        cmd_list.extend(fw_nat_command_helpers.get_nat_wan_setup_config(dev_id))
 
     # Update ospfd.conf.
     ospfd_file = fwglobals.g.FRR_OSPFD_FILE

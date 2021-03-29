@@ -239,15 +239,15 @@ def add_firewall_policy(params):
 
     inbound_rules = params.get('inbound')
     if inbound_rules:
-        nat_1to1_rules = inbound_rules.get("NAT_1to1")
+        nat_1to1_rules = inbound_rules.get("nat1to1")
         if nat_1to1_rules:
             cmd_list.extend(_process_inbound_rules(
                 nat_1to1_rules, InboundNatType.NAT_1TO1))
-        port_forward_rules = inbound_rules.get("Port_Forward")
+        port_forward_rules = inbound_rules.get("portForward")
         if port_forward_rules:
             cmd_list.extend(_process_inbound_rules(
                 port_forward_rules, InboundNatType.PORT_FORWARD))
-        edge_access_rules = inbound_rules.get("Edge_Access")
+        edge_access_rules = inbound_rules.get("edgeAccess")
         if edge_access_rules:
             cmd_list.extend(_process_inbound_rules(
                 edge_access_rules, InboundNatType.IDENTITY_MAPPING))
