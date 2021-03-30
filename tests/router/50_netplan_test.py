@@ -54,9 +54,7 @@ import fwtests
 
 CODE_ROOT = os.path.realpath(__file__).replace('\\', '/').split('/tests/')[0]
 TEST_ROOT = CODE_ROOT + '/tests/'
-sys.path.append(CODE_ROOT)
 sys.path.append(TEST_ROOT)
-import fwutils
 
 CLI_PATH = __file__.replace('.py', '')
 CLI_STOP_ROUTER = os.path.join(CLI_PATH, 'stop-router.cli')
@@ -82,7 +80,7 @@ def test_netplan(netplan_backup):
             else:
                 shutil.copy(yaml, '/etc/netplan/50-cloud-init.yaml')
             #apply netplan
-            fwutils.netplan_set_mac_addresses()
+            fwtests.adjust_environment_variables()
             os.system('netplan apply')
 
             with fwtests.TestFwagent() as agent:
@@ -92,8 +90,7 @@ def test_netplan(netplan_backup):
                 assert len(lines) == 0, "Error in start router: %s" % '\n'.join(lines)
 
                 # Load router configuration with spoiled lists
-                (cli_ok, out) = agent.cli('--api inject_requests filename=%s \
-                    ignore_errors=False' % test)
+                (cli_ok, out) = agent.cli('-f %s' % test) #ignore_errors=False
                 assert cli_ok, "Failed to inject request with %s file" % test
                 lines = agent.grep_log('Exception: API failed')
                 assert len(lines) == 0, "Errors in %s cli: %s" %(test, '\n'.join(lines))

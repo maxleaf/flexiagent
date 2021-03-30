@@ -186,6 +186,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
         fwglobals.log.error(err_str)
         return (False, err_str)
 
+    dev_id = fwutils.dev_id_to_full(dev_id)
     if dev_id in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[dev_id].get('fname')
         fname_run = fname.replace('yaml', 'fwrun.yaml')

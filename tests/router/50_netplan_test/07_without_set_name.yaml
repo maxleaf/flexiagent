@@ -1,16 +1,16 @@
 network:
     version: 2
     ethernets:
-        enp0s3:
+        __INTERFACE_3__name:
             dhcp4: true
             match:
                 macaddress: 08:00:27:97:c2:8d
-        enp0s8:
+        __INTERFACE_1__name:
             dhcp4: no
             addresses: [10.0.0.4/24]
             match:
                 macaddress: 08:00:27:23:f7:1d
-        enp0s9:
+        __INTERFACE_2__name:
             dhcp4: no
             addresses: [192.168.56.101/24]
             match:

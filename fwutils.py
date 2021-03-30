@@ -484,7 +484,7 @@ def get_linux_interfaces(cached=True):
         interfaces = fwglobals.g.cache.linux_interfaces
 
         if cached and interfaces:
-            return interfaces
+            return copy.deepcopy(interfaces)
 
         fwglobals.log.debug("get_linux_interfaces: Start to build Linux interfaces cache")
         interfaces.clear()
@@ -499,7 +499,7 @@ def get_linux_interfaces(cached=True):
             interface = {
                 'name':             if_name,
                 'devId':            dev_id,
-                'driver':           get_interface_driver(if_name),
+                'driver':           get_interface_driver(if_name, False),
                 'MAC':              '',
                 'IPv4':             '',
                 'IPv4Mask':         '',
@@ -573,7 +573,7 @@ def get_linux_interfaces(cached=True):
             interfaces[dev_id] = interface
 
         fwglobals.log.debug("get_linux_interfaces: Finished to build Linux interfaces cache")
-        return interfaces
+        return copy.deepcopy(interfaces)
 
 def get_interface_dev_id(if_name):
     """Convert  interface name into bus address.
@@ -2233,11 +2233,14 @@ def configure_hostapd(dev_id, configuration):
                 'logger_syslog_level'  : 2,
                 'logger_stdout'        : -1,
                 'logger_stdout_level'  : 2,
-                'max_num_sta'          : 128
+                'max_num_sta'          : 128,
+                'ctrl_interface'       : '/var/run/hostapd',
+                'ctrl_interface_group' : 0,
+                'wmm_enabled'          : 1
             }
 
             if band == '5GHz':
-                data['uapsd_advertisement_enabled=1'] = 1
+                data['uapsd_advertisement_enabled'] = 1
                 data['wmm_ac_bk_cwmin'] = 4
                 data['wmm_ac_bk_cwmax'] = 10
                 data['wmm_ac_bk_aifs'] = 7
@@ -2275,8 +2278,6 @@ def configure_hostapd(dev_id, configuration):
                 data['tx_queue_data0_cwmin'] = 3
                 data['tx_queue_data0_cwmax'] = 7
                 data['tx_queue_data0_burst'] = 1.5
-            else:
-                data['wmm_enabled'] = 0
 
             # Channel
             channel = config.get('channel', '0')
@@ -2286,7 +2287,11 @@ def configure_hostapd(dev_id, configuration):
             data['country_code'] = country_code
             if channel == '0':
                 data['ieee80211d'] = 1
-                data['ieee80211h'] = 1
+            data['ieee80211h'] = 0
+
+            subprocess.check_output('ifconfig %s up' % if_name, shell=True)
+            subprocess.check_output('iw reg set %s' % country_code, shell=True)
+            subprocess.check_output('iw dev %s scan' % if_name, shell=True)
 
             ap_mode = config.get('operationMode', 'g')
 
@@ -2312,9 +2317,10 @@ def configure_hostapd(dev_id, configuration):
                 data['hw_mode']       = 'a'
                 data['ieee80211ac']   = 1
                 data['ieee80211n']    = 1
+                data['ht_capab']      = '[HT40+][LDPC][SHORT-GI-20][SHORT-GI-40][TX-STBC][RX-STBC1][DSSS_CCK-40]'
                 data['wmm_enabled']   = 1
-                data['vht_oper_chwidth=0']   = 0
-                data['ht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
+                data['vht_oper_chwidth']   = 0
+                data['vht_capab']      = '[MAX-MPDU-11454][RXLDPC][SHORT-GI-80][TX-STBC-2BY1][RX-STBC-1]'
 
             security_mode = config.get('securityMode', 'wpa2-psk')
 
@@ -2500,25 +2506,27 @@ def dev_id_to_usb_device(dev_id):
     except subprocess.CalledProcessError:
         return None
 
-def _run_qmicli_command(dev_id, flag):
+def _run_qmicli_command(dev_id, flag, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT).decode()
         if output:
-            return output.splitlines()
+            return (output.splitlines(), None)
     except subprocess.CalledProcessError as err:
-        fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output.decode()))
-    return []
+        if print_error:
+            fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output.strip()))
+    return ([], err.output.strip())
 
-def _run_mbimcli_command(dev_id, cmd):
+def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT).decode()
         if output:
-            return output.splitlines()
+            return (output.splitlines(), None)
     except subprocess.CalledProcessError as err:
-        fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output.decode()))
-    return []
+        if print_error:
+            fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output.strip()))
+    return ([], err.output.strip())
 
 def qmi_get_simcard_status(dev_id):
     return _run_qmicli_command(dev_id, 'uim-get-card-status')
@@ -2531,7 +2539,7 @@ def qmi_get_ip_configuration(dev_id):
         ip = None
         gateway = None
         cmd = 'wds-get-current-settings | grep "IPv4 address\\|IPv4 subnet mask\\|IPv4 gateway address"'
-        lines = _run_qmicli_command(dev_id, cmd)
+        lines, _ = _run_qmicli_command(dev_id, cmd)
         for idx, line in enumerate(lines):
             if 'IPv4 address:' in line:
                 ip_without_mask = line.split(':')[-1].strip().replace("'", '')
@@ -2583,7 +2591,7 @@ def qmi_get_phone_number(dev_id):
     return _run_qmicli_command(dev_id, 'dms-get-msisdn')
 
 def lte_get_phone_number(dev_id):
-    lines = qmi_get_phone_number(dev_id)
+    lines, _ = qmi_get_phone_number(dev_id)
     for line in lines:
         if 'MSISDN:' in line:
             return line.split(':')[-1].strip().replace("'", '')
@@ -2635,7 +2643,7 @@ def lte_set_modem_to_mbim(dev_id):
         model =  hardware_info['Model']
 
         at_commands = []
-        if 'Quectel' in vendor or 'Quectel' in model:
+        if 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE): # Special fix for Quectel ec25 mini pci card
             print('Please wait...')
             at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
             at_serial_port = get_at_port(dev_id)
@@ -2663,27 +2671,32 @@ def lte_set_modem_to_mbim(dev_id):
 
 
 def lte_get_default_settings(dev_id):
-    res = {
-        'APN'     : '',
-        'UserName': '',
-        'Password': '',
-        'Auth'    : ''
-    }
+    default_settings = get_lte_cache(dev_id, 'default_settings')
+    if not default_settings:
+        lines, _ = qmi_get_default_settings(dev_id)
+        default_settings = {
+            'APN'     : '',
+            'UserName': '',
+            'Password': '',
+            'Auth'    : ''
+        }
     lines = qmi_get_default_settings(dev_id)
     for line in lines:
         if 'APN' in line:
-            res['APN'] = line.split(':')[-1].strip().replace("'", '')
+            default_settings['APN'] = line.split(':')[-1].strip().replace("'", '')
             continue
         if 'UserName' in line:
-            res['UserName'] = line.split(':')[-1].strip().replace("'", '')
+            default_settings['UserName'] = line.split(':')[-1].strip().replace("'", '')
             continue
         if 'Password' in line:
-            res['Password'] = line.split(':')[-1].strip().replace("'", '')
+            default_settings['Password'] = line.split(':')[-1].strip().replace("'", '')
             continue
         if 'Auth' in line:
-            res['Auth'] = line.split(':')[-1].strip().replace("'", '')
+            default_settings['Auth'] = line.split(':')[-1].strip().replace("'", '')
             continue
-    return res
+
+    set_lte_cache(dev_id, 'default_settings', default_settings)
+    return default_settings
 
 def lte_get_pin_state(dev_id):
     res = {
@@ -2691,7 +2704,7 @@ def lte_get_pin_state(dev_id):
         'PIN1_RETRIES': '',
         'PUK1_RETRIES': '',
     }
-    lines = qmi_get_simcard_status(dev_id)
+    lines, _ = qmi_get_simcard_status(dev_id)
     for index, line in enumerate(lines):
         if 'PIN1 state:' in line:
             res['PIN1_STATUS']= line.split(':')[-1].strip().replace("'", '').split(' ')[0]
@@ -2701,7 +2714,7 @@ def lte_get_pin_state(dev_id):
     return res
 
 def lte_sim_status(dev_id):
-    lines = qmi_get_simcard_status(dev_id)
+    lines, _ = qmi_get_simcard_status(dev_id)
     for line in lines:
         if 'Card state:' in line:
             state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
@@ -2786,12 +2799,30 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
-def mbim_is_connected(dev_id):
-    lines = _run_mbimcli_command(dev_id, '--query-connection-state')
+def mbim_connection_state(dev_id):
+    lines, _ = _run_mbimcli_command(dev_id, '--query-connection-state')
     for line in lines:
         if 'Activation state' in line:
-            return line.split(':')[-1].strip().replace("'", '') == 'activated'
-    return False
+            return line.split(':')[-1].strip().replace("'", '')
+    return ''
+
+def mbim_is_connected(dev_id):
+    return mbim_connection_state(dev_id) == 'activated'
+
+def mbim_registration_state(dev_id):
+    res = {
+        'register_state': '',
+        'network_error' : '',
+    }
+    lines, _ = _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
+    for line in lines:
+        if 'Network error:' in line:
+            res['network_error'] = line.split(':')[-1].strip().replace("'", '')
+            continue
+        if 'Register state:' in line:
+            res['register_state'] = line.split(':')[-1].strip().replace("'", '')
+            break
+    return res
 
 def reset_modem(dev_id):
     set_lte_cache(dev_id, 'state', 'resetting')
@@ -2844,12 +2875,16 @@ def lte_connect(params, reset=False):
         lte_disconnect(dev_id)
 
         connection_params = lte_prepare_connection_params(params)
-
-        _run_mbimcli_command(dev_id, '--query-subscriber-ready-status --no-close')
-        _run_mbimcli_command(dev_id, '--query-registration-state --no-open=3 --no-close')
-        _run_mbimcli_command(dev_id, '--attach-packet-service --no-open=4 --no-close')
-        grep = '| grep "Session ID\\|IP [0]\\|Gateway"'
-        lines = _run_mbimcli_command(dev_id, '--connect=%s --no-open=5 --no-close %s' % (connection_params, grep))
+        mbim_commands = [
+            '--query-subscriber-ready-status --no-close',
+            '--query-registration-state --no-open=3 --no-close',
+            '--attach-packet-service --no-open=4 --no-close',
+            '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway"' % connection_params
+        ]
+        for cmd in mbim_commands:
+            lines, err = _run_mbimcli_command(dev_id, cmd, True)
+            if err:
+                return (False, err)
 
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
 
@@ -2884,7 +2919,7 @@ def lte_get_system_info(dev_id):
         'MNC'            : ''
     }
     try:
-        lines = qmi_get_system_info(dev_id)
+        lines, _ = qmi_get_system_info(dev_id)
         for line in lines:
             if 'Cell ID' in line:
                 result['Cell_Id'] = line.split(':')[-1].strip().replace("'", '')
@@ -2896,10 +2931,10 @@ def lte_get_system_info(dev_id):
                 result['MNC'] = line.split(':')[-1].strip().replace("'", '')
                 continue
 
-        lines = qmi_get_operator_name(dev_id)
+        lines, _ = qmi_get_operator_name(dev_id)
         for line in lines:
             if '\tName' in line:
-                name = line.split(':')[-1].strip().replace("'", '')
+                name = line.split(':', 1)[-1].strip().replace("'", '')
                 result['Operator_Name'] = name if bool(re.match("^[a-zA-Z0-9_ ]*$", name)) else ''
                 break
 
@@ -2914,19 +2949,19 @@ def lte_get_hardware_info(dev_id):
         'Imei': '',
     }
     try:
-        lines = qmi_get_manufacturer(dev_id)
+        lines, _ = qmi_get_manufacturer(dev_id)
         for line in lines:
             if 'Manufacturer' in line:
                 result['Vendor'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines = qmi_get_model(dev_id)
+        lines, _ = qmi_get_model(dev_id)
         for line in lines:
             if 'Model' in line:
                 result['Model'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines = qmi_get_imei(dev_id)
+        lines, _ = qmi_get_imei(dev_id)
         for line in lines:
             if 'IMEI' in line:
                 result['Imei'] = line.split(':')[-1].strip().replace("'", '')
@@ -2942,7 +2977,7 @@ def lte_get_packets_state(dev_id):
         'Downlink_speed': 0
     }
     try:
-        lines = qmi_get_packet_service_state(dev_id)
+        lines, _ = qmi_get_packet_service_state(dev_id)
         for line in lines:
             if 'Max TX rate' in line:
                 result['Uplink_speed'] = line.split(':')[-1].strip().replace("'", '')
@@ -2964,7 +2999,7 @@ def lte_get_radio_signals_state(dev_id):
         'text' : ''
     }
     try:
-        lines = qmi_get_signals_state(dev_id)
+        lines, _ = qmi_get_signals_state(dev_id)
         for index, line in enumerate(lines):
             if 'RSSI' in line:
                 result['RSSI'] = lines[index + 1].split(':')[-1].strip().replace("'", '')
@@ -3002,7 +3037,7 @@ def mbim_get_ip_configuration(dev_id):
     ip = None
     gateway = None
     try:
-        lines = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
+        lines, _ = _run_mbimcli_command(dev_id, '--query-ip-configuration --no-close --no-open=6')
         for line in lines:
             if 'IP [0]:' in line:
                 ip = line.split(':')[-1].strip().replace("'", '')
@@ -3080,7 +3115,7 @@ def get_interface_driver_by_dev_id(dev_id):
     if_name = dev_id_to_linux_if(dev_id)
     return get_interface_driver(if_name)
 
-def get_interface_driver(if_name):
+def get_interface_driver(if_name, cache=True):
     """Get Linux interface driver.
 
     :param if_name: interface name in Linux.
@@ -3089,7 +3124,7 @@ def get_interface_driver(if_name):
     """
     with fwglobals.g.cache.lock:
         interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
-        if not interface:
+        if not interface or cache == False:
             fwglobals.g.cache.linux_interfaces_by_name[if_name] = {}
             interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
 
@@ -3268,6 +3303,23 @@ def check_root_access():
     print("Error: requires root privileges, try to run 'sudo'")
     return False
 
+def disable_ipv6():
+    """ disable default and all ipv6
+    """
+    sys_cmd = 'sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null'
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Disable IPv6 all command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Disable IPv6 all command successfully executed: %s" % (sys_cmd))
+
+    sys_cmd = 'sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null'
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Disable IPv6 default command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Disable IPv6 default command successfully executed: %s" % (sys_cmd))
+
 def set_default_linux_reverse_path_filter(rpf_value):
 
     """ set default and all (current) rp_filter value of Linux
@@ -3351,7 +3403,7 @@ def get_reconfig_hash():
     res = ''
 
     linux_interfaces = get_linux_interfaces()
-    for dev_id in copy.deepcopy(linux_interfaces):
+    for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]['name']
 
         is_lte = is_lte_interface(name)
@@ -3508,32 +3560,6 @@ def vpp_nat_addr_update_on_interface_add(dev_id, metric, remove):
 
     success = _vpp_nat_address_add_remove(vpp_if_name_remove, vpp_if_name_add)
     return success
-
-def netplan_set_mac_addresses():
-    '''
-    This function replaces the netplan files macaddr with the actual macaddr
-    '''
-    netplan_paths = glob.glob('/etc/netplan/*.yaml')
-    #Changing mac addresses in all netplan files
-    #Copy the current yaml into json variable, change the mac addr
-    #Copy the coverted json string back to yaml file
-    interface_mac_addr = {}
-    interfaces = psutil.net_if_addrs()
-    for nic_name, addrs in list(interfaces.items()):
-        for addr in addrs:
-            if addr.family == psutil.AF_LINK:
-                interface_mac_addr[nic_name] = addr.address
-    for netplan in netplan_paths:
-        with open(netplan, "r+") as fd:
-            netplan_json = yaml.load(fd, Loader=yaml.BaseLoader)
-            for if_name in netplan_json['network']['ethernets']:
-                interface = netplan_json['network']['ethernets'][if_name]
-                if interface.get('match'):
-                    interface['match']['macaddress'] = interface_mac_addr[if_name]
-            netplan_str = yaml.dump(netplan_json)
-            fd.seek(0)
-            fd.write(netplan_str)
-            fd.truncate()
 
 def wifi_get_capabilities(dev_id):
 
@@ -3764,3 +3790,126 @@ def exec_with_timeout(cmd, timeout=60):
             state['error'] = "Error killing command '%s', error %s" % (str(cmd), str(err))
             fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
+
+
+def get_template_data_by_hw(template_fname):
+    system_info = subprocess.check_output('lshw -c system', shell=True).strip()
+    match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
+    if len(match) > 0:
+        product = match[0].strip()
+        vendor = match[1].strip()
+        vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+
+    with open(template_fname, 'r') as stream:
+        info = yaml.load(stream, Loader=yaml.BaseLoader)
+        shared = info['devices']['globals']
+        # firstly, we will try to search for specific variables for the vendor and specific model
+        # if it does not exist, we will try to get variables for the vendor
+        vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
+        if vendor_product and vendor_product in info['devices']:
+            data = info['devices'][search]
+        elif vendor and vendor in info['devices']:
+            data = info['devices'][vendor]
+        elif product and product in info['devices']:
+            data = info['devices'][product]
+        else:
+            data = shared
+
+        # loop on global fields and override them with specific device values
+        for k, v in shared.items():
+            if k in data:
+                v.update(data[k])
+        data.update(shared)
+
+        return data
+
+def replace_file_variables(template_fname, replace_fname):
+    """Replace variables in the json file with the data from the template file.
+
+    For example, assuming we are in Virtualbox, the data from the template file looks:
+        VirtualBox:
+            __INTERFACE_1__:
+            dev_id:       pci:0000:00:08.0
+            name:         enp0s8
+            __INTERFACE_2__:
+            dev_id:       pci:0000:00:09.0
+            name:         enp0s9
+            __INTERFACE_3__:
+            dev_id:       pci:0000:00:03.0
+            name:         enp0s3
+
+    The file to replace looks:
+        [
+            {
+                "entity": "agent",
+                "message": "start-router",
+                "params": {
+                    "interfaces": [
+                        "__INTERFACE_1__",
+                        {
+                            "dev_id":"__INTERFACE_2__dev_id",
+                            "addr":"__INTERFACE_2__addr",
+                            "gateway": "192.168.56.1",
+                            "type":"wan",
+                            "routing":"ospf"
+                        }
+                    ]
+                }
+            }
+        ]
+    
+    The function loops on the requests and replaces the variables.
+    There are two types of variables. template and specific field.
+    If we want to use all the data for a given interface (addr, gateway, dev_id etc.), we can use __INTERFACE_1__ only.
+    If we want to get specifc value from a given interface, we can use __INTERFACE_1__{field_name} (__INTERFACE_1__addr)
+    In the example above, we use template variable for interface 1, and specific interfaces values for interface 2.
+
+    :param template_fname:    Path to template file
+    :param replace_fname:     Path to json file to replace
+
+    :returns: replaced json file
+    """
+    data = get_template_data_by_hw(template_fname)
+    def replace(input):
+        if type(input) == list:
+            for idx, value in enumerate(input):
+                input[idx] = replace(value)
+
+        elif type(input) == dict:
+            for key in input:
+                value = input[key]
+                input[key] = replace(value)
+
+        elif is_str(input):
+            match = re.search('(__.*__)(.*)', str(input))
+            if match:
+                interface, field = match.groups()
+                if field:
+                    new_input = re.sub('__.*__.*', data[interface][field], input)
+                    return new_input
+
+                # replace with the template, but remove unused keys, They break the expected JSON files
+                template = copy.deepcopy(data[interface])
+                del template['addr_no_mask']
+                if 'name' in template:
+                    del template['name']
+                return template
+        return input
+
+    # loop on the requests and replace the variables
+    with open(replace_fname, 'r') as f:
+        requests = json.loads(f.read())
+
+        # cli requests
+        if type(requests) == list:
+            for req in requests:
+                if not 'params' in req:
+                    continue
+                req['params'] = replace(req['params'])
+
+        # json expected files
+        elif type(requests) == dict:
+            for req in requests:
+                requests[req] = replace(requests[req])
+
+    return requests

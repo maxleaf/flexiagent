@@ -76,7 +76,7 @@
   "entity":  "agent",
   "message": "remove-tunnel",
   "params": {
-    "src": "10.0.0.4",
+    "src": "__INTERFACE_1__addr_no_mask",
     "dst": "20.0.0.4",
     "tunnel-id": 1,
     "ipsec": {
@@ -111,7 +111,7 @@
   "entity":  "agent",
   "message": "remove-tunnel",
   "params": {
-    "src": "10.0.0.4",
+    "src": "__INTERFACE_1__addr_no_mask",
     "dst": "70.0.0.7",
     "tunnel-id": 7,
     "ipsec": {

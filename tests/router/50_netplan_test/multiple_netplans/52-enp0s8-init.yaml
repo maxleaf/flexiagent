@@ -1,10 +1,10 @@
 network:
     version: 2
     ethernets:
-        enp0s9:
+        __INTERFACE_2__name:
             dhcp4: true
             dhcp4-overrides:
                 route-metric: 300
             match:
                 macaddress: 08:00:27:76:57:ff
-            set-name: enp0s9
+            set-name: __INTERFACE_2__name

@@ -1,0 +1,11 @@
+[
+    {
+        "entity": "agent",
+        "message": "start-router",
+        "params": {
+            "dev_id": [
+                "__WIFI_1__dev_id"
+            ]
+        }
+    }
+]

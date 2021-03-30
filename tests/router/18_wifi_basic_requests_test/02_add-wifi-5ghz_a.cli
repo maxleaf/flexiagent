@@ -1,0 +1,46 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-interface",
+        "params": {
+            "dev_id":"__WIFI_1__dev_id",
+            "addr":"__WIFI_1__addr",
+            "routing":"ospf",
+            "type":"lan",
+            "configuration": {
+                "5GHz": {
+                    "enable": true,
+                    "bandwidth": "20",
+                    "encryption": "aes-ccmp",
+                    "region": "US",
+                    "securityMode": "wpa2-psk",
+                    "hideSsid": false,
+                    "operationMode": "a",
+                    "ssid": "test_five_a",
+                    "password": "test_five_a",
+                    "channel": "0"
+                },
+                "2.4GHz": {
+                    "enable": false,
+                    "bandwidth": "20",
+                    "encryption": "aes-ccmp",
+                    "region": "DE",
+                    "securityMode": "wpa2-psk",
+                    "hideSsid": false,
+                    "operationMode": "g",
+                    "ssid": "test_two",
+                    "password": "test_two",
+                    "channel": "0"
+                }
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "start-router"
+    },
+    {
+        "entity": "agent",
+        "message": "stop-router"
+    }
+]

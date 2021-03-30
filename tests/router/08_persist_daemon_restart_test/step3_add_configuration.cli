@@ -3,9 +3,9 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "10.0.0.4",
+    "src": "__INTERFACE_1__addr_no_mask",
     "dst": "20.0.0.4",
-    "dev_id": "pci:0000:00:08.00",
+    "dev_id": "__INTERFACE_1__dev_id",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {
@@ -39,9 +39,9 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "10.0.0.4",
+    "src": "__INTERFACE_1__addr_no_mask",
     "dst": "70.0.0.7",
-    "dev_id": "pci:0000:00:08.00",
+    "dev_id": "__INTERFACE_1__dev_id",
     "tunnel-id": 7,
     "ipsec": {
       "local-sa": {

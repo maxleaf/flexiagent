@@ -7,11 +7,11 @@
   ],
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:pci:0000:00:08.00",
+      "Key": "add-interface:__INTERFACE_1__dev_id",
       "Params": {
-        "addr": "10.0.0.4/24",
-        "dev_id": "pci:0000:00:08.00",
-        "gateway": "10.0.0.10",
+        "addr": "__INTERFACE_1__addr",
+        "dev_id": "__INTERFACE_1__dev_id",
+        "gateway": "__INTERFACE_1__gateway",
         "multilink": {
           "labels": [
             "green"
@@ -21,10 +21,10 @@
       }
     },
     {
-      "Key": "add-interface:pci:0000:00:09.00",
+      "Key": "add-interface:__INTERFACE_2__dev_id",
       "Params": {
-        "addr": "192.168.56.102/24",
-        "dev_id": "pci:0000:00:09.00",
+        "addr": "__INTERFACE_2__addr",
+        "dev_id": "__INTERFACE_2__dev_id",
         "routing": "ospf",
         "type": "lan"
       }
@@ -32,21 +32,19 @@
   ],
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config pci:0000:00:09.00",
+      "Key": "add-dhcp-config __INTERFACE_2__dev_id",
       "Params": {
         "dns": [
           "8.8.4.4",
           "8.8.8.8"
         ],
-        "interface": "pci:0000:00:09.00",
+        "interface": "__INTERFACE_2__dev_id",
         "mac_assign": [],
         "range_end": "20.20.20.250",
         "range_start": "20.20.20.200"
       }
     }
-  ]
-}
-{
+  ],
   "============ APPLICATIONS ============": [
     {
       "Key": "add-application",
