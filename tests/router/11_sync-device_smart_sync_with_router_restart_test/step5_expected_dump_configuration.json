@@ -4,9 +4,7 @@
       "Key": "start-router",
       "Params": {}
     }
-  ]
-}
-{
+  ],
   "============ APPLICATIONS ============": [
     {
       "Key": "add-application",

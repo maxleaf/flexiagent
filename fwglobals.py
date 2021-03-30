@@ -225,6 +225,7 @@ class Fwglobals:
                 'DEV_ID_TO_VPP_IF_NAME': {},
                 'DEV_ID_TO_VPP_TAP_NAME': {},
                 'STUN': {},
+                'SYMMETRIC_NAT': {},
                 'VPP_IF_NAME_TO_DEV_ID': {},
                 'LINUX_INTERFACES_BY_NAME': {},
                 'WAN_MONITOR': {
@@ -238,6 +239,7 @@ class Fwglobals:
             self.dev_id_to_vpp_if_name      = self.db['DEV_ID_TO_VPP_IF_NAME']
             self.dev_id_to_vpp_tap_name     = self.db['DEV_ID_TO_VPP_TAP_NAME']
             self.stun_cache                 = self.db['STUN']
+            self.sym_nat_cache              = self.db['SYMMETRIC_NAT']
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
@@ -295,7 +297,7 @@ class Fwglobals:
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
         self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
-
+        self.request_lock                  = threading.RLock()   # lock to syncronize message processing
 
         # Load configuration from file
         self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
@@ -365,6 +367,7 @@ class Fwglobals:
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
         fwutils.set_default_linux_reverse_path_filter(2)  # RPF set to Loose mode
+        fwutils.disable_ipv6()
 
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
@@ -551,6 +554,9 @@ class Fwglobals:
             handler = request_handlers.get(req)
             assert handler, 'fwglobals: "%s" request is not supported' % req
 
+            # received_msg indicate that request is received from flexiManage
+            received_from_server = (received_msg != None)
+
             # Keep copy of the request aside for signature purposes,
             # as the original request might by modified by preprocessing.
             #
@@ -559,10 +565,11 @@ class Fwglobals:
 
             handler_func = getattr(self, handler.get('name'))
 
-            if result is None:
-                reply = handler_func(request)
-            else:
-                reply = handler_func(request, result)
+            with self.request_lock:
+                if result is None:
+                    reply = handler_func(request)
+                else:
+                    reply = handler_func(request, result)
             if reply['ok'] == 0:
                 myCmd = 'sudo vppctl api trace save error.api'
                 os.system(myCmd)
@@ -573,11 +580,11 @@ class Fwglobals:
             # signature. This is needed to assists the database synchronization
             # feature that keeps the configuration set by user on the flexiManage
             # in sync with the one stored on the flexiEdge device.
-            # Note we update signature on configuration requests only, but
-            # retrieve it into replies for all requests. This is to simplify
+            # Note we update signature on configuration requests received from flexiManage only,
+            # but retrieve it into replies for all requests. This is to simplify
             # flexiManage code.
             #
-            if reply['ok'] == 1 and handler.get('sign', False) == True:
+            if reply['ok'] == 1 and handler.get('sign', False) == True and received_from_server:
                 fwutils.update_device_config_signature(received_msg)
             reply['router-cfg-hash'] = fwutils.get_device_config_signature()
 

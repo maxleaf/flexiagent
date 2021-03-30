@@ -72,6 +72,7 @@ soft_checkers = [
     {'soft_check_multiple_interface_definitions': {'severity': 'critical'}},
     {'soft_check_duplicate_netplan_sections': {'severity': 'critical'}},
     { 'soft_check_default_routes_metric'         : { 'severity': 'critical' }},
+    { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
