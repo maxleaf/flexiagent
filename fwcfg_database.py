@@ -22,6 +22,7 @@
 
 import hashlib
 import json
+import pickle
 import re
 import traceback
 import copy
@@ -30,6 +31,15 @@ from sqlitedict import SqliteDict
 
 import fwglobals
 import fwutils
+
+def encode(obj):
+    """Serialize an object using pickle to a binary format accepted by SQLite."""
+    return sqlite3.Binary(dumps(obj, protocol=PICKLE_PROTOCOL))
+
+
+def decode(obj):
+    """Deserialize objects retrieved from SQLite."""
+    return pickle.loads(bytes(obj), encoding="latin1")
 
 class FwCfgDatabase:
     """This is requests DB class representation.
@@ -52,7 +62,7 @@ class FwCfgDatabase:
         """Constructor method
         """
         self.db_filename = db_file
-        self.db = SqliteDict(db_file, autocommit=True)
+        self.db = SqliteDict(db_file, autocommit=True, encode=encode, decode=decode)
 
     def __enter__(self):
         return self
