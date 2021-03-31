@@ -319,7 +319,7 @@ class FwWanMonitor:
         # created in vpp/vvpsb by tap-inject for tapcli-X interfaces used for
         # LTE/WiFi devices. These interfaces are assigned too.
         #
-        db_if = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
+        db_if = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id) if route.dev_id else []
         assigned = (not route.dev_id) or (db_if)
         if fwglobals.g.router_api.state_is_started() and assigned:
 
