@@ -347,7 +347,7 @@ def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
     try:
         stun_log("Tunnel: binding to %s:%d" %(source_ip, source_port))
         if dev_name != None:
-            sock.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
+            sock.setsockopt(socket.SOL_SOCKET, 25, dev_name.encode())
         sock.bind((source_ip, source_port))
     except Exception as e:
         stun_log("Tunnel: bind: %s" % str(e))
