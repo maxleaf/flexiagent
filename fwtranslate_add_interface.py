@@ -100,6 +100,7 @@ def add_interface(params):
     metric    = 0 if not params.get('metric', '') else int(params.get('metric', '0'))
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
+    mtu       = params.get('mtu', None)
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
@@ -258,7 +259,8 @@ def add_interface(params):
                     'gw'       : gw,
                     'metric'   : metric,
                     'dhcp'     : dhcp,
-                    'type'     : int_type
+                    'type'     : int_type,
+                    'mtu'      : mtu
         }
     }
 
@@ -279,6 +281,18 @@ def add_interface(params):
     cmd['revert']['params']['args']['is_add'] = 0
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
+
+    if mtu:
+        # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "sw_interface_set_mtu"
+        cmd['cmd']['descr']   = "set mtu=%s to interface" % (mtu)
+        cmd['cmd']['params']  = {
+            'substs':[{ 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+            'mtu': [ mtu , 0, 0, 0 ]
+            }
+        cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
     if not is_wifi and 'multilink' in params and 'labels' in params['multilink']:
