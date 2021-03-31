@@ -32,11 +32,6 @@ from sqlitedict import SqliteDict
 import fwglobals
 import fwutils
 
-def encode(obj):
-    """Serialize an object using pickle to a binary format accepted by SQLite."""
-    return sqlite3.Binary(dumps(obj, protocol=PICKLE_PROTOCOL))
-
-
 def decode(obj):
     """Deserialize objects retrieved from SQLite."""
     return pickle.loads(bytes(obj), encoding="latin1")
@@ -62,7 +57,7 @@ class FwCfgDatabase:
         """Constructor method
         """
         self.db_filename = db_file
-        self.db = SqliteDict(db_file, autocommit=True, encode=encode, decode=decode)
+        self.db = SqliteDict(db_file, autocommit=True, decode=decode)
 
     def __enter__(self):
         return self
