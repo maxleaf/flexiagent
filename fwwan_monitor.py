@@ -319,7 +319,8 @@ class FwWanMonitor:
         # created in vpp/vvpsb by tap-inject for tapcli-X interfaces used for
         # LTE/WiFi devices. These interfaces are assigned too.
         #
-        assigned = (not route.dev_id) or (fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id))
+        db_if = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id) if route.dev_id else []
+        assigned = (not route.dev_id) or (db_if)
         if fwglobals.g.router_api.state_is_started() and assigned:
 
             # Update netplan yaml-s in order to:
@@ -332,9 +333,11 @@ class FwWanMonitor:
             #
             ip   = fwutils.get_interface_address(route.dev, log=False)
             dhcp = 'yes' if route.proto == 'dhcp' else 'no'
+            mtu = db_if[0].get('mtu', None) if db_if else None
+
             (success, err_str) = fwnetplan.add_remove_netplan_interface(\
                                     True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN',
-                                    if_name=route.dev, wan_failover=True)
+                                    mtu, if_name=route.dev, wan_failover=True)
             if not success:
                 route.ok = prev_ok
                 fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
@@ -351,7 +354,7 @@ class FwWanMonitor:
                     fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.dev_id, ip, route.via, prev_metric, dhcp, 'WAN',
-                        if_name=route.dev, wan_failover=True)
+                        mtu, if_name=route.dev, wan_failover=True)
                     return
 
         # If defult route was changes as a result of metric update,
