@@ -145,9 +145,11 @@ def get_system_health():
         temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
         all_temp = psutil.sensors_temperatures()
         for ttype, templist in all_temp.items():
-            for temp in templist:
-                if temp.current > temp_stats['value']:
-                    temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}
+            if ttype == 'coretemp':
+                temp = templist[0]
+                if temp.current: temp_stats['value'] = temp.current
+                if temp.high: temp_stats['high'] = temp.high
+                if temp.critical: temp_stats['critical'] = temp.critical
     except Exception as e:
         fwglobals.log.excep("Error getting temperature stats: %s" % str(e))
 
