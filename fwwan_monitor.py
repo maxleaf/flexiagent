@@ -290,7 +290,7 @@ class FwWanMonitor:
             if mode == 'resetting' or mode == 'connecting':
                 return
 
-            connected = fwutils.mbim_is_connected(route.dev_id)
+            connected = fwutils.modem_is_connected(route.dev_id)
             if not connected:
                 fwglobals.log.debug("lte modem is disconnected on %s" % (route.dev_id))
                 fwglobals.g.system_api.restore_configuration(types=['add-lte'])

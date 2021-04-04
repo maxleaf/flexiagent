@@ -2221,7 +2221,7 @@ def is_lte_interface(if_name):
     :returns: Boolean.
     """
     driver = get_interface_driver(if_name)
-    supported_lte_drivers = ['cdc_mbim']
+    supported_lte_drivers = ['cdc_mbim', 'qmi_wwan']
     if driver in supported_lte_drivers:
         return True
 
@@ -2769,14 +2769,21 @@ def set_lte_cache(dev_id, key, value):
 
 def lte_disconnect(dev_id, hard_reset_service=False):
     try:
-        session = get_lte_cache(dev_id, 'session')
         if_name = get_lte_cache(dev_id, 'if_name')
-        if not session:
-            session = '0' # defualt session
         if not if_name:
             if_name = dev_id_to_linux_if(dev_id)
+        driver = get_interface_driver(if_name)
 
-        _run_mbimcli_command(dev_id, '--disconnect=%s' % session)
+        if driver == 'cdc_mbim':
+            session = get_lte_cache(dev_id, 'session')
+            if not session:
+                session = '0' # defualt session
+            _run_mbimcli_command(dev_id, '--disconnect=%s' % session)
+        elif driver == 'qmi_wwan':
+            pdh = get_lte_cache(dev_id, 'pdh')
+            cid = get_lte_cache(dev_id, 'cid')
+            _run_qmicli_command(dev_id, 'wds-stop-network=%s' % pdh)
+
         os.system('sudo ip link set dev %s down && sudo ip addr flush dev %s' % (if_name, if_name))
 
         # update the cache
@@ -2828,6 +2835,13 @@ def qmi_unblocked_pin(dev_id, puk, new_pin):
     time.sleep(1)
     return lte_get_pin_state(dev_id)
 
+def modem_connection_state(dev_id):
+    driver = get_interface_driver_by_dev_id(dev_id)
+    if driver == 'cdc_mbim':
+        return mbim_connection_state(dev_id)
+    elif driver == 'qmi_wwan':
+        return qmi_connection_state(dev_id)
+
 def mbim_connection_state(dev_id):
     lines, _ = _run_mbimcli_command(dev_id, '--query-connection-state')
     for line in lines:
@@ -2835,8 +2849,25 @@ def mbim_connection_state(dev_id):
             return line.split(':')[-1].strip().replace("'", '')
     return ''
 
+def qmi_connection_state(dev_id):
+    lines, _ = _run_qmicli_command(dev_id, 'wds-get-packet-service-status')
+    for line in lines:
+        if 'Connection status' in line:
+            return line.split(':')[-1].strip().replace("'", '')
+    return ''
+
 def mbim_is_connected(dev_id):
     return mbim_connection_state(dev_id) == 'activated'
+
+def qmi_is_connected(dev_id):
+    return qmi_connection_state(dev_id) == 'connected'
+
+def modem_is_connected(dev_id):
+    driver = get_interface_driver_by_dev_id(dev_id)
+    if driver == 'cdc_mbim':
+        return mbim_is_connected(dev_id)
+    elif driver == 'qmi_wwan':
+        return qmi_is_connected(dev_id)
 
 def mbim_registration_state(dev_id):
     res = {
@@ -2894,7 +2925,7 @@ def lte_connect(params, reset=False):
             return (False, "PIN is wrong")
 
     try:
-        is_modem_connected = mbim_is_connected(dev_id)
+        is_modem_connected = modem_is_connected(dev_id)
         if is_modem_connected:
             return (True, None)
 
@@ -2904,33 +2935,49 @@ def lte_connect(params, reset=False):
         lte_disconnect(dev_id)
 
         connection_params = lte_prepare_connection_params(params)
-        mbim_commands = [
-            '--query-subscriber-ready-status --no-close',
-            '--query-registration-state --no-open=3 --no-close',
-            '--attach-packet-service --no-open=4 --no-close',
-            '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway"' % connection_params
-        ]
-        for cmd in mbim_commands:
-            lines, err = _run_mbimcli_command(dev_id, cmd, True)
-            if err:
-                return (False, err)
+        if_name = dev_id_to_linux_if(dev_id)
+        driver = get_interface_driver(if_name)
+        if driver == 'cdc_mbim':
+            mbim_commands = [
+                '--query-subscriber-ready-status --no-close',
+                '--query-registration-state --no-open=3 --no-close',
+                '--attach-packet-service --no-open=4 --no-close',
+                '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway"' % connection_params
+            ]
+            for cmd in mbim_commands:
+                lines, err = _run_mbimcli_command(dev_id, cmd, True)
+                if err:
+                    return (False, err)
 
-        set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
-
-        for line in lines:
-            if 'Session ID:' in line:
-                session = line.split(':')[-1].strip().replace("'", '')
-                set_lte_cache(dev_id, 'session', session)
-                continue
-            if 'IP [0]:' in line:
-                ip = line.split(':')[-1].strip().replace("'", '')
-                set_lte_cache(dev_id, 'ip', ip)
-                continue
-            if 'Gateway:' in line:
-                gateway = line.split(':')[-1].strip().replace("'", '')
-                set_lte_cache(dev_id, 'gateway', gateway)
-                break
-
+            for line in lines:
+                if 'Session ID:' in line:
+                    session = line.split(':')[-1].strip().replace("'", '')
+                    set_lte_cache(dev_id, 'session', session)
+                    continue
+                if 'IP [0]:' in line:
+                    ip = line.split(':')[-1].strip().replace("'", '')
+                    set_lte_cache(dev_id, 'ip', ip)
+                    continue
+                if 'Gateway:' in line:
+                    gateway = line.split(':')[-1].strip().replace("'", '')
+                    set_lte_cache(dev_id, 'gateway', gateway)
+                    break
+        elif driver == 'qmi_wwan':
+            os.system('ifconfig %s down' % if_name)
+            os.system('echo Y > /sys/class/net/%s/qmi/raw_ip' % if_name)
+            
+            lines, err = _run_qmicli_command(dev_id, 'wds-start-network="ip-type=4,%s" --client-no-release-cid' % connection_params)
+            for line in lines:
+                if 'Packet data handle:' in line:
+                    pdh = line.split(':')[-1].strip().replace("'", '')
+                    set_lte_cache(dev_id, 'pdh', pdh)
+                    continue
+                if 'CID:' in line:
+                    pdh = line.split(':')[-1].strip().replace("'", '')
+                    set_lte_cache(dev_id, 'cid', pdh)
+                    continue
+        
+        set_lte_cache(dev_id, 'if_name', if_name)
         set_lte_cache(dev_id, 'state', '')
         return (True, None)
     except Exception as e:
