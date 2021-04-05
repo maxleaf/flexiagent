@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -23,20 +23,12 @@
 import json
 import loadsimulator
 import os
+import shutil
 
-
-# Try with PY3 else, use PY2
-try:
-    from urllib import request as ureq
-    from urllib import parse as uparse
-    from urllib import error as uerr
-    from http import server as hsvr
-    raw_input = input   # Python 2 has raw_input, and it doesn't support function aliasing, so downgrade :)
-except ImportError:
-    import urllib2 as ureq
-    import urllib as uparse
-    import urllib2 as uerr
-    import BaseHTTPServer as hsvr
+from urllib import request as ureq
+from urllib import parse as uparse
+from urllib import error as uerr
+from http import server as hsvr
 
 import websocket
 import ssl
@@ -53,6 +45,7 @@ import threading
 import traceback
 import yaml
 import fwglobals
+import fwikev2
 import fwstats
 import fwutils
 from fwlog import Fwlog
@@ -200,7 +193,7 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces          = fwutils.get_linux_interfaces(cached=False).values()
+        interfaces          = list(fwutils.get_linux_interfaces(cached=False).values())
         (dr_via, dr_dev, _) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
@@ -496,7 +489,12 @@ class FwAgent:
                         else:
                             break
                     else:
-                        fwstats.update_stats()
+                        try:
+                            fwstats.update_stats()
+                        except Exception as e:
+                            fwglobals.log.excep("failed to update stats %s" % str(e))
+                            raise e
+
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
@@ -650,7 +648,7 @@ def version():
         print(delimiter)
         print('Device %s' % versions['device'])
         print(delimiter)
-        for component in sorted(versions['components'].keys()):
+        for component in sorted(list(versions['components'].keys())):
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
@@ -678,14 +676,17 @@ def reset(soft=False, quiet=False):
         fwutils.reset_device_config()
         return
 
+    with fwikev2.FwIKEv2() as ike:
+        ike.reset()
+
     reset_device = True
     if not quiet:
         CSTART = "\x1b[0;30;43m"
         CEND = "\x1b[0m"
-        choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+    choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
                       "Already deleted in flexiManage y/n [n]" + CEND)
-        if choice != 'y' and choice != 'Y':
-            reset_device = False
+    if choice != 'y' and choice != 'Y':
+        reset_device = False
 
     if reset_device:
         if fwutils.vpp_does_run():

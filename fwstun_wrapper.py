@@ -232,7 +232,7 @@ class FwStunWrap:
         tunnel_stats = fwtunnel_stats.tunnel_stats_get()
         tunnels      = fwglobals.g.router_cfg.get_tunnels()
         ip_up_set    = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
-        for (dev_id, cached_addr) in self.stun_cache.items():
+        for (dev_id, cached_addr) in list(self.stun_cache.items()):
             # Do not reset info on interface participating in a connected tunnel
             if cached_addr.get('local_ip') in ip_up_set:
                 continue
@@ -500,7 +500,7 @@ class FwStunWrap:
 
         probe_tunnels = {}
 
-        for dev_id in self.sym_nat_cache:
+        for dev_id in list(self.sym_nat_cache):
             cached_addr = self.sym_nat_cache.get(dev_id)
             if not cached_addr or cached_addr.get('probe_time', 0) == 0:
                 continue
@@ -543,7 +543,7 @@ class FwStunWrap:
                         fwglobals.log.debug("Add tunnel: %s" %(tunnel))
                         fwglobals.g.handle_request({'message':'add-tunnel', "params": tunnel})
 
-        for dev_id in self.sym_nat_cache:
+        for dev_id in list(self.sym_nat_cache):
             cached_addr = self.sym_nat_cache.get(dev_id)
             if not cached_addr:
                 continue

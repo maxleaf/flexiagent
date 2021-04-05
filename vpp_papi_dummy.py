@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -57,14 +57,14 @@ class _VPP_API:
             meth = types.MethodType(myfunc, selfapi)
         return meth
 
-class VPP:
+class VPPApiClient:
     """This is Dummy VPP class representation.
     """
-    def __init__(self, jlist):
+    def __init__(self, apifiles, use_socket=False, read_timeout=5):
         """Constructor method
         """
         self.api = _VPP_API()
-        fwglobals.log.debug("Init: " + str(jlist))
+        fwglobals.log.debug("VPP Init: " + str(apifiles))
     def connect(self, name="default-conn"):
         """Connect to dummy VPP.
         """

@@ -88,7 +88,7 @@
             "name": "Test: Inject One Cli Request",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
+            "program": "fwagent.py",
             "args": [
                 "cli",
                 "-f",

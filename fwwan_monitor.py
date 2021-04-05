@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -161,13 +161,13 @@ class FwWanMonitor:
         '''Fetches routes from Linux and parses them into FwWanRoute objects.
         '''
         os_routes  = {}
-        min_metric = sys.maxint
+        min_metric = sys.maxsize
 
         out = []
         cmd = 'ip route list match default | grep via'
         for _ in range(5):
             try:
-                out = subprocess.check_output(cmd, shell=True).splitlines()
+                out = subprocess.check_output(cmd, shell=True).decode().splitlines()
                 break
             except Exception as e:
                 fwglobals.log.warning("no default routes found: %s" % str(e))
@@ -248,7 +248,7 @@ class FwWanMonitor:
             fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
-        return self.routes.values()
+        return list(self.routes.values())
 
 
     def _check_connectivity(self, route, server):
