@@ -1,0 +1,7 @@
+[
+{
+  "entity":  "agent",
+  "message": "get-device-certificate",
+  "params": {"days": 30}
+}
+]

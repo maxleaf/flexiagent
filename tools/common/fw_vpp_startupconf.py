@@ -66,7 +66,7 @@ class T(list):
 	e.append(value)
 	"""
 	def append(self, value):
-		if str(type(self[1])) == "<class 'fw_vpp_startupconf.L'>":
+		if re.search('fw_vpp_startupconf.L', str(type(self[1]))):
 			self[1].append(value)
 
 	def __str__(self):
@@ -95,7 +95,7 @@ class L(list):
 			the startupconf module, so we can do that.
 			"""
 			for element in self:
-				if str(type(element)) == "<class 'fw_vpp_startupconf.T'>":
+				if re.search('fw_vpp_startupconf.T', str(type(element))):
 					if element[self.L_ELEM_KEY] == key:
 						return element[self.L_ELEM_VALUE]
 			return None
@@ -159,7 +159,7 @@ class FwStartupConf:
 		self.out_fp     = sys.stdout
 		self.key        = ''
 		self.value      = ''
-		self.curr_list  = self.main_list
+		self.current_list  = self.main_list
 
 	def _create_list(self, lst):
 		"""
@@ -187,7 +187,7 @@ class FwStartupConf:
 		self.path = self.path+ '/' + self.key
 		self.levels +=1
 		self.listOfList.append(tup[1])
-		self.curr_list = self.listOfList[len(self.listOfList)-1]
+		self.current_list = self.listOfList[len(self.listOfList)-1]
 		self.key = self.value = ''
 
 	def _add_single_line_list(self):
@@ -198,7 +198,7 @@ class FwStartupConf:
 		sub_tup = self.create_element(self.value)
 		tup = self.create_element(self.key)
 		tup.append(sub_tup)
-		self.curr_list.append(tup)
+		self.current_list.append(tup)
 		self.key = self.value = ''
 
 	def _close_list(self):
@@ -207,10 +207,10 @@ class FwStartupConf:
 		"""
 		if len(self.listOfList) > 1:
 			del self.listOfList[-1]
-			self.curr_list = self.listOfList[len(self.listOfList)-1]
+			self.current_list = self.listOfList[len(self.listOfList)-1]
 		else:
 			self.listOfList = self.main_list
-			self.curr_list = None
+			self.current_list = None
 
 		steps = self.path.split('/')
 		del steps[-1]
@@ -223,7 +223,7 @@ class FwStartupConf:
 		The function is triggered by a single line in the startupconf file, such as 'num-rx-queues 3'
 		"""
 		tup = self.create_element(self.key)
-		self.curr_list.append(tup)
+		self.current_list.append(tup)
 		self.key = self.value = ''
 
 	def _parse_line(self, line):
@@ -287,7 +287,7 @@ class FwStartupConf:
 				result = self._parse_line(line)
 
 				if result == self.ADD_LIST:
-					self._create_list(self.curr_list)
+					self._create_list(self.current_list)
 					continue
 
 				elif result == self.ADD_LINE:
@@ -407,9 +407,9 @@ class FwStartupConf:
 		:param indent:  the indentation of the value inside the startup.conf file.
 		"""
 		for element in value:
-			if str(type(element)) == "<class 'fw_vpp_startupconf.T'>":
+			if re.search('fw_vpp_startupconf.T', str(type(element))):
 				self._dump_tuple(element, indent+1)
-			elif str(type(element)) == "<class 'fw_vpp_startupconf.L'>":
+			elif re.search('fw_vpp_startupconf.L', str(type(element))):
 				self._dump_list(element, indent+1)
 			else:
 				self._dump_line("dump_list: ERROR %s" %(str(type(element))), indent)
@@ -426,12 +426,12 @@ class FwStartupConf:
 		string = value[0]
 		string = string.strip('\'')
 		# This is a case for main category with empty list of values.
-		if (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])==0 and indent == 1:
+		if re.search('fw_vpp_startupconf.L', str(type(value[1]))) and len(value[1])==0 and indent == 1:
 			# This is a case of key in main list with empty list of values.
 			string = string + " {\n"
 			self._dump_line(string, indent)
 			self._dump_line('}\n\n',indent)
-		elif (str(type(value[1]))) == "<class 'fw_vpp_startupconf.L'>" and len(value[1])>0:
+		elif re.search('fw_vpp_startupconf.L', str(type(value[1]))) and len(value[1])>0:
 			if len(value[1]) == 1 and indent > 1:
 				#list[tuple[0]], value[1] is a list, so val is the 1st element of the first tuple in the list
 				val = value[1][0][0]

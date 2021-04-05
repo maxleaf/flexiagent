@@ -1,0 +1,132 @@
+[
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "encryption-mode": "ikev2",
+    "src": "192.168.0.105",
+    "dst": "192.168.0.104",
+    "dstPort": "4789",
+    "dev_id": "pci:0000:00:03.00",
+    "tunnel-id": 1,
+    "loopback-iface": {
+      "addr":"10.100.0.7/31",
+      "mac":"02:00:27:fd:00:04",
+      "mtu":1350,
+      "routing":"ospf"
+    },
+    "ikev2": {
+      "role": "initiator",
+      "remote-device-id": "AFF9E8C5-D02A-4AF9-96E6-B8E3F6A12A75",
+      "lifetime": 3600,
+      "ike": {
+        "crypto-alg": "aes-cbc",
+        "integ-alg": "sha1-96",
+        "dh-group": "modp-2048",
+        "key-size": 256
+      },
+      "esp": {
+        "crypto-alg": "aes-cbc",
+        "integ-alg": "sha1-96",
+        "dh-group": "ecp-256",
+        "key-size": 256
+      },
+      "certificate": [
+  "-----BEGIN CERTIFICATE-----\n", 
+  "MIIC3jCCAcagAwIBAgIIQw0W1w7eQPwwDQYJKoZIhvcNAQELBQAwLzEtMCsGA1UE\n", 
+  "AxMkQUZGOUU4QzUtRDAyQS00QUY5LTk2RTYtQjhFM0Y2QTEyQTc1MB4XDTIwMTIy\n", 
+  "MTEwNTI1OFoXDTIzMTIyMTEwNTI1OFowLzEtMCsGA1UEAxMkQUZGOUU4QzUtRDAy\n", 
+  "QS00QUY5LTk2RTYtQjhFM0Y2QTEyQTc1MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\n", 
+  "MIIBCgKCAQEAun1hhjnN+6y3Nxpb0Gyb249NjxTBj0lAUov5FOd/kF5HZdXxlV6P\n", 
+  "G+aNjmSbST6W/CFKTdqGQ2vG9v5P1EyV/nZw1LOYCnM28RGfM/m1gN4gphX/Lvyj\n", 
+  "py6Si7iI4+cLbr5HEz3erVlnyemW9a/gV6DgEXAHgjdmbKLmQnG+X6sMmagk3Pez\n", 
+  "FkmzEUO8pjj+cCJ1gw7+rJwNYBmOEMeBHXsAPNkgTYHUUO2IRZIl1utikfMtVjyR\n", 
+  "DZaXmopj1qRUDnIuPGduzSW/QFaSncj0U4Q7Bnj3h+ogIPU2tFIpgsgPij6H19tx\n", 
+  "NjzJBPlJN7qmlphkrj89RTx9ZsT+E5V0uwIDAQABMA0GCSqGSIb3DQEBCwUAA4IB\n", 
+  "AQCfGs+4m1wqpIpMMb8ihd0L6BD2BylIjRJQ7lPNCHs+TnxDfWDVpBNHYbsgdCIL\n", 
+  "vnJjcpr3xLUlJuH62SGMXhCa+dYa+t/mLk34EO9tBRmC/yar0v05JR6gRnLHS77l\n", 
+  "C0HOUgDRgFjuXZKvWd8P+hWyaxax5oF0OaRcdseeWPiOt86aRxcQ4h1JZDCLf9Aw\n", 
+  "540KedQOxeum5fU7ZfQoDNTomIIOPp7zZDdrqfKL2DBIMXo/PtkC+cszTstJAsKd\n", 
+  "lT0Z1e/wvvIYhPe3m3kmNvXCTp7+uGnWATRRvwB6TdcCToSjGUoBpGyupHw36/xE\n", 
+  "6BpIDbyJ0o4AJ9PqHQedbC1Y\n", 
+  "-----END CERTIFICATE-----\n"
+ ]
+    }
+  }
+},
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "encryption-mode": "ikev2",
+    "src": "192.168.0.105",
+    "dst": "192.168.0.104",
+    "dstPort": "4789",
+    "dev_id": "pci:0000:00:03.00",
+    "tunnel-id": 2,
+    "loopback-iface": {
+      "addr":"10.100.0.11/31",
+      "mac":"02:00:27:fd:00:14",
+      "mtu":1350,
+      "routing":"ospf"
+    },
+    "ikev2": {
+      "role": "initiator",
+      "remote-device-id": "AFF9E8C5-D02A-4AF9-96E6-B8E3F6A12A75",
+      "lifetime": 3600,
+      "ike": {
+        "crypto-alg": "aes-cbc",
+        "integ-alg": "sha1-96",
+        "dh-group": "modp-2048",
+        "key-size": 256
+      },
+      "esp": {
+        "crypto-alg": "aes-cbc",
+        "integ-alg": "sha1-96",
+        "dh-group": "ecp-256",
+        "key-size": 256
+      },
+      "certificate": [
+  "-----BEGIN CERTIFICATE-----\n", 
+  "MIIC3jCCAcagAwIBAgIIQw0W1w7eQPwwDQYJKoZIhvcNAQELBQAwLzEtMCsGA1UE\n", 
+  "AxMkQUZGOUU4QzUtRDAyQS00QUY5LTk2RTYtQjhFM0Y2QTEyQTc1MB4XDTIwMTIy\n", 
+  "MTEwNTI1OFoXDTIzMTIyMTEwNTI1OFowLzEtMCsGA1UEAxMkQUZGOUU4QzUtRDAy\n", 
+  "QS00QUY5LTk2RTYtQjhFM0Y2QTEyQTc1MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\n", 
+  "MIIBCgKCAQEAun1hhjnN+6y3Nxpb0Gyb249NjxTBj0lAUov5FOd/kF5HZdXxlV6P\n", 
+  "G+aNjmSbST6W/CFKTdqGQ2vG9v5P1EyV/nZw1LOYCnM28RGfM/m1gN4gphX/Lvyj\n", 
+  "py6Si7iI4+cLbr5HEz3erVlnyemW9a/gV6DgEXAHgjdmbKLmQnG+X6sMmagk3Pez\n", 
+  "FkmzEUO8pjj+cCJ1gw7+rJwNYBmOEMeBHXsAPNkgTYHUUO2IRZIl1utikfMtVjyR\n", 
+  "DZaXmopj1qRUDnIuPGduzSW/QFaSncj0U4Q7Bnj3h+ogIPU2tFIpgsgPij6H19tx\n", 
+  "NjzJBPlJN7qmlphkrj89RTx9ZsT+E5V0uwIDAQABMA0GCSqGSIb3DQEBCwUAA4IB\n", 
+  "AQCfGs+4m1wqpIpMMb8ihd0L6BD2BylIjRJQ7lPNCHs+TnxDfWDVpBNHYbsgdCIL\n", 
+  "vnJjcpr3xLUlJuH62SGMXhCa+dYa+t/mLk34EO9tBRmC/yar0v05JR6gRnLHS77l\n", 
+  "C0HOUgDRgFjuXZKvWd8P+hWyaxax5oF0OaRcdseeWPiOt86aRxcQ4h1JZDCLf9Aw\n", 
+  "540KedQOxeum5fU7ZfQoDNTomIIOPp7zZDdrqfKL2DBIMXo/PtkC+cszTstJAsKd\n", 
+  "lT0Z1e/wvvIYhPe3m3kmNvXCTp7+uGnWATRRvwB6TdcCToSjGUoBpGyupHw36/xE\n", 
+  "6BpIDbyJ0o4AJ9PqHQedbC1Y\n", 
+  "-----END CERTIFICATE-----\n"
+ ]
+    }
+  }
+},
+{
+  "entity": "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+     {
+	"dev_id": "pci:0000:00:03.00",
+	"addr": "192.168.0.105/24",
+	"gateway": "192.168.0.1",
+	"type":"WAN"
+     },
+     {
+	"dev_id": "pci:0000:00:08.00",
+	"addr": "10.10.10.1/24",
+	"routing":"ospf",
+	"type":"LAN"
+     }
+   ]  
+  }
+}
+]

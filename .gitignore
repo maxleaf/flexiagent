@@ -21,8 +21,5 @@ pytestdebug.log
 *.tar
 *.zip
 
-# Text files
-*.txt
-
 #Swap files
 *.sw[g-p]

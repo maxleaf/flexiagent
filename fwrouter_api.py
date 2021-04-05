@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -31,6 +31,7 @@ import json
 import subprocess
 import fwagent
 import fwglobals
+import fwikev2
 import fwutils
 import fwnetplan
 import fwtranslate_add_tunnel
@@ -40,6 +41,7 @@ from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 from fwcfg_request_handler import FwCfgRequestHandler
+from fwikev2 import FwIKEv2
 
 import fwtunnel_stats
 
@@ -54,6 +56,7 @@ fwrouter_translators = {
     'remove-route':             {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-tunnel':               {'module': __import__('fwtranslate_add_tunnel'),      'api':'add_tunnel'},
     'remove-tunnel':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'modify-tunnel':            {'module': __import__('fwtranslate_add_tunnel'),      'api':'modify_tunnel'},
     'add-dhcp-config':          {'module': __import__('fwtranslate_add_dhcp_config'), 'api':'add_dhcp_config'},
     'remove-dhcp-config':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-application':          {'module': __import__('fwtranslate_add_app'),         'api':'add_app'},
@@ -390,7 +393,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             for gw in gateways:
                 try:
                     cmd = 'ping -c 3 %s' % gw
-                    output = subprocess.check_output(cmd, shell=True)
+                    output = subprocess.check_output(cmd, shell=True).decode()
                     fwglobals.log.debug("call: %s: %s" % (cmd, output))
                 except Exception as e:
                     fwglobals.log.debug("call: %s: %s" % (cmd, str(e)))
@@ -417,6 +420,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         :returns: dictionary with status code and optional error message.
         """
         try:
+            whitelist = None
             req = request['message']
 
             router_was_started = fwutils.vpp_does_run()
@@ -565,7 +569,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             old_params = self.cfg_db.get_request_params(request)
             add_req    = _req.replace("modify-", "add-")
             new_params = copy.deepcopy(old_params)
-            new_params.update(_params.items())
+            new_params.update(_params)
 
             return [
                 { 'message': remove_req, 'params' : old_params },
@@ -581,7 +585,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
         #     Implement real modification on demand :)
         #
-        if re.match('modify-', req):
+        if re.match('modify-interface', req):
             req     = 'aggregated'
             params  = { 'requests' : _preprocess_modify_X(request) }
             request = {'message': req, 'params': params}
@@ -590,7 +594,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         elif req == 'aggregated':
             new_requests = []
             for _request in params['requests']:
-                if re.match('modify-', _request['message']):
+                if re.match('modify-interface', _request['message']):
                     new_requests += _preprocess_modify_X(_request)
                 else:
                     new_requests.append(_request)
@@ -898,6 +902,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         :returns: None.
         """
         self.state_change(FwRouterState.STOPPING)
+        with FwIKEv2() as ike:
+            ike.clean()
         self._stop_threads()
         fwutils.reset_dhcpd()
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()

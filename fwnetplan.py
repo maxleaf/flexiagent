@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -41,7 +41,7 @@ def _copyfile(source_name, dest_name, buffer_size=1024*1024):
             fwutils.file_write_and_flush(dest, copy_buffer)
 
 def backup_linux_netplan_files():
-    for values in fwglobals.g.NETPLAN_FILES.values():
+    for values in list(fwglobals.g.NETPLAN_FILES.values()):
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
         fname_run = fname.replace('yaml', 'fwrun.yaml')
@@ -82,7 +82,7 @@ def load_netplan_filenames(get_only=False):
 
     :param get_only: if True the parsed info is not loaded into cache.
     '''
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
     devices = {}
@@ -130,7 +130,7 @@ def load_netplan_filenames(get_only=False):
     if get_only:
         return our_files
 
-    for fname, devices in our_files.items():
+    for fname, devices in list(our_files.items()):
         for dev in devices:
             dev_id = dev.get('dev_id')
             ifname = dev.get('ifname')

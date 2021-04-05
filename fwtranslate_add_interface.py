@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -107,16 +107,17 @@ def add_interface(params):
     is_non_dpdk = is_wifi or is_lte
 
     if is_non_dpdk:
-        # create tap for this interface in vpp and linux
+        # Create tap interface in linux and vpp.
+        # This command will create three interfaces:
+        #   1. linux tap interface.
+        #   2. vpp tap interface in vpp.
+        #   3. linux interface for tap-inject.
+        #
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'configure_tap_in_linux_and_vpp',
-                    'args': { 'linux_if_name': iface_name }
-        }
-        cmd['cmd']['descr'] = "create tap interface in linux and vpp"
+        cmd['cmd']['name']    = "exec"
+        cmd['cmd']['descr']   = "create tap interface in vpp and linux"
+        cmd['cmd']['params']  = ["sudo vppctl create tap host-if-name %s" % fwutils.generate_linux_interface_short_name("tap", iface_name)]
         cmd_list.append(cmd)
 
         if is_wifi:
@@ -370,12 +371,12 @@ def add_interface(params):
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
         cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
         cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':1, 'is_inside':0 }
+                                    'is_add':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
         cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':0, 'is_inside':0 }
+                                    'is_add':0 }
         cmd_list.append(cmd)
 
         # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
