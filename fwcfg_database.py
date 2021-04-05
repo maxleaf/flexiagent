@@ -24,6 +24,7 @@ import hashlib
 import json
 import pickle
 import re
+import sqlite3
 import traceback
 import copy
 
@@ -35,6 +36,10 @@ import fwutils
 def decode(obj):
     """Deserialize objects retrieved from SQLite."""
     return pickle.loads(bytes(obj), encoding="latin1")
+
+def encode(obj):
+    """Deserialize objects retrieved from SQLite."""
+    return sqlite3.Binary(pickle.dumps(obj, protocol=2))
 
 class FwCfgDatabase:
     """This is requests DB class representation.
@@ -57,7 +62,7 @@ class FwCfgDatabase:
         """Constructor method
         """
         self.db_filename = db_file
-        self.db = SqliteDict(db_file, autocommit=True, decode=decode)
+        self.db = SqliteDict(db_file, autocommit=True, encode=encode, decode=decode)
 
     def __enter__(self):
         return self
