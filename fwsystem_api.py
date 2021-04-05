@@ -116,7 +116,7 @@ class FWSYSTEM_API(FwCfgRequestHandler):
 
                                 fwutils.configure_lte_interface({
                                     'dev_id': dev_id,
-                                    'metric': wan['metric']
+                                    'metric': wan['params']['metric']
                                 })
                                 params = self.cfg_db.get_interfaces(dev_id=dev_id)[0]
                                 params['addr'] = modem_addr
