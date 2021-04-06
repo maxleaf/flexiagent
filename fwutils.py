@@ -2495,9 +2495,13 @@ def dev_id_to_usb_device(dev_id):
 def _run_qmicli_command(dev_id, flag, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
-        output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT).decode()
+        qmicli_cmd = 'qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag)
+        output = subprocess.check_output(qmicli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
+        else:
+            fwglobals.log.debug('_run_qmicli_command: no output from command (%s)' % qmicli_cmd)
+            return ([], None)
     except subprocess.CalledProcessError as err:
         if print_error:
             fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output.strip()))
@@ -2506,9 +2510,13 @@ def _run_qmicli_command(dev_id, flag, print_error=False):
 def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
-        output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT).decode()
+        mbimcli_cmd = 'mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd)
+        output = subprocess.check_output(mbimcli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
+        else:
+            fwglobals.log.debug('_run_mbimcli_command: no output from command (%s)' % mbimcli_cmd)
+            return ([], None)
     except subprocess.CalledProcessError as err:
         if print_error:
             fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output.strip()))
