@@ -1,0 +1,11 @@
+argcomplete
+getmac
+pyjwt
+netaddr
+Pyro4
+psutil
+ruamel.yaml
+sqlitedict
+pyserial
+vpp-papi
+websocket-client

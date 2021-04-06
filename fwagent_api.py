@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -24,28 +24,30 @@ import json
 import loadsimulator
 import yaml
 import sys
+import subprocess
 import os
 from shutil import copyfile
 import fwglobals
+import fwikev2
 import fwstats
 import fwutils
 import fwsystem_api
 import fwrouter_api
 
 fwagent_api = {
-    'get-device-info':               '_get_device_info',
-    'get-device-stats':              '_get_device_stats',
-    'get-device-logs':               '_get_device_logs',
-    'get-device-packet-traces':      '_get_device_packet_traces',
-    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-certificate':        '_get_device_certificate',
     'get-device-config':             '_get_device_config',
-    'upgrade-device-sw':             '_upgrade_device_sw',
-    'reset-device':                  '_reset_device_soft',
-    'sync-device':                   '_sync_device',
-    'get-wifi-info':                 '_get_wifi_info',
+    'get-device-info':               '_get_device_info',
+    'get-device-logs':               '_get_device_logs',
+    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-packet-traces':      '_get_device_packet_traces',
+    'get-device-stats':              '_get_device_stats',
     'get-lte-info':                  '_get_lte_info',
-    'reset-lte':                     '_reset_lte',
+    'get-wifi-info':                 '_get_wifi_info',
     'modify-lte-pin':                '_modify_lte_pin',
+    'reset-lte':                     '_reset_lte',
+    'sync-device':                   '_sync_device',
+    'upgrade-device-sw':             '_upgrade_device_sw',
 }
 
 class FWAGENT_API:
@@ -85,12 +87,21 @@ class FWAGENT_API:
                 if tunnel_id in tunnel_ids:
                     # key1-key4 are the crypto keys stored in
                     # the management for each tunnel
+                    key1 = ""
+                    key2 = ""
+                    key3 = ""
+                    key4 = ""
+                    if "ipsec" in params:
+                        key1 = params["ipsec"]["local-sa"]["crypto-key"]
+                        key2 = params["ipsec"]["local-sa"]["integr-key"]
+                        key3 = params["ipsec"]["remote-sa"]["crypto-key"]
+                        key4 = params["ipsec"]["remote-sa"]["integr-key"]
                     tunnel_info.append({
                         "id": str(tunnel_id),
-                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
-                        "key2": params["ipsec"]["local-sa"]["integr-key"],
-                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
-                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
+                        "key1": key1,
+                        "key2": key2,
+                        "key3": key3,
+                        "key4": key4
                     })
 
             except Exception as e:
@@ -112,8 +123,10 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
+            info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
+            if fwglobals.g.ikev2.is_private_key_created():
+                info['ikev2'] = fwglobals.g.ikev2.get_certificate_expiration()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
@@ -245,7 +258,7 @@ class FWAGENT_API:
         :returns: Dictionary with status code.
         """
         if fwglobals.g.router_api.state_is_started():
-            fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
+            fwglobals.g.handle_request({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_device_config()
         return {'ok': 1}
 
@@ -269,7 +282,7 @@ class FWAGENT_API:
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        for module_name, module in fwglobals.modules.items():
+        for module_name, module in list(fwglobals.modules.items()):
             if module.get('sync', False) == True:
                 # get api module. e.g router_api, system_api
                 api_module = getattr(fwglobals.g, module.get('object'))
@@ -405,3 +418,12 @@ class FWAGENT_API:
         except Exception as e:
             reply = {'ok': 0, 'message': str(e)}
         return reply
+
+    def _get_device_certificate(self, params):
+        """IKEv2 certificate generation.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
+        return fwglobals.g.ikev2.create_private_key(params['days'], params['new'])

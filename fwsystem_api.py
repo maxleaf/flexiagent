@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -116,12 +116,12 @@ class FWSYSTEM_API(FwCfgRequestHandler):
 
                                 fwutils.configure_lte_interface({
                                     'dev_id': dev_id,
-                                    'metric': wan['metric']
+                                    'metric': wan['params']['metric']
                                 })
                                 params = self.cfg_db.get_interfaces(dev_id=dev_id)[0]
                                 params['addr'] = modem_addr
                                 params['gateway'] = fwutils.lte_get_ip_configuration(dev_id, 'gateway', True)
-                                fwglobals.g.router_api.call({'message':'modify-interface','params': params})
+                                fwglobals.g.handle_request({'message':'modify-interface','params': params})
 
                                 fwglobals.log.debug("%s: LTE IP was changed: %s -> %s" % (dev_id, iface_addr, modem_addr))
 

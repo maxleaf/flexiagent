@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -29,7 +29,7 @@ import fwglobals
 import fwtranslate_revert
 import fwutils
 
-from netaddr import *
+import netaddr
 
 # add-application
 # --------------------------------------
@@ -92,13 +92,13 @@ def add_acl_rule(rule, rules):
 
     ip = rule.get('ip', None)
     if ip:
-        ip_network = IPNetwork(rule['ip'])
+        ip_network = netaddr.IPNetwork(rule['ip'])
         ip_bytes, _ = fwutils.ip_str_to_bytes(str(ip_network.ip))
         ip_prefix = ip_network.prefixlen
 
     ports = rule.get('ports', None)
     if ports:
-        ports_map = map(int, ports.split('-'))
+        ports_map = list(map(int, ports.split('-')))
         port_from = port_to = ports_map[0]
         if len(ports_map) > 1:
             port_to = ports_map[1]

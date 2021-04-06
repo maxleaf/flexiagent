@@ -4,7 +4,7 @@
       "message": "remove-multilink-policy",
       "params": {
             "app":"google-dns",
-            "pci": "0000:00:08.00",
+            "dev_id": "0000:00:08.00",
             "route": 
             {
               "via": "10.100.0.6"

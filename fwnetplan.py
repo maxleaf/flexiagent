@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -41,7 +41,7 @@ def _copyfile(source_name, dest_name, buffer_size=1024*1024):
             fwutils.file_write_and_flush(dest, copy_buffer)
 
 def backup_linux_netplan_files():
-    for values in fwglobals.g.NETPLAN_FILES.values():
+    for values in list(fwglobals.g.NETPLAN_FILES.values()):
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
         fname_run = fname.replace('yaml', 'fwrun.yaml')
@@ -82,7 +82,7 @@ def load_netplan_filenames(get_only=False):
 
     :param get_only: if True the parsed info is not loaded into cache.
     '''
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
     devices = {}
@@ -130,7 +130,7 @@ def load_netplan_filenames(get_only=False):
     if get_only:
         return our_files
 
-    for fname, devices in our_files.items():
+    for fname, devices in list(our_files.items()):
         for dev in devices:
             dev_id = dev.get('dev_id')
             ifname = dev.get('ifname')
@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, mtu=None, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -170,8 +170,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, sta
 
     fwglobals.log.debug(
         "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
-         staticDnsServers=%s, staticDnsDomains=%s if_name=%s, wan_failover=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, if_name, str(wan_failover)))
+         staticDnsServers=%s, staticDnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, str(mtu), if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -223,6 +223,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, sta
 
         if 'dhcp6' in config_section:
             del config_section['dhcp6']
+
+        if mtu:
+            config_section['mtu'] = mtu
 
         if re.match('yes', dhcp):
             if 'addresses' in config_section:

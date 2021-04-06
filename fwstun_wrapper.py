@@ -232,7 +232,7 @@ class FwStunWrap:
         tunnel_stats = fwtunnel_stats.tunnel_stats_get()
         tunnels      = fwglobals.g.router_cfg.get_tunnels()
         ip_up_set    = fwtunnel_stats.get_if_addr_in_connected_tunnels(tunnel_stats, tunnels)
-        for (dev_id, cached_addr) in self.stun_cache.items():
+        for (dev_id, cached_addr) in list(self.stun_cache.items()):
             # Do not reset info on interface participating in a connected tunnel
             if cached_addr.get('local_ip') in ip_up_set:
                 continue
@@ -354,9 +354,8 @@ class FwStunWrap:
                     # probe tunnels in down state to see if we could find remote edge
                     # address/port from incoming packets for symmetric NAT traversal
 
-                    # TBD: Temp removal of symmetric NAT fix until we add message queue
-                    #if slept % probe_sym_nat_timeout == 0:
-                    #    self._probe_symmetric_nat()
+                    if slept % probe_sym_nat_timeout == 0:
+                        self._probe_symmetric_nat()
 
                     if slept % reset_all_timeout == 0:
                         # reset all STUN information every 10 minutes
@@ -501,7 +500,7 @@ class FwStunWrap:
 
         probe_tunnels = {}
 
-        for dev_id in self.sym_nat_cache:
+        for dev_id in list(self.sym_nat_cache):
             cached_addr = self.sym_nat_cache.get(dev_id)
             if not cached_addr or cached_addr.get('probe_time', 0) == 0:
                 continue
@@ -528,7 +527,7 @@ class FwStunWrap:
         tunnel_stats  = fwtunnel_stats.tunnel_stats_get()
         if not tunnels or not probe_tunnels or not tunnel_stats:
             return
-        
+
         for tunnel in tunnels:
             tunnel_id = tunnel['tunnel-id']
             stats = tunnel_stats.get(tunnel_id)
@@ -537,14 +536,14 @@ class FwStunWrap:
                 if vni in probe_tunnels:
                     if tunnel['dst'] != probe_tunnels[vni]["dst"] or tunnel['dstPort'] != probe_tunnels[vni]["dstPort"]:
                         fwglobals.log.debug("Remove tunnel: %s" %(tunnel))
-                        fwglobals.g.router_api._call_simple({'message':'remove-tunnel', "params": tunnel})
+                        fwglobals.g.handle_request({'message':'remove-tunnel', "params": tunnel})
 
                         tunnel['dst'] = probe_tunnels[vni]["dst"]
                         tunnel['dstPort'] = probe_tunnels[vni]["dstPort"]
                         fwglobals.log.debug("Add tunnel: %s" %(tunnel))
-                        fwglobals.g.router_api._call_simple({'message':'add-tunnel', "params": tunnel})
+                        fwglobals.g.handle_request({'message':'add-tunnel', "params": tunnel})
 
-        for dev_id in self.sym_nat_cache:
+        for dev_id in list(self.sym_nat_cache):
             cached_addr = self.sym_nat_cache.get(dev_id)
             if not cached_addr:
                 continue

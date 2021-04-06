@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -65,6 +65,7 @@ class Checker(fwsystem_checker_common.Checker):
                 if silently:
                     # Install the daemon if not installed
                     if not installed:
+                        os.system('apt-get update > /dev/null 2>&1')
                         ret = os.system('apt -y install resolvconf > /dev/null 2>&1')
                         if ret != 0:
                             print(prompt + 'failed to install resolvconf')
@@ -82,6 +83,7 @@ class Checker(fwsystem_checker_common.Checker):
                     if not installed:
                         choice = raw_input(prompt + "download and install resolvconf? [Y/n]: ")
                         if choice == 'y' or choice == 'Y' or choice == '':
+                            os.system('apt-get update')
                             ret = os.system('apt -y install resolvconf')
                             if ret != 0:
                                 print(prompt + 'failed to install resolvconf')
@@ -108,7 +110,7 @@ class Checker(fwsystem_checker_common.Checker):
         """Return True if service is running"""
         cmd = '/bin/systemctl status %s.service' % service
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-        lines = proc.communicate()[0].split('\n')
+        lines = proc.communicate()[0].decode().split('\n')
         for line in lines:
             if 'Active:' in line:
                 if '(running)' in line:
@@ -155,7 +157,7 @@ class Checker(fwsystem_checker_common.Checker):
                 else:
                     # Run the daemon if not running
                     if not running:
-                        choice = raw_input(prompt + "start networkd? [Y/n]: ")
+                        choice = input(prompt + "start networkd? [Y/n]: ")
                         if choice == 'y' or choice == 'Y' or choice == '':
                             ret = self._start_service("systemd-networkd")
                             if not ret:
@@ -182,7 +184,7 @@ class Checker(fwsystem_checker_common.Checker):
 
         def _fetch_autoupgrade_param(param):
             try:
-                out = subprocess.check_output("grep '%s' %s " % (param, autoupgrade_file) , shell=True).strip().split('\n')[0]
+                out = subprocess.check_output("grep '%s' %s " % (param, autoupgrade_file) , shell=True).decode().strip().split('\n')[0]
                 # APT::Periodic::Update-Package-Lists "0";
                 m = re.search(' "(.)";', out)
                 if m:
@@ -256,7 +258,7 @@ class Checker(fwsystem_checker_common.Checker):
         # systemd-timesyncd.service active: yes
         #     RTC in local TZ: no
         try:
-            out = subprocess.check_output("timedatectl | grep 'Time zone:'", shell=True).strip()
+            out = subprocess.check_output("timedatectl | grep 'Time zone:'", shell=True).decode().strip()
         except Exception as e:
             print(prompt + str(e))
             return False

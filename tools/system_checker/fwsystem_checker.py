@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -135,7 +135,7 @@ def check_hard_configuration(checker, check_only):
     """
     succeeded = True
     for element in hard_checkers:
-        (checker_name, checker_params) = element.items()[0]
+        (checker_name, checker_params) = list(element.items())[0]
 
         # Don't run connectivity checkers in check only mode,
         # as every check waits 5 seconds for ping response on every found interface.
@@ -165,7 +165,7 @@ def check_soft_configuration(checker, fix=False, quiet=False):
     succeeded = True
     for element in soft_checkers:
 
-        (checker_name, checker_params) = element.items()[0]
+        (checker_name, checker_params) = list(element.items())[0]
         prompt = checker_name_to_description(checker_name) + ': '
 
         checker_func = getattr(checker, checker_name)
@@ -202,7 +202,7 @@ def check_soft_configuration(checker, fix=False, quiet=False):
             report_checker_result(result, severity, checker_name)
         else:
             while True:
-                choice = raw_input(prompt + "configure? [y/N/q]: ")
+                choice = input(prompt + "configure? [y/N/q]: ")
                 if choice == 'y' or choice == 'Y':
                     result = checker_func(fix=True, silently=False, prompt=prompt)
                     report_checker_result(result, severity, checker_name)
@@ -227,7 +227,7 @@ def reset_system_to_defaults(checker):
 
     reboot_needed = False
     while True:
-        choice = raw_input("Resetting to Factory Defaults. Are you sure? [y/N]: ")
+        choice = input("Resetting to Factory Defaults. Are you sure? [y/N]: ")
         if choice == 'n' or choice == 'N' or choice == '':
             return True
         elif choice == 'y' or choice == 'Y':
@@ -241,7 +241,7 @@ def reset_system_to_defaults(checker):
 
     if reboot_needed == True:
         while True:
-            choice = raw_input("Reboot the system? [Y/n]: ")
+            choice = input("Reboot the system? [Y/n]: ")
             if choice == 'n' or choice == 'N':
                 print ("Please reboot the system for changes to take effect.")
                 return True
@@ -303,7 +303,7 @@ def main(args):
         check_soft_configuration(checker, fix=False)
         choice = 'x'
         while not (choice == '' or choice == '0' or choice == '4'):
-            choice = raw_input(
+            choice = input(
                             "\n" +
                             "\t[0] - quit and use fixed parameters\n" +
                             "\t 1  - check system configuration\n" +
@@ -313,13 +313,13 @@ def main(args):
                             "\t------------------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=False)
             elif choice == '2':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=True, quiet=True)
             elif choice == '3':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=True, quiet=False)
             elif choice == '4':
                 print ('')
@@ -328,20 +328,20 @@ def main(args):
                 success = True
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-	        if success == True:
-                    print ("Please wait..")
-                    os.system("sudo systemctl stop flexiwan-router")
-                    checker.save_config()
-                    if checker.update_grub == True:
-		                rebootSys = 'x'
-                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
-                                    rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
-                                                    "Would you like to reboot now (Y/n)?")
-                                    if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
-                                        print ("Rebooting...")
-                                        os.system('reboot now')
-                                    else:
-                                        print ("Please reboot the system for changes to take effect.")
+            if success == True:
+                print ("Please wait..")
+                os.system("sudo systemctl stop flexiwan-router")
+                checker.save_config()
+                if checker.update_grub == True:
+                    rebootSys = 'x'
+                    while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
+                        rebootSys = input("Changes to OS confugration requires system reboot.\n" +
+                                        "Would you like to reboot now (Y/n)?")
+                        if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
+                            print ("Rebooting...")
+                            os.system('reboot now')
+                        else:
+                            print ("Please reboot the system for changes to take effect.")
 
                 os.system("sudo systemctl start flexiwan-router")
                 print ("Done.")
@@ -361,7 +361,7 @@ if __name__ == '__main__':
     # no reason. Note it is too late to check system, if router was started :)
     #
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        subprocess.check_call(['pidof', 'vpp'])
         # If we reached this point, i.e. if no exception occurred, the vpp pid was found
         print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
         sys.exit(FW_EXIT_CODE_OK)
