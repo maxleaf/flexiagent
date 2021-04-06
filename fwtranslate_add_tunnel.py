@@ -219,38 +219,6 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
                               'is_set':0 , 'feature_bitmap':1 }  # 1 stands for LEARN (see test\test_l2bd_multi_instance.py)
     cmd_list.append(cmd)
 
-    if internal:
-        # interface.api.json: sw_interface_add_del_address (..., sw_if_index, is_add, prefix, ...)
-        # 'sw_if_index' is returned by the previous command and it is stored in the executor cache.
-        # So executor takes it out of the cache while executing this command.
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "sw_interface_add_del_address"
-        cmd['cmd']['descr']     = "set %s to loopback interface" % addr
-        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'is_add':1, 'prefix':addr }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "sw_interface_add_del_address"
-        cmd['revert']['descr']  = "unset %s from loopback interface" % addr
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'is_add':0, 'prefix':addr }
-        cmd_list.append(cmd)
-
-        # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "sw_interface_set_flags"
-        cmd['cmd']['descr']     = "UP loopback interface %s" % addr
-        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
-                                  }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "sw_interface_set_flags"
-        cmd['revert']['descr']  = "DOWN loopback interface %s" % addr
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                                    'flags':0 }
-        cmd_list.append(cmd)
-
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
     cmd = {}
     cmd['cmd'] = {}
@@ -323,6 +291,50 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
         cmd['cmd']['descr']   = "set mtu=%s into loopback interface %s in Linux" % (mtu, addr)
         cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
                                 "sudo ip link set dev DEV-STUB mtu %s" % mtu ]
+        cmd_list.append(cmd)
+
+        # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_set_flags"
+        cmd['cmd']['descr']     = "UP loopback interface %s" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
+                                    }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_set_flags"
+        cmd['revert']['descr']  = "DOWN loopback interface %s" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'flags':0 }
+        cmd_list.append(cmd)
+
+    if internal:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_add_del_address"
+        cmd['cmd']['descr']     = "set %s to loopback interface" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'is_add':1, 'prefix':addr }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_add_del_address"
+        cmd['revert']['descr']  = "unset %s from loopback interface" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'is_add':0, 'prefix':addr }
+        cmd_list.append(cmd)
+
+        # interface.api.json: sw_interface_set_flags (..., sw_if_index, flags, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "sw_interface_set_flags"
+        cmd['cmd']['descr']     = "UP loopback interface %s" % addr
+        cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'flags':1 # VppEnum.vl_api_if_status_flags_t.IF_STATUS_API_FLAG_ADMIN_UP
+                                    }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "sw_interface_set_flags"
+        cmd['revert']['descr']  = "DOWN loopback interface %s" % addr
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                    'flags':0 }
         cmd_list.append(cmd)
 
 def _add_bridge(cmd_list, bridge_id):
