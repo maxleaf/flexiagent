@@ -100,7 +100,11 @@ def add_interface(params):
     metric    = 0 if not params.get('metric', '') else int(params.get('metric', '0'))
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
-    staticDnsServers  = params.get('staticDnsServers', ['8.8.8.8', '8.8.4.4'])
+
+    default_dns_servers = ['8.8.8.8', '8.8.4.4']
+    staticDnsServers  = params.get('staticDnsServers', default_dns_servers)
+    if len(staticDnsServers) == 0:
+        staticDnsServers = default_dns_servers
     staticDnsDomains  = params.get('staticDnsDomains', None)
     mtu       = params.get('mtu', None)
 
