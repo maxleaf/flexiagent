@@ -18,6 +18,12 @@
             }
         },
         {
+            "name": "Python: Attach using Process Id",
+            "type": "python",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+        },
+        {
             "name": "fwkill",
             "type": "python",
             "request": "launch",
