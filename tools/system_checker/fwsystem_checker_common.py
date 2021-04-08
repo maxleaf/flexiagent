@@ -118,10 +118,10 @@ class Checker:
         :returns: 'True' if supported and 'False' otherwise.
         """
         try:
-            subprocess.check_call('cat /proc/cpuinfo | grep sse4_2', shell=True)
-        except subprocess.CalledProcessError:
+            ret = os.system('cat /proc/cpuinfo | grep sse4_2 > /dev/null 2>&1')
+            return ret == 0
+        except:
             return False
-        return True
 
     def hard_check_ram(self, gb):
         """Check RAM requirements.
