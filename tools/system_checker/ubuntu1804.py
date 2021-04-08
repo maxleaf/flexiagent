@@ -42,7 +42,7 @@ class Checker(fwsystem_checker_common.Checker):
         installed = False
         config_filename = '/etc/resolvconf/resolv.conf.d/tail'
         try: # Refresh self.nameservers on every invocation
-            out = subprocess.check_output("grep '^nameserver ' %s" % config_filename, shell=True).strip().split('\n')
+            out = subprocess.check_output("grep '^nameserver ' %s" % config_filename, shell=True).decode().strip().split('\n')
             self.nameservers = [ line.split(' ')[1] for line in out ]  # 'line' format is 'nameserver 127.0.0.53'
         except:
             self.nameservers = []
@@ -81,7 +81,7 @@ class Checker(fwsystem_checker_common.Checker):
                 else:
                     # Install the daemon if not installed
                     if not installed:
-                        choice = raw_input(prompt + "download and install resolvconf? [Y/n]: ")
+                        choice = input(prompt + "download and install resolvconf? [Y/n]: ")
                         if choice == 'y' or choice == 'Y' or choice == '':
                             os.system('apt-get update')
                             ret = os.system('apt -y install resolvconf')
@@ -93,11 +93,11 @@ class Checker(fwsystem_checker_common.Checker):
                     # Now add DNS servers to it's configuration, if no servers present
                     if len(self.nameservers) == 0:
                         while True:
-                            server = raw_input(prompt + "enter DNS Server address, e.g. 8.8.8.8: ")
+                            server = input(prompt + "enter DNS Server address, e.g. 8.8.8.8: ")
                             ret = os.system('printf "nameserver %s\n" >> %s' % (server, config_filename))
                             ret_str = 'succeeded' if ret == 0 else 'failed'
                             print(prompt + ret_str + ' to add ' + server)
-                            choice = raw_input(prompt + "repeat? [y/N]: " )
+                            choice = input(prompt + "repeat? [y/N]: " )
                             if choice == 'y' or choice == 'Y':
                                 continue
                             elif choice == 'n' or choice == 'N' or choice == '':
