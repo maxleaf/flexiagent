@@ -163,7 +163,7 @@ class FwDump:
         # Create temporary folder
         #
         if os.path.exists(self.temp_folder):
-            choice = raw_input(self.prompt + "the temporary folder '%s' exists, overwrite? [Y/n]: " % self.temp_folder) \
+            choice = input(self.prompt + "the temporary folder '%s' exists, overwrite? [Y/n]: " % self.temp_folder) \
                      if not self.quiet else 'y'
             if choice == 'y' or choice == 'Y' or choice == '':
                 os.system("rm -rf %s" % self.temp_folder)   # shutil.rmtree() fails sometimes on VBox shared folders!

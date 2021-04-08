@@ -462,7 +462,7 @@ def add_interface(params):
                     'args': {
                             'dev_id'  : dev_id,
                             'gw'      : '',
-                            'mac'     : '00:00:00:00:00:00',
+                            'mac'     : 'ff:ff:ff:ff:ff:ff',
                     },
                     'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg':[dev_id, 'gateway'] }]
         }

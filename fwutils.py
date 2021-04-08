@@ -742,37 +742,27 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
     # the commands "create tap host-if-name tap_wwan0" and "enable tap-inject" create three interfaces:
     # Two on Linux (tap_wwan0, vpp1) and one on vpp (tap1).
     # Note, we use "tap_" prefix in "tap_wwan0" in order to be able to associate the wwan0 physical interface
-    # with the tap1 interface. This is done as follows:
-    # 1. "show tap" vpp command brings following dump:
-    #         interface tap1
-    #            name "tap_wwan0"
-    #            ....         
+    # with the tap1 interface. This is done as follows:    
     # Then we can substr the dev_name and get back the linux interface name. Then we can get the dev_id of this interface.
     #
-    shif = _vppctl_read('show tap')
-    if shif == None:
-        fwglobals.log.debug("_build_dev_id_to_vpp_if_name_maps: Error reading tap info")
-    regex = r'(interface[\s\S]*?(?<=name )\".*?\")'
-    matches = re.findall(regex, shif)
-    if len(matches) > 0:
-        for match in matches:
-            tap = match.splitlines()
-            vpp_tap = tap[0].strip().split(' ')[-1]                 # fetch tap0
-            linux_tap = tap[1].strip().split(' ')[-1].strip('"')    # fetch tap_wwan0
-            linux_dev_name = linux_tap.split('_')[-1]               # tap_wwan0 - > wwan0
+    taps = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_tap_v2_dump()
+    for tap in taps:
+        vpp_tap = tap.dev_name                      # fetch tap0                 
+        linux_tap = tap.host_if_name                # fetch tap_wwan0
+        linux_dev_name = linux_tap.split('_')[-1]   # tap_wwan0 - > wwan0
 
-            # if the lte/wifi interface name is long (more than 15 letters),
-            # It's not enough to slice tap_wwan0 and get the linux interface name from the last part.
-            # So we take it from the /sys/class/net by filter out the tap_wwan0, 
-            # then we can get the complete name
-            #
-            cmd =  "ls -l /sys/class/net | grep -v %s | grep %s" % (linux_tap, linux_dev_name)
-            linux_dev_name = subprocess.check_output(cmd, shell=True).strip().split('/')[-1]
+        # if the lte/wifi interface name is long (more than 15 letters),
+        # It's not enough to slice tap_wwan0 and get the linux interface name from the last part.
+        # So we take it from the /sys/class/net by filter out the tap_wwan0,
+        # then we can get the complete name
+        #
+        cmd =  "ls -l /sys/class/net | grep -v %s | grep %s" % (linux_tap, linux_dev_name)
+        linux_dev_name = subprocess.check_output(cmd, shell=True).decode().strip().split('/')[-1]
 
-            bus = build_interface_dev_id(linux_dev_name)            # fetch bus address of wwan0
-            if bus:
-                fwglobals.g.cache.dev_id_to_vpp_if_name[bus] = vpp_tap
-                fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_tap] = bus
+        bus = build_interface_dev_id(linux_dev_name)            # fetch bus address of wwan0
+        if bus:
+            fwglobals.g.cache.dev_id_to_vpp_if_name[bus] = vpp_tap
+            fwglobals.g.cache.vpp_if_name_to_dev_id[vpp_tap] = bus
 
     shif = _vppctl_read('show hardware-interfaces')
     if shif == None:
@@ -1003,7 +993,7 @@ def vpp_tap_connect(linux_tap_if_name):
 def vpp_add_static_arp(dev_id, gw, mac):
     try:
         vpp_if_name = dev_id_to_vpp_if_name(dev_id)
-        vppctl_cmd = "set ip arp static %s %s %s" % (vpp_if_name, gw, mac)
+        vppctl_cmd = "set ip neighbor static %s %s %s" % (vpp_if_name, gw, mac)
         fwglobals.log.debug("vppctl " + vppctl_cmd)
         subprocess.check_call("sudo vppctl %s" % vppctl_cmd, shell=True)
         return (True, None)
@@ -2289,10 +2279,6 @@ def configure_hostapd(dev_id, configuration):
                 data['ieee80211d'] = 1
             data['ieee80211h'] = 0
 
-            subprocess.check_output('ifconfig %s up' % if_name, shell=True)
-            subprocess.check_output('iw reg set %s' % country_code, shell=True)
-            subprocess.check_output('iw dev %s scan' % if_name, shell=True)
-
             ap_mode = config.get('operationMode', 'g')
 
             if ap_mode == "g":
@@ -2479,7 +2465,7 @@ def configure_lte_interface(params):
         os.system('ifconfig %s %s up' % (nic_name, ip))
 
         # remove old default router
-        output = os.popen('ip route list match default | grep %s' % nic_name).read().decode()
+        output = os.popen('ip route list match default | grep %s' % nic_name).read()
         if output:
             routes = output.splitlines()
             for r in routes:
@@ -2509,24 +2495,32 @@ def dev_id_to_usb_device(dev_id):
 def _run_qmicli_command(dev_id, flag, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
-        output = subprocess.check_output('qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag), shell=True, stderr=subprocess.STDOUT).decode()
+        qmicli_cmd = 'qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag)
+        output = subprocess.check_output(qmicli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
+        else:
+            fwglobals.log.debug('_run_qmicli_command: no output from command (%s)' % qmicli_cmd)
+            return ([], None)
     except subprocess.CalledProcessError as err:
         if print_error:
             fwglobals.log.debug('_run_qmicli_command: flag: %s. err: %s' % (flag, err.output.strip()))
-    return ([], err.output.strip())
+        return ([], err.output.strip())
 
 def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
-        output = subprocess.check_output('mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd), shell=True, stderr=subprocess.STDOUT).decode()
+        mbimcli_cmd = 'mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd)
+        output = subprocess.check_output(mbimcli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
+        else:
+            fwglobals.log.debug('_run_mbimcli_command: no output from command (%s)' % mbimcli_cmd)
+            return ([], None)
     except subprocess.CalledProcessError as err:
         if print_error:
             fwglobals.log.debug('_run_mbimcli_command: cmd: %s. err: %s' % (cmd, err.output.strip()))
-    return ([], err.output.strip())
+        return ([], err.output.strip())
 
 def qmi_get_simcard_status(dev_id):
     return _run_qmicli_command(dev_id, 'uim-get-card-status')
@@ -3626,7 +3620,7 @@ def wifi_get_capabilities(dev_id):
             # banda1 = _get_band(output2, 1)
             # banda2 = _get_band(output2, 2)
 
-            output = subprocess.check_output('iw %s info' % phy_name, shell=True).replace('\t', '\\t').replace('\n', '\\n').decode()
+            output = subprocess.check_output('iw %s info' % phy_name, shell=True).decode().replace('\t', '\\t').replace('\n', '\\n')
             result['SupportedModes'] = _parse_key_data('Supported interface modes', output)
 
 
