@@ -106,6 +106,7 @@ def add_interface(params):
     if len(staticDnsServers) == 0:
         staticDnsServers = default_dns_servers
     staticDnsDomains  = params.get('staticDnsDomains', None)
+    
     mtu       = params.get('mtu', None)
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
