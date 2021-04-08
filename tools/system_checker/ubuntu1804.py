@@ -57,8 +57,7 @@ class Checker(fwsystem_checker_common.Checker):
             if len(self.nameservers) == 0:
                 raise Exception('no name servers was found in %s' % config_filename)
             return True
-        except Exception as e:
-            print(prompt + str(e))
+        except:
             if not fix:
                 return False
             else:
