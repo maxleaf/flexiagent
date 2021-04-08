@@ -2903,7 +2903,7 @@ def lte_connect(params, reset=False):
                 continue
             if 'DNS [0]:' in line:
                 dns_primary = line.split(':')[-1].strip().replace("'", '')
-                dns_secondary = lines[index + 1].split(':')[-1].strip().replace("'", '')
+                dns_secondary = lines[idx + 1].split(':')[-1].strip().replace("'", '')
                 set_lte_cache(dev_id, 'dns_servers', [dns_primary, dns_secondary])
                 break
 
