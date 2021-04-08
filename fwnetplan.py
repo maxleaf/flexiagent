@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, mtu=None, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -170,8 +170,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, sta
 
     fwglobals.log.debug(
         "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
-         staticDnsServers=%s, staticDnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
-        (is_add, dev_id, ip, gw, metric, dhcp, type, staticDnsServers, staticDnsDomains, str(mtu), if_name, str(wan_failover)))
+         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -260,13 +260,13 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, sta
                 if 'gateway4' in config_section:
                     del config_section['gateway4']
 
-                if staticDnsServers:
+                if dnsServers:
                     nameservers = config_section.get('nameservers', {})
-                    nameservers['addresses'] = staticDnsServers
+                    nameservers['addresses'] = dnsServers
                     config_section['nameservers'] = nameservers
-                if staticDnsDomains:
+                if dnsDomains:
                     nameservers = config_section.get('nameservers', {})
-                    nameservers['search'] = staticDnsDomains
+                    nameservers['search'] = dnsDomains
                     config_section['nameservers'] = nameservers
 
         if is_add == 1:
