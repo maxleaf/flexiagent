@@ -2630,7 +2630,7 @@ def lte_get_phone_number(dev_id):
             return line.split(':')[-1].strip().replace("'", '')
     return ''
 
-def get_at_port(self, dev_id):
+def get_at_port(dev_id):
     at_ports = []
     try:
         addr_type, addr = dev_id_parse(dev_id)
