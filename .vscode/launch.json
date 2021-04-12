@@ -5,16 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Attach using Process Id",
-            "type": "python",
-            "request": "attach",
-            "processId": "${command:pickProcess}",
-        },
-        {
             "name": "fwagent daemon",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
+            "program": "${workspaceFolder}/fwagent.py",
             "args": [
                 "daemon"
             ],
@@ -24,20 +18,26 @@
             }
         },
         {
+            "name": "Python: Attach using Process Id",
+            "type": "python",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
+        },
+        {
             "name": "fwkill",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/tools/common/fwkill",
+            "program": "${workspaceFolder}/tools/common/fwkill.py",
             "cwd": "${workspaceRoot}",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}/flexiagent"
             }
         },
         {
-            "name": "reset",
+            "name": "fwagent reset",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
+            "program": "${workspaceFolder}/fwagent.py",
             "args": [
                 "reset"
             ],
@@ -47,10 +47,10 @@
             }
         },
         {
-            "name": "reset soft",
+            "name": "fwagent reset -s",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
+            "program": "${workspaceFolder}/fwagent.py",
             "args": [
                 "reset",
                 "-s"
@@ -61,13 +61,14 @@
             }
         },
         {
-            "name": "Cache",
+            "name": "fwagent show --agent cache",
             "type": "python",
             "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
+            "program": "${workspaceFolder}/fwagent.py",
             "args": [
                 "show",
-                "--configuration"
+                "--agent",
+                "cache",
             ],
             "cwd": "${workspaceRoot}",
             "env": {
@@ -75,62 +76,7 @@
             }
         },
         {
-            "name": "Test: Run Specific Test",
-            "type": "python",
-            "request": "launch",
-            "module": "${workspaceFolder}/tests/router/01_cli_basic_requests_test",
-            "cwd": "${workspaceRoot}",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            }
-        },
-        {
-            "name": "Test: Inject One Cli Request",
-            "type": "python",
-            "request": "launch",
-            "program": "fwagent.py",
-            "args": [
-                "cli",
-                "-f",
-                "/root/flexiagent/tests/router/16_lte_watchdog_test/add-lte.cli",
-                "-t",
-                "/root/flexiagent/tests/fwtemplates.yaml"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            }
-        },
-        {
-            "name": "fwagent_without_flexiManage",
-            "type": "python",
-            "request": "launch",
-            "module": "${workspaceFolder}/fwagent",
-            "args": [
-                "daemon", "--dont_connect"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}/flexiagent"
-            }
-        },
-        {
-            "name": "pytest",
-            "type": "python",
-            "request": "launch",
-            "module": "pytest",
-            "args": [
-                "-k",
-                "18",
-                "-rs"
-            ],
-            "cwd": "${workspaceRoot}/tests",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            }
-        },
-        {
-            "name": "system_checker",
+            "name": "fwystem_checker",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/tools/system_checker/fwsystem_checker.py",
@@ -142,17 +88,57 @@
             "sudo": true,
         },
         {
-            "name": "Python: Current File",
+            "name": "test: run specific regression test",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
-        }
-    ],
-    "compounds": [
+            "program": "${workspaceFolder}/tests/router/01_cli_basic_requests_test.py",
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
         {
-            "name": "Pytest + Agent",
-            "configurations": ["fwagent_without_flexiManage", "Test: Inject One Cli Request"]
+            "name": "test: inject cli request",
+            "type": "python",
+            "request": "launch",
+            "program": "fwagent.py",
+            "args": [
+                "cli",
+                "-f",
+                "${workspaceFolder}/tests/router/16_lte_watchdog_test/add-lte.cli",
+                "-t",
+                "${workspaceFolder}/tests/fwtemplates.yaml"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+        {
+            "name": "test: fwagent deamon --cont_connect",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/fwagent.py",
+            "args": [
+                "daemon", "--dont_connect"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/flexiagent"
+            }
+        },
+        {
+            "name": "test: pytest",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-rs"
+            ],
+            "cwd": "${workspaceRoot}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
         }
     ]
 }
