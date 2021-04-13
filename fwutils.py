@@ -3951,3 +3951,25 @@ def replace_file_variables(template_fname, replace_fname):
                 requests[req] = replace(requests[req])
 
     return requests
+
+def reload_lte_drivers():
+    modules = [
+        'cdc_mbim',  
+        'qmi_wwan',
+        'option',
+        'cdc_wdm',
+        'cdc_ncm',
+        'usbnet',
+        'qcserial',
+        'usb_wwan',
+        'mii',
+        'usbserial'
+    ]
+
+    for module in modules:
+        os.system('rmmod %s 2>/dev/null' % module)
+
+    for module in modules:
+        os.system('modprobe %s' % module)
+
+    time.sleep(2)

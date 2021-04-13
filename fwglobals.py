@@ -331,6 +331,10 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
+        # Some lte modules have a problem with drivers binding.
+        # As workaround, we reload the driver to fix it.
+        fwutils.reload_lte_drivers()
+        
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
@@ -343,7 +347,7 @@ class Fwglobals:
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
-
+        
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
