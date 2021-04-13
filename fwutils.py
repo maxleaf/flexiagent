@@ -1944,9 +1944,12 @@ def tunnel_change_postprocess(add, addr):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
+    policies = fwglobals.g.policies.policies_get()
+    if len(policies) == 0:
+        return
+
     sw_if_index = vpp_ip_to_sw_if_index(addr)
     if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-    policies = fwglobals.g.policies.policies_get()
     remove = not add
 
     for policy_id, priority in list(policies.items()):
