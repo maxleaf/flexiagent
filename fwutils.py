@@ -2867,8 +2867,12 @@ def lte_connect(params, reset=False):
 
         set_lte_cache(dev_id, 'state', 'connecting')
 
-        # make sure context is released
+        if_name = dev_id_to_linux_if(dev_id)
+        set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
+
+        # make sure context is released and set the interface up
         lte_disconnect(dev_id)
+        os.system('ifconfig %s up' % if_name)
 
         connection_params = lte_prepare_connection_params(params)
         mbim_commands = [
@@ -2882,7 +2886,6 @@ def lte_connect(params, reset=False):
             if err:
                 return (False, err)
 
-        set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
 
         for line in lines:
             if 'Session ID:' in line:
@@ -3909,3 +3912,25 @@ def replace_file_variables(template_fname, replace_fname):
                 requests[req] = replace(requests[req])
 
     return requests
+
+def reload_lte_drivers():
+    modules = [
+        'cdc_mbim',
+        'qmi_wwan',
+        'option',
+        'cdc_wdm',
+        'cdc_ncm',
+        'usbnet',
+        'qcserial',
+        'usb_wwan',
+        'mii',
+        'usbserial'
+    ]
+
+    for module in modules:
+        os.system('rmmod %s 2>/dev/null' % module)
+
+    for module in modules:
+        os.system('modprobe %s' % module)
+
+    time.sleep(2)

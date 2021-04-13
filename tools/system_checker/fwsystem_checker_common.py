@@ -1315,7 +1315,7 @@ class Checker:
 
     def lte_interfaces_exists(self):
         for nicname, addrs in list(psutil.net_if_addrs().items()):
-            driver = fwutils.get_interface_driver(nicname)
+            driver = fwutils.get_interface_driver(nicname, cache=False)
             if driver and driver in ['cdc_mbim', 'qmi_wwan']:
                 return True
 
@@ -1324,9 +1324,9 @@ class Checker:
     def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
         drivers = []
         for nicname, addrs in list(psutil.net_if_addrs().items()):
-            dev_id = fwutils.get_interface_dev_id(nicname)# fwutils.get_interface_dev_id(nicname)
+            dev_id = fwutils.get_interface_dev_id(nicname)
             if dev_id:
-                driver = fwutils.get_interface_driver(nicname)
+                driver = fwutils.get_interface_driver(nicname, cache=False)
                 if driver and driver in ['cdc_mbim', 'qmi_wwan']:
                     drivers.append({'driver': driver, 'dev_id': dev_id})
 
