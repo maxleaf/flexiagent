@@ -343,7 +343,10 @@ class Fwglobals:
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
-
+        
+        # Some lte modules have a problem with drivers binding.
+        # As workaround, we reload the driver to fix it.
+        fwutils.reload_lte_drivers()
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
