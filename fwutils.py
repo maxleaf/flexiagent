@@ -3358,6 +3358,19 @@ def update_linux_metric(prefix, dev, metric):
     except Exception as e:
         return (False, str(e))
 
+def remove_linux_default_route(dev):
+    """Invokes 'ip route del' command to remove default route.
+    """
+    try:
+        cmd = "ip route del default dev %s" % dev
+        fwglobals.log.debug(cmd)
+        ok = not subprocess.call(cmd, shell=True)
+        if not ok:
+            raise Exception("'%s' failed" % cmd)
+        return True
+    except Exception as e:
+        fwglobals.log.error(str(e))
+        return False
 
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by

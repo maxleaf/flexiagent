@@ -285,6 +285,10 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
             stream.flush()
             os.fsync(stream.fileno())
 
+        # Remove default route from ip table because Netplan is not doing it.
+        if not is_add and type == 'WAN':
+            fwutils.remove_linux_default_route(ifname)
+
         fwutils.netplan_apply('add_remove_netplan_interface')
 
         # make sure IP address is applied in Linux.
