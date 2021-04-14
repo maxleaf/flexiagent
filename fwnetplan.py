@@ -273,7 +273,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
                 ethernets[set_name] = config_section
             elif set_name and is_lte:
                 del config_section['set-name']
-                del config_section['match']
+                if 'match' in config_section:
+                    del config_section['match']
                 ethernets[ifname] = config_section
             else:
                 ethernets[ifname] = config_section
