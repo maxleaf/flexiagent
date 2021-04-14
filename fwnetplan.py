@@ -259,14 +259,22 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
                 if 'gateway4' in config_section:
                     del config_section['gateway4']
 
+        is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
         if is_add == 1:
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
 
-            if set_name:
+            # set-name with LTE causes issue since the Linux LTE interface is not controlled by dpdk
+            # and stay in Linux with the vppsb interface. Our LTE solution is to set the IP on the vppsb, and if we use set-name, it stays down.
+            # We need to set the IP on the vppsb interface and remove the set-name and match sections. 
+            if set_name and not is_lte:
                 ethernets[set_name] = config_section
+            elif set_name and is_lte:
+                del config_section['set-name']
+                del config_section['match']
+                ethernets[ifname] = config_section
             else:
                 ethernets[ifname] = config_section
         else:
@@ -289,7 +297,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
 
         # make sure IP address is applied in Linux.
         if is_add and set_name:
-            if set_name != ifname:
+            if set_name != ifname and not is_lte:
                 cmd = 'ip link set %s name %s' % (ifname, set_name)
                 fwglobals.log.debug(cmd)
                 os.system(cmd)

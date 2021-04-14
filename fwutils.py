@@ -3973,3 +3973,5 @@ def reload_lte_drivers():
         os.system('modprobe %s' % module)
 
     time.sleep(2)
+
+    netplan_apply("reload_lte_drivers")
