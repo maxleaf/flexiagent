@@ -3258,6 +3258,9 @@ def netplan_apply(caller_name=None):
         fwglobals.g.cache.linux_interfaces_by_name.clear()
         clear_linux_interfaces_cache()
 
+        # IPv6 might be renable if interface name is changed using set-name
+        disable_ipv6()
+
         # Find out if the default route was changed. If it was - reconnect agent.
         #
         if fwglobals.g.fwagent:
