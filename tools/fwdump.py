@@ -94,7 +94,7 @@ g_dumpers = {
     #
     'fwagent_cache':                { 'shell_cmd': 'fwagent show --agent cache > <dumper_out_file>' },
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
-                                                   'cp /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
+                                                   'cp -r /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
     'fwagent_device_signature':     { 'shell_cmd': 'fwagent show --configuration signature > <dumper_out_file>' },
     'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
@@ -209,8 +209,8 @@ class FwDump:
                 cmd = re.sub('<dumper_out_file>', output_file, cmd)
                 try:
                     subprocess.check_call(cmd, shell=True)
-                except Exception:
-                    print(self.prompt + 'warning: dumper %s failed' % (dumper))
+                except Exception as e:
+                    print(self.prompt + 'warning: dumper %s failed, error %s' % (dumper, str(e)))
                     continue
 
     def zip(self, filename=None, path=None, delete_temp_folder=True):
