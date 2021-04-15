@@ -745,7 +745,8 @@ class Checker:
         # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
         grub_filename = '/etc/default/grub'
         try:
-            subprocess.check_call("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True)
+            subprocess.check_call("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, shell=True)
             return True   # No exception - grep found the pattern
         except subprocess.CalledProcessError:
             pass
