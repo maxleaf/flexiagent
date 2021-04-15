@@ -1,0 +1,25 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "inbound": {
+                "nat1to1": {
+                    "rules": [
+                        {
+                            "id": "1",
+                            "classification": {
+                                "destination": {
+                                    "interface": "pci:0000:00:09.00"
+                                }
+                            },
+                            "action": {
+                                "internalIP": "10.0.0.1"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+]

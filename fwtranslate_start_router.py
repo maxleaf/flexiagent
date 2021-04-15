@@ -27,6 +27,7 @@ import fwnetplan
 import fwglobals
 import fwikev2
 import fwutils
+import fw_nat_command_helpers
 
 # start_router
 # --------------------------------------
@@ -227,12 +228,7 @@ def start_router(params=None):
     cmd['cmd']['params']  = { 'enable':1, 'flags': 1,  # nat.h: _(0x01, IS_ENDPOINT_DEPENDENT)
                               'sessions':  100000 }    # Defaults: users=1024, sessions=10x1024, in multicore these parameters are per worker thread
     cmd_list.append(cmd)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
-    cmd['cmd']['descr']   = "enable NAT forwarding"
-    cmd['cmd']['params']  = { 'enable':1 }
-    cmd_list.append(cmd)
+    
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
@@ -256,6 +252,10 @@ def start_router(params=None):
         'func'  : 'restore_linux_netplan_files'
     }
     cmd_list.append(cmd)
+
+    # Setup Global VPP NAT parameters
+    # Post VPP NAT/Firewall changes - The param need to be false
+    cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(False))
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
