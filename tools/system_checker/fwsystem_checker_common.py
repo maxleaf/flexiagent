@@ -4,7 +4,7 @@
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #
-# Copyright (C) 2019  flexiWAN Ltd.
+# Copyright (C) 2021  flexiWAN Ltd.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Affero General Public License as published by the Free
@@ -177,13 +177,13 @@ class Checker:
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
-            ret = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
-            if ret == 0:
-                self.wan_interfaces.append(str(iface))
-                _print_without_line_feed("\r                                              \r")  # Clean the line on screen
-                return True
-        _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+            for _ in range(5):
+                ret = os.system("ping -c 1 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
+                if ret == 0:
+                    self.wan_interfaces.append(str(iface))
+                    return True
+                _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
+            _print_without_line_feed("\r                                              \r")  # Clean the line on screen
         return False
 
     def hard_check_kernel_io_modules(self, supported):
@@ -802,7 +802,6 @@ class Checker:
         # Update the grub file
         #
         cmd = 'sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\\"transparent_hugepage=never /" ' + grub_filename
-        print(cmd)
         ret = os.system(cmd)
         if ret != 0:
             print(prompt + "%s - failed (%d)" % (cmd,ret))
@@ -945,7 +944,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multi_core_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multi_core_support_requires_rss(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -1322,7 +1321,10 @@ class Checker:
 
         return False
 
-    def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
+    def soft_check_lte_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
+        if not self.lte_interfaces_exists():
+            raise Exception("No LTE device was detected")
+
         drivers = []
         for nicname, addrs in list(psutil.net_if_addrs().items()):
             dev_id = fwutils.get_interface_dev_id(nicname)
