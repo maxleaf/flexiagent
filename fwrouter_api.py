@@ -833,16 +833,16 @@ class FWROUTER_API(FwCfgRequestHandler):
     def _start_threads(self):
         """Start all threads.
         """
-        if self.thread_watchdog is None:
+        if self.thread_watchdog is None or self.thread_watchdog.is_alive() == False:
             self.thread_watchdog = threading.Thread(target=self.watchdog, name='Watchdog Thread')
             self.thread_watchdog.start()
-        if self.thread_tunnel_stats is None:
+        if self.thread_tunnel_stats is None or self.thread_tunnel_stats.is_alive() == False:
             self.thread_tunnel_stats = threading.Thread(target=self.tunnel_stats_thread, name='Tunnel Stats Thread')
             self.thread_tunnel_stats.start()
-        if self.thread_dhcpc is None:
+        if self.thread_dhcpc is None or self.thread_dhcpc.is_alive() == False:
             self.thread_dhcpc = threading.Thread(target=self.dhcpc_thread, name='DHCP Client Thread')
             self.thread_dhcpc.start()
-        if self.thread_static_route is None:
+        if self.thread_static_route is None or self.thread_static_route.is_alive() == False:
             self.thread_static_route = threading.Thread(target=self.static_route_thread, name='Static route Thread')
             self.thread_static_route.start()
 
