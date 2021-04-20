@@ -1361,8 +1361,7 @@ class Checker:
                         ]
 
                         try:
-                            print('\x1b[30;43m Installing new driver. It might take a few minutes to complete. \
-                                Please do not close the process during installation \x1b[0m')
+                            print('\x1b[30;43m Installing new driver. It might take a few minutes to complete. Please do not close the process during installation \x1b[0m')
                             time.sleep(5) # Wait five seconds for the user to notice and read this message. Otherwise he can close the process
                             
                             for module in modules:
