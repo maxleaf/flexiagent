@@ -3087,7 +3087,7 @@ def is_wifi_interface(if_name):
     :returns: Boolean.
     """
     try:
-        lines = subprocess.check_output('iwconfig', shell=True, stderr=subprocess.STDOUT).decode().splitlines()
+        lines = subprocess.check_output('iwconfig | grep %s' % if_name, shell=True, stderr=subprocess.STDOUT).decode().splitlines()
         for line in lines:
             if if_name in line and not 'no wireless extensions' in line:
                 return True
