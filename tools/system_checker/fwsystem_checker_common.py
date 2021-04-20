@@ -1345,8 +1345,8 @@ class Checker:
                 wifi_exists = True
                 driver = fwutils.get_interface_driver(nicname, cache=False)
                 if driver in ['ath10k_pci', 'ath9k_pci']:
-                    info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()
-                    is_kernel_driver = 'kernel' in info                
+                    driver_info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()
+                    is_kernel_driver = 'kernel' in driver_info                
                     if is_kernel_driver:
                         if not fix:
                             return False
