@@ -479,7 +479,7 @@ class Checker:
 
         return True
 
-    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=None):
+    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
         """Check if default routes have duplicate metrics.
 
         :param fix:             Fix problem.
@@ -568,7 +568,7 @@ class Checker:
                 duplicates[dev] = files
         return duplicates
 
-    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=None):
+    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=''):
         """Check if any section is defined multiple times in Netplan files.
 
         :param fix:             Fix problem.
@@ -585,7 +585,7 @@ class Checker:
             return False
         return True
 
-    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=None):
+    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=''):
         """Check if interface is defined in multiple Netplan files.
 
         :param fix:             Fix problem.
@@ -610,7 +610,7 @@ class Checker:
         return True
 
 
-    def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):
+    def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=''):
         """Check hostname syntax.
 
         :param fix:             Fix problem.
@@ -667,7 +667,7 @@ class Checker:
         return True
 
 
-    def soft_check_hostname_in_hosts(self, fix=False, silently=False, prompt=None):
+    def soft_check_hostname_in_hosts(self, fix=False, silently=False, prompt=''):
         """Check if hostname is present in /etc/hosts.
 
         :param fix:             Fix problem.
@@ -725,7 +725,7 @@ class Checker:
                 return False
         return True
 
-    def soft_check_disable_transparent_hugepages(self, fix=False, silently=False, prompt=None):
+    def soft_check_disable_transparent_hugepages(self, fix=False, silently=False, prompt=''):
         """Check if transparent hugepages are disabled.
 
         :param fix:             Fix problem.
@@ -809,7 +809,7 @@ class Checker:
         return True
 
 
-    def soft_check_hugepage_number(self, fix=False, silently=False, prompt=None):
+    def soft_check_hugepage_number(self, fix=False, silently=False, prompt=''):
         """Check if there is enough hugepages available.
 
         :param fix:             Fix problem.
@@ -883,7 +883,7 @@ class Checker:
         os.system('sysctl -p %s' %(vpp_hugepages_file))
         return True
 
-    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=None):
+    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=''):
         """Check if there is enough DPDK buffers available.
 
         :param fix:             Fix problem.
