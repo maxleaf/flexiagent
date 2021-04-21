@@ -31,6 +31,7 @@ import sys
 import uuid
 import yaml
 import shutil
+import time
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -1361,6 +1362,12 @@ class Checker:
             
             if silently:
                 print(TXT_COLOR.BG_WARNING + "Installing the new driver... that might takes few minutes" + TXT_COLOR.END)
+                
+                # Sleep a few seconds to trying making sure that the user sees and understands this message
+                # before the output of installation prints to the screen
+                #
+                time.sleep(4) 
+                
                 choice = "Y"
             else:
                 choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes few minutes. Continue? [Y/<any key for No>]: " + TXT_COLOR.END)
@@ -1381,8 +1388,8 @@ class Checker:
                 for module in modules:
                     os.system('rmmod %s 2>/dev/null' % module)
                 
-                os.system('apt update >> /var/log/flexiwan/fwsystem_checker.log 2>&1' )
-                os.system('apt install -y flexiwan-%s-dkms >> /var/log/flexiwan/fwsystem_checker.log 2>&1' % driver.split('_')[0])
+                os.system('apt update' )
+                os.system('apt install -y flexiwan-%s-dkms' % driver.split('_')[0])
 
                 for module in modules:
                     os.system('modprobe %s' % module)
