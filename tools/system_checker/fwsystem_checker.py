@@ -88,6 +88,7 @@ soft_checkers = [
 class TXT_COLOR:
     BG_FAILURE_CRITICAL = '\x1b[30;41m'  # Red
     BG_FAILURE_OPTIONAL = '\x1b[30;43m'  # Yellow
+    BG_WARNING          = '\x1b[30;43m'  # Yellow
     FG_SUCCESS          = '\x1b[32m'     # Green
     FG_FAILURE_CRITICAL = '\x1b[31m'     # Red
     FG_FAILURE_OPTIONAL = '\x1b[33m'     # Yellow

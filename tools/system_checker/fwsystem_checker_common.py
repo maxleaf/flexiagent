@@ -31,6 +31,7 @@ import sys
 import uuid
 import yaml
 import shutil
+import time
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -1359,44 +1360,44 @@ class Checker:
             if not fix:
                 return False
             
-            user_confirmation_msg = \
-                TXT_COLOR.BG_FAILURE_OPTIONAL + \
-                "We need to install and compile a new driver. " + \
-                "It might take a few minutes to complete. " + \
-                "Continue?  [Y/n]" + TXT_COLOR.END
-                
-            choice = "Y" if silently else input(user_confirmation_msg)
+            msg = "New driver installation is needed, that takes few minutes."
+            if silently:
+                print(TXT_COLOR.BG_WARNING + msg + TXT_COLOR.END)
+                time.sleep(3)
+                choice = "Y"
+            else:
+                choice = input(TXT_COLOR.BG_WARNING + msg + " Continue? [Y/n]: " + TXT_COLOR.END)
 
-            if choice == 'n' or choice == 'N':
+            if choice != 'y' and choice != 'Y' and choice != '':
                 return False
-            elif choice == 'y' or choice == 'Y' or choice == '':
-                modules = [
-                    'ath10k_pci',
-                    'ath10k_core',
-                    'ath',
-                    'mac80211',
-                    'cfg80211',
-                    'libarc4'
-                ]
+            
+            modules = [
+                'ath10k_pci',
+                'ath10k_core',
+                'ath',
+                'mac80211',
+                'cfg80211',
+                'libarc4'
+            ]
 
-                try:
-                    for module in modules:
-                        os.system('rmmod %s 2>/dev/null' % module)
-                    
-                    os.system('apt update')
-                    os.system('apt install -y flexiwan-%s-dkms' % driver.split('_')[0])
-
-                    for module in modules:
-                        os.system('modprobe %s' % module)
-                except Exception as e:
-                    print('Error: %s' % str(e))
-                    for module in modules:
-                        os.system('modprobe %s 2>/dev/null' % module)
-                    return False
+            try:
+                for module in modules:
+                    os.system('rmmod %s 2>/dev/null' % module)
                 
-                # At this point, the driver installed and compailed succeffoully. 
-                # We can return True even we are inside the loop, 
-                # since wo don't need to run it for each WiFi interface.
-                return True
+                os.system('apt update')
+                os.system('apt install -y flexiwan-%s-dkms' % driver.split('_')[0])
+
+                for module in modules:
+                    os.system('modprobe %s' % module)
+            except Exception as e:
+                print('Error: %s' % str(e))
+                for module in modules:
+                    os.system('modprobe %s 2>/dev/null' % module)
+                return False
+                
+            # At this point, the driver installed and compailed succeffoully. 
+            # We can return True even we are inside the loop, 
+            # since wo don't need to run it for each WiFi interface.
+            return True
 
         raise Exception("No WiFi device was detected")
