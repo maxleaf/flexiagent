@@ -1366,9 +1366,9 @@ class Checker:
                 time.sleep(3)
                 choice = "Y"
             else:
-                choice = input(TXT_COLOR.BG_WARNING + msg + " Continue? [Y/n]: " + TXT_COLOR.END)
+                choice = input(TXT_COLOR.BG_WARNING + msg + " Continue? [Y/<any key for No>]: " + TXT_COLOR.END)
 
-            if choice != 'y' and choice != 'Y' and choice != '':
+            if choice != 'y' and choice != 'Y':
                 return False
             
             modules = [
