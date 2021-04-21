@@ -272,6 +272,11 @@ class FwWanMonitor:
             new_metric = route.metric + self.WATERMARK
             fwglobals.log.debug("WAN Monitor: Link down Metric Update - From: %d To: %d" %
                 (route.metric, new_metric))
+            # When VM WAN interface in DHCP mode is disconnected from network, we need immediately
+            # to run netplan apply to cleanup up stale interface address and routes from Linux and more
+            # importantly from VPP. Without this fix, VPP is crashed on a packet inside ip4_lookup_inline()
+            # on ip4_fib_get()
+            fwutils.netplan_apply('WAN Monitor')
         elif route.metric >= self.WATERMARK and successes >= self.THRESHOLD:
             new_metric = route.metric - self.WATERMARK
             fwglobals.log.debug("WAN Monitor: Link up Metric Update - From: %d To: %d" %
