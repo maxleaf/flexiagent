@@ -1384,8 +1384,8 @@ class Checker:
                 for module in modules:
                     os.system('rmmod %s 2>/dev/null' % module)
                 
-                os.system('apt update')
-                os.system('apt install -y flexiwan-%s-dkms' % driver.split('_')[0])
+                os.system('apt update >> /var/log/flexiwan/fwsystem_checker.log 2>&1' )
+                os.system('apt install -y flexiwan-%s-dkms >> /var/log/flexiwan/fwsystem_checker.log 2>&1' % driver.split('_')[0])
 
                 for module in modules:
                     os.system('modprobe %s' % module)
