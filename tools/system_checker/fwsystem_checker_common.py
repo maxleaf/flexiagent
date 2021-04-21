@@ -31,7 +31,6 @@ import sys
 import uuid
 import yaml
 import shutil
-import time
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -1360,13 +1359,11 @@ class Checker:
             if not fix:
                 return False
             
-            msg = "New driver installation is needed, that takes few minutes."
             if silently:
-                print(TXT_COLOR.BG_WARNING + msg + TXT_COLOR.END)
-                time.sleep(3)
+                print(TXT_COLOR.BG_WARNING + "Installing the new driver... that might takes few minutes" + TXT_COLOR.END)
                 choice = "Y"
             else:
-                choice = input(TXT_COLOR.BG_WARNING + msg + " Continue? [Y/<any key for No>]: " + TXT_COLOR.END)
+                choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes few minutes. Continue? [Y/<any key for No>]: " + TXT_COLOR.END)
 
             if choice != 'y' and choice != 'Y':
                 return False
