@@ -4,7 +4,7 @@
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #
-# Copyright (C) 2019  flexiWAN Ltd.
+# Copyright (C) 2021  flexiWAN Ltd.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Affero General Public License as published by the Free
@@ -41,6 +41,7 @@ sys.path.append(globals)
 import fwglobals
 import fwutils
 import fwnetplan
+from fwsystem_checker import TXT_COLOR
 
 from yaml.constructor import ConstructorError
 
@@ -177,13 +178,13 @@ class Checker:
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
-            ret = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
-            if ret == 0:
-                self.wan_interfaces.append(str(iface))
-                _print_without_line_feed("\r                                              \r")  # Clean the line on screen
-                return True
-        _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+            for _ in range(5):
+                ret = os.system("ping -c 1 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
+                if ret == 0:
+                    self.wan_interfaces.append(str(iface))
+                    return True
+                _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
+            _print_without_line_feed("\r                                              \r")  # Clean the line on screen
         return False
 
     def hard_check_kernel_io_modules(self, supported):
@@ -479,7 +480,7 @@ class Checker:
 
         return True
 
-    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=None):
+    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
         """Check if default routes have duplicate metrics.
 
         :param fix:             Fix problem.
@@ -568,7 +569,7 @@ class Checker:
                 duplicates[dev] = files
         return duplicates
 
-    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=None):
+    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=''):
         """Check if any section is defined multiple times in Netplan files.
 
         :param fix:             Fix problem.
@@ -585,7 +586,7 @@ class Checker:
             return False
         return True
 
-    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=None):
+    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=''):
         """Check if interface is defined in multiple Netplan files.
 
         :param fix:             Fix problem.
@@ -610,7 +611,7 @@ class Checker:
         return True
 
 
-    def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):
+    def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=''):
         """Check hostname syntax.
 
         :param fix:             Fix problem.
@@ -667,7 +668,7 @@ class Checker:
         return True
 
 
-    def soft_check_hostname_in_hosts(self, fix=False, silently=False, prompt=None):
+    def soft_check_hostname_in_hosts(self, fix=False, silently=False, prompt=''):
         """Check if hostname is present in /etc/hosts.
 
         :param fix:             Fix problem.
@@ -725,7 +726,7 @@ class Checker:
                 return False
         return True
 
-    def soft_check_disable_transparent_hugepages(self, fix=False, silently=False, prompt=None):
+    def soft_check_disable_transparent_hugepages(self, fix=False, silently=False, prompt=''):
         """Check if transparent hugepages are disabled.
 
         :param fix:             Fix problem.
@@ -745,7 +746,8 @@ class Checker:
         # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
         grub_filename = '/etc/default/grub'
         try:
-            subprocess.check_call("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True)
+            subprocess.check_call("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, shell=True)
             return True   # No exception - grep found the pattern
         except subprocess.CalledProcessError:
             pass
@@ -801,7 +803,6 @@ class Checker:
         # Update the grub file
         #
         cmd = 'sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\\"transparent_hugepage=never /" ' + grub_filename
-        print(cmd)
         ret = os.system(cmd)
         if ret != 0:
             print(prompt + "%s - failed (%d)" % (cmd,ret))
@@ -809,7 +810,7 @@ class Checker:
         return True
 
 
-    def soft_check_hugepage_number(self, fix=False, silently=False, prompt=None):
+    def soft_check_hugepage_number(self, fix=False, silently=False, prompt=''):
         """Check if there is enough hugepages available.
 
         :param fix:             Fix problem.
@@ -883,7 +884,7 @@ class Checker:
         os.system('sysctl -p %s' %(vpp_hugepages_file))
         return True
 
-    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=None):
+    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=''):
         """Check if there is enough DPDK buffers available.
 
         :param fix:             Fix problem.
@@ -944,7 +945,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multi_core_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multi_core_support_requires_rss(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -1313,28 +1314,89 @@ class Checker:
             os.system ("sudo update-grub")
         return
 
-    def lte_interfaces_exists(self):
+    def soft_check_lte_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
+        lte_interfaces = []
         for nicname, addrs in list(psutil.net_if_addrs().items()):
-            driver = fwutils.get_interface_driver(nicname)
+            driver = fwutils.get_interface_driver(nicname, cache=False)
             if driver and driver in ['cdc_mbim', 'qmi_wwan']:
+                dev_id = fwutils.get_interface_dev_id(nicname)
+                if dev_id:
+                    lte_interfaces.append({'driver': driver, 'dev_id': dev_id})
+
+        if not lte_interfaces:
+            raise Exception("No LTE device was detected")
+
+        for inf in lte_interfaces:
+            if inf['driver'] == 'qmi_wwan':
+                if not fix:
+                    return False
+                success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
+                if not success:
+                    return False
+        return True
+
+    def soft_check_wifi_driver(self, fix=False, silently=False, prompt=''):
+        other_wifi_drivers = False
+        for nicname, addrs in list(psutil.net_if_addrs().items()):
+            if not fwutils.is_wifi_interface(nicname):
+                continue
+                
+            driver = fwutils.get_interface_driver(nicname, cache=False)
+            if not driver in ['ath10k_pci', 'ath9k_pci']:
+                other_wifi_drivers = True
+                continue
+            
+            # Check if driver is a kernel driver or a dkms driver
+            driver_info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()               
+            
+            # If driver is already dkms, we can return True
+            if 'dkms' in driver_info:
                 return True
 
-        return False
+            # Make sure that driver is a kernel driver
+            if not 'kernel' in driver_info:
+                continue
+            
+            # At this point, we sure that we need to replace the existing driver with our one
+            if not fix:
+                return False
+            
+            if silently:
+                print(TXT_COLOR.BG_WARNING + "Installing new driver... that might takes a few minutes" + TXT_COLOR.END)
+                choice = "Y"
+            else:
+                choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes a few minutes. Continue? [Y/N]: " + TXT_COLOR.END)
 
-    def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
-        drivers = []
-        for nicname, addrs in list(psutil.net_if_addrs().items()):
-            dev_id = fwutils.get_interface_dev_id(nicname)# fwutils.get_interface_dev_id(nicname)
-            if dev_id:
-                driver = fwutils.get_interface_driver(nicname)
-                if driver and driver in ['cdc_mbim', 'qmi_wwan']:
-                    drivers.append({'driver': driver, 'dev_id': dev_id})
+            if choice != 'y' and choice != 'Y':
+                return False
+            
+            modules = [
+                'ath10k_pci',
+                'ath10k_core',
+                'ath',
+                'mac80211',
+                'cfg80211',
+                'libarc4'
+            ]
 
-        if len(drivers) > 0:
-            for inf in drivers:
-                if inf['driver'] == 'qmi_wwan':
-                    if not fix:
-                        return False
-                    success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
-                    return success
-        return True
+            try:                
+                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHCECKER_LOG_FILE)
+                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
+
+                for module in modules:
+                    os.system('modprobe %s' % module)
+            except Exception as e:
+                print('Error: %s' % str(e))
+                for module in modules:
+                    os.system('modprobe %s 2>/dev/null' % module)
+                return False
+                
+            # At this point, the driver installed and compailed successfully. 
+            # We can return True even we are inside the loop, 
+            # since wo don't need to run it for each WiFi interface.
+            return True
+
+        if other_wifi_drivers:
+            return True
+
+        raise Exception("No WiFi device was detected")

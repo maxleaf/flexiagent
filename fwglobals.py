@@ -265,6 +265,7 @@ class Fwglobals:
         self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
+        self.SYSTEM_CHCECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
@@ -349,6 +350,13 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
+        # Some lte modules have a problem with drivers binding.
+        # As workaround, we reload the driver to fix it.
+        # We run it only if vpp is not running to make sure that we reload the driver
+        # only on boot, and not if a user run `systemctl restart flexiwan-router` when vpp is running.
+        if not fwutils.vpp_does_run():
+            fwutils.reload_lte_drivers()
+
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
@@ -362,7 +370,6 @@ class Fwglobals:
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
         self.ikev2        = FwIKEv2()
-
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 

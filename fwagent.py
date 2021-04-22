@@ -570,29 +570,32 @@ class FwAgent:
         :returns: (reply, msg), where reply is reply to be sent back to server,
                   msg is normalized received message.
         """
-        self.received_request = True
-        self.handling_request = True
+        try:
+            self.received_request = True
+            self.handling_request = True
 
-        msg = fwutils.fix_received_message(received_msg)
+            msg = fwutils.fix_received_message(received_msg)
 
-        print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
-        print_message = False if msg['message'] == 'add-application' else print_message
-        if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
-            print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
-        if print_message:
-            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
+            print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
+            print_message = False if msg['message'] == 'add-application' else print_message
+            if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
+                print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
+            if print_message:
+                fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
-        reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
+            reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
+            if not 'entity' in reply and 'entity' in msg:
+                reply.update({'entity': msg['entity'] + 'Reply'})
+            if not 'message' in reply:
+                reply.update({'message': 'success'})
 
-        if not 'entity' in reply and 'entity' in msg:
-            reply.update({'entity': msg['entity'] + 'Reply'})
-        if not 'message' in reply:
-            reply.update({'message': 'success'})
+            if print_message:
+                fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
 
-        if print_message:
-            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
-
-        self.handling_request = False
+            self.handling_request = False
+        except Exception as e:
+             fwglobals.log.error("handle_received_request failed: %s" + str(e))
+             return {'ok': 0, 'message': str(e)}
         return reply
 
     def inject_requests(self, filename, ignore_errors=False, json_requests=None):
