@@ -2175,6 +2175,8 @@ def connect_to_wifi(params):
 
 def is_lte_interface_by_dev_id(dev_id):
     if_name = dev_id_to_linux_if(dev_id)
+    if not if_name:
+        return False
     return is_lte_interface(if_name)
 
 def is_lte_interface(if_name):
@@ -3121,6 +3123,10 @@ def get_interface_driver(if_name, cache=True):
 
     :returns: driver name.
     """
+    if not if_name:
+        fwglobals.log.error('get_interface_driver: if_name is empty')
+        return ''
+
     with fwglobals.g.cache.lock:
         interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
         if not interface or cache == False:
