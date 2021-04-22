@@ -1392,7 +1392,7 @@ class Checker:
                     os.system('modprobe %s 2>/dev/null' % module)
                 return False
                 
-            # At this point, the driver installed and compailed succeffoully. 
+            # At this point, the driver installed and compailed successfully. 
             # We can return True even we are inside the loop, 
             # since wo don't need to run it for each WiFi interface.
             return True
