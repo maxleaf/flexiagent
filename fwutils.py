@@ -3773,39 +3773,19 @@ def exec_with_timeout(cmd, timeout=60):
 
     :returns: Command execution result
     """
-    state = {'output':'', 'error':'', 'returncode':0}
-    def target():
-        output = ''
-        try:
-            state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            (output, error) = state['proc'].communicate()
-            output = output.decode()
-        except OSError as err:
-            state['error'] = str(err)
-        except Exception as err:
-            state['error'] = "Error executing command '%s', error: %s" % (str(cmd), str(err))
-        state['output'] = output
-        state['error'] = error
-        state['returncode'] = state['proc'].returncode
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join(timeout)
-    if thread.is_alive():
-        try:
-            process = psutil.Process(state['proc'].pid)
-            for proc in process.children(recursive=True):
-                proc.kill()
-            process.kill()
-            state['error'] = "Command '%s' didn't complete after %d and killed" % (str(cmd), timeout)
-            fwglobals.log.debug("Command '%s' killed after timeout %d" % (str(cmd), timeout))
-            thread.join()
-        except psutil.NoSuchProcess:
-            pass
-        except Exception as err:
-            state['error'] = "Error killing command '%s', error %s" % (str(cmd), str(err))
-            fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
-    return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
+    state = {'proc':None, 'output':'', 'error':'', 'returncode':0}
+    try:
+        state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        (state['output'], state['error']) = state['proc'].communicate(timeout=timeout)
+    except OSError as err:
+        state['error'] = str(err)
+        fwglobals.log.error("Error executing command '%s', error: %s" % (str(cmd), str(err)))
+    except Exception as err:
+        state['error'] = "Error executing command '%s', error: %s" % (str(cmd), str(err))
+        fwglobals.log.error("Error executing command '%s', error: %s" % (str(cmd), str(err)))
+    state['returncode'] = state['proc'].returncode
 
+    return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
 def get_template_data_by_hw(template_fname):
     system_info = subprocess.check_output('lshw -c system', shell=True).strip()
