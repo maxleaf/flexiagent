@@ -101,6 +101,7 @@ def add_interface(params):
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
     mtu       = params.get('mtu', None)
+    bridged   = params.get('bridged', None)
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
@@ -270,6 +271,10 @@ def add_interface(params):
             { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
             { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] }
         ]
+
+    if bridged:
+        netplan_params['args']['ip'] = ''
+        netplan_params['args']['dont_check_ip'] = True
 
     cmd = {}
     cmd['cmd'] = {}

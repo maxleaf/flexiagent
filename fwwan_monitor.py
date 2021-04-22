@@ -337,7 +337,7 @@ class FwWanMonitor:
 
             (success, err_str) = fwnetplan.add_remove_netplan_interface(\
                                     True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN',
-                                    mtu, if_name=route.dev, wan_failover=True)
+                                    mtu, if_name=route.dev, dont_check_ip=True)
             if not success:
                 route.ok = prev_ok
                 fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
@@ -354,7 +354,7 @@ class FwWanMonitor:
                     fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.dev_id, ip, route.via, prev_metric, dhcp, 'WAN',
-                        mtu, if_name=route.dev, wan_failover=True)
+                        mtu, if_name=route.dev, dont_check_ip=True)
                     return
 
         # If defult route was changes as a result of metric update,

@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu=None, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu=None, if_name=None, dont_check_ip=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -169,8 +169,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, mtu=%s, if_name=%s, wan_failover=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type, str(mtu), if_name, str(wan_failover)))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, mtu=%s, if_name=%s, dont_check_ip=%s" % \
+        (is_add, dev_id, ip, gw, metric, dhcp, type, str(mtu), if_name, str(dont_check_ip)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -242,7 +242,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
             config_section['dhcp4'] = False
             if 'dhcp4-overrides' in config_section:
                 del config_section['dhcp4-overrides']
-            config_section['addresses'] = [ip]
+            if ip:
+                config_section['addresses'] = [ip]
 
             if gw and type == 'WAN':
                 default_route_found = False
@@ -334,7 +335,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
             ifname = fwutils.dev_id_to_tap(dev_id)
             fwglobals.log.debug("Interface name in cache is %s, dev_id %s" % (ifname, dev_id_full))
 
-        if not wan_failover: # Failover might be easily caused by interface down so no need to validate IP
+        if not dont_check_ip: # Failover might be easily caused by interface down so no need to validate IP
             if is_add and not _has_ip(ifname, (dhcp=='yes')):
                 raise Exception("ip was not assigned")
 
