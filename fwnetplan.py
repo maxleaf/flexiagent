@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu=None, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -169,8 +169,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, mtu=%s, if_name=%s, wan_failover=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type, str(mtu), if_name, str(wan_failover)))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
+         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -258,6 +259,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, mtu
                     config_section['routes'] = routes   # Handle case where there is no 'routes' section
                 if 'gateway4' in config_section:
                     del config_section['gateway4']
+
+                if dnsServers:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['addresses'] = dnsServers
+                    config_section['nameservers'] = nameservers
+                if dnsDomains:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['search'] = dnsDomains
+                    config_section['nameservers'] = nameservers
 
         is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
         if is_add == 1:

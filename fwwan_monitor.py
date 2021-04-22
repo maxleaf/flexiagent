@@ -333,10 +333,17 @@ class FwWanMonitor:
             #
             ip   = fwutils.get_interface_address(route.dev, log=False)
             dhcp = 'yes' if route.proto == 'dhcp' else 'no'
-            mtu = db_if[0].get('mtu', None) if db_if else None
+
+            ifc = db_if[0] if db_if else {}
+            mtu = ifc.get('mtu')
+
+            dnsServers  = ifc.get('dnsServers', [])
+            if len(dnsServers) == 0:
+                dnsServers = ['8.8.8.8', '8.8.4.4']
+            dnsDomains  = ifc.get('dnsDomains', None)
 
             (success, err_str) = fwnetplan.add_remove_netplan_interface(\
-                                    True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN',
+                                    True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
                                     mtu, if_name=route.dev, wan_failover=True)
             if not success:
                 route.ok = prev_ok
