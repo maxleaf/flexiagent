@@ -1336,12 +1336,14 @@ class Checker:
         return True
 
     def soft_check_wifi_driver(self, fix=False, silently=False, prompt=''):
+        other_wifi_drivers = False
         for nicname, addrs in list(psutil.net_if_addrs().items()):
             if not fwutils.is_wifi_interface(nicname):
                 continue
                 
             driver = fwutils.get_interface_driver(nicname, cache=False)
             if not driver in ['ath10k_pci', 'ath9k_pci']:
+                other_wifi_drivers = True
                 continue
             
             # Check if driver is a kernel driver or a dkms driver
@@ -1360,10 +1362,10 @@ class Checker:
                 return False
             
             if silently:
-                print(TXT_COLOR.BG_WARNING + "Installing the new driver... that might takes few minutes" + TXT_COLOR.END)
+                print(TXT_COLOR.BG_WARNING + "Installing new driver... that might takes a few minutes" + TXT_COLOR.END)
                 choice = "Y"
             else:
-                choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes few minutes. Continue? [Y/<any key for No>]: " + TXT_COLOR.END)
+                choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes a few minutes. Continue? [Y/N]: " + TXT_COLOR.END)
 
             if choice != 'y' and choice != 'Y':
                 return False
@@ -1377,10 +1379,7 @@ class Checker:
                 'libarc4'
             ]
 
-            try:
-                for module in modules:
-                    os.system('rmmod %s 2>/dev/null' % module)
-                
+            try:                
                 os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHCECKER_LOG_FILE)
                 os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
 
@@ -1395,6 +1394,9 @@ class Checker:
             # At this point, the driver installed and compailed successfully. 
             # We can return True even we are inside the loop, 
             # since wo don't need to run it for each WiFi interface.
+            return True
+
+        if other_wifi_drivers:
             return True
 
         raise Exception("No WiFi device was detected")
