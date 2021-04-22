@@ -54,18 +54,16 @@ import netaddr
 # }
 def _create_rule(is_ipv6=0, is_permit=0, proto=0,
                  sport_from=0, sport_to=65535,
-                 s_prefix=0, s_ip='\x00\x00\x00\x00',
+                 src_prefix='0.0.0.0/0',
                  dport_from=0, dport_to=65535,
-                 d_prefix=0, d_ip='\x00\x00\x00\x00'):
+                 dst_prefix='0.0.0.0/0'):
     rule = ({'is_permit': is_permit, 'is_ipv6': is_ipv6, 'proto': proto,
              'srcport_or_icmptype_first': sport_from,
              'srcport_or_icmptype_last': sport_to,
-             'src_ip_prefix_len': s_prefix,
-             'src_ip_addr': s_ip,
+             'src_prefix': src_prefix,
              'dstport_or_icmpcode_first': dport_from,
              'dstport_or_icmpcode_last': dport_to,
-             'dst_ip_prefix_len': d_prefix,
-             'dst_ip_addr': d_ip})
+             'dst_prefix': dst_prefix})
     return rule
 
 
@@ -80,8 +78,6 @@ def add_acl_rule(rule, rules):
      :returns: None.
      """
     # acl.api.json: acl_add_replace (..., tunnel <type vl_api_acl_rule_t>, ...)
-    ip_prefix = 0
-    ip_bytes = '\x00\x00\x00\x00'
     proto = None
     port_from = 0
     port_to = 65535
@@ -90,11 +86,7 @@ def add_acl_rule(rule, rules):
     if protocol:
         proto = [ proto_map[rule['protocol']] ]
 
-    ip = rule.get('ip', None)
-    if ip:
-        ip_network = netaddr.IPNetwork(rule['ip'])
-        ip_bytes, _ = fwutils.ip_str_to_bytes(str(ip_network.ip))
-        ip_prefix = ip_network.prefixlen
+    ip_prefix = rule.get('ip', '0.0.0.0/0')
 
     ports = rule.get('ports', None)
     if ports:
@@ -120,16 +112,14 @@ def add_acl_rule(rule, rules):
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
                                 dport_from=port_from,
                                 dport_to=port_to,
-                                d_prefix=ip_prefix,
                                 proto=p,
-                                d_ip=ip_bytes))
+                                dst_prefix=ip_prefix))
 
         rules.append(_create_rule(is_ipv6=0, is_permit=1,
                                 sport_from=port_from,
                                 sport_to=port_to,
-                                s_prefix=ip_prefix,
                                 proto=p,
-                                s_ip=ip_bytes))
+                                src_prefix=ip_prefix))
 
 def _add_acl(params, cmd_list, cache_key):
     """Generate ACL command.
