@@ -265,6 +265,7 @@ class Fwglobals:
         self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
+        self.SYSTEM_CHCECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'

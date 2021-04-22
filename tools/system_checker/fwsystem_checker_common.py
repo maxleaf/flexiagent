@@ -41,6 +41,7 @@ sys.path.append(globals)
 import fwglobals
 import fwutils
 import fwnetplan
+from fwsystem_checker import TXT_COLOR
 
 from yaml.constructor import ConstructorError
 
@@ -1313,31 +1314,89 @@ class Checker:
             os.system ("sudo update-grub")
         return
 
-    def lte_interfaces_exists(self):
+    def soft_check_lte_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
+        lte_interfaces = []
         for nicname, addrs in list(psutil.net_if_addrs().items()):
             driver = fwutils.get_interface_driver(nicname, cache=False)
             if driver and driver in ['cdc_mbim', 'qmi_wwan']:
-                return True
+                dev_id = fwutils.get_interface_dev_id(nicname)
+                if dev_id:
+                    lte_interfaces.append({'driver': driver, 'dev_id': dev_id})
 
-        return False
-
-    def soft_check_lte_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
-        if not self.lte_interfaces_exists():
+        if not lte_interfaces:
             raise Exception("No LTE device was detected")
 
-        drivers = []
-        for nicname, addrs in list(psutil.net_if_addrs().items()):
-            dev_id = fwutils.get_interface_dev_id(nicname)
-            if dev_id:
-                driver = fwutils.get_interface_driver(nicname, cache=False)
-                if driver and driver in ['cdc_mbim', 'qmi_wwan']:
-                    drivers.append({'driver': driver, 'dev_id': dev_id})
-
-        if len(drivers) > 0:
-            for inf in drivers:
-                if inf['driver'] == 'qmi_wwan':
-                    if not fix:
-                        return False
-                    success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
-                    return success
+        for inf in lte_interfaces:
+            if inf['driver'] == 'qmi_wwan':
+                if not fix:
+                    return False
+                success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
+                if not success:
+                    return False
         return True
+
+    def soft_check_wifi_driver(self, fix=False, silently=False, prompt=''):
+        other_wifi_drivers = False
+        for nicname, addrs in list(psutil.net_if_addrs().items()):
+            if not fwutils.is_wifi_interface(nicname):
+                continue
+                
+            driver = fwutils.get_interface_driver(nicname, cache=False)
+            if not driver in ['ath10k_pci', 'ath9k_pci']:
+                other_wifi_drivers = True
+                continue
+            
+            # Check if driver is a kernel driver or a dkms driver
+            driver_info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()               
+            
+            # If driver is already dkms, we can return True
+            if 'dkms' in driver_info:
+                return True
+
+            # Make sure that driver is a kernel driver
+            if not 'kernel' in driver_info:
+                continue
+            
+            # At this point, we sure that we need to replace the existing driver with our one
+            if not fix:
+                return False
+            
+            if silently:
+                print(TXT_COLOR.BG_WARNING + "Installing new driver... that might takes a few minutes" + TXT_COLOR.END)
+                choice = "Y"
+            else:
+                choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes a few minutes. Continue? [Y/N]: " + TXT_COLOR.END)
+
+            if choice != 'y' and choice != 'Y':
+                return False
+            
+            modules = [
+                'ath10k_pci',
+                'ath10k_core',
+                'ath',
+                'mac80211',
+                'cfg80211',
+                'libarc4'
+            ]
+
+            try:                
+                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHCECKER_LOG_FILE)
+                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
+
+                for module in modules:
+                    os.system('modprobe %s' % module)
+            except Exception as e:
+                print('Error: %s' % str(e))
+                for module in modules:
+                    os.system('modprobe %s 2>/dev/null' % module)
+                return False
+                
+            # At this point, the driver installed and compailed successfully. 
+            # We can return True even we are inside the loop, 
+            # since wo don't need to run it for each WiFi interface.
+            return True
+
+        if other_wifi_drivers:
+            return True
+
+        raise Exception("No WiFi device was detected")
