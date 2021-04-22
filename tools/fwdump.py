@@ -108,6 +108,11 @@ g_dumpers = {
     'fwagent_ui_log.1':             { 'shell_cmd': 'cp /var/log/flexiwan/agentui.log.1 <temp_folder>/fwagent_ui_1.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
+    'fwsystem_checker_log':         { 'shell_cmd': 'cp /var/log/flexiwan/system_checker.log <temp_folder>/fwsystem_checker.log 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+    'fwsystem_checker_log.1':       { 'shell_cmd': 'cp /var/log/flexiwan/system_checker.log.1 <temp_folder>/fwsystem_checker_1.log 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+
     'dpkg_log':                     { 'shell_cmd': 'cp /var/log/dpkg.log <temp_folder>/dpkg.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'dpkg_log.1':                   { 'shell_cmd': 'cp /var/log/dpkg.log.1 <temp_folder>/dpkg_1.log 2>/dev/null ;' +
