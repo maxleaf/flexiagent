@@ -63,6 +63,8 @@ fwrouter_translators = {
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-bridge':               {'module': __import__('fwtranslate_add_bridge'),      'api':'add_bridge'},
+    'remove-bridge':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):

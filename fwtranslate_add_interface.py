@@ -107,7 +107,7 @@ def add_interface(params):
     dnsDomains  = params.get('dnsDomains', None)
 
     mtu       = params.get('mtu', None)
-    bridged   = params.get('bridged', None)
+    bridge_addr   = params.get('bridge_addr', None)
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
@@ -281,7 +281,7 @@ def add_interface(params):
             { 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] }
         ]
 
-    if bridged:
+    if bridge_addr:
         netplan_params['args']['ip'] = ''
         netplan_params['args']['dont_check_ip'] = True
 
@@ -296,6 +296,31 @@ def add_interface(params):
     cmd['revert']['params']['args']['is_add'] = 0
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
+
+    if bridge_addr:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "exec"
+        cmd['cmd']['descr']   = "set interface to l2 bridge"
+        cmd['cmd']['params'] =  [
+            { 'substs': [
+                    { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id },
+                    { 'replace':'BRIDGE-ID', 'val_by_func':'iface_addr_to_bridge_id', 'arg':iface_addr },
+                ]
+            },
+            "sudo vppctl set interface l2 bridge VPP-DEV BRIDGE-ID"
+        ]
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "exec"
+        cmd['revert']['descr']   = "set interface from bridge to l3"
+        cmd['revert']['params'] =  [
+            { 'substs': [
+                    { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id }
+                ]
+            },
+            "sudo vppctl set interface l3 bridge VPP-DEV"
+        ]
+        cmd_list.append(cmd)
 
     if mtu:
         # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
