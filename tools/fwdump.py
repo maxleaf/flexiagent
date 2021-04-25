@@ -47,14 +47,18 @@ g_dumpers = {
     ############################################################################
     # Linux stuff - !!! PLEASE KEEP ALPHABET ORDER !!!
     #
+    'linux_cpu':                    { 'shell_cmd': 'cat /proc/cpuinfo > <dumper_out_file>' },
     'linux_dhcpd':                  { 'shell_cmd': 'mkdir -p <temp_folder>/linux_dhcpd/ && ' +
                                                    'cp /etc/dhcp/dhcpd.conf* <temp_folder>/linux_dhcpd 2>/dev/null ; ' +
                                                    'cp /var/log/dhcpd.log    <temp_folder>/linux_dhcpd 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+    'linux_disk':                   { 'shell_cmd': 'df -h > <dumper_out_file>' },
     'linux_dpdk_devbind_status':    { 'shell_cmd': 'dpdk-devbind -s > <dumper_out_file>' },
     'linux_grub':                   { 'shell_cmd': 'cp /etc/default/grub <temp_folder>/linux_grub 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
+    'linux_lsb_release':            { 'shell_cmd': 'cp /etc/lsb-release <temp_folder>/linux_lsb-release 2>/dev/null ; ' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_lspci':                  { 'shell_cmd': 'lspci -Dvmmn > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
     'linux_netplan':                { 'shell_cmd': 'mkdir -p <temp_folder>/linux_netplan/etc/ && ' +
@@ -67,6 +71,7 @@ g_dumpers = {
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; ' +
                                                    'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
                                                    'ps -elf | grep vpp >> <dumper_out_file>' },
+    'linux_ram':                    { 'shell_cmd': 'free > <dumper_out_file>' },
     'linux_resolvconf':             { 'shell_cmd': 'mkdir -p <temp_folder>/linux_resolvconf/ && ' +
                                                    'cp /etc/resolv.conf <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
                                                    'cp /etc/resolvconf/resolv.conf.d/base   <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
@@ -106,6 +111,11 @@ g_dumpers = {
     'fwagent_ui_log':               { 'shell_cmd': 'cp /var/log/flexiwan/agentui.log <temp_folder>/fwagent_ui.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'fwagent_ui_log.1':             { 'shell_cmd': 'cp /var/log/flexiwan/agentui.log.1 <temp_folder>/fwagent_ui_1.log 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+
+    'fwsystem_checker_log':         { 'shell_cmd': 'cp /var/log/flexiwan/system_checker.log <temp_folder>/fwsystem_checker.log 2>/dev/null ;' +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+    'fwsystem_checker_log.1':       { 'shell_cmd': 'cp /var/log/flexiwan/system_checker.log.1 <temp_folder>/fwsystem_checker_1.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
     'dpkg_log':                     { 'shell_cmd': 'cp /var/log/dpkg.log <temp_folder>/dpkg.log 2>/dev/null ;' +

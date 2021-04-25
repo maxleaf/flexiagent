@@ -81,13 +81,14 @@ soft_checkers = [
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_multi_core_support_requires_rss'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }},
-    { 'soft_check_lte_modem_configured_in_mbim_mode': { 'severity': 'critical' }}
-
+    { 'soft_check_lte_modem_configured_in_mbim_mode': { 'severity': 'critical' }},
+    { 'soft_check_wifi_driver': { 'severity': 'critical' }},
 ]
 
 class TXT_COLOR:
     BG_FAILURE_CRITICAL = '\x1b[30;41m'  # Red
     BG_FAILURE_OPTIONAL = '\x1b[30;43m'  # Yellow
+    BG_WARNING          = '\x1b[30;43m'  # Yellow
     FG_SUCCESS          = '\x1b[32m'     # Green
     FG_FAILURE_CRITICAL = '\x1b[31m'     # Red
     FG_FAILURE_OPTIONAL = '\x1b[33m'     # Yellow

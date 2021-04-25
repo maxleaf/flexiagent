@@ -2175,6 +2175,8 @@ def connect_to_wifi(params):
 
 def is_lte_interface_by_dev_id(dev_id):
     if_name = dev_id_to_linux_if(dev_id)
+    if not if_name:
+        return False
     return is_lte_interface(if_name)
 
 def is_lte_interface(if_name):
@@ -2535,7 +2537,9 @@ def qmi_get_ip_configuration(dev_id):
     try:
         ip = None
         gateway = None
-        cmd = 'wds-get-current-settings | grep "IPv4 address\\|IPv4 subnet mask\\|IPv4 gateway address"'
+        primary_dns = None
+        secondary_dns = None
+        cmd = 'wds-get-current-settings | grep "IPv4 address\\|IPv4 subnet mask\\|IPv4 gateway address\\|IPv4 primary DNS\\|IPv4 secondary DNS"'
         lines, _ = _run_qmicli_command(dev_id, cmd)
         for idx, line in enumerate(lines):
             if 'IPv4 address:' in line:
@@ -2545,10 +2549,16 @@ def qmi_get_ip_configuration(dev_id):
                 continue
             if 'IPv4 gateway address:' in line:
                 gateway = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'IPv4 primary DNS:' in line:
+                primary_dns = line.split(':')[-1].strip().replace("'", '')
+                continue
+            if 'IPv4 secondary DNS:' in line:
+                secondary_dns = line.split(':')[-1].strip().replace("'", '')
                 break
-        return (ip, gateway)
+        return (ip, gateway, primary_dns, secondary_dns)
     except Exception:
-        return (None, None)
+        return (None, None, None, None)
 
 def qmi_get_operator_name(dev_id):
     return _run_qmicli_command(dev_id, 'nas-get-operator-name')
@@ -2879,7 +2889,7 @@ def lte_connect(params, reset=False):
             '--query-subscriber-ready-status --no-close',
             '--query-registration-state --no-open=3 --no-close',
             '--attach-packet-service --no-open=4 --no-close',
-            '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway"' % connection_params
+            '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway\|DNS"' % connection_params
         ]
         for cmd in mbim_commands:
             lines, err = _run_mbimcli_command(dev_id, cmd, True)
@@ -2887,7 +2897,7 @@ def lte_connect(params, reset=False):
                 return (False, err)
 
 
-        for line in lines:
+        for idx, line in enumerate(lines) :
             if 'Session ID:' in line:
                 session = line.split(':')[-1].strip().replace("'", '')
                 set_lte_cache(dev_id, 'session', session)
@@ -2899,6 +2909,11 @@ def lte_connect(params, reset=False):
             if 'Gateway:' in line:
                 gateway = line.split(':')[-1].strip().replace("'", '')
                 set_lte_cache(dev_id, 'gateway', gateway)
+                continue
+            if 'DNS [0]:' in line:
+                dns_primary = line.split(':')[-1].strip().replace("'", '')
+                dns_secondary = lines[idx + 1].split(':')[-1].strip().replace("'", '')
+                set_lte_cache(dev_id, 'dns_servers', [dns_primary, dns_secondary])
                 break
 
         set_lte_cache(dev_id, 'state', '')
@@ -3050,24 +3065,31 @@ def mbim_get_ip_configuration(dev_id):
 
 def lte_get_ip_configuration(dev_id, key=None, cache=True):
     response = {
-        'ip'      : '',
-        'gateway' : '',
+        'ip'           : '',
+        'gateway'      : '',
+        'dns_servers'  : ''
     }
     try:
         # try to get it from cache
         ip = get_lte_cache(dev_id, 'ip')
         gateway =  get_lte_cache(dev_id, 'gateway')
+        dns_servers =  get_lte_cache(dev_id, 'dns_servers')
 
         # if not exists in cache, take from modem and update cache
-        if not ip or not gateway or cache == False:
-            ip, gateway = qmi_get_ip_configuration(dev_id)
+        if not ip or not gateway or not dns_servers or cache == False:
+            ip, gateway, primary_dns, secondary_dns = qmi_get_ip_configuration(dev_id)
 
-            if ip and gateway:
+            if ip:
                 set_lte_cache(dev_id, 'ip', ip)
+            if gateway:
                 set_lte_cache(dev_id, 'gateway', gateway)
+            if primary_dns and secondary_dns:
+                dns_servers = [primary_dns, secondary_dns]
+                set_lte_cache(dev_id, 'dns_servers', dns_servers)
 
         response['ip'] = ip
         response['gateway'] = gateway
+        response['dns_servers'] = dns_servers
 
         if key:
             return response[key]
@@ -3087,7 +3109,7 @@ def is_wifi_interface(if_name):
     :returns: Boolean.
     """
     try:
-        lines = subprocess.check_output('iwconfig', shell=True, stderr=subprocess.STDOUT).decode().splitlines()
+        lines = subprocess.check_output('iwconfig | grep %s' % if_name, shell=True, stderr=subprocess.STDOUT).decode().splitlines()
         for line in lines:
             if if_name in line and not 'no wireless extensions' in line:
                 return True
@@ -3121,6 +3143,10 @@ def get_interface_driver(if_name, cache=True):
 
     :returns: driver name.
     """
+    if not if_name:
+        fwglobals.log.error('get_interface_driver: if_name is empty')
+        return ''
+
     with fwglobals.g.cache.lock:
         interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
         if not interface or cache == False:
@@ -3773,39 +3799,19 @@ def exec_with_timeout(cmd, timeout=60):
 
     :returns: Command execution result
     """
-    state = {'output':'', 'error':'', 'returncode':0}
-    def target():
-        output = ''
-        try:
-            state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            (output, error) = state['proc'].communicate()
-            output = output.decode()
-        except OSError as err:
-            state['error'] = str(err)
-        except Exception as err:
-            state['error'] = "Error executing command '%s', error: %s" % (str(cmd), str(err))
-        state['output'] = output
-        state['error'] = error
-        state['returncode'] = state['proc'].returncode
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join(timeout)
-    if thread.is_alive():
-        try:
-            process = psutil.Process(state['proc'].pid)
-            for proc in process.children(recursive=True):
-                proc.kill()
-            process.kill()
-            state['error'] = "Command '%s' didn't complete after %d and killed" % (str(cmd), timeout)
-            fwglobals.log.debug("Command '%s' killed after timeout %d" % (str(cmd), timeout))
-            thread.join()
-        except psutil.NoSuchProcess:
-            pass
-        except Exception as err:
-            state['error'] = "Error killing command '%s', error %s" % (str(cmd), str(err))
-            fwglobals.log.error("Error killing exec command '%s', error %s" % (str(cmd), str(err)))
-    return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
+    state = {'proc':None, 'output':'', 'error':'', 'returncode':0}
+    try:
+        state['proc'] = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        (state['output'], state['error']) = state['proc'].communicate(timeout=timeout)
+    except OSError as err:
+        state['error'] = str(err)
+        fwglobals.log.error("Error executing command '%s', error: %s" % (str(cmd), str(err)))
+    except Exception as err:
+        state['error'] = "Error executing command '%s', error: %s" % (str(cmd), str(err))
+        fwglobals.log.error("Error executing command '%s', error: %s" % (str(cmd), str(err)))
+    state['returncode'] = state['proc'].returncode
 
+    return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
 def get_template_data_by_hw(template_fname):
     system_info = subprocess.check_output('lshw -c system', shell=True).strip()

@@ -100,6 +100,12 @@ def add_interface(params):
     metric    = 0 if not params.get('metric', '') else int(params.get('metric', '0'))
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
+
+    dnsServers  = params.get('dnsServers', [])
+    if len(dnsServers) == 0:
+        dnsServers = ['8.8.8.8', '8.8.4.4']
+    dnsDomains  = params.get('dnsDomains', None)
+
     mtu       = params.get('mtu', None)
     bridged   = params.get('bridged', None)
 
@@ -262,14 +268,17 @@ def add_interface(params):
                     'metric'   : metric,
                     'dhcp'     : dhcp,
                     'type'     : int_type,
-                    'mtu'      : mtu
+                    'mtu'      : mtu,
+                    'dnsServers': dnsServers,
+                    'dnsDomains': dnsDomains
         }
     }
 
     if is_lte:
         netplan_params['substs'] = [
             { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
-            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] }
+            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] },
+            { 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] }
         ]
 
     if bridged:
