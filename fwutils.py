@@ -2949,7 +2949,7 @@ def lte_get_system_info(dev_id):
         for line in lines:
             if '\tName' in line:
                 name = line.split(':', 1)[-1].strip().replace("'", '')
-                result['Operator_Name'] = name if bool(re.match("^[a-zA-Z0-9_ ]*$", name)) else ''
+                result['Operator_Name'] = name if bool(re.match("^[a-zA-Z0-9_ :]*$", name)) else ''
                 break
 
     except Exception:
