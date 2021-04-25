@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -41,7 +41,7 @@ def _copyfile(source_name, dest_name, buffer_size=1024*1024):
             fwutils.file_write_and_flush(dest, copy_buffer)
 
 def backup_linux_netplan_files():
-    for values in fwglobals.g.NETPLAN_FILES.values():
+    for values in list(fwglobals.g.NETPLAN_FILES.values()):
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
         fname_run = fname.replace('yaml', 'fwrun.yaml')
@@ -82,7 +82,7 @@ def load_netplan_filenames(get_only=False):
 
     :param get_only: if True the parsed info is not loaded into cache.
     '''
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
     devices = {}
@@ -130,7 +130,7 @@ def load_netplan_filenames(get_only=False):
     if get_only:
         return our_files
 
-    for fname, devices in our_files.items():
+    for fname, devices in list(our_files.items()):
         for dev in devices:
             dev_id = dev.get('dev_id')
             ifname = dev.get('ifname')
@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -169,8 +169,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, if_name=%s, wan_failover=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type, if_name, str(wan_failover)))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
+         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -223,6 +224,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
         if 'dhcp6' in config_section:
             del config_section['dhcp6']
 
+        if mtu:
+            config_section['mtu'] = mtu
+
         if re.match('yes', dhcp):
             if 'addresses' in config_section:
                 del config_section['addresses']
@@ -256,14 +260,32 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
                 if 'gateway4' in config_section:
                     del config_section['gateway4']
 
+                if dnsServers:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['addresses'] = dnsServers
+                    config_section['nameservers'] = nameservers
+                if dnsDomains:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['search'] = dnsDomains
+                    config_section['nameservers'] = nameservers
+
+        is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
         if is_add == 1:
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
 
-            if set_name:
+            # set-name with LTE causes issue since the Linux LTE interface is not controlled by dpdk
+            # and stay in Linux with the vppsb interface. Our LTE solution is to set the IP on the vppsb, and if we use set-name, it stays down.
+            # We need to set the IP on the vppsb interface and remove the set-name and match sections. 
+            if set_name and not is_lte:
                 ethernets[set_name] = config_section
+            elif set_name and is_lte:
+                del config_section['set-name']
+                if 'match' in config_section:
+                    del config_section['match']
+                ethernets[ifname] = config_section
             else:
                 ethernets[ifname] = config_section
         else:
@@ -282,11 +304,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
             stream.flush()
             os.fsync(stream.fileno())
 
+        # Remove default route from ip table because Netplan is not doing it.
+        if not is_add and type == 'WAN':
+            fwutils.remove_linux_default_route(ifname)
+
         fwutils.netplan_apply('add_remove_netplan_interface')
 
         # make sure IP address is applied in Linux.
         if is_add and set_name:
-            if set_name != ifname:
+            if set_name != ifname and not is_lte:
                 cmd = 'ip link set %s name %s' % (ifname, set_name)
                 fwglobals.log.debug(cmd)
                 os.system(cmd)

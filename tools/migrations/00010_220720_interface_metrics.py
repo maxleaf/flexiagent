@@ -39,7 +39,7 @@ from fwrouter_cfg import FwRouterCfg
 from fwrouter_api import fwrouter_translators
 
 def _find_primary_ip():
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
     if routes:
         route = routes[0]
@@ -47,7 +47,7 @@ def _find_primary_ip():
         dev = dev_split[1].split(' ')[0] if len(dev_split) > 1 else ''
         if dev:
             src = subprocess.check_output("ip -f inet address show %s | awk '/inet / {print $2}'" % dev,
-                                          shell=True).strip()
+                                          shell=True).decode().strip()
             return src
 
     return ''

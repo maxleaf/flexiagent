@@ -1,10 +1,10 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #
-# Copyright (C) 2019  flexiWAN Ltd.
+# Copyright (C) 2021  flexiWAN Ltd.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Affero General Public License as published by the Free
@@ -41,6 +41,7 @@ sys.path.append(globals)
 import fwglobals
 import fwutils
 import fwnetplan
+from fwsystem_checker import TXT_COLOR
 
 from yaml.constructor import ConstructorError
 
@@ -118,10 +119,10 @@ class Checker:
         :returns: 'True' if supported and 'False' otherwise.
         """
         try:
-            out = subprocess.check_output('cat /proc/cpuinfo | grep sse4_2', shell=True).strip()
-        except subprocess.CalledProcessError:
+            ret = os.system('cat /proc/cpuinfo | grep sse4_2 > /dev/null 2>&1')
+            return ret == 0
+        except:
             return False
-        return True
 
     def hard_check_ram(self, gb):
         """Check RAM requirements.
@@ -154,7 +155,7 @@ class Checker:
         """
         try:
             # NETWORK_BASE_CLASS = "02", so look for 'Class:  02XX'
-            out = subprocess.check_output("lspci -Dvmmn | grep -cE 'Class:[[:space:]]+02'", shell=True).strip()
+            out = subprocess.check_output("lspci -Dvmmn | grep -cE 'Class:[[:space:]]+02'", shell=True).decode().strip()
             if int(out) < num_nics:
                 return False
         except subprocess.CalledProcessError:
@@ -171,19 +172,19 @@ class Checker:
         def _print_without_line_feed(str):
             # So odd print is needed to enforce no line feed, so next print()
             # will override this line.
-            print str,
+            print (str,)
             sys.stdout.flush() # Need this as tail ',' removes the 'newline' in print(), so the print is not flushed immediately
 
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
-            ret = os.system("ping -c 1 -W 5 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
-            if ret == 0:
-                self.wan_interfaces.append(str(iface))
-                _print_without_line_feed("\r                                              \r")  # Clean the line on screen
-                return True
-        _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+            for _ in range(5):
+                ret = os.system("ping -c 1 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
+                if ret == 0:
+                    self.wan_interfaces.append(str(iface))
+                    return True
+                _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
+            _print_without_line_feed("\r                                              \r")  # Clean the line on screen
         return False
 
     def hard_check_kernel_io_modules(self, supported):
@@ -216,7 +217,7 @@ class Checker:
         if self.detected_nics is None:
             self.detected_nics = {}
             try:
-                out = subprocess.check_output("lspci -vnn", shell=True).strip().split('\n\n')
+                out = subprocess.check_output("lspci -vnn", shell=True).decode().strip().split('\n\n')
                 # 00:03.0 Ethernet controller [0200]: Intel Corporation 82540EM Gigabit Ethernet Controller [8086:100e] (rev 02)
                 #     Subsystem: Intel Corporation PRO/1000 MT Desktop Adapter [8086:001e]
                 #     Flags: bus master, 66MHz, medium devsel, latency 64, IRQ 19
@@ -228,10 +229,10 @@ class Checker:
                 #     Kernel modules: e1000
                 for device in out:
                     params = device.split('\n', 1)
-                    match = re.search('\[02..\]:', params[0])   # [02XX] stands for Network Base Class
+                    match = re.search('\\[02..\\]:', params[0])   # [02XX] stands for Network Base Class
                     if not match:
                         continue
-                    match = re.search('([^ ]+) .*\[02..\]: ([^ ]+)', params[0])
+                    match = re.search('([^ ]+) .*\\[02..\\]: ([^ ]+)', params[0])
                     if not match:
                         print("device: %s" % (str(device)))
                         print("params[0]: %s" % (str(params[0])))
@@ -310,7 +311,7 @@ class Checker:
             # We use ruamel.yaml and not yaml to preserve comments.
             new_uuid = str(uuid.uuid1()).upper()
             if not silently:
-                choice = raw_input(prompt + "use %s ? [Y/n]: " % new_uuid)
+                choice = input(prompt + "use %s ? [Y/n]: " % new_uuid)
                 if choice != 'y' and choice != 'Y' and choice != '':
                     return False
             f = open(self.CFG_FWAGENT_CONF_FILE, 'r')
@@ -338,7 +339,7 @@ class Checker:
                 self.hard_check_wan_connectivity(True)
 
             # Find all default routes and ensure that configured interface has WAN connectivity
-            default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
+            default_routes = subprocess.check_output('ip route | grep default', shell=True).decode().strip().split('\n')
             if len(default_routes) == 0:
                 print(prompt + "no default route was found")
                 return False
@@ -365,7 +366,7 @@ class Checker:
         """
         try:
             # Find all default routes and ensure that there is exactly one default route
-            default_routes = subprocess.check_output('ip route | grep default', shell=True).strip().split('\n')
+            default_routes = subprocess.check_output('ip route | grep default', shell=True).decode().strip().split('\n')
             if len(default_routes) == 0:
                 raise Exception("no default route was found")
             return True
@@ -377,21 +378,21 @@ class Checker:
                 if silently:
                     return False
                 while True:
-                    ip = raw_input(prompt + "please enter GW address, e.g. 192.168.1.1: ")
+                    ip = input(prompt + "please enter GW address, e.g. 192.168.1.1: ")
                     try:
-                        out = subprocess.check_output('ip route add default via %s' % ip, shell=True).strip()
+                        out = subprocess.check_output('ip route add default via %s' % ip, shell=True).decode().strip()
                         return True
                     except Exception as e:
                         print(prompt + str(e))
                         while True:
-                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            choice = input(prompt + "repeat? [Y/n]: ")
                             if choice == 'y' or choice == 'Y' or choice == '':
                                 break
                             elif choice == 'n' or choice == 'N':
                                 return False
 
     def _get_duplicate_metric(self):
-        output = subprocess.check_output('ip route show default', shell=True).strip()
+        output = subprocess.check_output('ip route show default', shell=True).decode().strip()
         routes = output.splitlines()
 
         metrics = {}
@@ -407,14 +408,14 @@ class Checker:
             else:
                 metrics[metric] = [[dev,rip]]
 
-        for metric, gws in metrics.items():
+        for metric, gws in list(metrics.items()):
             if len(gws) > 1:
                 return metric, metrics
 
         return None, None
 
     def _get_gateways(self):
-        output = subprocess.check_output('ip route show default', shell=True).strip()
+        output = subprocess.check_output('ip route show default', shell=True).decode().strip()
         routes = output.splitlines()
 
         gws = []
@@ -459,7 +460,7 @@ class Checker:
 
         files = fwnetplan.load_netplan_filenames(get_only=True)
         metric = 100
-        for fname, devices in files.items():
+        for fname, devices in list(files.items()):
             os.system('cp %s %s.fworig' % (fname, fname))
             fname_baseline = fname.replace('yaml', 'baseline.yaml')
             os.system('mv %s %s' % (fname, fname_baseline))
@@ -479,7 +480,7 @@ class Checker:
 
         return True
 
-    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=None):
+    def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
         """Check if default routes have duplicate metrics.
 
         :param fix:             Fix problem.
@@ -519,7 +520,7 @@ class Checker:
                         for gw in gws:
                             print("         %u  - %s" % (id, gw))
                             id += 1
-                        id = int(raw_input(prompt + "please choose the gw number: "))
+                        id = int(input(prompt + "please choose the gw number: "))
                         if id > len(gws):
                             print("Wrong number chosen!")
                             return False
@@ -527,7 +528,7 @@ class Checker:
                     except Exception as e:
                         print(prompt + str(e))
                         while True:
-                            choice = raw_input(prompt + "repeat? [Y/n]: ")
+                            choice = input(prompt + "repeat? [Y/n]: ")
                             if choice == 'y' or choice == 'Y' or choice == '':
                                 break
                             elif choice == 'n' or choice == 'N':
@@ -563,12 +564,12 @@ class Checker:
                                 interfaces[dev].append(fname)
 
         duplicates = {}
-        for dev, files in interfaces.items():
+        for dev, files in list(interfaces.items()):
             if len(files) > 1:
                 duplicates[dev] = files
         return duplicates
 
-    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=None):
+    def soft_check_duplicate_netplan_sections(self, fix=False, silently=False, prompt=''):
         """Check if any section is defined multiple times in Netplan files.
 
         :param fix:             Fix problem.
@@ -585,7 +586,7 @@ class Checker:
             return False
         return True
 
-    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=None):
+    def soft_check_multiple_interface_definitions(self, fix=False, silently=False, prompt=''):
         """Check if interface is defined in multiple Netplan files.
 
         :param fix:             Fix problem.
@@ -598,7 +599,7 @@ class Checker:
             duplicates = self._get_duplicate_interface_definitions()
             if duplicates:
                 message = "Found multiple interface definitions: "
-                for dev, files in duplicates.items():
+                for dev, files in list(duplicates.items()):
                     message += dev + ' in '
                     for file in files:
                         message += file + ', '
@@ -610,7 +611,7 @@ class Checker:
         return True
 
 
-    def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=None):
+    def soft_check_hostname_syntax(self, fix=False, silently=False, prompt=''):
         """Check hostname syntax.
 
         :param fix:             Fix problem.
@@ -624,7 +625,7 @@ class Checker:
         # Note standard requires all small letters, but Amazon uses capital letters too,
         # so we enable them.
         # ===========================================================================
-        pattern = '^[a-zA-Z0-9\-_.]{1,253}$'
+        pattern = '^[a-zA-Z0-9\\-_.]{1,253}$'
         try:
             hostname = subprocess.check_output(['hostname']).decode().split('\n')[0].strip()
             if not hostname:
@@ -642,7 +643,7 @@ class Checker:
 
         # Get new hostname from user
         while True:
-            new_hostname = raw_input(prompt + "enter hostname: ")
+            new_hostname = input(prompt + "enter hostname: ")
             if re.match(pattern, new_hostname):
                 break
             print(prompt + "hostname '%s' does not comply standard (%s)" % (new_hostname, pattern))
@@ -667,7 +668,7 @@ class Checker:
         return True
 
 
-    def soft_check_hostname_in_hosts(self, fix=False, silently=False, prompt=None):
+    def soft_check_hostname_in_hosts(self, fix=False, silently=False, prompt=''):
         """Check if hostname is present in /etc/hosts.
 
         :param fix:             Fix problem.
@@ -698,7 +699,7 @@ class Checker:
 
         def _add_record(address):
             try:
-                out = subprocess.check_output("grep '%s' %s" % (address, hosts_file), shell=True).strip().split('\n')[0]
+                out = subprocess.check_output("grep '%s' %s" % (address, hosts_file), shell=True).decode().strip().split('\n')[0]
                 if not out:
                     raise Exception
                 # At this point we have 127.0.0.1 line, just go and add the hostname to it
@@ -725,7 +726,7 @@ class Checker:
                 return False
         return True
 
-    def soft_check_disable_transparent_hugepages(self, fix=False, silently=False, prompt=None):
+    def soft_check_disable_transparent_hugepages(self, fix=False, silently=False, prompt=''):
         """Check if transparent hugepages are disabled.
 
         :param fix:             Fix problem.
@@ -739,13 +740,14 @@ class Checker:
         thp_filename = '/sys/kernel/mm/transparent_hugepage/enabled'
         with open(thp_filename, "r") as f:
             first_line = f.readlines()[0]
-            if re.search('\[never\]', first_line):
+            if re.search('\\[never\\]', first_line):
                 return True
         # Ensure that the /etc/default/grub file includes the "transparent_hugepage=never"
         # option in the GRUB_CMDLINE_LINUX_DEFAULT variable.
         grub_filename = '/etc/default/grub'
         try:
-            out = subprocess.check_output("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename, shell=True).strip()
+            subprocess.check_call("grep -E '^GRUB_CMDLINE_LINUX_DEFAULT=.*transparent_hugepage=never' %s" % grub_filename,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, shell=True)
             return True   # No exception - grep found the pattern
         except subprocess.CalledProcessError:
             pass
@@ -801,7 +803,6 @@ class Checker:
         # Update the grub file
         #
         cmd = 'sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=\\\"/GRUB_CMDLINE_LINUX_DEFAULT=\\\"transparent_hugepage=never /" ' + grub_filename
-        print(cmd)
         ret = os.system(cmd)
         if ret != 0:
             print(prompt + "%s - failed (%d)" % (cmd,ret))
@@ -809,7 +810,7 @@ class Checker:
         return True
 
 
-    def soft_check_hugepage_number(self, fix=False, silently=False, prompt=None):
+    def soft_check_hugepage_number(self, fix=False, silently=False, prompt=''):
         """Check if there is enough hugepages available.
 
         :param fix:             Fix problem.
@@ -826,9 +827,9 @@ class Checker:
         try:
             with open(vpp_hugepages_file, 'r') as f:
                 for line in f.readlines():
-                    if re.match('^[#\s]', line):    # skip commented lines
+                    if re.match(r'^[#\s]', line):    # skip commented lines
                         continue
-                    match = re.search('hugepages[\s]*=[\s]*([0-9]+)', line)
+                    match = re.search(r'hugepages[\s]*=[\s]*([0-9]+)', line)
                     if match:
                         num_hugepages = int(match.group(1))
                         break
@@ -853,14 +854,14 @@ class Checker:
                 if ret != 0:
                     print(prompt + "failed to write hugepages=%d into %s" % (default_hugepages, vpp_hugepages_file))
                     return False
-                    os.system('sysctl -p %s' %(vpp_hugepages_file))
+                os.system('sysctl -p %s' %(vpp_hugepages_file))
                 return True
             return True
 
         # Read parameter from user input
         hugepages = default_hugepages if num_hugepages is None else num_hugepages
         while True:
-            str_hugepages = raw_input(prompt + "Enter number of 2MB huge pages [%d]: " % hugepages)
+            str_hugepages = input(prompt + "Enter number of 2MB huge pages [%d]: " % hugepages)
             try:
                 if len(str_hugepages) == 0:
                     break
@@ -883,7 +884,7 @@ class Checker:
         os.system('sysctl -p %s' %(vpp_hugepages_file))
         return True
 
-    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=None):
+    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=''):
         """Check if there is enough DPDK buffers available.
 
         :param fix:             Fix problem.
@@ -914,7 +915,7 @@ class Checker:
 
         old = buffers
         while True:
-            str_buffers = raw_input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
+            str_buffers = input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
             try:
                 if len(str_buffers) == 0:
                     break
@@ -944,7 +945,7 @@ class Checker:
         self.vpp_config_modified = True
         return True
 
-    def soft_check_multi_core_support_requires_RSS(self, fix=False, silently=False, prompt=''):
+    def soft_check_multi_core_support_requires_rss(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
         :param fix:             Fix problem.
@@ -954,7 +955,7 @@ class Checker:
         :returns: 'True' if check is successful and 'False' otherwise.
         """
         # This function does the following:
-        # 1. sets "main-core", "corelist-workers" and "workers" in "cpu" section in /etc/vpp/startup.conf
+        # 1. sets "main-core" and "corelist-workers" in "cpu" section in /etc/vpp/startup.conf
         # 2. sets "num-rx-queues" in "dpdk" section in /etc/vpp/startup.conf
         # 3. updates "GRUB_CMDLINE_LINUX_DEFAULT" in /etc/default/grub
         # 4. sudo update-grub
@@ -968,7 +969,7 @@ class Checker:
         num_worker_cores = psutil.cpu_count() - 1
         input_cores = 0
         while True:
-            str_cores = raw_input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
+            str_cores = input(prompt + "Enter number of cores to process packets (max: %d): " % num_worker_cores)
             try:
                 if len(str_cores) == 0:
                     input_cores = num_worker_cores
@@ -986,12 +987,10 @@ class Checker:
 
         main_core_param                 = None
         main_core_param_val             = 0
-        corelist_worker_param_nim_val   = 0
+        corelist_worker_param_min_val   = 0
         corelist_worker_param_max_val   = 0
         corelist_worker_param           = None
         corelist_worker_param_val       = None
-        workers_param                   = None
-        workers_param_val               = 0
         num_of_rx_queues_param          = None
         num_of_rx_queues_param_val      = -1
         dev_default_key                 = 'dev default' # to avoid errors and mistypes
@@ -1036,18 +1035,10 @@ class Checker:
                 tmp = re.split('\s+', corelist_worker_param.strip())
                 corelist_worker_param_val = tmp[1]
                 if corelist_worker_param_val.isdigit():
-                    corelist_worker_param_nim_val = corelist_worker_param_max_val = corelist_worker_param_val
+                    corelist_worker_param_min_val = corelist_worker_param_max_val = corelist_worker_param_val
                 else:
-                    corelist_worker_param_nim_val = int(corelist_worker_param_val.split('-')[0])
+                    corelist_worker_param_min_val = int(corelist_worker_param_val.split('-')[0])
                     corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
-
-        string = self.fw_ac_db.get_element(conf['cpu'],'workers')
-        if string:
-            tup_workers = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
-            if tup_workers:
-                workers_param = tup_workers[0]
-                tmp = re.split('\s+', workers_param.strip())
-                workers_param_val = int(tmp[1])
 
         if conf and conf['dpdk'] == None:
             conf.append(self.fw_ac_db.create_element('dpdk'))
@@ -1063,7 +1054,6 @@ class Checker:
         # we assume the following configuration in 'cpu' and 'dpdk' sections:
         # main-core 0
         # corelist_workers 1-%input_cores
-        # workers %input_cores
         # num-rx-queues %input_cores
 
         # in case no multi core requested
@@ -1073,9 +1063,6 @@ class Checker:
 
             if corelist_worker_param:
                 self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-
-            if workers_param:
-                self.fw_ac_db.remove_element(conf['cpu'], workers_param)
 
             if num_of_rx_queues_param:
                 if conf['dpdk'][dev_default_key] != None:
@@ -1103,22 +1090,12 @@ class Checker:
             else:
                 new_corelist_worker_param = 'corelist-workers 1-%d' % (input_cores)
             if corelist_worker_param:
-                if corelist_worker_param_nim_val != 1 or corelist_worker_param_max_val != input_cores:
+                if corelist_worker_param_min_val != 1 or corelist_worker_param_max_val != input_cores:
                     self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
                     conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
                     self.vpp_config_modified = True
             else:
                 conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
-                self.vpp_config_modified = True
-
-            new_workers_param = 'workers %d' % (input_cores)
-            if workers_param:
-                if workers_param_val != input_cores:
-                    self.fw_ac_db.remove_element(conf['cpu'], workers_param)
-                    conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
-                    self.vpp_config_modified = True
-            else:
-                conf['cpu'].append(self.fw_ac_db.create_element(new_workers_param))
                 self.vpp_config_modified = True
 
             if num_of_rx_queues_param_val != input_cores:
@@ -1190,7 +1167,7 @@ class Checker:
                     conf_param = tup[0]
 
         while True:
-            str_ps_mode = raw_input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")
+            str_ps_mode = input(prompt + "Enable Power-Saving mode on main core (y/N/q)?")
             if str_ps_mode == 'Y' or str_ps_mode == 'y':
                 enable_ps_mode = True
                 break
@@ -1243,13 +1220,19 @@ class Checker:
         if reset==False:
             cfg = self.vpp_configuration
             if cfg and cfg['cpu']:
-                string = self.fw_ac_db.get_element(cfg['cpu'],'workers')
+                string = self.fw_ac_db.get_element(cfg['cpu'],'corelist-workers')
                 if string:
-                    tup_workers = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
-                    if tup_workers:
-                        workers_param = tup_workers[0]
-                        tmp = re.split('\s+', workers_param.strip())
-                        num_of_workers_cores = int(tmp[1])
+                    tup_core_list = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                    if tup_core_list:
+                        corelist_worker_param = tup_core_list[0]
+                        tmp = re.split('\s+', corelist_worker_param.strip())
+                        corelist_worker_param_val = tmp[1]
+                        if corelist_worker_param_val.isdigit():
+                            corelist_worker_param_min_val = corelist_worker_param_max_val = corelist_worker_param_val
+                        else:
+                            corelist_worker_param_min_val = int(corelist_worker_param_val.split('-')[0])
+                            corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
+                        num_of_workers_cores = corelist_worker_param_max_val + 1 - corelist_worker_param_min_val
 
         update_line = ''
         if num_of_workers_cores == 0:
@@ -1331,28 +1314,89 @@ class Checker:
             os.system ("sudo update-grub")
         return
 
-    def lte_interfaces_exists(self):
-        for nicname, addrs in psutil.net_if_addrs().items():
-            driver = fwutils.get_interface_driver(nicname)
+    def soft_check_lte_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
+        lte_interfaces = []
+        for nicname, addrs in list(psutil.net_if_addrs().items()):
+            driver = fwutils.get_interface_driver(nicname, cache=False)
             if driver and driver in ['cdc_mbim', 'qmi_wwan']:
+                dev_id = fwutils.get_interface_dev_id(nicname)
+                if dev_id:
+                    lte_interfaces.append({'driver': driver, 'dev_id': dev_id})
+
+        if not lte_interfaces:
+            raise Exception("No LTE device was detected")
+
+        for inf in lte_interfaces:
+            if inf['driver'] == 'qmi_wwan':
+                if not fix:
+                    return False
+                success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
+                if not success:
+                    return False
+        return True
+
+    def soft_check_wifi_driver(self, fix=False, silently=False, prompt=''):
+        other_wifi_drivers = False
+        for nicname, addrs in list(psutil.net_if_addrs().items()):
+            if not fwutils.is_wifi_interface(nicname):
+                continue
+                
+            driver = fwutils.get_interface_driver(nicname, cache=False)
+            if not driver in ['ath10k_pci', 'ath9k_pci']:
+                other_wifi_drivers = True
+                continue
+            
+            # Check if driver is a kernel driver or a dkms driver
+            driver_info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()               
+            
+            # If driver is already dkms, we can return True
+            if 'dkms' in driver_info:
                 return True
 
-        return False
+            # Make sure that driver is a kernel driver
+            if not 'kernel' in driver_info:
+                continue
+            
+            # At this point, we sure that we need to replace the existing driver with our one
+            if not fix:
+                return False
+            
+            if silently:
+                print(TXT_COLOR.BG_WARNING + "Installing new driver... that might takes a few minutes" + TXT_COLOR.END)
+                choice = "Y"
+            else:
+                choice = input(TXT_COLOR.BG_WARNING + "New driver installation is needed, that takes a few minutes. Continue? [Y/N]: " + TXT_COLOR.END)
 
-    def soft_check_LTE_modem_configured_in_mbim_mode(self, fix=False, silently=False, prompt=''):
-        drivers = []
-        for nicname, addrs in psutil.net_if_addrs().items():
-            dev_id = fwutils.get_interface_dev_id(nicname)# fwutils.get_interface_dev_id(nicname)
-            if dev_id:
-                driver = fwutils.get_interface_driver(nicname)
-                if driver and driver in ['cdc_mbim', 'qmi_wwan']:
-                    drivers.append({'driver': driver, 'dev_id': dev_id})
+            if choice != 'y' and choice != 'Y':
+                return False
+            
+            modules = [
+                'ath10k_pci',
+                'ath10k_core',
+                'ath',
+                'mac80211',
+                'cfg80211',
+                'libarc4'
+            ]
 
-        if len(drivers) > 0:
-            for inf in drivers:
-                if inf['driver'] == 'qmi_wwan':
-                    if not fix:
-                        return False
-                    success, _ = fwutils.lte_set_modem_to_mbim(inf['dev_id'])
-                    return success
-        return True
+            try:                
+                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHCECKER_LOG_FILE)
+                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
+
+                for module in modules:
+                    os.system('modprobe %s' % module)
+            except Exception as e:
+                print('Error: %s' % str(e))
+                for module in modules:
+                    os.system('modprobe %s 2>/dev/null' % module)
+                return False
+                
+            # At this point, the driver installed and compailed successfully. 
+            # We can return True even we are inside the loop, 
+            # since wo don't need to run it for each WiFi interface.
+            return True
+
+        if other_wifi_drivers:
+            return True
+
+        raise Exception("No WiFi device was detected")

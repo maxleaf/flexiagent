@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -46,6 +46,7 @@ from fwrouter_cfg import FwRouterCfg
 from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
+from fwikev2 import FwIKEv2
 
 # sync flag indicated if module implement sync logic. 
 # IMPORTANT! Please keep the list order. It indicates the sync priorities
@@ -81,6 +82,7 @@ request_handlers = {
     'get-lte-info':                      {'name': '_call_agent_api'},
     'reset-lte':                         {'name': '_call_agent_api'},
     'modify-lte-pin':                    {'name': '_call_agent_api'},
+    'get-device-certificate':            {'name': '_call_agent_api'},
 
     # Aggregated API
     'aggregated':                   {'name': '_call_aggregated', 'sign': True},
@@ -95,6 +97,7 @@ request_handlers = {
     'remove-route':                 {'name': '_call_router_api', 'sign': True},
     'add-tunnel':                   {'name': '_call_router_api', 'sign': True},
     'remove-tunnel':                {'name': '_call_router_api', 'sign': True},
+    'modify-tunnel':                {'name': '_call_router_api', 'sign': True},
     'add-dhcp-config':              {'name': '_call_router_api', 'sign': True},
     'remove-dhcp-config':           {'name': '_call_router_api', 'sign': True},
     'add-application':              {'name': '_call_router_api', 'sign': True},
@@ -131,16 +134,30 @@ request_handlers = {
     'bridge_domain_add_del':        {'name': '_call_vpp_api'},
     'create_loopback_instance':     {'name': '_call_vpp_api'},
     'delete_loopback':              {'name': '_call_vpp_api'},
-    'ipsec_gre_add_del_tunnel':     {'name': '_call_vpp_api'},
-    'ipsec_sad_add_del_entry':      {'name': '_call_vpp_api'},
+    'gre_tunnel_add_del':           {'name': '_call_vpp_api'},
+    'ikev2_initiate_sa_init':       {'name': '_call_vpp_api'},
+    'ikev2_profile_add_del':        {'name': '_call_vpp_api'},
+    'ikev2_profile_set_auth':       {'name': '_call_vpp_api'},
+    'ikev2_profile_set_id':         {'name': '_call_vpp_api'},
+    'ikev2_profile_set_ts':         {'name': '_call_vpp_api'},
+    'ikev2_set_esp_transforms':     {'name': '_call_vpp_api'},
+    'ikev2_set_ike_transforms':     {'name': '_call_vpp_api'},
+    'ikev2_set_local_key':          {'name': '_call_vpp_api'},
+    'ikev2_set_responder':          {'name': '_call_vpp_api'},
+    'ikev2_set_sa_lifetime':        {'name': '_call_vpp_api'},
+    'ikev2_set_tunnel_interface':   {'name': '_call_vpp_api'},
+    'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
     'ipsec_interface_add_del_spd':  {'name': '_call_vpp_api'},
     'ipsec_spd_add_del_entry':      {'name': '_call_vpp_api'},
+    'ipsec_tunnel_protect_del':     {'name': '_call_vpp_api'},
+    'ipsec_tunnel_protect_update':  {'name': '_call_vpp_api'},
     'l2_flags':                     {'name': '_call_vpp_api'},
+    'nat44_add_del_identity_mapping':           {'name': '_call_vpp_api'},
     'nat44_add_del_interface_addr':             {'name': '_call_vpp_api'},
     'nat44_interface_add_del_output_feature':   {'name': '_call_vpp_api'},
     'nat44_forwarding_enable_disable':          {'name': '_call_vpp_api'},
-    'nat44_add_del_identity_mapping':           {'name': '_call_vpp_api'},
+    'nat44_plugin_enable_disable':              {'name': '_call_vpp_api'},
     'sw_interface_add_del_address': {'name': '_call_vpp_api'},
     'sw_interface_set_flags':       {'name': '_call_vpp_api'},
     'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
@@ -245,8 +262,10 @@ class Fwglobals:
         self.SYSTEM_CFG_FILE     = self.DATA_PATH + '.system.sqlite'
         self.ROUTER_STATE_FILE   = self.DATA_PATH + '.router.state'
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
+        self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
+        self.SYSTEM_CHCECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'
@@ -331,6 +350,13 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
+        # Some lte modules have a problem with drivers binding.
+        # As workaround, we reload the driver to fix it.
+        # We run it only if vpp is not running to make sure that we reload the driver
+        # only on boot, and not if a user run `systemctl restart flexiwan-router` when vpp is running.
+        if not fwutils.vpp_does_run():
+            fwutils.reload_lte_drivers()
+
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
         self.router_cfg   = FwRouterCfg(self.ROUTER_CFG_FILE) # IMPORTANT! Initialize database at the first place!
@@ -343,11 +369,12 @@ class Fwglobals:
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
-
+        self.ikev2        = FwIKEv2()
 
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
         fwutils.set_default_linux_reverse_path_filter(2)  # RPF set to Loose mode
+        fwutils.disable_ipv6()
 
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
@@ -483,6 +510,8 @@ class Fwglobals:
                 func = getattr(self.router_api.vpp_api, params['func'])
             elif params['object'] == 'fwglobals.g.apps':
                 func = getattr(self.apps, params['func'])
+            elif params['object'] == 'fwglobals.g.ikev2':
+                func = getattr(self.ikev2, params['func'])
             else:
                 raise Exception("object '%s' is not supported" % (params['object']))
         else:
@@ -669,6 +698,7 @@ class Fwglobals:
 
         # Go over list of aggregations and execute their requests one by one.
         #
+        apis = list(aggregations.keys())
         executed_apis = []
 
         for api in ['_call_system_api', '_call_router_api']:
@@ -710,7 +740,7 @@ class Fwglobals:
         are replaced with the old parameters that are currently stored in the configuration database.
         '''
         rollbacks_aggregations = copy.deepcopy(aggregations)
-        for (api, aggregated) in rollbacks_aggregations.items():
+        for (api, aggregated) in list(rollbacks_aggregations.items()):
             cfg_db = self._get_api_object_attr(api, 'cfg_db')
             for request in aggregated['params']['requests']:
 

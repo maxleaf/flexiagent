@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -26,6 +26,7 @@ import traceback
 import subprocess
 import fwglobals
 import fwutils
+import os
 from fwcfg_request_handler import FwCfgRequestHandler
 
 fwsystem_translators = {
@@ -102,6 +103,10 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                                 fwglobals.g.system_api.restore_configuration(types=['add-lte'])
                                 continue
 
+                            # Make sure that LTE Linux interface is up
+                            linux_ifc_name = fwutils.dev_id_to_linux_if(dev_id)
+                            os.system('ifconfig %s up' % linux_ifc_name)
+                            
                     # Ensure that provider did not change IP provisioned to modem,
                     # so the IP that we assigned to the modem interface is still valid.
                     # If it was changed, go and update the interface, vpp, etc.
@@ -116,12 +121,15 @@ class FWSYSTEM_API(FwCfgRequestHandler):
 
                                 fwutils.configure_lte_interface({
                                     'dev_id': dev_id,
-                                    'metric': wan['metric']
+                                    'metric': wan['params']['metric']
                                 })
-                                params = self.cfg_db.get_interfaces(dev_id=dev_id)[0]
-                                params['addr'] = modem_addr
-                                params['gateway'] = fwutils.lte_get_ip_configuration(dev_id, 'gateway', True)
-                                fwglobals.g.handle_request({'message':'modify-interface','params': params})
+
+                                interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+                                if len(interfaces) > 0:
+                                    params = interfaces[0]
+                                    params['addr'] = modem_addr
+                                    params['gateway'] = fwutils.lte_get_ip_configuration(dev_id, 'gateway')
+                                    fwglobals.g.handle_request({'message':'modify-interface','params': params})
 
                                 fwglobals.log.debug("%s: LTE IP was changed: %s -> %s" % (dev_id, iface_addr, modem_addr))
 

@@ -5,23 +5,23 @@
 	"params": {
 	"interfaces": [
 	   {
-		"pci": "0000:00:03.00",
+		"dev_id": "0000:00:03.00",
 		"type":"wan",
 	        "dhcp":"yes"
 	   },
 	   {
-		"pci": "0000:00:08.00",
+		"dev_id": "0000:00:08.00",
 		"addr": "20.20.20.1/24",
 		"routing":"ospf",
 		"type":"lan"
 	   },
 	   {
-		"pci": "0000:00:09.00",
+		"dev_id": "0000:00:09.00",
 		"type":"wan",
 	        "dhcp":"yes"
 	   },
 	   {
-		"pci": "0000:00:0a.00",
+		"dev_id": "0000:00:0a.00",
 		"type":"wan",
 	        "dhcp":"yes"
 	   }

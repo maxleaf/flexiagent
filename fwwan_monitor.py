@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -161,13 +161,13 @@ class FwWanMonitor:
         '''Fetches routes from Linux and parses them into FwWanRoute objects.
         '''
         os_routes  = {}
-        min_metric = sys.maxint
+        min_metric = sys.maxsize
 
         out = []
         cmd = 'ip route list match default | grep via'
         for _ in range(5):
             try:
-                out = subprocess.check_output(cmd, shell=True).splitlines()
+                out = subprocess.check_output(cmd, shell=True).decode().splitlines()
                 break
             except Exception as e:
                 fwglobals.log.warning("no default routes found: %s" % str(e))
@@ -248,7 +248,7 @@ class FwWanMonitor:
             fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
-        return self.routes.values()
+        return list(self.routes.values())
 
 
     def _check_connectivity(self, route, server):
@@ -319,7 +319,8 @@ class FwWanMonitor:
         # created in vpp/vvpsb by tap-inject for tapcli-X interfaces used for
         # LTE/WiFi devices. These interfaces are assigned too.
         #
-        assigned = (not route.dev_id) or (fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id))
+        db_if = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id) if route.dev_id else []
+        assigned = (not route.dev_id) or (db_if)
         if fwglobals.g.router_api.state_is_started() and assigned:
 
             # Update netplan yaml-s in order to:
@@ -332,9 +333,18 @@ class FwWanMonitor:
             #
             ip   = fwutils.get_interface_address(route.dev, log=False)
             dhcp = 'yes' if route.proto == 'dhcp' else 'no'
+
+            ifc = db_if[0] if db_if else {}
+            mtu = ifc.get('mtu')
+
+            dnsServers  = ifc.get('dnsServers', [])
+            if len(dnsServers) == 0:
+                dnsServers = ['8.8.8.8', '8.8.4.4']
+            dnsDomains  = ifc.get('dnsDomains', None)
+
             (success, err_str) = fwnetplan.add_remove_netplan_interface(\
-                                    True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN',
-                                    if_name=route.dev, wan_failover=True)
+                                    True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
+                                    mtu, if_name=route.dev, wan_failover=True)
             if not success:
                 route.ok = prev_ok
                 fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
@@ -351,7 +361,7 @@ class FwWanMonitor:
                     fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
                     fwnetplan.add_remove_netplan_interface(\
                         True, route.dev_id, ip, route.via, prev_metric, dhcp, 'WAN',
-                        if_name=route.dev, wan_failover=True)
+                        mtu, if_name=route.dev, wan_failover=True)
                     return
 
         # If defult route was changes as a result of metric update,
