@@ -915,9 +915,9 @@ def tap_to_vpp_if_name(tap):
 
     taps = taps.splitlines()
     for line in taps:
-        if tap in line:
-            vpp_if_name = line.split(' ->')[0]
-            return vpp_if_name
+        tap_info = line.split(' -> ')
+        if tap_info[1] == tap:
+            return tap_info[0]
 
     return None
 
