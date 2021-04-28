@@ -592,7 +592,7 @@ def get_interface_dev_id(if_name):
             interface = fwglobals.g.cache.linux_interfaces_by_name.get(if_name)
 
         dev_id = interface.get('dev_id')
-        if dev_id:
+        if dev_id != None:
             return dev_id
 
         # First try to get dev id if interface is under linux control
