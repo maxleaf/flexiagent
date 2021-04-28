@@ -915,10 +915,12 @@ def tap_to_vpp_if_name(tap):
 
     taps = taps.splitlines()
     for line in taps:
-        tap_info = line.split(' -> ')
-        if not tap_info:
-            fwglobals.log.error("tap_to_vpp_if_name: could not parse '%s'" % line)
+        # check if tap-inject is configured and enabled
+        if '->' not in line:
+            fwglobals.log.debug("tap_to_vpp_if_name: '%s'" % line)
             continue
+
+        tap_info = line.split(' -> ')
         if tap_info[1] == tap:
             return tap_info[0]
 
