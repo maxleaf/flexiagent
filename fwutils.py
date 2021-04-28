@@ -603,6 +603,10 @@ def get_interface_dev_id(if_name):
             vpp_if_name = tap_to_vpp_if_name(if_name)
             if vpp_if_name and not re.match(r'^loop', vpp_if_name): # loopback interfaces have no dev id (bus id)
                 dev_id = vpp_if_name_to_dev_id(vpp_if_name)
+                if not dev_id:
+                    fwglobals.log.error(
+                        'get_interface_dev_id: if_name=%s, vpp_if_name=%s, dev_id=%s' %
+                        (if_name, str(vpp_if_name), str(dev_id)))
 
         interface.update({'dev_id': dev_id})
         return dev_id
