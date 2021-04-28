@@ -603,6 +603,10 @@ def get_interface_dev_id(if_name):
             vpp_if_name = tap_to_vpp_if_name(if_name)
             if vpp_if_name and not re.match(r'^loop', vpp_if_name): # loopback interfaces have no dev id (bus id)
                 dev_id = vpp_if_name_to_dev_id(vpp_if_name)
+                if not dev_id:
+                    fwglobals.log.error(
+                        'get_interface_dev_id: if_name=%s, vpp_if_name=%s, dev_id=%s' %
+                        (if_name, str(vpp_if_name), str(dev_id)))
 
         interface.update({'dev_id': dev_id})
         return dev_id
@@ -915,10 +919,12 @@ def tap_to_vpp_if_name(tap):
 
     taps = taps.splitlines()
     for line in taps:
+        # check if tap-inject is configured and enabled
+        if '->' not in line:
+            fwglobals.log.debug("tap_to_vpp_if_name: vpp was not started yet ('%s')" % line)
+            break
+
         tap_info = line.split(' -> ')
-        if not tap_info:
-            fwglobals.log.error("tap_to_vpp_if_name: could not parse '%s'" % line)
-            continue
         if tap_info[1] == tap:
             return tap_info[0]
 
