@@ -24,6 +24,7 @@ import json
 import loadsimulator
 import os
 import shutil
+import glob
 
 from urllib import request as ureq
 from urllib import parse as uparse
@@ -139,6 +140,37 @@ class FwAgent:
             os.remove(fwglobals.g.CONN_FAILURE_FILE)
             fwglobals.log.debug("_clean_connection_failure")
 
+    def _setup_repository(self, repo):
+        # Extract repo info. Formatted is 'https://deb.flexiwan.com|flexiWAN|main'
+        repo_split = repo.split('|')
+        if len(repo_split) != 3:
+            fwglobals.log.info("Registration error: Incorrect repository info %s" % (repo))
+            return False
+        # Get current repo configuration
+        repo_files = glob.glob(fwglobals.g.REPO_SOURCE_DIR + "flexiwan*")
+        if len(repo_files) != 1:
+            fwglobals.log.info("Registration error: Folder %s must include a single repository file, found %d" %
+                (fwglobals.g.REPO_SOURCE_DIR, len(repo_files)))
+            return False
+        repo_file = repo_files[1]
+        with open(repo_file, 'r') as f:
+            repo_config = f.readline().strip()
+        # format of repo_config is, get all parameters
+        # deb [ arch=amd64 ] https://deb.flexiwan.com/flexiWAN bionic main
+        repo_match = re.match(r'^deb[ \t]+\[[ \t]+arch=(.+)[ \t]+\][ \t]+(http.*)/(.+)[ \t]+(.+)[ \t]+(.+)$',
+            repo_config)
+        if not repo_match:
+            fwglobals.log.info("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
+                (repo_file, repo_config))
+            return False
+        (rarch, rserver, rrepo, rdistro, rname) = repo_match.groups(0,1,2,3,4)
+        # Check if not the same as configured
+        if (rserver != repo_split[0] or rrepo != repo_split[1] or rname!= repo_split[2]):
+            with open(repo_file, 'w') as f:
+                fwutils.file_write_and_flush(f, "deb [ arch=%s ] %s/%s %s %s" %
+                    (rarch, repo_split[0], repo_split[1], rdistro, repo_split[2]))
+        return True
+
     def register(self):
         """Registers device with the flexiManage.
         To do that the Fwagent establishes secure HTTP connection to the manager
@@ -170,6 +202,12 @@ class FwAgent:
 
         try:
             parsed_token = jwt.decode(self.token, options={"verify_signature": False})
+            # If repository defined in token, make sure device works with that repo
+            # Reo is sent if device is connected to a flexiManage that doesn't work with
+            # the default flexiWAN repository
+            repo = parsed_token.get('repo')
+            if repo:
+                if not self._setup_repository(repo): return False
             server = parsed_token.get('server')
             if server:
                 # User server from token
