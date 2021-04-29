@@ -432,12 +432,14 @@ class FwStunWrap:
                         fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
                         self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
                         self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
-                else:
+                elif dev_id is not None:
                     fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
                     self.sym_nat_cache[dev_id] = {
                                 'local_ip'    : tunnel['src'],
                                 'probe_time'  : time.time() + 25,
                            }
+                else:
+                    fwglobals.log.debug("Dev is %s for tunnel %d"%(dev_id, tunnel_id))
             else:
                 if self.stun_cache.get(dev_id):
                     self.stun_cache[dev_id]['success'] = True
@@ -518,6 +520,13 @@ class FwStunWrap:
 
         self._handle_symmetric_nat_response(probe_tunnels)
 
+        for dev_id in list(self.sym_nat_cache):
+            cached_addr = self.sym_nat_cache.get(dev_id)
+            if not cached_addr:
+                continue
+            cached_addr['probe_time'] = 0
+
+
     def _handle_symmetric_nat_response(self, probe_tunnels):
         """ Handle response for symmetric NAT probe. Reset all the counters,
         update the results, and set the 'success' flag to True.
@@ -542,9 +551,3 @@ class FwStunWrap:
                         tunnel['dstPort'] = probe_tunnels[vni]["dstPort"]
                         fwglobals.log.debug("Add tunnel: %s" %(tunnel))
                         fwglobals.g.handle_request({'message':'add-tunnel', "params": tunnel})
-
-        for dev_id in list(self.sym_nat_cache):
-            cached_addr = self.sym_nat_cache.get(dev_id)
-            if not cached_addr:
-                continue
-            cached_addr['probe_time'] = 0
