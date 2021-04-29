@@ -1207,6 +1207,12 @@ def print_router_config(basic=True, full=False, multilink=False):
             cfg = ''
         print(cfg)
 
+    if multilink:
+        with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
+            cfg = multilink_db.dumps()
+            print(cfg)
+
+
 def update_device_config_signature(request):
     """Updates the database signature.
     This function assists the database synchronization feature that keeps
