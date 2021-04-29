@@ -493,7 +493,8 @@ class FwAgent:
                         else:
                             fwstats.update_stats()
                 except Exception as e:
-                    fwglobals.log.excep("failed to update stats %s." % str(e.with_traceback()))
+                    fwglobals.log.excep("%s: %s (%s)" % 
+                        (threading.current_thread().getName(), str(e), traceback.format_exc()))
                     pass
 
                 # Sleep 1 second and make another iteration
