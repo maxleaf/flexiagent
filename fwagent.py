@@ -472,29 +472,30 @@ class FwAgent:
                 # avoid false alarm and unnecessary disconnection check the
                 # self.handling_request flag.
                 #
-                timeout = 30
-                if (slept % timeout) == 0:
-                    if self.received_request or self.handling_request:
-                        self.received_request = False
-                    else:
-                        fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
-                        ws.close()
-                        fwglobals.log.debug("connect: connection was terminated")
-                        break
-                # Every 30 seconds update statistics
-                if (slept % timeout) == 0:
-                    if loadsimulator.g.enabled():
-                        if loadsimulator.g.started:
-                            loadsimulator.g.update_stats()
-                        else:
-                            break
-                    else:
-                        try:
-                            fwstats.update_stats()
-                        except Exception as e:
-                            fwglobals.log.excep("failed to update stats %s" % str(e))
-                            raise e
 
+                try:  # Ensure thread doesn't exit on exception
+                    timeout = 30
+                    if (slept % timeout) == 0:
+                        if self.received_request or self.handling_request:
+                            self.received_request = False
+                        else:
+                            fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
+                            ws.close()
+                            fwglobals.log.debug("connect: connection was terminated")
+                            break
+                        
+                        # Every 30 seconds update statistics
+                        if loadsimulator.g.enabled():
+                            if loadsimulator.g.started:
+                                loadsimulator.g.update_stats()
+                            else:
+                                break
+                        else:
+                            fwstats.update_stats()
+                except Exception as e:
+                    fwglobals.log.excep("%s: %s (%s)" % 
+                        (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                    pass
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
