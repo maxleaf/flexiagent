@@ -152,7 +152,7 @@ class FwAgent:
             fwglobals.log.info("Registration error: Folder %s must include a single repository file, found %d" %
                 (fwglobals.g.REPO_SOURCE_DIR, len(repo_files)))
             return False
-        repo_file = repo_files[1]
+        repo_file = repo_files[0]
         with open(repo_file, 'r') as f:
             repo_config = f.readline().strip()
         # format of repo_config is, get all parameters
@@ -163,11 +163,11 @@ class FwAgent:
             fwglobals.log.info("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
                 (repo_file, repo_config))
             return False
-        (rarch, rserver, rrepo, rdistro, rname) = repo_match.groups(0,1,2,3,4)
+        (rarch, rserver, rrepo, rdistro, rname) = repo_match.group(1,2,3,4,5)
         # Check if not the same as configured
         if (rserver != repo_split[0] or rrepo != repo_split[1] or rname!= repo_split[2]):
             with open(repo_file, 'w') as f:
-                fwutils.file_write_and_flush(f, "deb [ arch=%s ] %s/%s %s %s" %
+                fwutils.file_write_and_flush(f, "deb [ arch=%s ] %s/%s %s %s\n" %
                     (rarch, repo_split[0], repo_split[1], rdistro, repo_split[2]))
         return True
 
@@ -896,7 +896,7 @@ class FwagentDaemon(object):
         root = os.path.dirname(os.path.realpath(__file__))
         checker = os.path.join(root, 'tools' , 'system_checker' , 'fwsystem_checker.py')
         try:
-            subprocess.check_call(['python' , checker , '--check_only'])
+            subprocess.check_call(['python3' , checker , '--check_only'])
             return True
         except subprocess.CalledProcessError as err:
             fwglobals.log.excep("+====================================================")
