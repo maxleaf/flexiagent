@@ -517,15 +517,9 @@ class FwStunWrap:
                 probe_tunnels_dev = fwstun.get_remote_ip_info(src_ip, src_port, dev_name)
                 fwglobals.log.debug("Tunnel: discovered tunnels %s on dev %s" %(probe_tunnels_dev, dev_name))
                 probe_tunnels.update(probe_tunnels_dev)
+                cached_addr['probe_time'] = 0
 
         self._handle_symmetric_nat_response(probe_tunnels)
-
-        for dev_id in list(self.sym_nat_cache):
-            cached_addr = self.sym_nat_cache.get(dev_id)
-            if not cached_addr:
-                continue
-            cached_addr['probe_time'] = 0
-
 
     def _handle_symmetric_nat_response(self, probe_tunnels):
         """ Handle response for symmetric NAT probe. Reset all the counters,
