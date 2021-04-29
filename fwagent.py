@@ -483,8 +483,8 @@ class FwAgent:
                             ws.close()
                             fwglobals.log.debug("connect: connection was terminated")
                             break
-                    # Every 30 seconds update statistics
-                    if (slept % timeout) == 0:
+                        
+                        # Every 30 seconds update statistics
                         if loadsimulator.g.enabled():
                             if loadsimulator.g.started:
                                 loadsimulator.g.update_stats()
