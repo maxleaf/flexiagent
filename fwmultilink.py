@@ -36,7 +36,7 @@ class FwMultilink:
         if not 'labels' in self.db:
             self.db['labels'] = {}
         if not 'vacant_ids' in self.db:
-            self.db['vacant_ids'] = list(range(255))  # VPP uses u8 to keep ID, hence limitation of 255
+            self.db['vacant_ids'] = list(range(256))  # VPP uses u8 to keep ID, hence limitation of 0-255
         else:
             self.db['vacant_ids'] = sorted(self.db['vacant_ids'])  # Reduce chaos a bit :)
 
@@ -55,7 +55,7 @@ class FwMultilink:
         """Clean DB
         """
         self.db['labels'] = {}
-        self.db['vacant_ids'] = list(range(255))
+        self.db['vacant_ids'] = list(range(256))
 
     def dumps(self):
         """Prints content of database to STDOUT
@@ -98,10 +98,13 @@ class FwMultilink:
                     labels[name]['refCounter'] += 1
                 ids.append(labels[name]['id'])
             else:
+                if remove:
+                    raise Exception("FwMultilink: remove not existing label '%s'" % name)
+
                 if len(vacant_ids) == 0:
                     self.db['labels']     = labels
                     self.db['vacant_ids'] = vacant_ids
-                    raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label " + name)
+                    raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label '%s'" % name)
 
                 new_id = vacant_ids.pop(0)
                 labels[name] = {}
