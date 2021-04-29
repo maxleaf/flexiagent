@@ -912,7 +912,7 @@ def tap_to_vpp_if_name(tap):
     taps = taps.splitlines()
     for line in taps:
         # check if tap-inject is configured and enabled
-        if '->' not in line:
+        if ' -> ' not in line:
             fwglobals.log.debug("tap_to_vpp_if_name: vpp was not started yet ('%s')" % line)
             break
 
