@@ -1384,10 +1384,10 @@ class Checker:
                 os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
 
                 for module in modules:
-                    os.system('rmmod %s' % module)
+                    os.system('rmmod %s 2>/dev/null' % module)
 
                 for module in modules:
-                    os.system('modprobe %s' % module)
+                    os.system('modprobe %s 2>/dev/null' % module)
             except Exception as e:
                 print('Error: %s' % str(e))
                 for module in modules:
