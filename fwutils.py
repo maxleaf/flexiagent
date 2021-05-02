@@ -920,7 +920,7 @@ def tap_to_vpp_if_name(tap):
     taps = taps.splitlines()
     for line in taps:
         # check if tap-inject is configured and enabled
-        if '->' not in line:
+        if ' -> ' not in line:
             fwglobals.log.debug("tap_to_vpp_if_name: vpp was not started yet ('%s')" % line)
             break
 
@@ -1208,6 +1208,12 @@ def print_router_config(basic=True, full=False, multilink=False):
         else:
             cfg = ''
         print(cfg)
+
+    if multilink:
+        with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
+            cfg = multilink_db.dumps()
+            print(cfg)
+
 
 def update_device_config_signature(request):
     """Updates the database signature.
