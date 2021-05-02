@@ -141,15 +141,16 @@ class FwAgent:
             fwglobals.log.debug("_clean_connection_failure")
 
     def _setup_repository(self, repo):
-        # Extract repo info. Formatted is 'https://deb.flexiwan.com|flexiWAN|main'
+        # Extract repo info. e.g. 'https://deb.flexiwan.com|flexiWAN|main'
         repo_split = repo.split('|')
         if len(repo_split) != 3:
-            fwglobals.log.info("Registration error: Incorrect repository info %s" % (repo))
+            fwglobals.log.error("Registration error: Incorrect repository info %s" % (repo))
             return False
+        repo_server, repo_repo, repo_name = repo_split[0], repo_split[1], repo_split[2]
         # Get current repo configuration
         repo_files = glob.glob(fwglobals.g.REPO_SOURCE_DIR + "flexiwan*")
         if len(repo_files) != 1:
-            fwglobals.log.info("Registration error: Folder %s must include a single repository file, found %d" %
+            fwglobals.log.error("Registration error: Folder %s must include a single repository file, found %d" %
                 (fwglobals.g.REPO_SOURCE_DIR, len(repo_files)))
             return False
         repo_file = repo_files[0]
@@ -160,15 +161,15 @@ class FwAgent:
         repo_match = re.match(r'^deb[ \t]+\[[ \t]+arch=(.+)[ \t]+\][ \t]+(http.*)/(.+)[ \t]+(.+)[ \t]+(.+)$',
             repo_config)
         if not repo_match:
-            fwglobals.log.info("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
+            fwglobals.log.error("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
                 (repo_file, repo_config))
             return False
-        (rarch, rserver, rrepo, rdistro, rname) = repo_match.group(1,2,3,4,5)
+        (found_arch, found_server, found_repo, found_distro, found_name) = repo_match.group(1,2,3,4,5)
         # Check if not the same as configured
-        if (rserver != repo_split[0] or rrepo != repo_split[1] or rname!= repo_split[2]):
+        if (found_server != repo_server or found_repo != repo_repo or found_name != repo_name):
             with open(repo_file, 'w') as f:
                 fwutils.file_write_and_flush(f, "deb [ arch=%s ] %s/%s %s %s\n" %
-                    (rarch, repo_split[0], repo_split[1], rdistro, repo_split[2]))
+                    (found_arch, repo_server, repo_repo, found_distro, repo_name))
         return True
 
     def register(self):
@@ -203,7 +204,7 @@ class FwAgent:
         try:
             parsed_token = jwt.decode(self.token, options={"verify_signature": False})
             # If repository defined in token, make sure device works with that repo
-            # Reo is sent if device is connected to a flexiManage that doesn't work with
+            # Repo is sent if device is connected to a flexiManage that doesn't work with
             # the default flexiWAN repository
             repo = parsed_token.get('repo')
             if repo:
@@ -214,7 +215,7 @@ class FwAgent:
                 fwglobals.g.cfg.MANAGEMENT_URL = server
                 fwglobals.log.info("Using management url from token: %s" % (server))
         except Exception as e:
-                fwglobals.log.error("Failed to decode token: " + str(e))
+                fwglobals.log.excep("Failed to decode and setup token: %s (%s)" %(str(e), traceback.format_exc()))
                 return False
 
         if fwutils.vpp_does_run():
@@ -521,7 +522,7 @@ class FwAgent:
                             ws.close()
                             fwglobals.log.debug("connect: connection was terminated")
                             break
-                        
+
                         # Every 30 seconds update statistics
                         if loadsimulator.g.enabled():
                             if loadsimulator.g.started:
@@ -531,7 +532,7 @@ class FwAgent:
                         else:
                             fwstats.update_stats()
                 except Exception as e:
-                    fwglobals.log.excep("%s: %s (%s)" % 
+                    fwglobals.log.excep("%s: %s (%s)" %
                         (threading.current_thread().getName(), str(e), traceback.format_exc()))
                     pass
 
