@@ -5,3 +5,5 @@ agent:
   monitor_unassigned_interfaces: true   # default: true
   debug: true                           # default: true
 
+edgeui:
+  enabled: true                         # default or omit: true
