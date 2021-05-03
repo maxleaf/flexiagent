@@ -2875,9 +2875,21 @@ def lte_connect(params, reset=False):
         if not pin:
             return (False, "PIN is required")
 
-        updated_pin_state = qmi_verify_pin(dev_id, pin)[0].get('PIN1_STATUS')
-        if updated_pin_state not in['disabled', 'enabled-verified']:
+        # If a user enters a wrong pin, the function will fail, but flexiManage will send three times `sync` jobs.
+        # As a result, the SIM may be locked. So we save the wrong pin in the cache
+        # and we will not try again with this wrong one.
+        wrong_pin = get_lte_cache(dev_id, 'wrong_pin')
+        if wrong_pin and wrong_pin == pin:
             return (False, "PIN is wrong")
+
+        updated_pin_state, err = qmi_verify_pin(dev_id, pin)
+        if err:
+            set_lte_cache(dev_id, 'wrong_pin', pin)
+            return (False, "PIN is wrong")
+
+    # at this point, the sim is unblocked.
+    # It might be opened from different places so we need to make sure to clear this cache
+    set_lte_cache(dev_id, 'wrong_pin', None)
 
     try:
         is_modem_connected = mbim_is_connected(dev_id)
