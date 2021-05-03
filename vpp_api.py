@@ -29,8 +29,8 @@ import time
 try:
     from vpp_papi import VPPApiClient
     vppWrapper = False
-except:
-    print("vpp_papi library not found, using VPP dummy wrapper. Only for testing!!!")
+except Exception as e:
+    print(str(e) + ": use dummy VPP wrapper. Only for testing!!!")
     from vpp_papi_dummy import VPPApiClient
     vppWrapper = True
 

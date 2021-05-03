@@ -859,7 +859,7 @@ class FwagentDaemon(object):
         root = os.path.dirname(os.path.realpath(__file__))
         checker = os.path.join(root, 'tools' , 'system_checker' , 'fwsystem_checker.py')
         try:
-            subprocess.check_call(['python' , checker , '--check_only'])
+            subprocess.check_call(['python3' , checker , '--check_only'])
             return True
         except subprocess.CalledProcessError as err:
             fwglobals.log.excep("+====================================================")

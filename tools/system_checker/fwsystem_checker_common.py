@@ -476,8 +476,7 @@ class Checker:
                     self._add_netplan_interface(fname_baseline, ifname, metric)
                     metric += 100
 
-        subprocess.check_output('sudo netplan apply', shell=True)
-
+        subprocess.check_call('sudo netplan apply', shell=True)
         return True
 
     def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
