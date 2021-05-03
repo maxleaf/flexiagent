@@ -167,9 +167,46 @@ class FwAgent:
         (found_arch, found_server, found_repo, found_distro, found_name) = repo_match.group(1,2,3,4,5)
         # Check if not the same as configured
         if (found_server != repo_server or found_repo != repo_repo or found_name != repo_name):
+            new_repo_config = "deb [ arch=%s ] %s/%s %s %s\n" % (found_arch, repo_server, repo_repo, found_distro, repo_name)
             with open(repo_file, 'w') as f:
-                fwutils.file_write_and_flush(f, "deb [ arch=%s ] %s/%s %s %s\n" %
-                    (found_arch, repo_server, repo_repo, found_distro, repo_name))
+                fwutils.file_write_and_flush(f, new_repo_config)
+            fwglobals.log.info("Overwriting repository from token, token_repo=%s, prev_repo_config=%s, new_repo_config=%s" %
+                (repo, repo_config, new_repo_config))
+        return True
+
+    def _decode_token_and_setup_environment(self, token):
+        """Decode token and setup environment variables if required.
+        The environment setup is needed when the non default flexiManage server is used.
+        This could be on test, a dedicated, or a self hosting flexiManage setup.
+        After installing the flexiEdge software, it contains the default server and repository.
+        The software can be installed as a debian install on Linux, an ISO installation or,
+        pre installed by the hardware vendor.
+        In this case the server and repository flexiEdge has are different than what should be used.
+        The token is generated in flexiManage and installed on the device.
+        The token may encode the server and the repository parameters.
+        When the token is installed on flexiEdge, we check the server and repository decoded and
+        setup the system accordingly.
+        We call this function before registration when the token file is first processed
+
+        :returns: `True` if succeeded, `False` otherwise.
+        """
+        parsed_token = jwt.decode(token, options={"verify_signature": False})
+
+        # If repository defined in token, make sure device works with that repo
+        # Repo is sent if device is connected to a flexiManage that doesn't work with
+        # the default flexiWAN repository
+        repo = parsed_token.get('repo')
+        if repo:
+            if not self._setup_repository(repo): return False
+
+        # Setup the flexiManage server to work with
+        server = parsed_token.get('server')
+        if server:
+            # Use server from token
+            fwglobals.g.cfg.MANAGEMENT_URL = server
+            fwglobals.log.info("Using management url from token: %s" % (server))
+
+        # Setup passed, return True
         return True
 
     def register(self):
@@ -201,22 +238,13 @@ class FwAgent:
             fwglobals.log.error(err)
             return False
 
+        # Token found, decode token and setup environment parameters from token
         try:
-            parsed_token = jwt.decode(self.token, options={"verify_signature": False})
-            # If repository defined in token, make sure device works with that repo
-            # Repo is sent if device is connected to a flexiManage that doesn't work with
-            # the default flexiWAN repository
-            repo = parsed_token.get('repo')
-            if repo:
-                if not self._setup_repository(repo): return False
-            server = parsed_token.get('server')
-            if server:
-                # User server from token
-                fwglobals.g.cfg.MANAGEMENT_URL = server
-                fwglobals.log.info("Using management url from token: %s" % (server))
-        except Exception as e:
-                fwglobals.log.excep("Failed to decode and setup token: %s (%s)" %(str(e), traceback.format_exc()))
+            if not self._decode_token_and_setup_environment(self.token):
                 return False
+        except Exception as e:
+            fwglobals.log.excep("Failed to decode and setup environment: %s (%s)" %(str(e), traceback.format_exc()))
+            return False
 
         if fwutils.vpp_does_run():
             fwglobals.log.error("register: router is running, it by 'fwagent stop' and retry by 'fwagent start'")
