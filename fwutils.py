@@ -67,6 +67,9 @@ def get_device_logs(file, num_of_lines):
     :returns: Return list.
     """
     try:
+        if not os.path.exists(file):
+            return []
+
         cmd = "tail -{} {}".format(num_of_lines, file)
         res = subprocess.check_output(cmd, shell=True).decode().splitlines()
 
