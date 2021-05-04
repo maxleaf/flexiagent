@@ -354,6 +354,9 @@ def main(args):
                             print ("Please reboot the system for changes to take effect.")
 
                 os.system("sudo systemctl start flexiwan-router")
+                # Wait two seconds for the agent to reload the LTE drivers
+                time.sleep(2)
+
                 print ("Done.")
 
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
