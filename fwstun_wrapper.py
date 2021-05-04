@@ -490,8 +490,11 @@ class FwStunWrap:
                 return dev_id
         return None
 
-    def _get_vni(self, tunnel_id):
-        return tunnel_id*2+1 
+    def _get_vni(self, tunnel_id, encryption_mode):
+        if encryption_mode == "none":
+            return tunnel_id*2
+        else:
+            return tunnel_id*2+1
 
     def _probe_symmetric_nat(self):
         """ Assume that tunnel in down state has remote edge behind symmetric NAT.
@@ -533,9 +536,10 @@ class FwStunWrap:
 
         for tunnel in tunnels:
             tunnel_id = tunnel['tunnel-id']
+            encryption_mode = tunnel.get("encryption-mode", "psk")
             stats = tunnel_stats.get(tunnel_id)
             if stats and stats.get('status') == 'down':
-                vni = self._get_vni(tunnel_id)
+                vni = self._get_vni(tunnel_id, encryption_mode)
                 if vni in probe_tunnels:
                     if tunnel['dst'] != probe_tunnels[vni]["dst"] or tunnel['dstPort'] != probe_tunnels[vni]["dstPort"]:
                         fwglobals.log.debug("Remove tunnel: %s" %(tunnel))
