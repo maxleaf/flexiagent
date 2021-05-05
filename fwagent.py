@@ -854,6 +854,8 @@ def show(agent, configuration, database, status):
             fwutils.print_router_config(full=True)
         elif database == 'system':
             fwutils.print_system_config(full=True)
+        elif database == 'internal':
+            fwutils.print_internal_database()
 
     if status:
         if status == 'daemon':
@@ -1292,7 +1294,7 @@ if __name__ == '__main__':
                         choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
     parser_show.add_argument('--database', const='all', nargs='?',
-                        choices=['all', 'router', 'system'],
+                        choices=['all', 'router', 'system','internal'],
                         help="show whole flexiEdge database")
     parser_show.add_argument('--status', choices=['daemon', 'router'],
                         help="show flexiEdge status")
