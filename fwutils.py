@@ -284,7 +284,7 @@ def get_tunnel_gateway(dst, dev_id):
                 # In this case the system uses default route as a gateway and connect the interfaces directly and not via the GW
                 if is_ip_in_subnet(dst,network): return ''
             except Exception as e:
-                fwglobals.log.error("get_effective_gateway: failed to check networks: dst=%s, dev_id=%s, network=%s, error=%s" % (dst, dev_id, network, str(e)))
+                fwglobals.log.error("get_tunnel_gateway: failed to check networks: dst=%s, dev_id=%s, network=%s, error=%s" % (dst, dev_id, network, str(e)))
 
     # If src, dst are not on same subnet or any error, use the gateway defined on the device
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
@@ -318,13 +318,11 @@ def get_all_interfaces():
         if not dev_id:
             continue
 
-        if is_lte_interface(nic_name) and fwglobals.g.router_api.state_is_started():
-            is_assigned = is_interface_assigned_to_vpp(dev_id)
-            if is_assigned:
-                tap_name = dev_id_to_tap(dev_id)
-                if tap_name:
-                    nic_name = tap_name
-                    addrs = interfaces.get(nic_name)
+        if is_lte_interface(nic_name):
+            tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+            if tap_name:
+                nic_name = tap_name
+                addrs = interfaces.get(nic_name)
 
         dev_id_ip_gw[dev_id] = {}
         dev_id_ip_gw[dev_id]['addr'] = ''
@@ -539,12 +537,11 @@ def get_linux_interfaces(cached=True):
                     'default_settings':   lte_get_default_settings(dev_id)
                 }
 
-                is_assigned = is_interface_assigned_to_vpp(dev_id)
                 # LTE physical device has no IP, GW etc. so we take this info from vppsb interface (vpp1)
-                tap = dev_id_to_tap(dev_id) if not fwglobals.g.router_api.state_is_starting_stopping() and vpp_does_run() and is_assigned else None
-                if tap:
-                    interface['gateway'], interface['metric'] = get_interface_gateway(tap)
-                    int_addr = get_interface_address(tap)
+                tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+                if tap_name:
+                    interface['gateway'], interface['metric'] = get_interface_gateway(tap_name)
+                    int_addr = get_interface_address(tap_name)
                     if int_addr:
                         int_addr = int_addr.split('/')
                         interface['IPv4'] = int_addr[0]
@@ -879,12 +876,18 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def dev_id_to_tap(dev_id):
+def dev_id_to_tap(dev_id, check_vpp_state=False):
     """Convert Bus address into TAP name.
 
-    :param dev_id:      Bus address.
+    :param dev_id:          Bus address.
+    :param check_vpp_state: If True ensure that vpp runs so taps are available.
     :returns: Linux TAP interface name.
     """
+
+    if check_vpp_state:
+        is_assigned = is_interface_assigned_to_vpp(dev_id)
+        if not (is_assigned and vpp_does_run()):
+            return None
 
     dev_id_full = dev_id_to_full(dev_id)
     cache    = fwglobals.g.cache.dev_id_to_vpp_tap_name
@@ -3467,11 +3470,9 @@ def get_reconfig_hash():
 
         is_lte = is_lte_interface(name)
         if is_lte:
-            is_assigned = is_interface_assigned_to_vpp(dev_id)
-            if is_assigned and fwglobals.g.router_api.state_is_started():
-                tap_name = dev_id_to_tap(dev_id)
-                if tap_name:
-                    name = tap_name
+            tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+            if tap_name:
+                name = tap_name
 
         addr = get_interface_address(name, log=False)
         gw, metric = get_interface_gateway(name)
