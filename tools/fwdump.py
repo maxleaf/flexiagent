@@ -130,7 +130,7 @@ g_dumpers = {
     'fwagent_router_cfg':           { 'shell_cmd': 'fwagent show --configuration router > <dumper_out_file>' },
     'fwagent_system_configuration': { 'shell_cmd': 'fwagent show --configuration system > <dumper_out_file>' },
 
-    'fwagent_internal_database':    { 'shell_cmd': 'fwagent show --database internal > <dumper_out_file>' },
+    'fwagent_internal_database':    { 'shell_cmd': 'fwagent show --database general > <dumper_out_file>' },
     
     'fwagent_threads':              { 'shell_cmd': 'fwagent show --agent threads > <dumper_out_file>' },
     'fwagent_version':              { 'shell_cmd': 'fwagent version > <dumper_out_file>' },

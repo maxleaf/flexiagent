@@ -1220,10 +1220,10 @@ def print_router_config(basic=True, full=False, multilink=False):
             cfg = multilink_db.dumps()
             print(cfg)
 
-def print_internal_database():
+def print_general_database():
     out = []
     try:
-        for key in fwglobals.g.db.keys():
+        for key in sorted(list(fwglobals.g.db.keys())):
             obj = {}
             obj[key] = fwglobals.g.db[key]
             out.append(obj)
