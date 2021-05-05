@@ -420,7 +420,7 @@ class FWAGENT_API:
         if err:
             raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
 
-        # at this point, pin is verified so we reset wrong pin protection
+        # at this point, pin is changed so we reset wrong pin protection
         fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
 
     def _handle_verify_pin_code(self, params, is_currently_enabled, retries_left):
