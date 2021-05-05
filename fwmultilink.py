@@ -58,16 +58,11 @@ class FwMultilink:
         self.db['vacant_ids'] = list(range(256))
 
     def dumps(self):
-        """Prints content of database to STDOUT
+        """Prints content of database into string
         """
-        out = ''
-        if self.db['labels']:
-            out += '\nlabels:\n'
-            names = list(self.db['labels'].keys())
-            for name in sorted(names):
-                out += name + ': ' + str(self.db['labels'][name]) + '\n'
-        out += '\nvacant label ids:\n' + str(sorted(self.db['vacant_ids'])) + '\n'
-        return out
+        db_keys = sorted(self.db.keys())                    # The key order might be affected by dictionary content, so sort it
+        dump = [ { key: self.db[key] } for key in db_keys ] # We can't json.dumps(self.db) directly as it is SqlDict and not dict
+        return json.dumps(dump, indent=2, sort_keys=True)
 
     def get_label_ids_by_names(self, names, remove=False):
         """Maps label names into label id-s.
