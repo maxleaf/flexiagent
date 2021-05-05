@@ -24,6 +24,7 @@ import json
 import loadsimulator
 import os
 import shutil
+import glob
 
 from urllib import request as ureq
 from urllib import parse as uparse
@@ -139,6 +140,75 @@ class FwAgent:
             os.remove(fwglobals.g.CONN_FAILURE_FILE)
             fwglobals.log.debug("_clean_connection_failure")
 
+    def _setup_repository(self, repo):
+        # Extract repo info. e.g. 'https://deb.flexiwan.com|flexiWAN|main'
+        repo_split = repo.split('|')
+        if len(repo_split) != 3:
+            fwglobals.log.error("Registration error: Incorrect repository info %s" % (repo))
+            return False
+        repo_server, repo_repo, repo_name = repo_split[0], repo_split[1], repo_split[2]
+        # Get current repo configuration
+        repo_files = glob.glob(fwglobals.g.REPO_SOURCE_DIR + "flexiwan*")
+        if len(repo_files) != 1:
+            fwglobals.log.error("Registration error: Folder %s must include a single repository file, found %d" %
+                (fwglobals.g.REPO_SOURCE_DIR, len(repo_files)))
+            return False
+        repo_file = repo_files[0]
+        with open(repo_file, 'r') as f:
+            repo_config = f.readline().strip()
+        # format of repo_config is, get all parameters
+        # deb [ arch=amd64 ] https://deb.flexiwan.com/flexiWAN bionic main
+        repo_match = re.match(r'^deb[ \t]+\[[ \t]+arch=(.+)[ \t]+\][ \t]+(http.*)/(.+)[ \t]+(.+)[ \t]+(.+)$',
+            repo_config)
+        if not repo_match:
+            fwglobals.log.error("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
+                (repo_file, repo_config))
+            return False
+        (found_arch, found_server, found_repo, found_distro, found_name) = repo_match.group(1,2,3,4,5)
+        # Check if not the same as configured
+        if (found_server != repo_server or found_repo != repo_repo or found_name != repo_name):
+            new_repo_config = "deb [ arch=%s ] %s/%s %s %s\n" % (found_arch, repo_server, repo_repo, found_distro, repo_name)
+            with open(repo_file, 'w') as f:
+                fwutils.file_write_and_flush(f, new_repo_config)
+            fwglobals.log.info("Overwriting repository from token, token_repo=%s, prev_repo_config=%s, new_repo_config=%s" %
+                (repo, repo_config, new_repo_config))
+        return True
+
+    def _decode_token_and_setup_environment(self, token):
+        """Decode token and setup environment variables if required.
+        The environment setup is needed when the non default flexiManage server is used.
+        This could be on test, a dedicated, or a self hosting flexiManage setup.
+        After installing the flexiEdge software, it contains the default server and repository.
+        The software can be installed as a debian install on Linux, an ISO installation or,
+        pre installed by the hardware vendor.
+        In this case the server and repository flexiEdge has are different than what should be used.
+        The token is generated in flexiManage and installed on the device.
+        The token may encode the server and the repository parameters.
+        When the token is installed on flexiEdge, we check the server and repository decoded and
+        setup the system accordingly.
+        We call this function before registration when the token file is first processed
+
+        :returns: `True` if succeeded, `False` otherwise.
+        """
+        parsed_token = jwt.decode(token, options={"verify_signature": False})
+
+        # If repository defined in token, make sure device works with that repo
+        # Repo is sent if device is connected to a flexiManage that doesn't work with
+        # the default flexiWAN repository
+        repo = parsed_token.get('repo')
+        if repo:
+            if not self._setup_repository(repo): return False
+
+        # Setup the flexiManage server to work with
+        server = parsed_token.get('server')
+        if server:
+            # Use server from token
+            fwglobals.g.cfg.MANAGEMENT_URL = server
+            fwglobals.log.info("Using management url from token: %s" % (server))
+
+        # Setup passed, return True
+        return True
+
     def register(self):
         """Registers device with the flexiManage.
         To do that the Fwagent establishes secure HTTP connection to the manager
@@ -168,16 +238,13 @@ class FwAgent:
             fwglobals.log.error(err)
             return False
 
+        # Token found, decode token and setup environment parameters from token
         try:
-            parsed_token = jwt.decode(self.token, options={"verify_signature": False})
-            server = parsed_token.get('server')
-            if server:
-                # User server from token
-                fwglobals.g.cfg.MANAGEMENT_URL = server
-                fwglobals.log.info("Using management url from token: %s" % (server))
-        except Exception as e:
-                fwglobals.log.error("Failed to decode token: " + str(e))
+            if not self._decode_token_and_setup_environment(self.token):
                 return False
+        except Exception as e:
+            fwglobals.log.excep("Failed to decode and setup environment: %s (%s)" %(str(e), traceback.format_exc()))
+            return False
 
         if fwutils.vpp_does_run():
             fwglobals.log.error("register: router is running, it by 'fwagent stop' and retry by 'fwagent start'")
@@ -472,29 +539,30 @@ class FwAgent:
                 # avoid false alarm and unnecessary disconnection check the
                 # self.handling_request flag.
                 #
-                timeout = 30
-                if (slept % timeout) == 0:
-                    if self.received_request or self.handling_request:
-                        self.received_request = False
-                    else:
-                        fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
-                        ws.close()
-                        fwglobals.log.debug("connect: connection was terminated")
-                        break
-                # Every 30 seconds update statistics
-                if (slept % timeout) == 0:
-                    if loadsimulator.g.enabled():
-                        if loadsimulator.g.started:
-                            loadsimulator.g.update_stats()
-                        else:
-                            break
-                    else:
-                        try:
-                            fwstats.update_stats()
-                        except Exception as e:
-                            fwglobals.log.excep("failed to update stats %s" % str(e))
-                            raise e
 
+                try:  # Ensure thread doesn't exit on exception
+                    timeout = 30
+                    if (slept % timeout) == 0:
+                        if self.received_request or self.handling_request:
+                            self.received_request = False
+                        else:
+                            fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
+                            ws.close()
+                            fwglobals.log.debug("connect: connection was terminated")
+                            break
+
+                        # Every 30 seconds update statistics
+                        if loadsimulator.g.enabled():
+                            if loadsimulator.g.started:
+                                loadsimulator.g.update_stats()
+                            else:
+                                break
+                        else:
+                            fwstats.update_stats()
+                except Exception as e:
+                    fwglobals.log.excep("%s: %s (%s)" %
+                        (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                    pass
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
@@ -858,7 +926,7 @@ class FwagentDaemon(object):
         root = os.path.dirname(os.path.realpath(__file__))
         checker = os.path.join(root, 'tools' , 'system_checker' , 'fwsystem_checker.py')
         try:
-            subprocess.check_call(['python' , checker , '--check_only'])
+            subprocess.check_call(['python3' , checker , '--check_only'])
             return True
         except subprocess.CalledProcessError as err:
             fwglobals.log.excep("+====================================================")

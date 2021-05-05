@@ -67,6 +67,9 @@ def get_device_logs(file, num_of_lines):
     :returns: Return list.
     """
     try:
+        if not os.path.exists(file):
+            return []
+
         cmd = "tail -{} {}".format(num_of_lines, file)
         res = subprocess.check_output(cmd, shell=True).decode().splitlines()
 
@@ -93,7 +96,7 @@ def get_device_packet_traces(num_of_packets, timeout):
             cmd = 'sudo vppctl trace add dpdk-input %s && sudo vppctl trace add virtio-input %s' % (num_of_packets, num_of_packets)
         else:
             cmd = 'sudo vppctl trace add vmxnet3-input %s && sudo vppctl trace add virtio-input %s' % (num_of_packets, num_of_packets)
-        subprocess.check_output(cmd, shell=True)
+        subprocess.check_call(cmd, shell=True)
         time.sleep(timeout)
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
         res = subprocess.check_output(cmd, shell=True).decode().splitlines()
@@ -920,7 +923,7 @@ def tap_to_vpp_if_name(tap):
     taps = taps.splitlines()
     for line in taps:
         # check if tap-inject is configured and enabled
-        if '->' not in line:
+        if ' -> ' not in line:
             fwglobals.log.debug("tap_to_vpp_if_name: vpp was not started yet ('%s')" % line)
             break
 
@@ -1208,6 +1211,12 @@ def print_router_config(basic=True, full=False, multilink=False):
         else:
             cfg = ''
         print(cfg)
+
+    if multilink:
+        with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
+            cfg = multilink_db.dumps()
+            print(cfg)
+
 
 def update_device_config_signature(request):
     """Updates the database signature.
@@ -2164,16 +2173,16 @@ def connect_to_wifi(params):
             time.sleep(3)
 
         # create config file
-        subprocess.check_output('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
+        subprocess.check_call('wpa_passphrase %s %s | sudo tee /etc/wpa_supplicant.conf' % (essid, password), shell=True)
 
         try:
-            subprocess.check_output('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
+            subprocess.check_call('wpa_supplicant -i %s -c /etc/wpa_supplicant.conf -D wext -B -C /var/run/wpa_supplicant' % interface_name, shell=True)
             time.sleep(3)
 
             output = subprocess.check_output('wpa_cli  status | grep wpa_state | cut -d"=" -f2', shell=True).decode().strip()
             if output == 'COMPLETED':
                 if params['useDHCP']:
-                    subprocess.check_output('dhclient %s' % interface_name, shell=True)
+                    subprocess.check_call('dhclient %s' % interface_name, shell=True)
                 return True
             else:
                 return False
@@ -2907,10 +2916,10 @@ def lte_connect(params, reset=False):
 
         connection_params = lte_prepare_connection_params(params)
         mbim_commands = [
-            '--query-subscriber-ready-status --no-close',
-            '--query-registration-state --no-open=3 --no-close',
-            '--attach-packet-service --no-open=4 --no-close',
-            '--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway\|DNS"' % connection_params
+            r'--query-subscriber-ready-status --no-close',
+            r'--query-registration-state --no-open=3 --no-close',
+            r'--attach-packet-service --no-open=4 --no-close',
+            r'--connect=%s --no-open=5 --no-close | grep "Session ID\|IP\|Gateway\|DNS"' % connection_params
         ]
         for cmd in mbim_commands:
             lines, err = _run_mbimcli_command(dev_id, cmd, True)
@@ -3645,7 +3654,7 @@ def linux_routes_dictionary_get():
 
     # get only our static routes from Linux
     try :
-        output = subprocess.check_output('ip route show | grep -v proto', shell=True).strip().decode()
+        output = subprocess.check_output('ip route show | grep -v proto', shell=True).decode().strip()
     except:
         return routes_dict
 
@@ -3754,7 +3763,7 @@ def exec_with_timeout(cmd, timeout=60):
     return {'output':state['output'], 'error':state['error'], 'returncode':state['returncode']}
 
 def get_template_data_by_hw(template_fname):
-    system_info = subprocess.check_output('lshw -c system', shell=True).strip()
+    system_info = subprocess.check_output('lshw -c system', shell=True).decode().strip()
     match = re.findall('(?<=vendor: ).*?\\n|(?<=product: ).*?\\n', system_info)
     if len(match) > 0:
         product = match[0].strip()
@@ -3841,7 +3850,7 @@ def replace_file_variables(template_fname, replace_fname):
                 value = input[key]
                 input[key] = replace(value)
 
-        elif is_str(input):
+        elif type(input) == str:
             match = re.search('(__.*__)(.*)', str(input))
             if match:
                 interface, field = match.groups()

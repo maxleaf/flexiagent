@@ -432,12 +432,14 @@ class FwStunWrap:
                         fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
                         self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
                         self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
-                else:
+                elif dev_id is not None:
                     fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
                     self.sym_nat_cache[dev_id] = {
                                 'local_ip'    : tunnel['src'],
                                 'probe_time'  : time.time() + 25,
                            }
+                else:
+                    fwglobals.log.debug("Dev is %s for tunnel %d"%(dev_id, tunnel_id))
             else:
                 if self.stun_cache.get(dev_id):
                     self.stun_cache[dev_id]['success'] = True
@@ -488,8 +490,11 @@ class FwStunWrap:
                 return dev_id
         return None
 
-    def _get_vni(self, tunnel_id):
-        return tunnel_id*2+1 
+    def _get_vni(self, tunnel_id, encryption_mode):
+        if encryption_mode == "none":
+            return tunnel_id*2
+        else:
+            return tunnel_id*2+1
 
     def _probe_symmetric_nat(self):
         """ Assume that tunnel in down state has remote edge behind symmetric NAT.
@@ -515,6 +520,7 @@ class FwStunWrap:
                 probe_tunnels_dev = fwstun.get_remote_ip_info(src_ip, src_port, dev_name)
                 fwglobals.log.debug("Tunnel: discovered tunnels %s on dev %s" %(probe_tunnels_dev, dev_name))
                 probe_tunnels.update(probe_tunnels_dev)
+                cached_addr['probe_time'] = 0
 
         self._handle_symmetric_nat_response(probe_tunnels)
 
@@ -530,9 +536,10 @@ class FwStunWrap:
 
         for tunnel in tunnels:
             tunnel_id = tunnel['tunnel-id']
+            encryption_mode = tunnel.get("encryption-mode", "psk")
             stats = tunnel_stats.get(tunnel_id)
             if stats and stats.get('status') == 'down':
-                vni = self._get_vni(tunnel_id)
+                vni = self._get_vni(tunnel_id, encryption_mode)
                 if vni in probe_tunnels:
                     if tunnel['dst'] != probe_tunnels[vni]["dst"] or tunnel['dstPort'] != probe_tunnels[vni]["dstPort"]:
                         fwglobals.log.debug("Remove tunnel: %s" %(tunnel))
@@ -542,9 +549,3 @@ class FwStunWrap:
                         tunnel['dstPort'] = probe_tunnels[vni]["dstPort"]
                         fwglobals.log.debug("Add tunnel: %s" %(tunnel))
                         fwglobals.g.handle_request({'message':'add-tunnel', "params": tunnel})
-
-        for dev_id in list(self.sym_nat_cache):
-            cached_addr = self.sym_nat_cache.get(dev_id)
-            if not cached_addr:
-                continue
-            cached_addr['probe_time'] = 0
