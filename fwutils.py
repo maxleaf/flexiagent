@@ -3932,3 +3932,38 @@ def reload_lte_drivers():
     time.sleep(2)
 
     netplan_apply("reload_lte_drivers")
+
+def send_udp_packet(src_ip, src_port, dst_ip, dst_port, dev_name, msg):
+    """
+    This function sends a UDP packet with provided source/destination parameters and payload.
+    : param src_ip     : packet source IP
+    : param src_port   : packet source port
+    : param dst_ip     : packet destination IP
+    : param dst_port   : packet destination port
+    : param dev_name   : device name to bind() to
+    : param msg        : packet payload
+
+    """
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(3)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        if dev_name != None:
+            s.setsockopt(socket.SOL_SOCKET, 25, dev_name.encode())
+        s.bind((src_ip, src_port))
+    except Exception as e:
+        fwglobals.log.error("send_udp_packet: bind: %s" % str(e))
+        s.close()
+        return
+
+    data = binascii.a2b_hex(msg)
+    #fwglobals.log.debug("Packet: sendto: (%s,%d) data %s" %(dst_ip, dst_port, data))
+    try:
+        s.sendto(data, (dst_ip, dst_port))
+    except Exception as e:
+        fwglobals.log.error("send_udp_packet: sendto(%s:%d) failed: %s" % (dst_ip, dst_port, str(e)))
+        s.close()
+        return
+
+    s.close()
