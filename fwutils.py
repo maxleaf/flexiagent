@@ -230,14 +230,14 @@ def get_default_route(if_name=None):
     """
     (via, dev, metric, proto) = ("", "", 0xffffffff, "")
     try:
-        output = os.popen('ip route list match default').read().decode()
+        output = os.popen('ip route list match default').read()
         if output:
             routes = output.splitlines()
             for r in routes:
                 _dev = ''   if not 'dev '    in r else r.split('dev ')[1].split(' ')[0]
                 _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
                 _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
-                _proto = '' if not 'proto ' in r else int(r.split('proto ')[1].split(' ')[0])
+                _proto = '' if not 'proto '  in r else r.split('proto ')[1].split(' ')[0]
 
                 if if_name and if_name == _dev: # If if_name specified, we return info for that dev even if it has a higher metric
                     dev    = _dev
