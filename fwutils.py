@@ -634,7 +634,6 @@ def build_interface_dev_id(if_name):
                     dev_id = dev_id_add_type(if_addr)
                     dev_id = dev_id_to_full(dev_id)
         except Exception as e:
-            fwglobals.log.error('Exception: ' + str(e))
             pass
     return dev_id
 
