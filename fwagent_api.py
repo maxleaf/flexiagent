@@ -335,9 +335,9 @@ class FWAGENT_API:
         connection_state = fwutils.mbim_connection_state(params['dev_id'])
         registration_network = fwutils.mbim_registration_state(params['dev_id'])
 
-        is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
-        if fwutils.vpp_does_run() and is_assigned:
-            interface_name = fwutils.dev_id_to_tap(params['dev_id'])
+        tap_name = fwutils.dev_id_to_tap(params['dev_id'], check_vpp_state=True)
+        if tap_name:
+            interface_name = tap_name
 
         addr = fwutils.get_interface_address(interface_name)
         connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0

@@ -459,9 +459,9 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
 
     # for lte interface, we need to get the current source IP, and not the one stored in DB. The IP may have changed due last 'add-interface' job.
     if fwutils.is_lte_interface_by_dev_id(dev_id):
-        tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
-        if tap:
-            source = fwutils.get_interface_address(tap)
+        tap_name = fwutils.dev_id_to_tap(dev_id, check_vpp_state=True)
+        if tap_name:
+            source = fwutils.get_interface_address(tap_name)
             if source:
                 src = source.split('/')[0]
                 src_addr = ipaddress.ip_address(src)
@@ -1165,24 +1165,43 @@ def add_tunnel(params):
         cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "python"
-        cmd['cmd']['descr']   = "preprocess tunnel add"
-        cmd['cmd']['params']  = {
-                        'module': 'fwutils',
-                        'func'  : 'tunnel_change_postprocess',
-                        'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
-        }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "preprocess tunnel remove"
-        cmd['revert']['params'] = {
-                        'module': 'fwutils',
-                        'func'  : 'tunnel_change_postprocess',
-                        'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
-        }
-        cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "tunnel stats add"
+    cmd['cmd']['params']  = {
+                    'module': 'fwtunnel_stats',
+                    'func'  : 'tunnel_stats_add',
+                    'args'  : { 'tunnel_id': params['tunnel-id'], 'loopback_addr': params['loopback-iface']['addr']},
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "tunnel stats remove"
+    cmd['revert']['params'] = {
+                    'module': 'fwtunnel_stats',
+                    'func'  : 'tunnel_stats_remove',
+                    'args'  : { 'tunnel_id': params['tunnel-id']},
+    }
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "preprocess tunnel add"
+    cmd['cmd']['params']  = {
+                    'module': 'fwutils',
+                    'func'  : 'tunnel_change_postprocess',
+                    'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "preprocess tunnel remove"
+    cmd['revert']['params'] = {
+                    'module': 'fwutils',
+                    'func'  : 'tunnel_change_postprocess',
+                    'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
+    }
+    cmd_list.append(cmd)
 
     return cmd_list
 
