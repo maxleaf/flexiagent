@@ -755,10 +755,10 @@ def reset(soft=False, quiet=False):
     if not quiet:
         CSTART = "\x1b[0;30;43m"
         CEND = "\x1b[0m"
-    choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
-                      "Already deleted in flexiManage y/n [n]" + CEND)
-    if choice != 'y' and choice != 'Y':
-        reset_device = False
+        choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+                        "Already deleted in flexiManage y/n [n]" + CEND)
+        if choice != 'y' and choice != 'Y':
+            reset_device = False
 
     if reset_device:
         if fwutils.vpp_does_run():
@@ -1295,7 +1295,7 @@ if __name__ == '__main__':
                         choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
     parser_show.add_argument('--database',
-                        choices=['router', 'system', 'multilink', 'general'],
+                        choices=['general', 'multilink', 'router', 'system'],
                         help="show whole flexiEdge database")
     parser_show.add_argument('--status', choices=['daemon', 'router'],
                         help="show flexiEdge status")
