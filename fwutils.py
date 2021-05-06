@@ -220,32 +220,45 @@ def get_os_routing_table():
     except:
         return (None)
 
-def get_default_route():
+def get_default_route(if_name=None):
     """Get default route.
 
-    :returns: tuple (<IP of GW>, <name of network interface>, <Dev ID of network interface>).
+    :param if_name:  name of the interface to return info for.
+        if not provided, the route with the lowest metric will return.
+
+    :returns: tuple (<IP of GW>, <name of network interface>, <Dev ID of network interface>, <protocol>).
     """
-    (via, dev, metric) = ("", "", 0xffffffff)
+    (via, dev, metric, proto) = ("", "", 0xffffffff, "")
     try:
-        output = os.popen('ip route list match default').read().decode()
+        output = os.popen('ip route list match default').read()
         if output:
             routes = output.splitlines()
             for r in routes:
                 _dev = ''   if not 'dev '    in r else r.split('dev ')[1].split(' ')[0]
                 _via = ''   if not 'via '    in r else r.split('via ')[1].split(' ')[0]
                 _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
+                _proto = '' if not 'proto '  in r else r.split('proto ')[1].split(' ')[0]
+
+                if if_name == _dev: # If if_name specified, we return info for that dev even if it has a higher metric
+                    dev    = _dev
+                    via    = _via
+                    metric = _metric
+                    proto  = _proto
+                    return (via, dev, dev_id, proto)
+
                 if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
                     dev    = _dev
                     via    = _via
                     metric = _metric
+                    proto = _proto
     except:
         pass
 
     if not dev:
-        return ("", "", "")
+        return ("", "", "", "")
 
     dev_id = get_interface_dev_id(dev)
-    return (via, dev, dev_id)
+    return (via, dev, dev_id, proto)
 
 def get_interface_gateway(if_name, if_dev_id=None):
     """Get gateway.
@@ -3286,7 +3299,7 @@ def netplan_apply(caller_name=None):
         # If it will be changed as a result of netplan apply, we return True.
         #
         if fwglobals.g.fwagent:
-            (_, _, dr_dev_id_before) = get_default_route()
+            (_, _, dr_dev_id_before, _) = get_default_route()
 
         # Now go and apply the netplan
         #
@@ -3307,7 +3320,7 @@ def netplan_apply(caller_name=None):
         # Find out if the default route was changed. If it was - reconnect agent.
         #
         if fwglobals.g.fwagent:
-            (_, _, dr_dev_id_after) = get_default_route()
+            (_, _, dr_dev_id_after, _) = get_default_route()
             if dr_dev_id_before != dr_dev_id_after:
                 fwglobals.log.debug(
                     "%s: netplan_apply: default route changed (%s->%s) - reconnect" % \
