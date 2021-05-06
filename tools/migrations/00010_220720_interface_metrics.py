@@ -60,7 +60,7 @@ def _find_gateway_ip(dev_id):
         return ip
 
     if not ip:
-        ip, _, _ = fwutils.get_default_route()
+        ip, _, _, _ = fwutils.get_default_route()
         return ip
 
     return ''

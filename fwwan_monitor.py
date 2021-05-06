@@ -330,9 +330,22 @@ class FwWanMonitor:
             # 2. Keep interface rule in routing table in sync with metric in default route:
             #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
             #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
-            #
-            ip   = fwutils.get_interface_address(route.dev, log=False)
-            dhcp = 'yes' if route.proto == 'dhcp' else 'no'
+            # 3. We take the updated data for route since we found some cases
+            #    that monitoring cache saved when the interface wasn't completely configured.
+
+            name = fwutils.dev_id_to_linux_if(route.dev_id)
+            if not name:
+                name = fwutils.dev_id_to_tap(dev_id)
+
+            ip   = fwutils.get_interface_address(name, log=False)
+            (via, dev, dev_id, protocol) = fwutils.get_default_route(name)
+
+            if not protocol:
+                protocol = route.proto
+            dhcp = 'yes' if protocol == 'dhcp' else 'no'
+
+            if not via:
+                via = route.via
 
             ifc = db_if[0] if db_if else {}
             mtu = ifc.get('mtu')
@@ -343,7 +356,7 @@ class FwWanMonitor:
             dnsDomains  = ifc.get('dnsDomains', None)
 
             (success, err_str) = fwnetplan.add_remove_netplan_interface(\
-                                    True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
+                                    True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
                                     mtu, if_name=route.dev, wan_failover=True)
             if not success:
                 route.ok = prev_ok
