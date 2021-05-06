@@ -96,6 +96,10 @@ def tunnel_stats_add(tunnel_id, loopback_addr):
     with tunnel_stats_global_lock:
         tunnel_stats_global[tunnel_id] = stats_entry
 
+def tunnel_stats_remove(tunnel_id):
+    with tunnel_stats_global_lock:
+        del tunnel_stats_global[tunnel_id]
+
 def tunnel_stats_test():
     """Update RTT, drop rate and other fields for all tunnels.
 
@@ -121,7 +125,8 @@ def tunnel_stats_test():
             value['received'] = 0
 
     with tunnel_stats_global_lock:
-        tunnel_stats_global.update(tunnel_stats_global_copy)
+        for key in list(tunnel_stats_global.keys()):
+            tunnel_stats_global[key] = tunnel_stats_global_copy[key]
 
 def tunnel_stats_get():
     """Return a new tunnel status dictionary.
