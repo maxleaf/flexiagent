@@ -1295,7 +1295,7 @@ if __name__ == '__main__':
                         choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
     parser_show.add_argument('--database',
-                        choices=['router', 'system', 'multilink', 'general'],
+                        choices=['general', 'multilink', 'router', 'system'],
                         help="show whole flexiEdge database")
     parser_show.add_argument('--status', choices=['daemon', 'router'],
                         help="show flexiEdge status")
