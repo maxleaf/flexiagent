@@ -47,6 +47,7 @@ import traceback
 import yaml
 import fwglobals
 import fwikev2
+import fwmultilink
 import fwstats
 import fwutils
 from fwlog import Fwlog
@@ -847,13 +848,15 @@ def show(agent, configuration, database, status):
             fwglobals.log.info(out, to_syslog=False)
 
     if database:
-        if database == 'all':
-            fwutils.print_router_config(full=True)
-            fwutils.print_system_config(full=True)
-        elif database == 'router':
+        if database == 'router':
             fwutils.print_router_config(full=True)
         elif database == 'system':
             fwutils.print_system_config(full=True)
+        elif database == 'general':
+            fwutils.print_general_database()
+        elif database == 'multilink':
+            with fwmultilink.FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
+                print(multilink_db.dumps())
 
     if status:
         if status == 'daemon':
@@ -1291,8 +1294,8 @@ if __name__ == '__main__':
     parser_show.add_argument('--configuration', const='all', nargs='?',
                         choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
-    parser_show.add_argument('--database', const='all', nargs='?',
-                        choices=['all', 'router', 'system'],
+    parser_show.add_argument('--database',
+                        choices=['router', 'system', 'multilink', 'general'],
                         help="show whole flexiEdge database")
     parser_show.add_argument('--status', choices=['daemon', 'router'],
                         help="show flexiEdge status")

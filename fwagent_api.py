@@ -406,6 +406,9 @@ class FWAGENT_API:
         if err:
             raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
 
+        # at this point, pin is verified so we reset wrong pin protection
+        fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
+
     def _handle_change_pin_code(self, params, is_currently_enabled):
         dev_id = params['dev_id']
         current_pin = params.get('currentPin')
@@ -416,6 +419,9 @@ class FWAGENT_API:
         updated_status, err = fwutils.qmi_change_pin(dev_id, current_pin, new_pin)
         if err:
             raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
+
+        # at this point, pin is changed so we reset wrong pin protection
+        fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
 
     def _handle_verify_pin_code(self, params, is_currently_enabled, retries_left):
         dev_id = params['dev_id']
@@ -434,6 +440,9 @@ class FWAGENT_API:
         if updated_pin_state not in['disabled', 'enabled-verified']:
             raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
 
+        # at this point, pin is verified so we reset wrong pin protection
+        fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
+
     def _modify_lte_pin(self, params):
         try:
             dev_id = params['dev_id']
@@ -448,7 +457,7 @@ class FWAGENT_API:
             # Handle blocked SIM card. In order to unblock it a user should provide PUK code and new PIN code
             if current_pin_state.get('PIN1_STATUS') == 'blocked' or retries_left == '0':
                 self._handle_unblock_sim(params)
-                return {'ok': 1, 'message': ''}
+                return {'ok': 1, 'message': { 'err_msg': None, 'data': fwutils.lte_get_pin_state(dev_id)}}
 
             # for the following operations we need current pin
             if not current_pin:
@@ -470,9 +479,9 @@ class FWAGENT_API:
             if need_to_verify:
                 self._handle_verify_pin_code(params, is_currently_enabled, retries_left)
 
-            reply = {'ok': 1, 'message': ''}
+            reply = {'ok': 1, 'message': { 'err_msg': None, 'data': fwutils.lte_get_pin_state(dev_id)}}
         except Exception as e:
-            reply = {'ok': 0, 'message': str(e)}
+            reply = {'ok': 0, 'message': { 'err_msg': str(e), 'data': fwutils.lte_get_pin_state(dev_id)} }
         return reply
 
     def _get_device_certificate(self, params):
