@@ -332,37 +332,39 @@ class FwWanMonitor:
             #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
             # 3. We take the updated data for route since we found some cases
             #    that monitoring cache saved when the interface wasn't completely configured.
+            try:
+                name = fwutils.dev_id_to_linux_if(route.dev_id)
+                if not name:
+                    name = fwutils.dev_id_to_tap(route.dev_id)
 
-            name = fwutils.dev_id_to_linux_if(route.dev_id)
-            if not name:
-                name = fwutils.dev_id_to_tap(dev_id)
+                ip   = fwutils.get_interface_address(name, log=False)
+                (via, dev, dev_id, protocol) = fwutils.get_default_route(name)
 
-            ip   = fwutils.get_interface_address(name, log=False)
-            (via, dev, dev_id, protocol) = fwutils.get_default_route(name)
+                if not protocol:
+                    protocol = route.proto
+                dhcp = 'yes' if protocol == 'dhcp' else 'no'
 
-            if not protocol:
-                protocol = route.proto
-            dhcp = 'yes' if protocol == 'dhcp' else 'no'
+                if not via:
+                    via = route.via
 
-            if not via:
-                via = route.via
+                ifc = db_if[0] if db_if else {}
+                mtu = ifc.get('mtu')
 
-            ifc = db_if[0] if db_if else {}
-            mtu = ifc.get('mtu')
+                dnsServers  = ifc.get('dnsServers', [])
+                if len(dnsServers) == 0:
+                    dnsServers = ['8.8.8.8', '8.8.4.4']
+                dnsDomains  = ifc.get('dnsDomains', None)
 
-            dnsServers  = ifc.get('dnsServers', [])
-            if len(dnsServers) == 0:
-                dnsServers = ['8.8.8.8', '8.8.4.4']
-            dnsDomains  = ifc.get('dnsDomains', None)
-
-            (success, err_str) = fwnetplan.add_remove_netplan_interface(\
-                                    True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
-                                    mtu, if_name=route.dev, wan_failover=True)
-            if not success:
-                route.ok = prev_ok
-                fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
-                return
+                (success, err_str) = fwnetplan.add_remove_netplan_interface(\
+                                        True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
+                                        mtu, if_name=route.dev, wan_failover=True)
+                if not success:
+                    route.ok = prev_ok
+                    fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
+                    fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
+                    return
+            except Exception as e:
+                fwglobals.log.error("_update_metric failed: %s" % str(e))
 
         # If defult route was changes as a result of metric update,
         # reconnect agent to flexiManage.
