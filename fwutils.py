@@ -1183,6 +1183,9 @@ def reset_device_config():
     with FwIKEv2() as ike:
         ike.clean()
 
+    if 'lte' in fwglobals.g.db:
+        fwglobals.g.db['lte'] = {}
+
     reset_dhcpd()
 
 def print_system_config(full=False):
@@ -1212,6 +1215,19 @@ def print_router_config(basic=True, full=False, multilink=False):
             cfg = ''
         print(cfg)
 
+def print_general_database():
+    out = []
+    try:
+        for key in sorted(list(fwglobals.g.db.keys())):
+            obj = {}
+            obj[key] = fwglobals.g.db[key]
+            out.append(obj)
+        cfg = json.dumps(out, indent=2, sort_keys=True)
+        print(cfg)
+    except Exception as e:
+        fwglobals.log.error(str(e))
+        pass
+    
 def update_device_config_signature(request):
     """Updates the database signature.
     This function assists the database synchronization feature that keeps
@@ -2742,6 +2758,19 @@ def lte_sim_status(dev_id):
 def lte_is_sim_inserted(dev_id):
     return lte_sim_status(dev_id) == "present"
 
+def get_lte_db_entry(dev_id, key):
+    lte_db = fwglobals.g.db.get('lte' ,{})
+    dev_id_entry = lte_db.get(dev_id ,{})
+    return dev_id_entry.get(key)
+
+def set_lte_db_entry(dev_id, key, value):
+    lte_db = fwglobals.g.db.get('lte' ,{})
+    dev_id_entry = lte_db.get(dev_id ,{})   
+    dev_id_entry[key] = value
+    
+    lte_db[dev_id] = dev_id_entry
+    fwglobals.g.db['lte'] = lte_db # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+
 def get_lte_cache(dev_id, key):
     cache = fwglobals.g.cache.lte
     lte_interface = cache.get(dev_id, {})
@@ -2753,7 +2782,6 @@ def set_lte_cache(dev_id, key, value):
     if not lte_interface:
         fwglobals.g.cache.lte[dev_id] = {}
         lte_interface = fwglobals.g.cache.lte[dev_id]
-
     lte_interface[key] = value
 
 def lte_disconnect(dev_id, hard_reset_service=False):
@@ -2798,19 +2826,19 @@ def lte_prepare_connection_params(params):
 
 def qmi_verify_pin(dev_id, pin):
     fwglobals.log.debug('verifying lte pin number')
-    _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
+    lines, err = _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
     time.sleep(2)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_set_pin_protection(dev_id, pin, is_enable):
-    _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
+    lines, err = _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
     time.sleep(1)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_change_pin(dev_id, old_pin, new_pin):
-    _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
+    lines, err = _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
     time.sleep(1)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_unblocked_pin(dev_id, puk, new_pin):
     _run_qmicli_command(dev_id, 'uim-unblock-pin=PIN1,%s,%s' % (puk, new_pin))
@@ -2854,6 +2882,9 @@ def reset_modem(dev_id):
     except Exception:
         pass
     set_lte_cache(dev_id, 'state', '')
+    
+    # clear wrong PIN cache on reset
+    set_lte_db_entry(dev_id, 'wrong_pin', None)
 
 def lte_connect(params, reset=False):
     # with fwglobals.g.cache.lock:
@@ -2878,9 +2909,21 @@ def lte_connect(params, reset=False):
         if not pin:
             return (False, "PIN is required")
 
-        updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
-        if updated_pin_state not in['disabled', 'enabled-verified']:
+        # If a user enters a wrong pin, the function will fail, but flexiManage will send three times `sync` jobs.
+        # As a result, the SIM may be locked. So we save the wrong pin in the cache
+        # and we will not try again with this wrong one.
+        wrong_pin = get_lte_db_entry(dev_id, 'wrong_pin')
+        if wrong_pin and wrong_pin == pin:
             return (False, "PIN is wrong")
+
+        updated_pin_state, err = qmi_verify_pin(dev_id, pin)
+        if err:
+            set_lte_db_entry(dev_id, 'wrong_pin', pin)
+            return (False, "PIN is wrong")
+
+    # at this point, the sim is unblocked.
+    # It might be opened from different places so we need to make sure to clear this cache
+    set_lte_db_entry(dev_id, 'wrong_pin', None)
 
     try:
         is_modem_connected = mbim_is_connected(dev_id)
