@@ -453,15 +453,17 @@ class FwStunWrap:
         : return : 'useStun' value in DB, or False if not found -> Bool
         """
         interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
-        if interfaces and interfaces[0].get('useStun') != '':
+        if interfaces and interfaces[0].get('useStun','') != '':
             return interfaces[0].get('useStun')
+
+        if interfaces and interfaces[0].get('type','WAN') == 'LAN':
+            return False
 
         # The dev_id was not found in the DB, so it is an unassigned interface. Let's check
         # if it has a GW configured. It so, it is a WAN interface, and we will return 'True'
-        vpp_run = fwutils.vpp_does_run()
         name = fwutils.dev_id_to_linux_if(dev_id)
-        if name is None and vpp_run:
-            name = fwutils.dev_id_to_tap(dev_id)
+        if not name:
+            name = fwutils.dev_id_to_tap(dev_id, check_vpp_state=True)
         if not name:
             return False
         gw, _ = fwutils.get_interface_gateway(name)

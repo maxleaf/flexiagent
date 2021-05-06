@@ -296,7 +296,7 @@ def get_tunnel_gateway(dst, dev_id):
                 # In this case the system uses default route as a gateway and connect the interfaces directly and not via the GW
                 if is_ip_in_subnet(dst,network): return ''
             except Exception as e:
-                fwglobals.log.error("get_effective_gateway: failed to check networks: dst=%s, dev_id=%s, network=%s, error=%s" % (dst, dev_id, network, str(e)))
+                fwglobals.log.error("get_tunnel_gateway: failed to check networks: dst=%s, dev_id=%s, network=%s, error=%s" % (dst, dev_id, network, str(e)))
 
     # If src, dst are not on same subnet or any error, use the gateway defined on the device
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
@@ -330,13 +330,11 @@ def get_all_interfaces():
         if not dev_id:
             continue
 
-        if is_lte_interface(nic_name) and fwglobals.g.router_api.state_is_started():
-            is_assigned = is_interface_assigned_to_vpp(dev_id)
-            if is_assigned:
-                tap_name = dev_id_to_tap(dev_id)
-                if tap_name:
-                    nic_name = tap_name
-                    addrs = interfaces.get(nic_name)
+        if is_lte_interface(nic_name):
+            tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+            if tap_name:
+                nic_name = tap_name
+                addrs = interfaces.get(nic_name)
 
         dev_id_ip_gw[dev_id] = {}
         dev_id_ip_gw[dev_id]['addr'] = ''
@@ -551,12 +549,11 @@ def get_linux_interfaces(cached=True):
                     'default_settings':   lte_get_default_settings(dev_id)
                 }
 
-                is_assigned = is_interface_assigned_to_vpp(dev_id)
                 # LTE physical device has no IP, GW etc. so we take this info from vppsb interface (vpp1)
-                tap = dev_id_to_tap(dev_id) if not fwglobals.g.router_api.state_is_starting_stopping() and vpp_does_run() and is_assigned else None
-                if tap:
-                    interface['gateway'], interface['metric'] = get_interface_gateway(tap)
-                    int_addr = get_interface_address(tap)
+                tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+                if tap_name:
+                    interface['gateway'], interface['metric'] = get_interface_gateway(tap_name)
+                    int_addr = get_interface_address(tap_name)
                     if int_addr:
                         int_addr = int_addr.split('/')
                         interface['IPv4'] = int_addr[0]
@@ -646,7 +643,6 @@ def build_interface_dev_id(if_name):
                     dev_id = dev_id_add_type(if_addr)
                     dev_id = dev_id_to_full(dev_id)
         except Exception as e:
-            fwglobals.log.error('Exception: ' + str(e))
             pass
     return dev_id
 
@@ -891,12 +887,18 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def dev_id_to_tap(dev_id):
+def dev_id_to_tap(dev_id, check_vpp_state=False):
     """Convert Bus address into TAP name.
 
-    :param dev_id:      Bus address.
+    :param dev_id:          Bus address.
+    :param check_vpp_state: If True ensure that vpp runs so taps are available.
     :returns: Linux TAP interface name.
     """
+
+    if check_vpp_state:
+        is_assigned = is_interface_assigned_to_vpp(dev_id)
+        if not (is_assigned and vpp_does_run()):
+            return None
 
     dev_id_full = dev_id_to_full(dev_id)
     cache    = fwglobals.g.cache.dev_id_to_vpp_tap_name
@@ -1195,6 +1197,9 @@ def reset_device_config():
     with FwIKEv2() as ike:
         ike.clean()
 
+    if 'lte' in fwglobals.g.db:
+        fwglobals.g.db['lte'] = {}
+
     reset_dhcpd()
 
 def print_system_config(full=False):
@@ -1224,12 +1229,19 @@ def print_router_config(basic=True, full=False, multilink=False):
             cfg = ''
         print(cfg)
 
-    if multilink:
-        with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
-            cfg = multilink_db.dumps()
-            print(cfg)
-
-
+def print_general_database():
+    out = []
+    try:
+        for key in sorted(list(fwglobals.g.db.keys())):
+            obj = {}
+            obj[key] = fwglobals.g.db[key]
+            out.append(obj)
+        cfg = json.dumps(out, indent=2, sort_keys=True)
+        print(cfg)
+    except Exception as e:
+        fwglobals.log.error(str(e))
+        pass
+    
 def update_device_config_signature(request):
     """Updates the database signature.
     This function assists the database synchronization feature that keeps
@@ -2760,6 +2772,19 @@ def lte_sim_status(dev_id):
 def lte_is_sim_inserted(dev_id):
     return lte_sim_status(dev_id) == "present"
 
+def get_lte_db_entry(dev_id, key):
+    lte_db = fwglobals.g.db.get('lte' ,{})
+    dev_id_entry = lte_db.get(dev_id ,{})
+    return dev_id_entry.get(key)
+
+def set_lte_db_entry(dev_id, key, value):
+    lte_db = fwglobals.g.db.get('lte' ,{})
+    dev_id_entry = lte_db.get(dev_id ,{})   
+    dev_id_entry[key] = value
+    
+    lte_db[dev_id] = dev_id_entry
+    fwglobals.g.db['lte'] = lte_db # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+
 def get_lte_cache(dev_id, key):
     cache = fwglobals.g.cache.lte
     lte_interface = cache.get(dev_id, {})
@@ -2771,7 +2796,6 @@ def set_lte_cache(dev_id, key, value):
     if not lte_interface:
         fwglobals.g.cache.lte[dev_id] = {}
         lte_interface = fwglobals.g.cache.lte[dev_id]
-
     lte_interface[key] = value
 
 def lte_disconnect(dev_id, hard_reset_service=False):
@@ -2816,19 +2840,19 @@ def lte_prepare_connection_params(params):
 
 def qmi_verify_pin(dev_id, pin):
     fwglobals.log.debug('verifying lte pin number')
-    _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
+    lines, err = _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
     time.sleep(2)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_set_pin_protection(dev_id, pin, is_enable):
-    _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
+    lines, err = _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
     time.sleep(1)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_change_pin(dev_id, old_pin, new_pin):
-    _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
+    lines, err = _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
     time.sleep(1)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_unblocked_pin(dev_id, puk, new_pin):
     _run_qmicli_command(dev_id, 'uim-unblock-pin=PIN1,%s,%s' % (puk, new_pin))
@@ -2872,6 +2896,9 @@ def reset_modem(dev_id):
     except Exception:
         pass
     set_lte_cache(dev_id, 'state', '')
+    
+    # clear wrong PIN cache on reset
+    set_lte_db_entry(dev_id, 'wrong_pin', None)
 
 def lte_connect(params, reset=False):
     # with fwglobals.g.cache.lock:
@@ -2896,9 +2923,21 @@ def lte_connect(params, reset=False):
         if not pin:
             return (False, "PIN is required")
 
-        updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
-        if updated_pin_state not in['disabled', 'enabled-verified']:
+        # If a user enters a wrong pin, the function will fail, but flexiManage will send three times `sync` jobs.
+        # As a result, the SIM may be locked. So we save the wrong pin in the cache
+        # and we will not try again with this wrong one.
+        wrong_pin = get_lte_db_entry(dev_id, 'wrong_pin')
+        if wrong_pin and wrong_pin == pin:
             return (False, "PIN is wrong")
+
+        updated_pin_state, err = qmi_verify_pin(dev_id, pin)
+        if err:
+            set_lte_db_entry(dev_id, 'wrong_pin', pin)
+            return (False, "PIN is wrong")
+
+    # at this point, the sim is unblocked.
+    # It might be opened from different places so we need to make sure to clear this cache
+    set_lte_db_entry(dev_id, 'wrong_pin', None)
 
     try:
         is_modem_connected = mbim_is_connected(dev_id)
@@ -3479,11 +3518,9 @@ def get_reconfig_hash():
 
         is_lte = is_lte_interface(name)
         if is_lte:
-            is_assigned = is_interface_assigned_to_vpp(dev_id)
-            if is_assigned and fwglobals.g.router_api.state_is_started():
-                tap_name = dev_id_to_tap(dev_id)
-                if tap_name:
-                    name = tap_name
+            tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+            if tap_name:
+                name = tap_name
 
         addr = get_interface_address(name, log=False)
         gw, metric = get_interface_gateway(name)
