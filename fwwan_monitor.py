@@ -330,22 +330,27 @@ class FwWanMonitor:
             # 2. Keep interface rule in routing table in sync with metric in default route:
             #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
             #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
-            # 3. We take the updated data for route since we found some cases
-            #    that monitoring cache saved when the interface wasn't completely configured.
+            #
+            # Note we load fresh data for this route from OS again (`ip route`)
+            # in order to handle cases, where the interface is being modified under our legs.
+            #
             try:
                 name = fwutils.dev_id_to_linux_if(route.dev_id)
                 if not name:
                     name = fwutils.dev_id_to_tap(route.dev_id)
 
                 ip   = fwutils.get_interface_address(name, log=False)
-                (via, dev, dev_id, protocol) = fwutils.get_default_route(name)
+                (via, dev, dev_id, proto) = fwutils.get_default_route(name)
 
-                if not protocol:
-                    protocol = route.proto
-                dhcp = 'yes' if protocol == 'dhcp' else 'no'
+                if not proto:
+                    proto = route.proto
+                dhcp = 'yes' if proto == 'dhcp' else 'no'
 
                 if not via:
                     via = route.via
+
+                if not dev:
+                    dev = route.dev
 
                 ifc = db_if[0] if db_if else {}
                 mtu = ifc.get('mtu')
@@ -361,7 +366,7 @@ class FwWanMonitor:
                 if not success:
                     route.ok = prev_ok
                     fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                    fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
+                    fwutils.update_linux_metric(route.prefix, dev, route.metric)
                     return
             except Exception as e:
                 fwglobals.log.error("_update_metric failed: %s" % str(e))

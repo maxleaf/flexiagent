@@ -239,13 +239,14 @@ def get_default_route(if_name=None):
                 _metric = 0 if not 'metric ' in r else int(r.split('metric ')[1].split(' ')[0])
                 _proto = '' if not 'proto '  in r else r.split('proto ')[1].split(' ')[0]
 
-                if if_name and if_name == _dev: # If if_name specified, we return info for that dev even if it has a higher metric
+                if if_name == _dev: # If if_name specified, we return info for that dev even if it has a higher metric
                     dev    = _dev
                     via    = _via
                     metric = _metric
                     proto  = _proto
+                    return (via, dev, dev_id, proto)
 
-                if not if_name and _metric < metric:  # The default route among default routes is the one with the lowest metric :)
+                if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
                     dev    = _dev
                     via    = _via
                     metric = _metric
