@@ -245,7 +245,7 @@ def get_default_route(if_name=None):
                     metric = _metric
                     proto  = _proto
 
-                if not if_name and _metric < metric):  # The default route among default routes is the one with the lowest metric :)
+                if not if_name and _metric < metric:  # The default route among default routes is the one with the lowest metric :)
                     dev    = _dev
                     via    = _via
                     metric = _metric
