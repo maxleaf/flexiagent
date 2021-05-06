@@ -2804,19 +2804,19 @@ def lte_prepare_connection_params(params):
 
 def qmi_verify_pin(dev_id, pin):
     fwglobals.log.debug('verifying lte pin number')
-    _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
+    lines, err = _run_qmicli_command(dev_id, 'uim-verify-pin=PIN1,%s' % pin)
     time.sleep(2)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_set_pin_protection(dev_id, pin, is_enable):
-    _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
+    lines, err = _run_qmicli_command(dev_id, 'uim-set-pin-protection=PIN1,%s,%s' % ('enable' if is_enable else 'disable', pin))
     time.sleep(1)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_change_pin(dev_id, old_pin, new_pin):
-    _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
+    lines, err = _run_qmicli_command(dev_id, 'uim-change-pin=PIN1,%s,%s' % (old_pin, new_pin))
     time.sleep(1)
-    return lte_get_pin_state(dev_id)
+    return (lte_get_pin_state(dev_id), err)
 
 def qmi_unblocked_pin(dev_id, puk, new_pin):
     _run_qmicli_command(dev_id, 'uim-unblock-pin=PIN1,%s,%s' % (puk, new_pin))
@@ -2884,7 +2884,7 @@ def lte_connect(params, reset=False):
         if not pin:
             return (False, "PIN is required")
 
-        updated_pin_state = qmi_verify_pin(dev_id, pin).get('PIN1_STATUS')
+        updated_pin_state = qmi_verify_pin(dev_id, pin)[0].get('PIN1_STATUS')
         if updated_pin_state not in['disabled', 'enabled-verified']:
             return (False, "PIN is wrong")
 
