@@ -463,7 +463,7 @@ class FwStunWrap:
             # we have to send VxLAN packet to the remote end of the tunnel in order to pinhole the NAT.
             # Otherwise the remote end, which is IKE initiator, will be not able to intiate the IKE negotiation.
             encryption_mode = tunnel.get("encryption-mode", "psk")
-            role = tunnel["ikev2"]["role"]
+            role = tunnel.get("ikev2", {}).get("role", "")
             if encryption_mode == "ikev2" and role == "responder":
                 fwglobals.log.debug("ikev2 tunnel %d responder side is down on dev %s"%(tunnel_id, dev_id))
                 self.sym_nat_tunnels_cache[tunnel_id] = {
