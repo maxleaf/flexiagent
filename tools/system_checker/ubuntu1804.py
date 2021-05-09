@@ -48,7 +48,7 @@ class Checker(fwsystem_checker_common.Checker):
             self.nameservers = []
 
         try:
-            out = subprocess.check_output('dpkg -l | grep resolvconf', shell=True).strip()
+            out = subprocess.check_output('dpkg -l | grep resolvconf', shell=True).decode().strip()
             if len(out) == 0:
                 raise Exception(prompt + 'resolvconf is not installed')
             else:

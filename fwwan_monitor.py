@@ -331,38 +331,45 @@ class FwWanMonitor:
             #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
             #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
             #
-            ip   = fwutils.get_interface_address(route.dev, log=False)
-            dhcp = 'yes' if route.proto == 'dhcp' else 'no'
-
-            ifc = db_if[0] if db_if else {}
-            mtu = ifc.get('mtu')
-
-            dnsServers  = ifc.get('dnsServers', [])
-            if len(dnsServers) == 0:
-                dnsServers = ['8.8.8.8', '8.8.4.4']
-            dnsDomains  = ifc.get('dnsDomains', None)
-
-            (success, err_str) = fwnetplan.add_remove_netplan_interface(\
-                                    True, route.dev_id, ip, route.via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
-                                    mtu, if_name=route.dev, dont_check_ip=True)
-            if not success:
-                route.ok = prev_ok
-                fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
-                return
-
-            # Update VPP NAT with the new default route interface.
+            # Note we load fresh data for this route from OS again (`ip route`)
+            # in order to handle cases, where the interface is being modified under our legs.
             #
-            if route.default:
-                success = fwutils.vpp_nat_addr_update_on_metric_change(route.dev_id, new_metric)
+            try:
+                name = fwutils.dev_id_to_linux_if(route.dev_id)
+                if not name:
+                    name = fwutils.dev_id_to_tap(route.dev_id)
+
+                ip   = fwutils.get_interface_address(name, log=False)
+                (via, dev, dev_id, proto) = fwutils.get_default_route(name)
+
+                if not proto:
+                    proto = route.proto
+                dhcp = 'yes' if proto == 'dhcp' else 'no'
+
+                if not via:
+                    via = route.via
+
+                if not dev:
+                    dev = route.dev
+
+                ifc = db_if[0] if db_if else {}
+                mtu = ifc.get('mtu')
+
+                dnsServers  = ifc.get('dnsServers', [])
+                if len(dnsServers) == 0:
+                    dnsServers = ['8.8.8.8', '8.8.4.4']
+                dnsDomains  = ifc.get('dnsDomains', None)
+
+                (success, err_str) = fwnetplan.add_remove_netplan_interface(\
+                                        True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
+                                        mtu, if_name=route.dev, wan_failover=True)
                 if not success:
                     route.ok = prev_ok
-                    fwglobals.log.error("failed to reflect metric in VPP NAT Address")
-                    fwutils.update_linux_metric(route.prefix, route.dev, route.metric)
-                    fwnetplan.add_remove_netplan_interface(\
-                        True, route.dev_id, ip, route.via, prev_metric, dhcp, 'WAN',
-                        mtu, if_name=route.dev, dont_check_ip=True)
+                    fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
+                    fwutils.update_linux_metric(route.prefix, dev, route.metric)
                     return
+            except Exception as e:
+                fwglobals.log.error("_update_metric failed: %s" % str(e))
 
         # If defult route was changes as a result of metric update,
         # reconnect agent to flexiManage.

@@ -476,8 +476,7 @@ class Checker:
                     self._add_netplan_interface(fname_baseline, ifname, metric)
                     metric += 100
 
-        subprocess.check_output('sudo netplan apply', shell=True)
-
+        subprocess.check_call('sudo netplan apply', shell=True)
         return True
 
     def soft_check_default_routes_metric(self, fix=False, silently=False, prompt=''):
@@ -1384,7 +1383,10 @@ class Checker:
                 os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
 
                 for module in modules:
-                    os.system('modprobe %s' % module)
+                    os.system('rmmod %s 2>/dev/null' % module)
+
+                for module in modules:
+                    os.system('modprobe %s 2>/dev/null' % module)
             except Exception as e:
                 print('Error: %s' % str(e))
                 for module in modules:

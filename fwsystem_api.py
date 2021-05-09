@@ -84,10 +84,8 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                     if modem_mode == 'resetting' or modem_mode == 'connecting':
                         continue
 
-                    is_assigned = fwutils.is_interface_assigned_to_vpp(dev_id)
-                    if is_assigned and fwglobals.g.router_api.state_is_started():
-                        name = fwutils.dev_id_to_tap(dev_id)
-                    else:
+                    name = fwutils.dev_id_to_tap(dev_id, check_vpp_state=True)
+                    if not name:
                         name = fwutils.dev_id_to_linux_if(dev_id)
 
                     # Ensure that lte connection is opened.

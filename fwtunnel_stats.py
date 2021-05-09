@@ -18,16 +18,19 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
 import re
 import time
 from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
+import threading
 import fwglobals
 import fwutils
 
 tunnel_stats_global = {}
+tunnel_stats_global_lock = threading.RLock()
 
 TIMEOUT = 15
 WINDOW_SIZE = 30
@@ -64,7 +67,8 @@ def tunnel_stats_clear():
 
     :returns: None.
     """
-    tunnel_stats_global.clear()
+    with tunnel_stats_global_lock:
+        tunnel_stats_global.clear()
 
 def tunnel_stats_add(tunnel_id, loopback_addr):
     """Add tunnel statistics entry into a dictionary.
@@ -75,26 +79,37 @@ def tunnel_stats_add(tunnel_id, loopback_addr):
     :returns: None.
     """
     ip_addr = IPNetwork(loopback_addr)
-    tunnel_stats_global[tunnel_id] = dict()
-    tunnel_stats_global[tunnel_id]['loopback_network'] = str(ip_addr)
-    tunnel_stats_global[tunnel_id]['sent'] = 0
-    tunnel_stats_global[tunnel_id]['received'] = 0
-    tunnel_stats_global[tunnel_id]['drop_rate'] = 0
-    tunnel_stats_global[tunnel_id]['rtt'] = 0
-    tunnel_stats_global[tunnel_id]['timestamp'] = 0
+    stats_entry = dict()
+    stats_entry['loopback_network'] = str(ip_addr)
+    stats_entry['sent'] = 0
+    stats_entry['received'] = 0
+    stats_entry['drop_rate'] = 0
+    stats_entry['rtt'] = 0
+    stats_entry['timestamp'] = 0
 
     for ip in ip_addr:
         if (ip.value != ip_addr.value):
-            tunnel_stats_global[tunnel_id]['loopback_remote'] = str(ip)
+            stats_entry['loopback_remote'] = str(ip)
         else:
-            tunnel_stats_global[tunnel_id]['loopback_local'] = str(ip)
+            stats_entry['loopback_local'] = str(ip)
+
+    with tunnel_stats_global_lock:
+        tunnel_stats_global[tunnel_id] = stats_entry
+
+def tunnel_stats_remove(tunnel_id):
+    with tunnel_stats_global_lock:
+        del tunnel_stats_global[tunnel_id]
 
 def tunnel_stats_test():
     """Update RTT, drop rate and other fields for all tunnels.
 
     :returns: None.
     """
-    for value in list(tunnel_stats_global.values()):
+    tunnel_stats_global_copy = {}
+    with tunnel_stats_global_lock:
+        tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
+
+    for key, value in tunnel_stats_global_copy.items():
         value['sent'] += 1
 
         rtt = tunnel_stats_get_ping_time(value['loopback_remote'])
@@ -109,6 +124,11 @@ def tunnel_stats_test():
             value['sent'] = 0
             value['received'] = 0
 
+    with tunnel_stats_global_lock:
+        for key in list(tunnel_stats_global.keys()):
+            if key in tunnel_stats_global_copy:
+                tunnel_stats_global[key] = tunnel_stats_global_copy[key]
+
 def tunnel_stats_get():
     """Return a new tunnel status dictionary.
     Update tunnel status based on timeout.
@@ -117,8 +137,12 @@ def tunnel_stats_get():
     """
     tunnel_stats = {}
     cur_time = time.time()
+    tunnel_stats_global_copy = {}
 
-    for key, value in list(tunnel_stats_global.items()):
+    with tunnel_stats_global_lock:
+        tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
+
+    for key, value in tunnel_stats_global_copy.items():
         tunnel_stats[key] = {}
         tunnel_stats[key]['rtt'] = value['rtt']
         tunnel_stats[key]['drop_rate'] = value['drop_rate']

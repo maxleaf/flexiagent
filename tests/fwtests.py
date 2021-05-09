@@ -44,8 +44,8 @@ template_path = os.path.abspath(TEST_ROOT + '/fwtemplates.yaml')
 
 class TestFwagent:
     def __init__(self):
-        self.fwagent_py = 'python ' + os.path.join(CODE_ROOT, 'fwagent.py')
-        self.fwkill_py  = 'python ' + os.path.join(CODE_ROOT, 'tools', 'common', 'fwkill.py')
+        self.fwagent_py = 'python3 ' + os.path.join(CODE_ROOT, 'fwagent.py')
+        self.fwkill_py  = 'python3 ' + os.path.join(CODE_ROOT, 'tools', 'common', 'fwkill.py')
         self.set_log_start_marker()
 
     def __enter__(self):
@@ -269,7 +269,7 @@ def fwagent_daemon_pid():
 
 def linux_interfaces_count():
     cmd = 'ls -A /sys/class/net | wc -l'
-    count = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).strip()
+    count = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).decode().strip()
     return int(count)
 
 def linux_interfaces_are_configured(expected_count, print_error=True):
@@ -420,16 +420,16 @@ def file_exists(filename, check_size=True):
     return True
 
 def router_is_configured(expected_cfg_dump_filename,
-                         fwagent_py='python /usr/share/flexiwan/agent/fwagent.py',
+                         fwagent_py='python3 /usr/share/flexiwan/agent/fwagent.py',
                          print_error=True):
     # Dumps current agent configuration into temporary file and checks
     # if the dump file is equal to the provided expected dump file.
     actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
     replaced_expected_cfg_dump_filename = expected_cfg_dump_filename + ".replaced.txt"
 
-    dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True)
-    dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True)
-    dump_system = subprocess.check_output("sudo %s show --configuration system" % fwagent_py, shell=True)
+    dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True).decode()
+    dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True).decode()
+    dump_system = subprocess.check_output("sudo %s show --configuration system" % fwagent_py, shell=True).decode()
 
     actual_json = json.loads(dump_configuration)
     if dump_multilink.strip():

@@ -459,9 +459,9 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
 
     # for lte interface, we need to get the current source IP, and not the one stored in DB. The IP may have changed due last 'add-interface' job.
     if fwutils.is_lte_interface_by_dev_id(dev_id):
-        tap = fwutils.dev_id_to_tap(dev_id) if fwutils.vpp_does_run() else None
-        if tap:
-            source = fwutils.get_interface_address(tap)
+        tap_name = fwutils.dev_id_to_tap(dev_id, check_vpp_state=True)
+        if tap_name:
+            source = fwutils.get_interface_address(tap_name)
             if source:
                 src = source.split('/')[0]
                 src_addr = ipaddress.ip_address(src)
@@ -1048,7 +1048,7 @@ def add_tunnel(params):
     """
     cmd_list = []
 
-    encryption_mode = params.get("encryption-mode", "pre-shared-key")
+    encryption_mode = params.get("encryption-mode", "psk")
 
     loop0_ip  = IPNetwork(params['loopback-iface']['addr'])     # 10.100.0.4 / 10.100.0.5
     loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
@@ -1083,7 +1083,7 @@ def add_tunnel(params):
         _add_loop_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=bridge_id, internal=True, loop_cache_key='loop1_sw_if_index')
 
         l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
-        if encryption_mode == "pre-shared-key":
+        if encryption_mode == "psk":
             # Add loop0-bridge-l2gre-ipsec
             _add_loop0_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2)
         elif encryption_mode == "ikev2":
@@ -1165,24 +1165,43 @@ def add_tunnel(params):
         cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "python"
-        cmd['cmd']['descr']   = "preprocess tunnel add"
-        cmd['cmd']['params']  = {
-                        'module': 'fwutils',
-                        'func'  : 'tunnel_change_postprocess',
-                        'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
-        }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "preprocess tunnel remove"
-        cmd['revert']['params'] = {
-                        'module': 'fwutils',
-                        'func'  : 'tunnel_change_postprocess',
-                        'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
-        }
-        cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "tunnel stats add"
+    cmd['cmd']['params']  = {
+                    'module': 'fwtunnel_stats',
+                    'func'  : 'tunnel_stats_add',
+                    'args'  : { 'tunnel_id': params['tunnel-id'], 'loopback_addr': params['loopback-iface']['addr']},
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "tunnel stats remove"
+    cmd['revert']['params'] = {
+                    'module': 'fwtunnel_stats',
+                    'func'  : 'tunnel_stats_remove',
+                    'args'  : { 'tunnel_id': params['tunnel-id']},
+    }
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "preprocess tunnel add"
+    cmd['cmd']['params']  = {
+                    'module': 'fwutils',
+                    'func'  : 'tunnel_change_postprocess',
+                    'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "preprocess tunnel remove"
+    cmd['revert']['params'] = {
+                    'module': 'fwutils',
+                    'func'  : 'tunnel_change_postprocess',
+                    'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
+    }
+    cmd_list.append(cmd)
 
     return cmd_list
 

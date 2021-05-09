@@ -228,6 +228,7 @@ class Fwglobals:
                 'DEV_ID_TO_VPP_TAP_NAME': {},
                 'STUN': {},
                 'SYMMETRIC_NAT': {},
+                'SYMMETRIC_NAT_TUNNELS': {},
                 'VPP_IF_NAME_TO_DEV_ID': {},
                 'LINUX_INTERFACES_BY_NAME': {},
                 'WAN_MONITOR': {
@@ -242,6 +243,7 @@ class Fwglobals:
             self.dev_id_to_vpp_tap_name     = self.db['DEV_ID_TO_VPP_TAP_NAME']
             self.stun_cache                 = self.db['STUN']
             self.sym_nat_cache              = self.db['SYMMETRIC_NAT']
+            self.sym_nat_tunnels_cache      = self.db['SYMMETRIC_NAT_TUNNELS']
             self.vpp_if_name_to_dev_id      = self.db['VPP_IF_NAME_TO_DEV_ID']
             self.linux_interfaces_by_name   = self.db['LINUX_INTERFACES_BY_NAME']
             self.wan_monitor                = self.db['WAN_MONITOR']
@@ -268,6 +270,7 @@ class Fwglobals:
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
         self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
         self.SYSTEM_CHCECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
+        self.REPO_SOURCE_DIR     = '/etc/apt/sources.list.d/'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
         self.DHCP_LOG_FILE       = '/var/log/dhcpd.log'

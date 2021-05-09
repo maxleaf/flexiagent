@@ -447,9 +447,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
             FwCfgRequestHandler._call_simple(self, request, execute, filter)
 
-            if re.match('(add|remove)-tunnel',  req):
-                self._fill_tunnel_stats_dict()
-
         except Exception as e:
             err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
             fwglobals.log.error(err_str)
