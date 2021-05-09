@@ -2521,6 +2521,11 @@ def configure_lte_interface(params):
         # set updated default route
         os.system('route add -net 0.0.0.0 gw %s metric %s' % (gateway, metric))
 
+        # configure dns servers for the interface
+        set_dns_str = ' '.join(map(lambda server: '--set-dns=' + server, ip_config['dns_servers']))
+        if set_dns_str:
+            os.system('systemd-resolve %s --interface %s' % (set_dns_str, nic_name))
+
         clear_linux_interfaces_cache() # remove this code when move ip configuration to netplan
         return (True , None)
     except Exception as e:
@@ -3137,7 +3142,7 @@ def lte_get_ip_configuration(dev_id, key=None, cache=True):
     response = {
         'ip'           : '',
         'gateway'      : '',
-        'dns_servers'  : ''
+        'dns_servers'  : []
     }
     try:
         # try to get it from cache
