@@ -300,26 +300,49 @@ def add_interface(params):
     if bridge_addr:
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "set interface to l2 bridge"
-        cmd['cmd']['params'] =  [
-            { 'substs': [
-                    { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id },
-                    { 'replace':'BRIDGE-ID', 'val_by_func':'iface_addr_to_bridge_id', 'arg':iface_addr },
-                ]
-            },
-            "sudo vppctl set interface l2 bridge VPP-DEV BRIDGE-ID"
-        ]
+        cmd['cmd']['name']    = "sw_interface_set_l2_bridge"
+        cmd['cmd']['descr']   = "add interface %s to bridge" % iface_name
+        cmd['cmd']['params']  = {
+            'substs': [
+                { 'add_param':'rx_sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id }
+                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': iface_addr }
+            ],
+            'enable':1, 'port_type':0
+        }
         cmd['revert'] = {}
-        cmd['revert']['name']   = "exec"
-        cmd['revert']['descr']   = "set interface from bridge to l3"
-        cmd['revert']['params'] =  [
-            { 'substs': [
-                    { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id }
-                ]
-            },
-            "sudo vppctl set interface l3 bridge VPP-DEV"
-        ]
+        cmd['revert']['name']   = 'sw_interface_set_l2_bridge'
+        cmd['revert']['descr']  = "remove interface %s from bridge" % iface_name
+        cmd['revert']['params'] = {
+            'substs': [
+                { 'add_param':'rx_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
+                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': iface_addr }
+            ],
+            'bd_id':bridge_id , 'enable':0
+        }
+
+
+        # cmd = {}
+        # cmd['cmd'] = {}
+        # cmd['cmd']['name']    = "exec"
+        # cmd['cmd']['descr']   = "set interface to l2 bridge"
+        # cmd['cmd']['params'] =  [
+        #     { 'substs': [
+        #             { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id },
+        #             { 'replace':'BRIDGE-ID', 'val_by_func':'iface_addr_to_bridge_id', 'arg':iface_addr },
+        #         ]
+        #     },
+        #     "sudo vppctl set interface l2 bridge VPP-DEV BRIDGE-ID"
+        # ]
+        # cmd['revert'] = {}
+        # cmd['revert']['name']   = "exec"
+        # cmd['revert']['descr']   = "set interface from bridge to l3"
+        # cmd['revert']['params'] =  [
+        #     { 'substs': [
+        #             { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id }
+        #         ]
+        #     },
+        #     "sudo vppctl set interface l3 bridge VPP-DEV"
+        # ]
         cmd_list.append(cmd)
 
     if mtu:

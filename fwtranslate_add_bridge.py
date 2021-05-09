@@ -22,21 +22,23 @@
 
 import fwglobals
 
-def generate_bridge_id():
+def generate_bridge_id(addr):
     """Generate bridge identifier.
 
     :returns: New bridge identifier.
     """
     router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
 
-    if not 'bridge_id' in router_api_db:
-        router_api_db['bridge_id'] = 0
+    if not 'bridges' in router_api_db:
+        router_api_db['bridges'] = {}
 
-    bridge_id = router_api_db['bridge_id']
+    bridge_id = router_api_db['bridges'].get('last_bridge_id', 2000)
     bridge_id += 1
-    if bridge_id >= 16777215: # bridge_id is up to 16 mb in vpp
-        bridge_id = 0
-    router_api_db['bridge_id'] = bridge_id
+    if bridge_id >= 5000: # bridge_id is up to 16 mb in vpp
+        bridge_id = 2000
+
+    router_api_db['bridges']['last_bridge_id'] = bridge_id
+    router_api_db['bridges'][addr] = bridge_id
 
     fwglobals.g.db['router_api'] = router_api_db
     return bridge_id
@@ -50,7 +52,7 @@ def add_bridge(params):
     """
     cmd_list = []
 
-    bridge_id = generate_bridge_id()
+    bridge_id = generate_bridge_id(params['addr'])
 
     ret_attr = 'sw_if_index'
     cache_key = 'loop_bridge_%d' % bridge_id
@@ -65,18 +67,7 @@ def add_bridge(params):
     cmd['revert']['name']       = 'delete_loopback'
     cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ] }
     cmd['revert']['descr']      = "delete loopback interface (id=%d)" % bridge_id
-
-    # cmd = {}
-    # cmd['cmd'] = {}
-    # cmd['cmd']['name']    = "exec"
-    # cmd['cmd']['descr']   = "create loopback interface for a bridge"
-    # cmd['cmd']['params'] =  ["sudo vppctl loop create"]
-    # cmd['revert'] = {}
-    # cmd['revert']['name']   = "exec"
-    # cmd['revert']['descr']   = "remove loopback interface"
-    # cmd['revert']['params'] =  ["sudo vppctl loop delete intfc loop0"]
-    # cmd_list.append(cmd)
-
+    cmd_list.append(cmd)
 
     cmd = {}
     cmd['cmd'] = {}
@@ -90,21 +81,6 @@ def add_bridge(params):
     cmd['revert']['params'] = { 'substs': [ { 'add_param':'rx_sw_if_index', 'val_by_key':cache_key} ],
                               'bd_id':bridge_id , 'enable':0 }
     cmd_list.append(cmd)
-
-
-    # cmd = {}
-    # cmd['cmd'] = {}
-    # cmd['cmd']['name']    = "exec"
-    # cmd['cmd']['descr']   = "set interface to l2 bridge"
-    # cmd['cmd']['params'] =  [
-    #     { 'substs': [
-    #             { 'replace':'VPP-LOOP', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id },
-    #             { 'replace':'BRIDGE-ID', 'val_by_func':'iface_addr_to_bridge_id', 'arg':iface_addr },
-    #         ]
-    #     },
-    #     "sudo vppctl set interface l2 bridge VPP-LOOP %s bvi" % bridge_id
-    # ]
-    # cmd_list.append(cmd)
 
     return cmd_list
 

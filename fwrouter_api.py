@@ -960,6 +960,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Apply router configuration on successful VPP start.
         """
         types = [
+            'add-bridge',
             'add-interface',
             'add-tunnel',
             'add-application',

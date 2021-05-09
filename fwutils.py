@@ -486,6 +486,13 @@ def clear_linux_interfaces_cache():
     with fwglobals.g.cache.lock:
         fwglobals.g.cache.linux_interfaces.clear()
 
+def iface_addr_to_bridge_id(addr):
+    bridges = fwglobals.g.db['router_api'].get('bridges', {})
+    bridge_id = bridges.get(addr)
+    if not bridge_id:
+        raise Exception("iface_addr_to_bridge_id: bridge id can't found")
+    return bridge_id
+
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
 
