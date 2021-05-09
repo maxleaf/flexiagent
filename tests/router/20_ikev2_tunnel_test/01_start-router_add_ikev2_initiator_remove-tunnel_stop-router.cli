@@ -28,6 +28,12 @@
 ,
 {
   "entity":  "agent",
+  "message": "get-device-certificate",
+  "params": {"days": 30, "new": true }
+}
+,
+{
+  "entity":  "agent",
   "message": "add-tunnel",
   "params": {
     "encryption-mode": "ikev2",

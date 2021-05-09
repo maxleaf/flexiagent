@@ -62,6 +62,7 @@ class FwStunWrap:
         """
         self.stun_cache    = fwglobals.g.cache.stun_cache
         self.sym_nat_cache = fwglobals.g.cache.sym_nat_cache
+        self.sym_nat_tunnels_cache = fwglobals.g.cache.sym_nat_tunnels_cache
         self.thread_stun   = None
         self.standalone    = standalone
         self.stun_retry    = 60
@@ -337,6 +338,7 @@ class FwStunWrap:
         update_cache_from_os_timeout = 2 * 60
         send_stun_timeout = 3
         probe_sym_nat_timeout = 30
+        send_sym_nat_timeout = 3
 
         while not fwglobals.g.teardown:
 
@@ -353,6 +355,9 @@ class FwStunWrap:
 
                     # probe tunnels in down state to see if we could find remote edge
                     # address/port from incoming packets for symmetric NAT traversal
+
+                    if slept % send_sym_nat_timeout == 0:
+                        self._send_symmetric_nat()
 
                     if slept % probe_sym_nat_timeout == 0:
                         self._probe_symmetric_nat()
@@ -387,6 +392,8 @@ class FwStunWrap:
         if self.standalone:
             return
 
+        self.sym_nat_tunnels_cache.clear()
+
         tunnels = fwglobals.g.router_cfg.get_tunnels()
 
         if not tunnels:
@@ -402,50 +409,70 @@ class FwStunWrap:
             tunnel_id = tunnel['tunnel-id']
             dev_id = self._get_tunnel_source_dev_id(tunnel_id)
             stats = tunnel_stats.get(tunnel_id)
-            if stats and stats.get('status') == 'down':
-                # Down tunnel found. However, the tunnel might be disconnected due to changes in
-                # source IP address. In that case, the current source address of the tunnel
-                # is no longer valid. To make things safe, we check if the IP address exists
-                # in the system. If it is not, no point on adding it to the STUN cache.
-                if tunnel['src'] not in ips:
-                    fwglobals.log.debug("Tunnel %d is down, but its source address %s was not found in the system"\
-                        %(tunnel_id, tunnel['src']))
-                    continue
-                # If valid IP, check if the IP is part of other connected tunnels. If so,
-                # do not add it to the STUN hash, as it might cause other connected tunnels
-                # with that IP to disconnect. If it is not part of any connected tunnel,
-                # updates its source IP address to the cache of addresses for which
-                # we will send STUN requests.
-                if tunnel['src'] not in ip_up_set:
-                    fwglobals.log.debug("Tunnel %d is down, updating address %s in STUN interfaces cache"\
-                        %(tunnel_id, tunnel['src']))
-                    # Force sending STUN request on behalf of the tunnel's source address
-                    if self.stun_cache.get(dev_id):
-                        self.stun_cache[dev_id]['success'] = False
-                        # it takes around 30 seconds to create a tunnel, so don't
-                        # start sending STUN requests right away
-                        self.stun_cache[dev_id]['send_time'] = time.time() + 30
-                # Assume that remote edge is behind symmetric NAT
-                # Try to discover remote edge ip and port from incoming packets.
-                if self.sym_nat_cache.get(dev_id):
-                    if self.sym_nat_cache[dev_id]['probe_time'] == 0:
-                        fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
-                        self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
-                        self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
-                elif dev_id is not None:
-                    fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
-                    self.sym_nat_cache[dev_id] = {
-                                'local_ip'    : tunnel['src'],
-                                'probe_time'  : time.time() + 25,
-                           }
-                else:
-                    fwglobals.log.debug("Dev is %s for tunnel %d"%(dev_id, tunnel_id))
-            else:
+
+            # If tunnel is UP, skip it while clearing the cache
+            if not stats or stats.get('status') != 'down':
                 if self.stun_cache.get(dev_id):
                     self.stun_cache[dev_id]['success'] = True
                     self.stun_cache[dev_id]['send_time'] = 0
                 if self.sym_nat_cache.get(dev_id):
                     self.sym_nat_cache['probe_time'] = 0
+                continue
+
+            # Down tunnel found. However, the tunnel might be disconnected due to changes in
+            # source IP address. In that case, the current source address of the tunnel
+            # is no longer valid. To make things safe, we check if the IP address exists
+            # in the system. If it is not, no point on adding it to the STUN cache.
+            if tunnel['src'] not in ips:
+                fwglobals.log.debug("Tunnel %d is down, but its source address %s was not found in the system"\
+                    %(tunnel_id, tunnel['src']))
+                continue
+
+            # If valid IP, check if the IP is part of other connected tunnels. If so,
+            # do not add it to the STUN hash, as it might cause other connected tunnels
+            # with that IP to disconnect. If it is not part of any connected tunnel,
+            # updates its source IP address to the cache of addresses for which
+            # we will send STUN requests.
+            if tunnel['src'] not in ip_up_set:
+                fwglobals.log.debug("Tunnel %d is down, updating address %s in STUN interfaces cache"\
+                    %(tunnel_id, tunnel['src']))
+                # Force sending STUN request on behalf of the tunnel's source address
+                if self.stun_cache.get(dev_id):
+                    self.stun_cache[dev_id]['success'] = False
+                    # it takes around 30 seconds to create a tunnel, so don't
+                    # start sending STUN requests right away
+                    self.stun_cache[dev_id]['send_time'] = time.time() + 30
+
+            # Assume that remote edge is behind symmetric NAT
+            # Try to discover remote edge ip and port from incoming packets.
+            if self.sym_nat_cache.get(dev_id):
+                if self.sym_nat_cache[dev_id]['probe_time'] == 0:
+                    fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
+                    self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
+                    self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
+            elif dev_id is not None:
+                fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
+                self.sym_nat_cache[dev_id] = {
+                            'local_ip'    : tunnel['src'],
+                            'probe_time'  : time.time() + 25,
+                        }
+            else:
+                fwglobals.log.debug("Dev is %s for tunnel %d"%(dev_id, tunnel_id))
+
+            # For IKEv2 tunnels, if we are behind symmetric NAT, and if we are IKE responder,
+            # we have to send VxLAN packet to the remote end of the tunnel in order to pinhole the NAT.
+            # Otherwise the remote end, which is IKE initiator, will be not able to intiate the IKE negotiation.
+            encryption_mode = tunnel.get("encryption-mode", "psk")
+            role = tunnel.get("ikev2", {}).get("role", "")
+            if encryption_mode == "ikev2" and role == "responder":
+                fwglobals.log.debug("ikev2 tunnel %d responder side is down on dev %s"%(tunnel_id, dev_id))
+                self.sym_nat_tunnels_cache[tunnel_id] = {
+                            'src'       : tunnel['src'],
+                            'dst'       : tunnel['dst'],
+                            'dstPort'   : tunnel['dstPort'],
+                            'vni'       : self._get_vni(tunnel_id, encryption_mode)
+                        }
+
 
     def _is_useStun(self, dev_id):
         """ check router DB for 'useStun' flag for an interface bus address
@@ -551,3 +578,23 @@ class FwStunWrap:
                         tunnel['dstPort'] = probe_tunnels[vni]["dstPort"]
                         fwglobals.log.debug("Add tunnel: %s" %(tunnel))
                         fwglobals.g.handle_request({'message':'add-tunnel', "params": tunnel})
+
+    def _send_symmetric_nat(self):
+        """ For IKEv2 tunnels, if we are behind symmetric NAT, and if we are IKE responder,
+            we have to send VxLAN packet to the remote end of the tunnel in order to pinhole the NAT.
+            Otherwise the remote end, which is IKE initiator, will be not able to intiate the IKE negotiation.
+        """
+        if not self.sym_nat_tunnels_cache:
+            return
+
+        for tunnel_id, tunnel in self.sym_nat_tunnels_cache.items():
+            src_ip = tunnel['src']
+            src_port = 4789
+            dst_ip = tunnel['dst']
+            dst_port = int(tunnel['dstPort'])
+            dev_name = fwutils.get_interface_name(src_ip)
+            vni = int(tunnel['vni'])
+            vxLanMsgType = '08000000'
+            vxLanReserved = '00'
+            msg = vxLanMsgType + str(vni).zfill(6) + vxLanReserved
+            fwutils.send_udp_packet(src_ip, src_port, dst_ip, dst_port, dev_name, msg)

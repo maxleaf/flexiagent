@@ -126,7 +126,8 @@ def tunnel_stats_test():
 
     with tunnel_stats_global_lock:
         for key in list(tunnel_stats_global.keys()):
-            tunnel_stats_global[key] = tunnel_stats_global_copy[key]
+            if key in tunnel_stats_global_copy:
+                tunnel_stats_global[key] = tunnel_stats_global_copy[key]
 
 def tunnel_stats_get():
     """Return a new tunnel status dictionary.
