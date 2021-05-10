@@ -60,7 +60,7 @@ def add_bridge(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "create_loopback_instance"
-    cmd['cmd']['params']        = { 'is_specified': 1, 'user_instance': bridge_id }
+    cmd['cmd']['params']        = { 'is_specified': 1 }
     cmd['cmd']['cache_ret_val'] = (ret_attr,cache_key)
     cmd['cmd']['descr']         = "create loopback interface (id=%d)" % bridge_id
     cmd['revert'] = {}
@@ -80,6 +80,32 @@ def add_bridge(params):
     cmd['revert']['descr']  = "remove loop interface from bridge %d" % bridge_id
     cmd['revert']['params'] = { 'substs': [ { 'add_param':'rx_sw_if_index', 'val_by_key':cache_key} ],
                               'bd_id':bridge_id , 'enable':0 }
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "set %s to loopback interface in Linux" % params['addr']
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                "sudo ip addr add %s dev DEV-STUB" % (params['addr']) ]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "unset %s from loopback interface in Linux" % params['addr']
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                "sudo ip addr del %s dev DEV-STUB" % (params['addr']) ]
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "UP loopback interface %s in Linux" % params['addr']
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                "sudo ip link set dev DEV-STUB up" ]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "DOWN loopback interface %s in Linux" % params['addr']
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
+                                "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)
 
     return cmd_list
