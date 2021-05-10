@@ -3444,6 +3444,16 @@ def set_default_linux_reverse_path_filter(rpf_value):
         fwglobals.log.debug("RPF set command successfully executed: %s" % (sys_cmd))
     return rc
 
+def set_linux_igmp_max_memberships(value = 4096):
+    """ Set limit to allowed simultaneous multicast group membership (linux default is 20)
+    """
+    sys_cmd = 'sysctl -w net.ipv4.igmp_max_memberships=%d > /dev/null' % (value)
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Set limit of multicast group membership command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Set limit of multicast group membership command successfully executed: %s" % (sys_cmd))
+
 def update_linux_metric(prefix, dev, metric):
     """Invokes 'ip route' commands to update metric on the provide device.
     """
