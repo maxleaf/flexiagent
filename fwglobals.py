@@ -380,6 +380,9 @@ class Fwglobals:
 
         fwutils.set_default_linux_reverse_path_filter(2)  # RPF set to Loose mode
         fwutils.disable_ipv6()
+        # Increase allowed multicast group membership from default 20 to 4096
+        # OSPF need that to be able to discover more neighbors on adjacent links
+        fwutils.set_linux_igmp_max_memberships(4096)
 
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
