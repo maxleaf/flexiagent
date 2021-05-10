@@ -54,6 +54,7 @@ from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
 from fwikev2        import FwIKEv2
+from fwtranslate_add_bridge import generate_bridge_id
 
 
 dpdk = __import__('dpdk-devbind')
@@ -487,11 +488,7 @@ def clear_linux_interfaces_cache():
         fwglobals.g.cache.linux_interfaces.clear()
 
 def iface_addr_to_bridge_id(addr):
-    bridges = fwglobals.g.db['router_api'].get('bridges', {})
-    bridge_id = bridges.get(addr)
-    if not bridge_id:
-        raise Exception("iface_addr_to_bridge_id: bridge id can't found")
-    return bridge_id
+    return generate_bridge_id(addr)
 
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.

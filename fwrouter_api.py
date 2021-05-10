@@ -504,6 +504,12 @@ class FWROUTER_API(FwCfgRequestHandler):
                 return True
             return False
 
+        def _should_restart_router_on_modify_interface(new_params):
+            old_params = self.cfg_db.get_interfaces(dev_id=new_params['dev_id'])[0]
+            if new_params.get('bridge_addr') != old_params.get('bridge_addr'):
+                return True
+            return False
+
 
         (restart_router, reconnect_agent, gateways) = \
         (False,          False,           [])
@@ -514,6 +520,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 reconnect_agent = True
             elif request['message'] == 'modify-interface':
                 reconnect_agent = _should_reconnect_agent_on_modify_interface(request['params'])
+                restart_router = _should_restart_router_on_modify_interface(request['params'])
             elif request['message'] == 'aggregated':
                 for _request in request['params']['requests']:
                     if re.match('(add|remove)-interface', _request['message']):
@@ -522,6 +529,8 @@ class FWROUTER_API(FwCfgRequestHandler):
                     elif _request['message'] == 'modify-interface':
                         if _should_reconnect_agent_on_modify_interface(_request['params']):
                             reconnect_agent = True
+                        if _should_restart_router_on_modify_interface(_request['params']):
+                            restart_router = True
 
         if re.match('(start|stop)-router', request['message']):
             reconnect_agent = True
@@ -733,7 +742,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Than the 'add-X' requests should follow in opposite order:
         #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
         #
-        add_order    = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
+        add_order    = [ 'add-bridge', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')
         remove_order.reverse()
@@ -756,6 +765,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         # It is based on the first appearance of the preprocessor requests.
         #
         indexes = {
+            'remove-bridge'           : -1,
+            'add-bridge'              : -1,
             'remove-interface'        : -1,
             'add-interface'           : -1,
             'remove-application'      : -1,
@@ -911,6 +922,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             fwglobals.g.db['router_api'] = {}
         router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
         router_api_db['sa_id'] = 0
+        router_api_db['bridges'] = {}
         fwglobals.g.db['router_api'] = router_api_db
 
         fwutils.vmxnet3_unassigned_interfaces_up()

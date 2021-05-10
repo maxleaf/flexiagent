@@ -28,14 +28,17 @@ def generate_bridge_id(addr):
     :returns: New bridge identifier.
     """
     router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-
     if not 'bridges' in router_api_db:
         router_api_db['bridges'] = {}
 
-    bridge_id = router_api_db['bridges'].get('last_bridge_id', 2000)
+    bridge_id = router_api_db['bridges'].get(addr)
+    if bridge_id:
+        return bridge_id
+
+    bridge_id = router_api_db['bridges'].get('last_bridge_id', 20000)
     bridge_id += 1
-    if bridge_id >= 5000: # bridge_id is up to 16 mb in vpp
-        bridge_id = 2000
+    if bridge_id >= 25000: # bridge_id is up to 16 mb in vpp
+        bridge_id = 20000
 
     router_api_db['bridges']['last_bridge_id'] = bridge_id
     router_api_db['bridges'][addr] = bridge_id
@@ -56,6 +59,17 @@ def add_bridge(params):
 
     ret_attr = 'sw_if_index'
     cache_key = 'loop_bridge_%d' % bridge_id
+
+    # cmd = {}
+    # cmd['cmd'] = {}
+    # cmd['cmd']['name']      = "bridge_domain_add_del"
+    # cmd['cmd']['params']    = { 'bd_id': bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0}
+    # cmd['cmd']['descr']     = "create bridge"
+    # cmd['revert'] = {}
+    # cmd['revert']['name']   = 'bridge_domain_add_del'
+    # cmd['revert']['params'] = { 'bd_id': bridge_id , 'is_add':0 }
+    # cmd['revert']['descr']  = "delete bridge"
+    # cmd_list.append(cmd)
 
     cmd = {}
     cmd['cmd'] = {}

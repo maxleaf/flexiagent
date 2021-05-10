@@ -80,9 +80,6 @@ def add_interface(params):
     dev_id  = params['dev_id']
 
     iface_addr = params.get('addr', '')
-    iface_addr_bytes = ''
-    if iface_addr:
-        iface_addr_bytes, _ = fwutils.ip_str_to_bytes(iface_addr)
 
     iface_name = fwutils.dev_id_to_linux_if(dev_id)
 
@@ -108,6 +105,8 @@ def add_interface(params):
 
     mtu       = params.get('mtu', None)
     bridge_addr   = params.get('bridge_addr', None)
+    if bridge_addr:
+        iface_addr = bridge_addr
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
@@ -305,7 +304,7 @@ def add_interface(params):
         cmd['cmd']['params']  = {
             'substs': [
                 { 'add_param':'rx_sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': iface_addr }
+                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': bridge_addr }
             ],
             'enable':1, 'port_type':0
         }
@@ -315,7 +314,7 @@ def add_interface(params):
         cmd['revert']['params'] = {
             'substs': [
                 { 'add_param':'rx_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': iface_addr }
+                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': bridge_addr }
             ],
             'enable':0
         }
