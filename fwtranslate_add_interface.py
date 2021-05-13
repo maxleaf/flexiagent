@@ -318,30 +318,6 @@ def add_interface(params):
             ],
             'enable':0
         }
-
-
-        # cmd = {}
-        # cmd['cmd'] = {}
-        # cmd['cmd']['name']    = "exec"
-        # cmd['cmd']['descr']   = "set interface to l2 bridge"
-        # cmd['cmd']['params'] =  [
-        #     { 'substs': [
-        #             { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id },
-        #             { 'replace':'BRIDGE-ID', 'val_by_func':'iface_addr_to_bridge_id', 'arg':iface_addr },
-        #         ]
-        #     },
-        #     "sudo vppctl set interface l2 bridge VPP-DEV BRIDGE-ID"
-        # ]
-        # cmd['revert'] = {}
-        # cmd['revert']['name']   = "exec"
-        # cmd['revert']['descr']   = "set interface from bridge to l3"
-        # cmd['revert']['params'] =  [
-        #     { 'substs': [
-        #             { 'replace':'VPP-DEV', 'val_by_func':'dev_id_to_vpp_if_name', 'arg':dev_id }
-        #         ]
-        #     },
-        #     "sudo vppctl set interface l3 bridge VPP-DEV"
-        # ]
         cmd_list.append(cmd)
 
     if mtu:
