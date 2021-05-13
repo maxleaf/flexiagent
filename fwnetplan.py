@@ -290,7 +290,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             else:
                 ethernets[ifname] = config_section
         else:
-            # This function is called when the VP is running and we do not need to stop it.
+            # This function is called when the VPV is running and we do not need to stop it.
             # Hence, if we want to remove an interface (is_add=0), it doesn't mean that we release if from vpp to Linux control
             # But it stays under vpp control, and tap-inject is enable, and we only need to clean up the interface configuration
             if set_name:
