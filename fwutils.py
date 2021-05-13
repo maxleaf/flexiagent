@@ -244,7 +244,7 @@ def get_default_route(if_name=None):
                     via    = _via
                     metric = _metric
                     proto  = _proto
-                    return (via, dev, dev_id, proto)
+                    return (via, dev, get_interface_dev_id(dev), proto)
 
                 if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
                     dev    = _dev
@@ -1726,7 +1726,7 @@ def modify_dhcpd(is_add, params):
     try:
         output = subprocess.check_output(exec_string, shell=True).decode()
     except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % str(e))
 
     return True
 
@@ -2162,9 +2162,8 @@ def wifi_get_available_networks(dev_id):
     """
     linux_if = dev_id_to_linux_if(dev_id)
 
+    networks = []
     if linux_if:
-        networks = []
-
         def clean(n):
             n = n.replace('"', '')
             n = n.strip()
@@ -3830,7 +3829,7 @@ def get_template_data_by_hw(template_fname):
         # if it does not exist, we will try to get variables for the vendor
         vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
         if vendor_product and vendor_product in info['devices']:
-            data = info['devices'][search]
+            data = info['devices'][vendor_product]
         elif vendor and vendor in info['devices']:
             data = info['devices'][vendor]
         elif product and product in info['devices']:
