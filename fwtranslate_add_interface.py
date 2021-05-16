@@ -481,7 +481,7 @@ def add_interface(params):
         cmd['revert']['name']   = "exec"
         cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
         cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] } ]},
-                                    "sudo arp -d DEV-STUB" ]
+                                    "sudo arp -d DEV-STUB || true" ]
         cmd_list.append(cmd)
 
         cmd = {}
