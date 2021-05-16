@@ -162,7 +162,8 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                 for wan in wan_list:
                     dhcp = wan.get('dhcp', 'no')
-                    if dhcp == 'no':
+                    device_type = wan.get('deviceType')
+                    if dhcp == 'no' or device_type == 'lte':
                         continue
 
                     name = fwutils.dev_id_to_tap(wan['dev_id'])
