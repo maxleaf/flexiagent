@@ -2549,6 +2549,7 @@ def _run_qmicli_command(dev_id, flag, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         qmicli_cmd = 'qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag)
+        fwglobals.log.debug("qmicli command: %s" % qmicli_cmd)
         output = subprocess.check_output(qmicli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
@@ -2564,6 +2565,7 @@ def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         mbimcli_cmd = 'mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd)
+        fwglobals.log.debug("mbimcli command: %s" % mbimcli_cmd)
         output = subprocess.check_output(mbimcli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
@@ -2768,15 +2770,22 @@ def lte_get_pin_state(dev_id):
     return res
 
 def lte_sim_status(dev_id):
-    lines, _ = qmi_get_simcard_status(dev_id)
+    lines, err = qmi_get_simcard_status(dev_id)
+    if err:
+        return (False, err)
+
     for line in lines:
         if 'Card state:' in line:
             state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
-            return state
-    return False
+            return (state, None)
+
+    return (False, None)
 
 def lte_is_sim_inserted(dev_id):
-    return lte_sim_status(dev_id) == "present"
+    status, err = lte_sim_status(dev_id)
+    if err:
+        raise Exception(err)
+    return status == "present"
 
 def get_lte_db_entry(dev_id, key):
     lte_db = fwglobals.g.db.get('lte' ,{})
@@ -2892,54 +2901,70 @@ def mbim_registration_state(dev_id):
 
 def reset_modem(dev_id):
     set_lte_cache(dev_id, 'state', 'resetting')
-    try: # make sure we set 'resetting' cache to false
+    try:
         fwglobals.log.debug('reset_modem: reset starting')
+
         _run_qmicli_command(dev_id,'dms-set-operating-mode=offline')
         _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
-        time.sleep(10)
+        time.sleep(10) # reset operation might take few seconds
         _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
+    
+        # To reapply set-name for LTE interface we have to call netplan apply here
+        netplan_apply("reset_modem")
+
         fwglobals.log.debug('reset_modem: reset finished')
     except Exception:
         pass
+
     set_lte_cache(dev_id, 'state', '')
-    
     # clear wrong PIN cache on reset
     set_lte_db_entry(dev_id, 'wrong_pin', None)
 
 def lte_connect(params, reset=False):
-    # with fwglobals.g.cache.lock:
     dev_id = params['dev_id']
 
     if reset:
         reset_modem(dev_id)
 
-    if not lte_is_sim_inserted(dev_id):
-        qmi_sim_power_off(dev_id)
-        time.sleep(1)
-        qmi_sim_power_on(dev_id)
-        time.sleep(1)
-        inserted = lte_is_sim_inserted(dev_id)
-        if not inserted:
-            return (False, "Sim is not presented")
+    # To avoid wan failover monitor and lte watchdog at this time
+    set_lte_cache(dev_id, 'state', 'connecting')
+
+    # Check If Sim exists
+    try:
+        if not lte_is_sim_inserted(dev_id):
+            qmi_sim_power_off(dev_id)
+            time.sleep(1)
+            qmi_sim_power_on(dev_id)
+            time.sleep(1)
+            inserted = lte_is_sim_inserted(dev_id)
+            if not inserted:
+                raise Exception("Sim is not presented")
+    except Exception as e:
+        set_lte_cache(dev_id, 'state', '')
+        return (False, str(e))
 
     # check PIN status
-    pin_state = lte_get_pin_state(params['dev_id']).get('PIN1_STATUS', 'disabled')
-    if pin_state not in ['disabled', 'enabled-verified']:
-        pin = params.get('pin')
-        if not pin:
-            return (False, "PIN is required")
+    try:
+        pin_state = lte_get_pin_state(dev_id).get('PIN1_STATUS', 'disabled')
+        if pin_state not in ['disabled', 'enabled-verified']:
+            pin = params.get('pin')
+            if not pin:
+                raise Exception("PIN is required")
 
-        # If a user enters a wrong pin, the function will fail, but flexiManage will send three times `sync` jobs.
-        # As a result, the SIM may be locked. So we save the wrong pin in the cache
-        # and we will not try again with this wrong one.
-        wrong_pin = get_lte_db_entry(dev_id, 'wrong_pin')
-        if wrong_pin and wrong_pin == pin:
-            return (False, "PIN is wrong")
+            # If a user enters a wrong pin, the function will fail, but flexiManage will send three times `sync` jobs.
+            # As a result, the SIM may be locked. So we save the wrong pin in the cache
+            # and we will not try again with this wrong one.
+            wrong_pin = get_lte_db_entry(dev_id, 'wrong_pin')
+            if wrong_pin and wrong_pin == pin:
+                raise Exception("PIN is wrong")
 
-        updated_pin_state, err = qmi_verify_pin(dev_id, pin)
-        if err:
-            set_lte_db_entry(dev_id, 'wrong_pin', pin)
-            return (False, "PIN is wrong")
+            _, err = qmi_verify_pin(dev_id, pin)
+            if err:
+                set_lte_db_entry(dev_id, 'wrong_pin', pin)
+                raise Exception("PIN is wrong")
+    except Exception as e:
+        set_lte_cache(dev_id, 'state', '')
+        return (False, str(e))
 
     # at this point, the sim is unblocked.
     # It might be opened from different places so we need to make sure to clear this cache
@@ -2948,9 +2973,8 @@ def lte_connect(params, reset=False):
     try:
         is_modem_connected = mbim_is_connected(dev_id)
         if is_modem_connected:
+            set_lte_cache(dev_id, 'state', '')
             return (True, None)
-
-        set_lte_cache(dev_id, 'state', 'connecting')
 
         if_name = dev_id_to_linux_if(dev_id)
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
@@ -2969,6 +2993,7 @@ def lte_connect(params, reset=False):
         for cmd in mbim_commands:
             lines, err = _run_mbimcli_command(dev_id, cmd, True)
             if err:
+                set_lte_cache(dev_id, 'state', '')
                 return (False, err)
 
 

@@ -324,7 +324,7 @@ class FWAGENT_API:
     def _get_lte_info(self, params):
         interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
-        sim_status = fwutils.lte_sim_status(params['dev_id'])
+        sim_status, _ = fwutils.lte_sim_status(params['dev_id'])
         signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
         hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
         packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])

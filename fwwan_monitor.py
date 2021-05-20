@@ -134,6 +134,8 @@ class FwWanMonitor:
                 server = self._get_server()
                 routes = self._get_routes()
                 for r in routes:
+                    if fwutils.get_lte_cache(r.dev_id, 'state') == 'resetting':
+                        continue
                     self._check_connectivity(r, server)
 
             except Exception as e:
