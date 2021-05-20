@@ -1029,9 +1029,14 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
         remote_loop_mac = remote_loop_cfg['mac']
 
         # ip_neighbor.api.json: _vl_api_ip_neighbor (...)
+        # 
+        # Available flags:
+        #    IP_API_NEIGHBOR_FLAG_NONE         IPNeighborFlags = 0
+	    #    IP_API_NEIGHBOR_FLAG_STATIC       IPNeighborFlags = 1
+	    #    IP_API_NEIGHBOR_FLAG_NO_FIB_ENTRY IPNeighborFlags = 2
         neighbor = {
             'substs':       [ { 'add_param':'sw_if_index', 'val_by_key':loop_cache_key} ],
-            'flags'         : 1, # set for static arp
+            'flags'         : 1,
             'mac_address'   : remote_loop_mac,
             'ip_address'    : remote_loop_ip
         }
