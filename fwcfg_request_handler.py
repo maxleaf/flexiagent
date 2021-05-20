@@ -418,7 +418,7 @@ class FwCfgRequestHandler:
                 else:  # list
                     for (idx, p) in enumerate(params):
                         if type(p) == str:
-                            params.insert(idx, p.replace(old, new))
+                            params.insert(idx, p.replace(old, str(new))) # new variable might be vpp_sw_interface_index which is number, so we stringify it
                             params.remove(p)
             else:
                 raise Exception("fwutils.py.substitute: not supported type of substitution in '%s'" % format(params))
