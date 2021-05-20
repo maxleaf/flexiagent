@@ -219,7 +219,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
 
         if old_ethernets:
             if old_ifname in old_ethernets:
-                config_section = old_ethernets[old_ifname]
+                config_section = dict(old_ethernets[old_ifname])
 
         if 'dhcp6' in config_section:
             del config_section['dhcp6']
@@ -286,6 +286,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 if 'match' in config_section:
                     del config_section['match']
                 ethernets[ifname] = config_section
+
+                if old_ethernets and old_ifname in old_ethernets:
+                    ethernets[old_ifname] = old_ethernets[old_ifname]
             else:
                 ethernets[ifname] = config_section
         else:
