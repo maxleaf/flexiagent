@@ -269,6 +269,12 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     nameservers['search'] = dnsDomains
                     config_section['nameservers'] = nameservers
 
+        # Note, for the LTE interface we have two interfaces.
+        # The physical interface (wwan0) and the vppsb(vppX) interface.
+        # We set the IP configuration only on the vppsb.
+        # But if the user has configured in the netplan file also the LTE with set-name option,
+        # we need to make sure that in any action, of any kind, that set-name will apply to the interface.
+        # Note the comments below in the appropriate places.
         is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
         if is_add == 1:
             if old_ifname in ethernets:
@@ -278,7 +284,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
 
             # set-name with LTE causes issue since the Linux LTE interface is not controlled by dpdk
             # and stay in Linux with the vppsb interface. Our LTE solution is to set the IP on the vppsb, and if we use set-name, it stays down.
-            # We need to set the IP on the vppsb interface and remove the set-name and match sections. 
+            # We need to set the IP on the vppsb interface and remove the set-name and match sections.
             if set_name and not is_lte:
                 ethernets[set_name] = config_section
             elif set_name and is_lte:
@@ -287,6 +293,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     del config_section['match']
                 ethernets[ifname] = config_section
 
+                # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
+                # So for lte with set-name both interfaces should listed in netplan files.
+                # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
                 if old_ethernets and old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]
             else:
@@ -295,6 +304,11 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             if set_name:
                 if set_name in ethernets:
                     del ethernets[set_name]
+
+                # For the LTE interface, the physical interface with the set-name doesn't replace by the vppsb interface.
+                # So we need to remove the vppsb interface and not the physical with set-name.
+                if is_lte and ifname in ethernets:
+                    del ethernets[ifname]
             else:
                 if ifname in ethernets:
                     del ethernets[ifname]
