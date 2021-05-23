@@ -20,6 +20,7 @@
 
 import copy
 import binascii
+import datetime
 import glob
 import hashlib
 import inspect
@@ -4018,3 +4019,12 @@ def send_udp_packet(src_ip, src_port, dst_ip, dst_port, dev_name, msg):
         return
 
     s.close()
+
+def build_timestamped_filename(filename, ext=''):
+    '''Incorporates date and time into the filename in format "%Y%M%d_%H%M%S".
+    Example:
+        build_timestamped_filename("fwdump_EdgeDevice01_", ext='.tar.gz')
+        ->
+        fwdump_EdgeDevice01_20210510_131900.tar.gz
+    '''
+    return filename + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ext
