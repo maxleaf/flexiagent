@@ -328,7 +328,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 #       'mtu': 1500,
                 #       'nameservers': {'addresses': ['91.135.104.8', '91.135.102.8']},
                 #       'routes': [{'metric': 150, 'to': '0.0.0.0/0', 'via': '10.95.246.40'}]},
-                #    'wwan0': {'match': {'macaddress': 'ba:2a:be:44:38:e8'}, 'set-name': 'WANLTE'}}"
+                #    'wwan0': {'match': {'macaddress': 'ba:2a:be:44:38:e8'}, 'set-name': 'WANLTE'}
+                # }
                 # So we need to clear the ip configuration for vpp1, and keep the the set-name on the wwan0
                 if is_lte:
                     if ifname in ethernets:
