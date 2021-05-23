@@ -506,7 +506,6 @@ class FWROUTER_API(FwCfgRequestHandler):
             return False
 
 
-
         (restart_router, reconnect_agent, gateways) = \
         (False,          False,           [])
 

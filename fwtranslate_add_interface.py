@@ -282,7 +282,7 @@ def add_interface(params):
 
     if bridge_addr:
         netplan_params['args']['ip'] = ''
-        netplan_params['args']['dont_check_ip'] = True
+        netplan_params['args']['validate_ip'] = False
 
     cmd = {}
     cmd['cmd'] = {}

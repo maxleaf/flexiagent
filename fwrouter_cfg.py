@@ -89,7 +89,7 @@ class FwRouterCfg(FwCfgDatabase):
                                     #
             'start-router':         "======= START COMMAND =======",
             'add-interface':        "======== INTERFACES ========",
-            'add-bridge':          "======== BRIDGES ========",
+            'add-bridge':           "======== BRIDGES ========",
             'add-route':            "========= ROUTES =========",
             'add-tunnel':           "========== TUNNELS ==========",
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",

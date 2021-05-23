@@ -161,7 +161,7 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, dont_check_ip=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, validate_ip=True):
     '''
     :param metric:  integer (whole number)
     '''
@@ -170,8 +170,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
 
     fwglobals.log.debug(
         "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
-         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, dont_check_ip=%s" %
-        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(dont_check_ip)))
+         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, validate_ip=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(validate_ip)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -290,7 +290,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             else:
                 ethernets[ifname] = config_section
         else:
-            # This function is called when the VPV is running and we do not need to stop it.
+            # This function is called when the VPP is running and we do not need to stop it.
             # Hence, if we want to remove an interface (is_add=0), it doesn't mean that we release if from vpp to Linux control
             # But it stays under vpp control, and tap-inject is enable, and we only need to clean up the interface configuration
             if set_name:
@@ -348,7 +348,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             ifname = fwutils.dev_id_to_tap(dev_id)
             fwglobals.log.debug("Interface name in cache is %s, dev_id %s" % (ifname, dev_id_full))
 
-        if not dont_check_ip: # Failover might be easily caused by interface down so no need to validate IP
+        if validate_ip: # Failover might be easily caused by interface down so no need to validate IP
             if is_add and not _has_ip(ifname, (dhcp=='yes')):
                 raise Exception("ip was not assigned")
 
