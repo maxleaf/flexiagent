@@ -1378,9 +1378,9 @@ class Checker:
                 'libarc4'
             ]
 
-            try:                
-                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHCECKER_LOG_FILE)
-                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
+            try:
+                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHECKER_LOG_FILE)
+                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHECKER_LOG_FILE))
 
                 for module in modules:
                     os.system('rmmod %s 2>/dev/null' % module)

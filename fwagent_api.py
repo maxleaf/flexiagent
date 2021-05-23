@@ -194,7 +194,7 @@ class FWAGENT_API:
             'vpp': fwglobals.g.VPP_LOG_FILE,
             'ospf': fwglobals.g.OSPF_LOG_FILE,
             'hostapd': fwglobals.g.HOSTAPD_LOG_FILE,
-            'agentui': fwglobals.g.AGNET_UI_LOG_FILE
+            'agentui': fwglobals.g.AGENT_UI_LOG_FILE
 	    }
         file = dl_map.get(params['filter'], '')
         try:
