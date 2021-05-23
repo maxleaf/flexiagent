@@ -165,7 +165,53 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
     '''
     :param metric:  integer (whole number)
     '''
-    config_section = {}
+
+    def _set_netplan_section_dhcp(config_section):
+        if 'dhcp6' in config_section:
+            del config_section['dhcp6']
+
+        if re.match('yes', dhcp):
+            if 'addresses' in config_section:
+                del config_section['addresses']
+            if 'routes' in config_section:
+                del config_section['routes']
+            if 'gateway4' in config_section:
+                del config_section['gateway4']
+            if 'nameservers' in config_section:
+                del config_section['nameservers']
+
+            config_section['dhcp4'] = True
+            config_section['dhcp4-overrides'] = {'route-metric': metric}
+        else:
+            config_section['dhcp4'] = False
+            if 'dhcp4-overrides' in config_section:
+                del config_section['dhcp4-overrides']
+            config_section['addresses'] = [ip]
+
+            if gw and type == 'WAN':
+                default_route_found = False
+                routes = config_section.get('routes', [])
+                for route in routes:
+                    if route['to'] == '0.0.0.0/0':
+                        default_route_found = True
+                        route['metric']     = metric
+                        route['via']        = gw
+                        break
+                if not default_route_found:
+                    routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
+                    config_section['routes'] = routes   # Handle case where there is no 'routes' section
+                if 'gateway4' in config_section:
+                    del config_section['gateway4']
+
+                if dnsServers:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['addresses'] = dnsServers
+                    config_section['nameservers'] = nameservers
+                if dnsDomains:
+                    nameservers = config_section.get('nameservers', {})
+                    nameservers['search'] = dnsDomains
+                    config_section['nameservers'] = nameservers
+
     old_ethernets = {}
 
     fwglobals.log.debug(
@@ -217,101 +263,80 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
 
         ethernets = network['ethernets']
 
+        config_section = {}
         if old_ethernets:
             if old_ifname in old_ethernets:
                 config_section = dict(old_ethernets[old_ifname])
 
-        if 'dhcp6' in config_section:
-            del config_section['dhcp6']
-
         if mtu:
             config_section['mtu'] = mtu
 
-        if re.match('yes', dhcp):
-            if 'addresses' in config_section:
-                del config_section['addresses']
-            if 'routes' in config_section:
-                del config_section['routes']
-            if 'gateway4' in config_section:
-                del config_section['gateway4']
-            if 'nameservers' in config_section:
-                del config_section['nameservers']
-
-            config_section['dhcp4'] = True
-            config_section['dhcp4-overrides'] = {'route-metric': metric}
-        else:
-            config_section['dhcp4'] = False
-            if 'dhcp4-overrides' in config_section:
-                del config_section['dhcp4-overrides']
-            config_section['addresses'] = [ip]
-
-            if gw and type == 'WAN':
-                default_route_found = False
-                routes = config_section.get('routes', [])
-                for route in routes:
-                    if route['to'] == '0.0.0.0/0':
-                        default_route_found = True
-                        route['metric']     = metric
-                        route['via']        = gw
-                        break
-                if not default_route_found:
-                    routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
-                    config_section['routes'] = routes   # Handle case where there is no 'routes' section
-                if 'gateway4' in config_section:
-                    del config_section['gateway4']
-
-                if dnsServers:
-                    nameservers = config_section.get('nameservers', {})
-                    nameservers['addresses'] = dnsServers
-                    config_section['nameservers'] = nameservers
-                if dnsDomains:
-                    nameservers = config_section.get('nameservers', {})
-                    nameservers['search'] = dnsDomains
-                    config_section['nameservers'] = nameservers
+        # Configure DHCP related logic
+        _set_netplan_section_dhcp(config_section)
 
         # Note, for the LTE interface we have two interfaces.
         # The physical interface (wwan0) and the vppsb(vppX) interface.
+        # Both of them have the same dev_id, so we return True from `is_lte_interface()` for both of them.
         # We set the IP configuration only on the vppsb.
         # But if the user has configured in the netplan file also the LTE with set-name option,
         # we need to make sure that in any action, of any kind, that set-name will apply to the interface.
         # Note the comments below in the appropriate places.
         is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
+
         if is_add == 1:
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
             if set_name in ethernets:
                 del ethernets[set_name]
 
-            # set-name with LTE causes issue since the Linux LTE interface is not controlled by dpdk
-            # and stay in Linux with the vppsb interface. Our LTE solution is to set the IP on the vppsb, and if we use set-name, it stays down.
-            # We need to set the IP on the vppsb interface and remove the set-name and match sections.
-            if set_name and not is_lte:
-                ethernets[set_name] = config_section
-            elif set_name and is_lte:
-                del config_section['set-name']
-                if 'match' in config_section:
-                    del config_section['match']
-                ethernets[ifname] = config_section
+            # For LTE interface with set-name we need to keep the `set-name` on the physical interface and not for the vppsb (see explanation above)
+            if set_name:
+                if not is_lte:
+                    ethernets[set_name] = config_section
+                else:
+                    del config_section['set-name']
+                    if 'match' in config_section:
+                        del config_section['match']
+                    ethernets[ifname] = config_section
 
                 # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
-                # So for lte with set-name both interfaces should listed in netplan files.
+                # So for lte with set-name both interfaces should be listed in netplan files.
                 # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
                 if old_ethernets and old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]
             else:
                 ethernets[ifname] = config_section
         else:
+            # remove interface
             if set_name:
-                if set_name in ethernets:
-                    del ethernets[set_name]
-
-                # For the LTE interface, the physical interface with the set-name doesn't replace by the vppsb interface.
-                # So we need to remove the vppsb interface and not the physical with set-name.
-                if is_lte and ifname in ethernets:
-                    del ethernets[ifname]
+                # For the LTE interface with set-name,
+                # when we want to remove it from netplan, we have here three variables:
+                #    'set_name' which is the new name for the physical interface(WANLTE)
+                #    'ifname' which is the vppsb interface name (vpp1).
+                #    'old_ifname' which is the original lte interface name (wwan0)
+                #
+                # 'ethernets' at this point looks:
+                # {
+                #   'eno1': ...,
+                #   'eno2': ...,
+                #   'vpp1': {
+                #       'addresses': ['10.95.246.39/28'],
+                #       'dhcp4': False,
+                #       'mtu': 1500,
+                #       'nameservers': {'addresses': ['91.135.104.8', '91.135.102.8']},
+                #       'routes': [{'metric': 150, 'to': '0.0.0.0/0', 'via': '10.95.246.40'}]},
+                #    'wwan0': {'match': {'macaddress': 'ba:2a:be:44:38:e8'}, 'set-name': 'WANLTE'}}"
+                # So we need to clear the ip configuration for vpp1, and keep the the set-name on the wwan0
+                if is_lte:
+                    if ifname in ethernets:
+                        del ethernets[ifname]
+                else:
+                    if set_name in ethernets:
+                        del ethernets[set_name]
             else:
                 if ifname in ethernets:
                     del ethernets[ifname]
+
             if old_ethernets:
                 if old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]

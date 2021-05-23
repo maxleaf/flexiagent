@@ -2549,7 +2549,7 @@ def _run_qmicli_command(dev_id, flag, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         qmicli_cmd = 'qmicli --device=/dev/%s --device-open-proxy --%s' % (device, flag)
-        fwglobals.log.debug("qmicli command: %s" % qmicli_cmd)
+        fwglobals.log.debug("_run_qmicli_command: %s" % qmicli_cmd)
         output = subprocess.check_output(qmicli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
@@ -2565,7 +2565,7 @@ def _run_mbimcli_command(dev_id, cmd, print_error=False):
     try:
         device = dev_id_to_usb_device(dev_id) if dev_id else 'cdc-wdm0'
         mbimcli_cmd = 'mbimcli --device=/dev/%s --device-open-proxy %s' % (device, cmd)
-        fwglobals.log.debug("mbimcli command: %s" % mbimcli_cmd)
+        fwglobals.log.debug("_run_mbimcli_command: %s" % mbimcli_cmd)
         output = subprocess.check_output(mbimcli_cmd, shell=True, stderr=subprocess.STDOUT).decode()
         if output:
             return (output.splitlines(), None)
@@ -2772,19 +2772,17 @@ def lte_get_pin_state(dev_id):
 def lte_sim_status(dev_id):
     lines, err = qmi_get_simcard_status(dev_id)
     if err:
-        return (False, err)
+        raise Exception(err)
 
+    state = ''
     for line in lines:
         if 'Card state:' in line:
             state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
-            return (state, None)
-
-    return (False, None)
+            break
+    return state
 
 def lte_is_sim_inserted(dev_id):
-    status, err = lte_sim_status(dev_id)
-    if err:
-        raise Exception(err)
+    status = lte_sim_status(dev_id)
     return status == "present"
 
 def get_lte_db_entry(dev_id, key):
@@ -2908,7 +2906,7 @@ def reset_modem(dev_id):
         _run_qmicli_command(dev_id,'dms-set-operating-mode=reset')
         time.sleep(10) # reset operation might take few seconds
         _run_qmicli_command(dev_id,'dms-set-operating-mode=online')
-    
+
         # To reapply set-name for LTE interface we have to call netplan apply here
         netplan_apply("reset_modem")
 
@@ -2920,17 +2918,14 @@ def reset_modem(dev_id):
     # clear wrong PIN cache on reset
     set_lte_db_entry(dev_id, 'wrong_pin', None)
 
-def lte_connect(params, reset=False):
+def lte_connect(params):
     dev_id = params['dev_id']
-
-    if reset:
-        reset_modem(dev_id)
 
     # To avoid wan failover monitor and lte watchdog at this time
     set_lte_cache(dev_id, 'state', 'connecting')
 
-    # Check If Sim exists
     try:
+        # check if sim exists
         if not lte_is_sim_inserted(dev_id):
             qmi_sim_power_off(dev_id)
             time.sleep(1)
@@ -2939,12 +2934,8 @@ def lte_connect(params, reset=False):
             inserted = lte_is_sim_inserted(dev_id)
             if not inserted:
                 raise Exception("Sim is not presented")
-    except Exception as e:
-        set_lte_cache(dev_id, 'state', '')
-        return (False, str(e))
 
-    # check PIN status
-    try:
+        # check PIN status
         pin_state = lte_get_pin_state(dev_id).get('PIN1_STATUS', 'disabled')
         if pin_state not in ['disabled', 'enabled-verified']:
             pin = params.get('pin')
@@ -2962,15 +2953,13 @@ def lte_connect(params, reset=False):
             if err:
                 set_lte_db_entry(dev_id, 'wrong_pin', pin)
                 raise Exception("PIN is wrong")
-    except Exception as e:
-        set_lte_cache(dev_id, 'state', '')
-        return (False, str(e))
 
-    # at this point, the sim is unblocked.
-    # It might be opened from different places so we need to make sure to clear this cache
-    set_lte_db_entry(dev_id, 'wrong_pin', None)
+        # At this point, we sure that the sim is unblocked.
+        # After a block, the sim might open it from different places (manually qmicli command, for example),
+        # so we need to make sure to clear this cache
+        set_lte_db_entry(dev_id, 'wrong_pin', None)
 
-    try:
+        # Check if modem already connected to ISP.
         is_modem_connected = mbim_is_connected(dev_id)
         if is_modem_connected:
             set_lte_cache(dev_id, 'state', '')
@@ -2979,7 +2968,7 @@ def lte_connect(params, reset=False):
         if_name = dev_id_to_linux_if(dev_id)
         set_lte_cache(dev_id, 'if_name', dev_id_to_linux_if(dev_id))
 
-        # make sure context is released and set the interface up
+        # Make sure context is released and set the interface to up
         lte_disconnect(dev_id)
         os.system('ifconfig %s up' % if_name)
 
@@ -2993,9 +2982,7 @@ def lte_connect(params, reset=False):
         for cmd in mbim_commands:
             lines, err = _run_mbimcli_command(dev_id, cmd, True)
             if err:
-                set_lte_cache(dev_id, 'state', '')
-                return (False, err)
-
+                raise Exception(err)
 
         for idx, line in enumerate(lines) :
             if 'Session ID:' in line:
@@ -3020,8 +3007,6 @@ def lte_connect(params, reset=False):
         return (True, None)
     except Exception as e:
         fwglobals.log.debug('lte_connect: faild to connect lte. %s' % str(e))
-        if not reset:
-            return lte_connect(params, True)
         set_lte_cache(dev_id, 'state', '')
         return (False, "Exception: %s" % str(e))
 
