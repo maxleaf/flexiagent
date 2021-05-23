@@ -60,16 +60,16 @@ def add_bridge(params):
     ret_attr = 'sw_if_index'
     cache_key = 'loop_bridge_%d' % bridge_id
 
-    # cmd = {}
-    # cmd['cmd'] = {}
-    # cmd['cmd']['name']      = "bridge_domain_add_del"
-    # cmd['cmd']['params']    = { 'bd_id': bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0}
-    # cmd['cmd']['descr']     = "create bridge"
-    # cmd['revert'] = {}
-    # cmd['revert']['name']   = 'bridge_domain_add_del'
-    # cmd['revert']['params'] = { 'bd_id': bridge_id , 'is_add':0 }
-    # cmd['revert']['descr']  = "delete bridge"
-    # cmd_list.append(cmd)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "bridge_domain_add_del"
+    cmd['cmd']['params']    = { 'bd_id': bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0}
+    cmd['cmd']['descr']     = "create bridge"
+    cmd['revert'] = {}
+    cmd['revert']['name']   = 'bridge_domain_add_del'
+    cmd['revert']['params'] = { 'bd_id': bridge_id , 'is_add':0 }
+    cmd['revert']['descr']  = "delete bridge"
+    cmd_list.append(cmd)
 
     cmd = {}
     cmd['cmd'] = {}

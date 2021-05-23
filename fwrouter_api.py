@@ -505,11 +505,6 @@ class FWROUTER_API(FwCfgRequestHandler):
                 return True
             return False
 
-        def _should_restart_router_on_modify_interface(new_params):
-            old_params = self.cfg_db.get_interfaces(dev_id=new_params['dev_id'])[0]
-            if new_params.get('bridge_addr') != old_params.get('bridge_addr'):
-                return True
-            return False
 
 
         (restart_router, reconnect_agent, gateways) = \
@@ -521,7 +516,6 @@ class FWROUTER_API(FwCfgRequestHandler):
                 reconnect_agent = True
             elif request['message'] == 'modify-interface':
                 reconnect_agent = _should_reconnect_agent_on_modify_interface(request['params'])
-                restart_router = _should_restart_router_on_modify_interface(request['params'])
             elif request['message'] == 'aggregated':
                 for _request in request['params']['requests']:
                     if re.match('(add|remove)-interface', _request['message']):
@@ -530,8 +524,6 @@ class FWROUTER_API(FwCfgRequestHandler):
                     elif _request['message'] == 'modify-interface':
                         if _should_reconnect_agent_on_modify_interface(_request['params']):
                             reconnect_agent = True
-                        if _should_restart_router_on_modify_interface(_request['params']):
-                            restart_router = True
 
         if re.match('(start|stop)-router', request['message']):
             reconnect_agent = True
@@ -608,37 +600,6 @@ class FWROUTER_API(FwCfgRequestHandler):
                 else:
                     new_requests.append(_request)
             params['requests'] = new_requests
-
-
-
-        # def _preprocess_bridge(incoming_interfaces_requests):
-        #     # Combine incoming interfaces with existsing one
-        #     interfaces = self.cfg_db.get_interfaces()
-        #     interfaces += incoming_interfaces_requests
-
-        #     a = 'a'
-
-        #     if interfaces:
-        #         a = 'a'
-        #     return request
-
-        # if re.match('(add|remove|modify)interface', req):
-        #     requests = _preprocess_bridge([request['params']])
-        # elif req == 'aggregated':
-        #     interfaces_requests = []
-        #     new_requests = []
-        #     for _request in params['requests']:
-        #         if re.match('add-interface', _request['message']):
-        #             interfaces_requests.append(_request['params'])
-        #         else:
-        #             new_requests.append(_request)
-
-        #     if interfaces_requests:
-        #         new_requests += _preprocess_bridge(interfaces_requests)
-
-        #     params['requests'] = new_requests
-
-
 
         # For aggregated request go over all remove-X requests and replace their
         # parameters with current configuration for X stored in database.
