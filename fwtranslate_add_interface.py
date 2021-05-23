@@ -124,6 +124,11 @@ def add_interface(params):
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "create tap interface in vpp and linux"
         cmd['cmd']['params']  = ["sudo vppctl create tap host-if-name %s" % fwutils.generate_linux_interface_short_name("tap", iface_name)]
+        cmd['revert'] = {}
+        cmd['revert']['name']    = "exec"
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]},
+                                        "sudo vppctl delete tap sw_if_index DEV-TAP" ]
+        cmd['revert']['descr']  = "delete tap interface in vpp and linux"
         cmd_list.append(cmd)
 
         if is_wifi:
@@ -218,7 +223,7 @@ def add_interface(params):
             cmd['revert'] = {}
             cmd['revert']['name']   = "exec"
             cmd['revert']['descr']  = "Down interface %s in Linux" % iface_name
-            cmd['revert']['params'] = [ "sudo ip link set dev %s down" %  iface_name]
+            cmd['revert']['params'] = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" %  (iface_name, iface_name)]
             cmd_list.append(cmd)
 
             # connect the modem to the cellular provider
