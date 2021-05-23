@@ -2774,7 +2774,6 @@ def lte_sim_status(dev_id):
     if err:
         raise Exception(err)
 
-    state = ''
     for line in lines:
         if 'Card state:' in line:
             state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
@@ -2793,9 +2792,9 @@ def get_lte_db_entry(dev_id, key):
 
 def set_lte_db_entry(dev_id, key, value):
     lte_db = fwglobals.g.db.get('lte' ,{})
-    dev_id_entry = lte_db.get(dev_id ,{})   
+    dev_id_entry = lte_db.get(dev_id ,{})
     dev_id_entry[key] = value
-    
+
     lte_db[dev_id] = dev_id_entry
     fwglobals.g.db['lte'] = lte_db # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
 
