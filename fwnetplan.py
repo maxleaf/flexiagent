@@ -298,8 +298,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     ethernets[set_name] = config_section
                 else:
                     del config_section['set-name']
-                    if 'match' in config_section:
-                        del config_section['match']
+                    del config_section['match'] # set-name requires 'match' property
                     ethernets[ifname] = config_section
 
                 # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
