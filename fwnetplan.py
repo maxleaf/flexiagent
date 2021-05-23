@@ -161,56 +161,59 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
+def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsServers, dnsDomains):
+    if 'dhcp6' in config_section:
+        del config_section['dhcp6']
+
+    if re.match('yes', dhcp):
+        if 'addresses' in config_section:
+            del config_section['addresses']
+        if 'routes' in config_section:
+            del config_section['routes']
+        if 'gateway4' in config_section:
+            del config_section['gateway4']
+        if 'nameservers' in config_section:
+            del config_section['nameservers']
+
+        config_section['dhcp4'] = True
+        config_section['dhcp4-overrides'] = {'route-metric': metric}
+        return config_section
+
+    # Static IP
+    config_section['dhcp4'] = False
+    if 'dhcp4-overrides' in config_section:
+        del config_section['dhcp4-overrides']
+    config_section['addresses'] = [ip]
+
+    if gw and type == 'WAN':
+        default_route_found = False
+        routes = config_section.get('routes', [])
+        for route in routes:
+            if route['to'] == '0.0.0.0/0':
+                default_route_found = True
+                route['metric']     = metric
+                route['via']        = gw
+                break
+        if not default_route_found:
+            routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
+            config_section['routes'] = routes   # Handle case where there is no 'routes' section
+        if 'gateway4' in config_section:
+            del config_section['gateway4']
+
+        if dnsServers:
+            nameservers = config_section.get('nameservers', {})
+            nameservers['addresses'] = dnsServers
+            config_section['nameservers'] = nameservers
+        if dnsDomains:
+            nameservers = config_section.get('nameservers', {})
+            nameservers['search'] = dnsDomains
+            config_section['nameservers'] = nameservers
+    return config_section
+
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
-
-    def _set_netplan_section_dhcp(config_section):
-        if 'dhcp6' in config_section:
-            del config_section['dhcp6']
-
-        if re.match('yes', dhcp):
-            if 'addresses' in config_section:
-                del config_section['addresses']
-            if 'routes' in config_section:
-                del config_section['routes']
-            if 'gateway4' in config_section:
-                del config_section['gateway4']
-            if 'nameservers' in config_section:
-                del config_section['nameservers']
-
-            config_section['dhcp4'] = True
-            config_section['dhcp4-overrides'] = {'route-metric': metric}
-        else:
-            config_section['dhcp4'] = False
-            if 'dhcp4-overrides' in config_section:
-                del config_section['dhcp4-overrides']
-            config_section['addresses'] = [ip]
-
-            if gw and type == 'WAN':
-                default_route_found = False
-                routes = config_section.get('routes', [])
-                for route in routes:
-                    if route['to'] == '0.0.0.0/0':
-                        default_route_found = True
-                        route['metric']     = metric
-                        route['via']        = gw
-                        break
-                if not default_route_found:
-                    routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
-                    config_section['routes'] = routes   # Handle case where there is no 'routes' section
-                if 'gateway4' in config_section:
-                    del config_section['gateway4']
-
-                if dnsServers:
-                    nameservers = config_section.get('nameservers', {})
-                    nameservers['addresses'] = dnsServers
-                    config_section['nameservers'] = nameservers
-                if dnsDomains:
-                    nameservers = config_section.get('nameservers', {})
-                    nameservers['search'] = dnsDomains
-                    config_section['nameservers'] = nameservers
 
     old_ethernets = {}
 
@@ -272,14 +275,14 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             config_section['mtu'] = mtu
 
         # Configure DHCP related logic
-        _set_netplan_section_dhcp(config_section)
+        config_section = _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsServers, dnsDomains)
 
         # Note, for the LTE interface we have two interfaces.
         # The physical interface (wwan0) and the vppsb(vppX) interface.
         # Both of them have the same dev_id, so we return True from `is_lte_interface()` for both of them.
         # We set the IP configuration only on the vppsb.
         # But if the user has configured in the netplan file also the LTE with set-name option,
-        # we need to make sure that in any action, of any kind, that set-name will apply to the interface.
+        # we need to make sure that in any action, of any kind, that set-name will apply to the physical interface.
         # Note the comments below in the appropriate places.
         is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
 

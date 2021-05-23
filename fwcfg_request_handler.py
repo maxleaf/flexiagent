@@ -416,7 +416,7 @@ class FwCfgRequestHandler:
                 if type(params) is dict:
                     raise Exception("fwutils.py:substitute: 'replace' is not supported for dictionary in '%s'" % format(params))
                 else:  # list
-                    for (idx, p) in enumerate(params):
+                    for (idx, p) in list(enumerate(params)):
                         if type(p) == str:
                             params.insert(idx, p.replace(old, str(new))) # new variable might be vpp_sw_interface_index which is number, so we stringify it
                             params.remove(p)

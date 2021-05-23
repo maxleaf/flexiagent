@@ -2778,8 +2778,9 @@ def lte_sim_status(dev_id):
     for line in lines:
         if 'Card state:' in line:
             state = line.split(':')[-1].strip().replace("'", '').split(' ')[0]
-            break
-    return state
+            return state
+    return ''
+
 
 def lte_is_sim_inserted(dev_id):
     status = lte_sim_status(dev_id)
