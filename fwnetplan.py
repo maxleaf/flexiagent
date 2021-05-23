@@ -185,29 +185,32 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         del config_section['dhcp4-overrides']
     config_section['addresses'] = [ip]
 
-    if gw and type == 'WAN':
-        default_route_found = False
-        routes = config_section.get('routes', [])
-        for route in routes:
-            if route['to'] == '0.0.0.0/0':
-                default_route_found = True
-                route['metric']     = metric
-                route['via']        = gw
-                break
-        if not default_route_found:
-            routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
-            config_section['routes'] = routes   # Handle case where there is no 'routes' section
-        if 'gateway4' in config_section:
-            del config_section['gateway4']
+    if not gw or type != 'WAN':
+        return config_section
 
-        if dnsServers:
-            nameservers = config_section.get('nameservers', {})
-            nameservers['addresses'] = dnsServers
-            config_section['nameservers'] = nameservers
-        if dnsDomains:
-            nameservers = config_section.get('nameservers', {})
-            nameservers['search'] = dnsDomains
-            config_section['nameservers'] = nameservers
+    # WAN interface configuration
+    default_route_found = False
+    routes = config_section.get('routes', [])
+    for route in routes:
+        if route['to'] == '0.0.0.0/0':
+            default_route_found = True
+            route['metric']     = metric
+            route['via']        = gw
+            break
+    if not default_route_found:
+        routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
+        config_section['routes'] = routes   # Handle case where there is no 'routes' section
+    if 'gateway4' in config_section:
+        del config_section['gateway4']
+
+    if dnsServers:
+        nameservers = config_section.get('nameservers', {})
+        nameservers['addresses'] = dnsServers
+        config_section['nameservers'] = nameservers
+    if dnsDomains:
+        nameservers = config_section.get('nameservers', {})
+        nameservers['search'] = dnsDomains
+        config_section['nameservers'] = nameservers
     return config_section
 
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
