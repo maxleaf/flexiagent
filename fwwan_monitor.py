@@ -335,9 +335,9 @@ class FwWanMonitor:
             # in order to handle cases, where the interface is being modified under our legs.
             #
             try:
-                name = fwutils.dev_id_to_linux_if(route.dev_id)
+                name = fwutils.dev_id_to_tap(route.dev_id) # as vpp runs we fetch ip from taps
                 if not name:
-                    name = fwutils.dev_id_to_tap(route.dev_id)
+                    name = route.dev
 
                 ip   = fwutils.get_interface_address(name, log=False)
                 (via, dev, dev_id, proto) = fwutils.get_default_route(name)

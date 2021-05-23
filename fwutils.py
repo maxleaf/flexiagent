@@ -245,7 +245,7 @@ def get_default_route(if_name=None):
                     via    = _via
                     metric = _metric
                     proto  = _proto
-                    return (via, dev, dev_id, proto)
+                    return (via, dev, get_interface_dev_id(dev), proto)
 
                 if _metric < metric:  # The default route among default routes is the one with the lowest metric :)
                     dev    = _dev
@@ -628,28 +628,42 @@ def get_interface_dev_id(if_name):
         interface.update({'dev_id': dev_id})
         return dev_id
 
-def build_interface_dev_id(if_name):
-    """Convert Linux interface name into bus address.
+def build_interface_dev_id(linux_dev_name, sys_class_net=None):
+    """Converts Linux interface name into bus address.
     This function returns dev_id only for physical interfaces controlled by linux.
 
-    :param if_name:      Linux interface name.
+    :param linux_dev_name:     Linux device name.
+    :param sys_class_net:      List of available networking devices formatted as output of the 'ls -l /sys/class/net' command.
+                               This parameter is used for tests.
 
     :returns: dev_id or None if interface was created by vppsb
     """
-    dev_id = ""
-    if if_name:
+    if not linux_dev_name:
+        return ""
+
+    if sys_class_net is None:
+        cmd = "sudo ls -l /sys/class/net"
         try:
-            if_addr_line = subprocess.check_output("sudo ls -l /sys/class/net/ | grep %s" % if_name, shell=True).decode()
-            regex = r'[0-9A-Fa-f]{4}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{1,2}|usb\d+\/.*(?=\/net)'
-            if_addr = re.findall(regex, if_addr_line)
-            if if_addr:
-                if_addr = if_addr[-1]
-                if re.search(r'usb|pci', if_addr_line):
-                    dev_id = dev_id_add_type(if_addr)
-                    dev_id = dev_id_to_full(dev_id)
+            out = subprocess.check_output(cmd, shell=True).decode()
+            sys_class_net = out.splitlines()
         except Exception as e:
-            pass
-    return dev_id
+            fwglobals.log.error('build_interface_dev_id: failed to fetch networking devices: %s' % str(e))
+            return ""
+
+    for networking_device in sys_class_net:
+        regex = r'\b%s\b' % linux_dev_name
+        if not re.search(regex, networking_device):
+            continue
+        regex = r'[0-9A-Fa-f]{4}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}\.[0-9A-Fa-f]{1,2}|usb\d+\/.*(?=\/net)'
+        if_addr = re.findall(regex, networking_device)
+        if if_addr:
+            if_addr = if_addr[-1]
+            if re.search(r'usb|pci', networking_device):
+                dev_id = dev_id_add_type(if_addr)
+                dev_id = dev_id_to_full(dev_id)
+                return dev_id
+
+    return ""
 
 def dev_id_to_linux_if(dev_id):
     """Convert device bus address into Linux interface name.
@@ -762,12 +776,12 @@ def _build_dev_id_to_vpp_if_name_maps(dev_id, vpp_if_name):
     # the commands "create tap host-if-name tap_wwan0" and "enable tap-inject" create three interfaces:
     # Two on Linux (tap_wwan0, vpp1) and one on vpp (tap1).
     # Note, we use "tap_" prefix in "tap_wwan0" in order to be able to associate the wwan0 physical interface
-    # with the tap1 interface. This is done as follows:    
+    # with the tap1 interface. This is done as follows:
     # Then we can substr the dev_name and get back the linux interface name. Then we can get the dev_id of this interface.
     #
     taps = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_tap_v2_dump()
     for tap in taps:
-        vpp_tap = tap.dev_name                      # fetch tap0                 
+        vpp_tap = tap.dev_name                      # fetch tap0
         linux_tap = tap.host_if_name                # fetch tap_wwan0
         linux_dev_name = linux_tap.split('_')[-1]   # tap_wwan0 - > wwan0
 
@@ -1730,7 +1744,7 @@ def modify_dhcpd(is_add, params):
     try:
         output = subprocess.check_output(exec_string, shell=True).decode()
     except Exception as e:
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % str(e))
 
     return True
 
@@ -2166,9 +2180,8 @@ def wifi_get_available_networks(dev_id):
     """
     linux_if = dev_id_to_linux_if(dev_id)
 
+    networks = []
     if linux_if:
-        networks = []
-
         def clean(n):
             n = n.replace('"', '')
             n = n.strip()
@@ -3834,7 +3847,7 @@ def get_template_data_by_hw(template_fname):
         # if it does not exist, we will try to get variables for the vendor
         vendor_product = '%s__%s' % (vendor, product.replace(" ", "_"))
         if vendor_product and vendor_product in info['devices']:
-            data = info['devices'][search]
+            data = info['devices'][vendor_product]
         elif vendor and vendor in info['devices']:
             data = info['devices'][vendor]
         elif product and product in info['devices']:
