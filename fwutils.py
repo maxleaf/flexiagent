@@ -611,19 +611,33 @@ def get_interface_dev_id(if_name):
 
         # First try to get dev id if interface is under linux control
         dev_id = build_interface_dev_id(if_name)
+        if dev_id:
+            interface.update({'dev_id': dev_id})
+            return dev_id
 
-        # If not found, try to fetch dev id if interface was created by vppsb, e.g. vpp1
-        if not dev_id and vpp_does_run():
-            vpp_if_name = tap_to_vpp_if_name(if_name)
-            if vpp_if_name and not re.match(r'^loop', vpp_if_name): # loopback interfaces have no dev id (bus id)
-                dev_id = vpp_if_name_to_dev_id(vpp_if_name)
-                if not dev_id:
-                    fwglobals.log.error(
-                        'get_interface_dev_id: if_name=%s, vpp_if_name=%s, dev_id=%s' %
-                        (if_name, str(vpp_if_name), str(dev_id)))
+        if not vpp_does_run():
+            # don't update cache
+            return ''
 
-        interface.update({'dev_id': dev_id})
-        return dev_id
+        # If not found and vpp is running, try to fetch dev id if interface was created by vppsb, e.g. vpp1
+        vpp_if_name = tap_to_vpp_if_name(if_name)
+        if not vpp_if_name:
+            # don't update cache
+            return ''
+
+        if re.match(r'^loop', vpp_if_name): # loopback interfaces have no dev id (bus id)
+            interface.update({'dev_id': ''})
+            return ''
+
+        dev_id = vpp_if_name_to_dev_id(vpp_if_name)
+        if dev_id:
+            interface.update({'dev_id': dev_id})
+            return dev_id
+
+        fwglobals.log.error(
+            'get_interface_dev_id: if_name=%s, vpp_if_name=%s' % (if_name, str(vpp_if_name)))
+        # don't update cache
+        return ''
 
 def build_interface_dev_id(linux_dev_name, sys_class_net=None):
     """Converts Linux interface name into bus address.
