@@ -317,7 +317,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 if old_ethernets and old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]
 
-                    # On vpp runs, we don't need the nameservers on the physical interface but on vppsb
+                    # When vpp runs, we don't need the nameservers on the physical interface but the vppsb
                     if 'nameservers' in ethernets[old_ifname]:
                         del ethernets[old_ifname]['nameservers']
             else:
