@@ -165,6 +165,15 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
     if 'dhcp6' in config_section:
         del config_section['dhcp6']
 
+    if dnsServers:
+        nameservers = config_section.get('nameservers', {})
+        nameservers['addresses'] = dnsServers
+        config_section['nameservers'] = nameservers
+    if dnsDomains:
+        nameservers = config_section.get('nameservers', {})
+        nameservers['search'] = dnsDomains
+        config_section['nameservers'] = nameservers
+
     if re.match('yes', dhcp):
         if 'addresses' in config_section:
             del config_section['addresses']
@@ -172,11 +181,17 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
             del config_section['routes']
         if 'gateway4' in config_section:
             del config_section['gateway4']
-        if 'nameservers' in config_section:
-            del config_section['nameservers']
 
         config_section['dhcp4'] = True
         config_section['dhcp4-overrides'] = {'route-metric': metric}
+
+        # Override DNS info received from DHCP server
+        if dnsServers:
+            config_section['dhcp4-overrides']['use-dns'] = False
+        else:
+            if 'nameservers' in config_section:
+                del config_section['nameservers']
+
         return config_section
 
     # Static IP
@@ -203,14 +218,6 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
     if 'gateway4' in config_section:
         del config_section['gateway4']
 
-    if dnsServers:
-        nameservers = config_section.get('nameservers', {})
-        nameservers['addresses'] = dnsServers
-        config_section['nameservers'] = nameservers
-    if dnsDomains:
-        nameservers = config_section.get('nameservers', {})
-        nameservers['search'] = dnsDomains
-        config_section['nameservers'] = nameservers
     return config_section
 
 def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
@@ -309,6 +316,10 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
                 if old_ethernets and old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]
+
+                    # On vpp runs, we don't need the nameservers on the physical interface but on vppsb
+                    if 'nameservers' in ethernets[old_ifname]:
+                        del ethernets[old_ifname]['nameservers']
             else:
                 ethernets[ifname] = config_section
         else:

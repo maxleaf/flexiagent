@@ -102,8 +102,6 @@ def add_interface(params):
     int_type  = params.get('type', None)
 
     dnsServers  = params.get('dnsServers', [])
-    if len(dnsServers) == 0:
-        dnsServers = ['8.8.8.8', '8.8.4.4']
     dnsDomains  = params.get('dnsDomains', None)
 
     mtu       = params.get('mtu', None)
@@ -282,8 +280,11 @@ def add_interface(params):
         netplan_params['substs'] = [
             { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
             { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] },
-            { 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] }
         ]
+
+        # If a user doesn't configure static dns servers, we use the servers received from ISP
+        if len(dnsServers) == 0:
+            netplan_params['substs'].append({ 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] })
 
     cmd = {}
     cmd['cmd'] = {}

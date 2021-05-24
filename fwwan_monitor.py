@@ -356,10 +356,7 @@ class FwWanMonitor:
 
                 ifc = db_if[0] if db_if else {}
                 mtu = ifc.get('mtu')
-
                 dnsServers  = ifc.get('dnsServers', [])
-                if len(dnsServers) == 0:
-                    dnsServers = ['8.8.8.8', '8.8.4.4']
                 dnsDomains  = ifc.get('dnsDomains', None)
 
                 (success, err_str) = fwnetplan.add_remove_netplan_interface(\

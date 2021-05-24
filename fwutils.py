@@ -2534,7 +2534,8 @@ def configure_lte_interface(params):
         # set updated default route
         os.system('route add -net 0.0.0.0 gw %s metric %s' % (gateway, metric))
 
-        # configure dns servers for the interface
+        # configure dns servers for the interface.
+        # If the LTE interface is configure in netplan, the user must set the dns servers manually in netplan.
         set_dns_str = ' '.join(map(lambda server: '--set-dns=' + server, ip_config['dns_servers']))
         if set_dns_str:
             os.system('systemd-resolve %s --interface %s' % (set_dns_str, nic_name))
