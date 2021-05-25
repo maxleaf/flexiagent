@@ -120,7 +120,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/fwagent.py",
             "args": [
-                "daemon",  "--dont_connect"
+                "daemon", "--dont_connect"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
