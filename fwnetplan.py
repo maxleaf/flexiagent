@@ -165,13 +165,12 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
     if 'dhcp6' in config_section:
         del config_section['dhcp6']
 
+    nameservers = config_section.get('nameservers', {})
     if dnsServers:
-        nameservers = config_section.get('nameservers', {})
         nameservers['addresses'] = dnsServers
         config_section['nameservers'] = nameservers
 
     if dnsDomains:
-        nameservers = config_section.get('nameservers', {})
         nameservers['search'] = dnsDomains
         config_section['nameservers'] = nameservers
 
@@ -186,27 +185,25 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         config_section['dhcp4'] = True
         config_section['dhcp4-overrides'] = {'route-metric': metric}
 
-        # If a user doesn't specificed static DNS servers and domains, use DNS that received from dhcp
-        name_servers = True if 'nameservers' in config_section else False
-        addresses = True if name_servers and 'addresses' in config_section['nameservers'] else False
-        domains = True if name_servers and 'search' in config_section['nameservers'] else False
+        # If a user doesn't specify static DNS servers and domains, use DNS that received from DHCP
+        name_servers_section = True if 'nameservers' in config_section else False
+        addresses_section = True if name_servers_section and 'addresses' in config_section['nameservers'] else False
+        domains_section = True if name_servers_section and 'search' in config_section['nameservers'] else False
 
         if not dnsServers and not dnsDomains:
-            if name_servers:
+            if name_servers_section:
                 del config_section['nameservers']
 
         # Override DNS info received from DHCP server with those configured by the user
         if dnsServers:
             config_section['dhcp4-overrides']['use-dns'] = False
-        else:
-            if name_servers and addresses:
-                del config_section['addresses']
+        elif addresses_section:
+            del config_section['nameservers']['addresses']
 
         if dnsDomains:
             config_section['dhcp4-overrides']['use-domains'] = False
-        else:
-            if name_servers and domains:
-                del config_section['search']
+        elif domains_section:
+            del config_section['nameservers']['search']
 
         return config_section
 
