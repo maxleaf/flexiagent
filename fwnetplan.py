@@ -95,7 +95,7 @@ def load_netplan_filenames(get_only=False):
             glob.glob("/lib/netplan/*.fw_run_orig") + \
             glob.glob("/run/netplan/*.fw_run_orig")
 
-    if not files:
+    if not files or fwutils.vpp_does_run():
         files = glob.glob("/etc/netplan/*.yaml") + \
                 glob.glob("/lib/netplan/*.yaml") + \
                 glob.glob("/run/netplan/*.yaml")
@@ -242,10 +242,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
     dev_id = fwutils.dev_id_to_full(dev_id)
     if dev_id in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[dev_id].get('fname')
-        fname_run = fname.replace('yaml', 'fwrun.yaml')
-        _add_netplan_file(fname_run)
 
-        fname_backup = fname + '.fw_run_orig'
+        # If netplan files restored when vpp was run
+        if 'fwrun.yaml' in fname:
+            fname_backup = fname.replace('fwrun.yaml', 'yaml.fw_run_orig')
+            fname_run = fname
+        else:
+            fname_run = fname.replace('yaml', 'fwrun.yaml')
+            _add_netplan_file(fname_run)
+            fname_backup = fname + '.fw_run_orig'
 
         old_ifname = fwglobals.g.NETPLAN_FILES[dev_id].get('ifname')
         set_name   = fwglobals.g.NETPLAN_FILES[dev_id].get('set-name', '')
