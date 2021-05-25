@@ -105,7 +105,7 @@ def add_interface(params):
     # If for any reason, static IP interface comes without static dns servers, we set the default automatically
     if int_type == 'wan' and dhcp == 'no' and len(dnsServers) == 0:
         dnsServers = fwglobals.g.DEFAULT_DNS_SERVERS
-    dnsDomains  = params.get('dnsDomains', None)
+    dnsDomains  = params.get('dnsDomains')
 
     mtu       = params.get('mtu', None)
 

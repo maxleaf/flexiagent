@@ -186,22 +186,18 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         config_section['dhcp4-overrides'] = {'route-metric': metric}
 
         # If a user doesn't specify static DNS servers and domains, use DNS that received from DHCP
-        name_servers_section = True if 'nameservers' in config_section else False
-        addresses_section = True if name_servers_section and 'addresses' in config_section['nameservers'] else False
-        domains_section = True if name_servers_section and 'search' in config_section['nameservers'] else False
-
-        if not dnsServers and not dnsDomains and name_servers_section:
+        if not dnsServers and not dnsDomains and 'nameservers' in config_section:
             del config_section['nameservers']
 
         # Override DNS info received from DHCP server with those configured by the user
         if dnsServers:
             config_section['dhcp4-overrides']['use-dns'] = False
-        elif addresses_section:
+        elif config_section.get('nameservers', {}).get('addresses'):
             del config_section['nameservers']['addresses']
 
         if dnsDomains:
             config_section['dhcp4-overrides']['use-domains'] = False
-        elif domains_section:
+        elif config_section.get('nameservers', {}).get('search'):
             del config_section['nameservers']['search']
 
         return config_section
