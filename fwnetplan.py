@@ -169,6 +169,7 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         nameservers = config_section.get('nameservers', {})
         nameservers['addresses'] = dnsServers
         config_section['nameservers'] = nameservers
+
     if dnsDomains:
         nameservers = config_section.get('nameservers', {})
         nameservers['search'] = dnsDomains
@@ -185,12 +186,27 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         config_section['dhcp4'] = True
         config_section['dhcp4-overrides'] = {'route-metric': metric}
 
-        # Override DNS info received from DHCP server
+        # If a user doesn't specificed static DNS servers and domains, use DNS that received from dhcp
+        name_servers = True if 'nameservers' in config_section else False
+        addresses = True if name_servers and 'addresses' in config_section['nameservers'] else False
+        domains = True if name_servers and 'search' in config_section['nameservers'] else False
+
+        if not dnsServers and not dnsDomains:
+            if name_servers:
+                del config_section['nameservers']
+
+        # Override DNS info received from DHCP server with those configured by the user
         if dnsServers:
             config_section['dhcp4-overrides']['use-dns'] = False
         else:
-            if 'nameservers' in config_section:
-                del config_section['nameservers']
+            if name_servers and addresses:
+                del config_section['addresses']
+
+        if dnsDomains:
+            config_section['dhcp4-overrides']['use-domains'] = False
+        else:
+            if name_servers and domains:
+                del config_section['search']
 
         return config_section
 
@@ -311,15 +327,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     del config_section['match'] # set-name requires 'match' property
                     ethernets[ifname] = config_section
 
-                # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
-                # So for lte with set-name both interfaces should be listed in netplan files.
-                # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
-                if old_ethernets and old_ifname in old_ethernets:
-                    ethernets[old_ifname] = old_ethernets[old_ifname]
+                    # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
+                    # So for lte with set-name both interfaces should be listed in netplan files.
+                    # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
+                    if old_ethernets and old_ifname in old_ethernets:
+                        ethernets[old_ifname] = old_ethernets[old_ifname]
 
-                    # When vpp runs, we don't need the nameservers on the physical interface but the vppsb
-                    if 'nameservers' in ethernets[old_ifname]:
-                        del ethernets[old_ifname]['nameservers']
+                        # When vpp runs, we don't need the nameservers on the physical interface but the vppsb
+                        if 'nameservers' in ethernets[old_ifname]:
+                            del ethernets[old_ifname]['nameservers']
             else:
                 ethernets[ifname] = config_section
         else:

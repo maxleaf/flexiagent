@@ -357,6 +357,9 @@ class FwWanMonitor:
                 ifc = db_if[0] if db_if else {}
                 mtu = ifc.get('mtu')
                 dnsServers  = ifc.get('dnsServers', [])
+                # If for any reason, static IP interface comes without static dns servers, we set the default automatically
+                if dhcp == 'no' and len(dnsServers) == 0:
+                    dnsServers = fwglobals.g.DEFAULT_DNS_SERVERS
                 dnsDomains  = ifc.get('dnsDomains', None)
 
                 (success, err_str) = fwnetplan.add_remove_netplan_interface(\
