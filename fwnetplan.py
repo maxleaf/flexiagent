@@ -190,9 +190,8 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         addresses_section = True if name_servers_section and 'addresses' in config_section['nameservers'] else False
         domains_section = True if name_servers_section and 'search' in config_section['nameservers'] else False
 
-        if not dnsServers and not dnsDomains:
-            if name_servers_section:
-                del config_section['nameservers']
+        if not dnsServers and not dnsDomains and name_servers_section:
+            del config_section['nameservers']
 
         # Override DNS info received from DHCP server with those configured by the user
         if dnsServers:
