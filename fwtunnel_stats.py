@@ -28,6 +28,7 @@ from subprocess import Popen, PIPE, STDOUT
 import threading
 import fwglobals
 import fwutils
+import json
 
 tunnel_stats_global = {}
 tunnel_stats_global_lock = threading.RLock()
@@ -47,20 +48,22 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     args = shlex.split(cmd)
     return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
 
-def tunnel_stats_get_ping_time(host):
+def tunnel_stats_get_ping_time(hosts):
     """Use fping to get RTT.
 
-    :param host:         IP address to ping.
+    :param hosts:         IP addresses to ping.
 
-    :returns: RTT value on success and 0 otherwise.
+    :returns: RTT values on success and 0 otherwise.
     """
-    host = host.split(':')[0]
-    cmd = "fping {host} -C 1 -q".format(host=host)
-    res = [float(x) for x in tunnel_stats_get_simple_cmd_output(cmd).strip().split(':')[-1].split() if x != '-']
-    if len(res) > 0:
-        return sum(res) / len(res)
-    else:
-        return 0
+    ret = {}
+    cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
+
+    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().split('\n'):
+        host = [x.strip() for x in row.strip().split(':')]
+        rtt = [float(x) for x in host[-1].split() if x != '-']
+        ret[host[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+
+    return ret
 
 def tunnel_stats_clear():
     """Clear previously collected statistics.
@@ -109,10 +112,13 @@ def tunnel_stats_test():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
+    hosts = [x.get('loopback_remote').split(':')[0] for x in tunnel_stats_global_copy.values()]
+    tunnel_rtt = tunnel_stats_get_ping_time(hosts)
+
     for key, value in tunnel_stats_global_copy.items():
         value['sent'] += 1
 
-        rtt = tunnel_stats_get_ping_time(value['loopback_remote'])
+        rtt = tunnel_rtt.get(value['loopback_remote'], 0)
         if rtt > 0:
             value['received'] += 1
             value['timestamp'] = time.time()
