@@ -88,6 +88,7 @@ def load_netplan_filenames(read_from_disk=False, get_only=False):
     if read_from_disk:
         netplan_filenames = fwglobals.g.db.get('router_api', {}).get('netplan_filenames')
         if netplan_filenames:
+            fwglobals.log.debug("load_netplan_filenames: load from disk. %s" % str(netplan_filenames))
             fwglobals.g.NETPLAN_FILES = dict(netplan_filenames)
             return fwglobals.g.NETPLAN_FILES
 
@@ -318,11 +319,11 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     del config_section['match'] # set-name requires 'match' property
                     ethernets[ifname] = config_section
 
-                # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
-                # So for lte with set-name both interfaces should be listed in netplan files.
-                # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
-                if old_ethernets and old_ifname in old_ethernets:
-                    ethernets[old_ifname] = old_ethernets[old_ifname]
+                    # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
+                    # So for lte with set-name both interfaces should be listed in netplan files.
+                    # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
+                    if old_ethernets and old_ifname in old_ethernets:
+                        ethernets[old_ifname] = old_ethernets[old_ifname]
             else:
                 ethernets[ifname] = config_section
         else:
