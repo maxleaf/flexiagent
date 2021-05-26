@@ -88,7 +88,7 @@ def load_netplan_filenames(read_from_disk=False, get_only=False):
     if read_from_disk:
         netplan_filenames = fwglobals.g.db.get('router_api', {}).get('netplan_filenames')
         if netplan_filenames:
-            fwglobals.log.debug("load_netplan_filenames: load from disk. %s" % str(netplan_filenames))
+            fwglobals.log.debug("load_netplan_filenames: loading from disk. %s" % str(netplan_filenames))
             fwglobals.g.NETPLAN_FILES = dict(netplan_filenames)
             return fwglobals.g.NETPLAN_FILES
 
