@@ -272,7 +272,6 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
         fname_run = fwglobals.g.NETPLAN_FILE
         _add_netplan_file(fname_run)
 
-
     try:
         with open(fname_run, 'r') as stream:
             config = yaml.safe_load(stream)
