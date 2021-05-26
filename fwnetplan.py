@@ -85,7 +85,7 @@ def load_netplan_filenames(read_from_disk=False, get_only=False):
     '''
 
     if read_from_disk:
-        netplan_filenames = fwglobals.g.db.get('router_api', {}).get('netplan_filenames')
+        netplan_filenames = fwglobals.g.db.get('netplan', {}).get('filenames')
         if netplan_filenames:
             fwglobals.log.debug("load_netplan_filenames: loading from disk. %s" % str(netplan_filenames))
             fwglobals.g.NETPLAN_FILES = dict(netplan_filenames)
@@ -149,9 +149,12 @@ def load_netplan_filenames(read_from_disk=False, get_only=False):
                 fwglobals.log.debug('load_netplan_filenames: %s(%s) uses %s' % (ifname, dev_id, fname))
 
     # Save the disk cache for use when needed
-    router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-    router_api_db['netplan_filenames'] = fwglobals.g.NETPLAN_FILES
-    fwglobals.g.db['router_api'] = router_api_db
+    netplan = fwglobals.g.db.get('netplan')
+    if not netplan:
+        fwglobals.g.db['netplan'] = {}
+    netplan_db = fwglobals.g.db['netplan']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    netplan_db['filenames'] = fwglobals.g.NETPLAN_FILES
+    fwglobals.g.db['netplan'] = netplan_db
 
 
 def _add_netplan_file(fname):

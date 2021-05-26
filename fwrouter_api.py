@@ -932,11 +932,6 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwutils.clear_linux_interfaces_cache()
 
-        # Clear the netplan cache from disk
-        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-        router_api_db['netplan_filenames'] = None
-        fwglobals.g.db['router_api'] = router_api_db
-
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
         """
