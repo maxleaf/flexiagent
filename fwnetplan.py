@@ -148,7 +148,7 @@ def load_netplan_filenames(read_from_disk=False, get_only=False):
                 fwglobals.g.NETPLAN_FILES[dev_id] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
                 fwglobals.log.debug('load_netplan_filenames: %s(%s) uses %s' % (ifname, dev_id, fname))
 
-    # Save to disk to be saved even if the service is restarted
+    # Save the disk cache for use when needed
     router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
     router_api_db['netplan_filenames'] = fwglobals.g.NETPLAN_FILES
     fwglobals.g.db['router_api'] = router_api_db
