@@ -57,6 +57,8 @@ def tunnel_stats_get_ping_time(hosts):
     ret = {}
     cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
 
+    # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
+    # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
     for row in tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines():
         host_rtt = [x.strip() for x in row.strip().split(':')]
         rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
