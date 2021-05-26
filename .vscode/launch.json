@@ -76,6 +76,18 @@
             }
         },
         {
+            "name": "fwdump",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tools/fwdump.py",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}/"
+            },
+            "sudo": true,
+        },
+        {
             "name": "fwystem_checker",
             "type": "python",
             "request": "launch",

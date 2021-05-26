@@ -872,6 +872,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self.state_change(FwRouterState.STARTING)
 
+        # Clean VPP API trace from previous invocation (if exists)
+        #
+        os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
+
         # Reset sa-id used by tunnels
         #
         router_api = fwglobals.g.db.get('router_api')

@@ -27,8 +27,6 @@
 # than whole folder is tar-ed and is zipped.
 
 
-import datetime
-import getopt
 import os
 import re
 import subprocess
@@ -38,6 +36,9 @@ import time
 agent_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..')
 sys.path.append(agent_root_dir)
 import fwutils
+import fwglobals
+
+g = fwglobals.Fwglobals()
 
 # Special variables in the dumper commands are substituted in run time as follows:
 #   <dumper_out_file> -> '<temporary_folder>/<dumper>.log'
@@ -54,10 +55,10 @@ g_dumpers = {
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_disk':                   { 'shell_cmd': 'df -h > <dumper_out_file>' },
     'linux_dpdk_devbind_status':    { 'shell_cmd': 'dpdk-devbind -s > <dumper_out_file>' },
-    'linux_grub':                   { 'shell_cmd': 'cp /etc/default/grub <temp_folder>/linux_grub 2>/dev/null ; ' +
+    'linux_grub':                   { 'shell_cmd': 'cp /etc/default/grub <temp_folder>/linux_grub.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
-    'linux_lsb_release':            { 'shell_cmd': 'cp /etc/lsb-release <temp_folder>/linux_lsb-release 2>/dev/null ; ' +
+    'linux_lsb_release':            { 'shell_cmd': 'cp /etc/lsb-release <temp_folder>/linux_lsb-release.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_lspci':                  { 'shell_cmd': 'lspci -Dvmmn > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
@@ -88,6 +89,8 @@ g_dumpers = {
     ############################################################################
     # VPP related stuff in Linux - !!! PLEASE KEEP ALPHABET ORDER !!!
     #
+    'linux_vpp_api_trace':          { 'shell_cmd': 'cp /tmp/*%s <temp_folder>/ 2>/dev/null ;' % g.VPP_TRACE_FILE_EXT +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_vpp_startup_conf':       { 'shell_cmd': 'mkdir -p <temp_folder>/vpp_startup_conf && cp /etc/vpp/* <temp_folder>/vpp_startup_conf/ 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
@@ -103,19 +106,19 @@ g_dumpers = {
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
                                                    'cp -r /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
     'fwagent_device_signature':     { 'shell_cmd': 'fwagent show --configuration signature > <dumper_out_file>' },
-    'fwagent_log':                  { 'shell_cmd': 'cp /var/log/flexiwan/agent.log <temp_folder>/fwagent.log 2>/dev/null ;' +
+    'fwagent_log':                  { 'shell_cmd': 'cp %s <temp_folder>/fwagent.log 2>/dev/null ;' % (g.ROUTER_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwagent_log.1':                { 'shell_cmd': 'cp /var/log/flexiwan/agent.log.1 <temp_folder>/fwagent_1.log 2>/dev/null ;' +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-
-    'fwagent_ui_log':               { 'shell_cmd': 'cp /var/log/flexiwan/agentui.log <temp_folder>/fwagent_ui.log 2>/dev/null ;' +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwagent_ui_log.1':             { 'shell_cmd': 'cp /var/log/flexiwan/agentui.log.1 <temp_folder>/fwagent_ui_1.log 2>/dev/null ;' +
+    'fwagent_log.1':                { 'shell_cmd': 'cp %s.1 <temp_folder>/fwagent_1.log 2>/dev/null ;' % (g.ROUTER_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
-    'fwsystem_checker_log':         { 'shell_cmd': 'cp /var/log/flexiwan/system_checker.log <temp_folder>/fwsystem_checker.log 2>/dev/null ;' +
+    'fwagent_ui_log':               { 'shell_cmd': 'cp %s <temp_folder>/fwagent_ui.log 2>/dev/null ;' % (g.AGENT_UI_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwsystem_checker_log.1':       { 'shell_cmd': 'cp /var/log/flexiwan/system_checker.log.1 <temp_folder>/fwsystem_checker_1.log 2>/dev/null ;' +
+    'fwagent_ui_log.1':             { 'shell_cmd': 'cp %s.1 <temp_folder>/fwagent_ui_1.log 2>/dev/null ;' % (g.AGENT_UI_LOG_FILE) +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+
+    'fwsystem_checker_log':         { 'shell_cmd': 'cp %s <temp_folder>/fwsystem_checker.log 2>/dev/null ;' % (g.SYSTEM_CHECKER_LOG_FILE) +
+                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
+    'fwsystem_checker_log.1':       { 'shell_cmd': 'cp %s.1 <temp_folder>/fwsystem_checker_1.log 2>/dev/null ;' % (g.SYSTEM_CHECKER_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
     'dpkg_log':                     { 'shell_cmd': 'cp /var/log/dpkg.log <temp_folder>/dpkg.log 2>/dev/null ;' +
@@ -123,7 +126,7 @@ g_dumpers = {
     'dpkg_log.1':                   { 'shell_cmd': 'cp /var/log/dpkg.log.1 <temp_folder>/dpkg_1.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
-    'hostapd.log':                  { 'shell_cmd': 'cp /var/log/hostapd.log <temp_folder>/hostapd.log 2>/dev/null ;' +
+    'hostapd.log':                  { 'shell_cmd': 'cp %s <temp_folder>/hostapd.log 2>/dev/null ;' % (g.HOSTAPD_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
     'fwagent_db_general':           { 'shell_cmd': 'fwagent show --database general > <dumper_out_file>' },
@@ -142,10 +145,14 @@ g_dumpers = {
     #
     'vpp_acl_dump':                 { 'shell_cmd': 'echo acl_dump > vat.txt && vpp_api_test script in vat.txt > <dumper_out_file> 2>&1 ; rm -rf vat.txt' },
     'vpp_adj':                      { 'shell_cmd': 'vppctl sh adj > <dumper_out_file>' },
+    'vpp_bridge':                   { 'shell_cmd': 'vppctl sh bridge > <dumper_out_file>' },
+    'vpp_ike_sa':                   { 'shell_cmd': 'vppctl sh ike sa > <dumper_out_file>' },
     'vpp_interfaces_hw':            { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
     'vpp_interfaces_sw':            { 'shell_cmd': 'vppctl sh int > <dumper_out_file>' },
     'vpp_interfaces_addresses':     { 'shell_cmd': 'vppctl sh int addr > <dumper_out_file>' },
     'vpp_interfaces_vmxnet3':       { 'shell_cmd': 'vppctl show vmxnet3 > <dumper_out_file>' },
+    'vpp_ipsec_sa':                 { 'shell_cmd': 'vppctl sh ipsec sa > <dumper_out_file>' },
+    'vpp_ipsec_tunnel':             { 'shell_cmd': 'vppctl sh ipsec tunnel > <dumper_out_file>' },
     'vpp_fib_entries':              { 'shell_cmd': 'vppctl sh fib entry > <dumper_out_file>' },
     'vpp_fib_paths':                { 'shell_cmd': 'vppctl sh fib paths > <dumper_out_file>' },
     'vpp_fib_pathlists':            { 'shell_cmd': 'vppctl sh fib path-lists > <dumper_out_file>' },
@@ -159,7 +166,7 @@ g_dumpers = {
     'vpp_nat44_interface_address':  { 'shell_cmd': 'vppctl show nat44 interface address > <dumper_out_file>' },
     'vpp_nat44_static_mappings':    { 'shell_cmd': 'vppctl show nat44 static mappings > <dumper_out_file>' },
     'vpp_tap_inject':               { 'shell_cmd': 'vppctl show tap-inject > <dumper_out_file>' },
-
+    'vpp_vxlan_tunnel':             { 'shell_cmd': 'vppctl sh vxlan tunnel > <dumper_out_file>' },
 }
 
 class FwDump:
@@ -171,10 +178,9 @@ class FwDump:
         self.zip_file       = None
         self.hostname       = os.uname()[1]
 
-
-        self.now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         if not temp_folder:
-            self.temp_folder = os.path.join(os.getcwd(), self.now)
+            timestamp = fwutils.build_timestamped_filename('')
+            self.temp_folder = os.path.join(os.getcwd(), timestamp)
 
         # Create temporary folder
         #
@@ -231,7 +237,7 @@ class FwDump:
 
     def zip(self, filename=None, path=None, delete_temp_folder=True):
         if not filename:
-            filename = 'fwdump_%s_%s.tar.gz' % (self.hostname, self.now)
+            filename = fwutils.build_timestamped_filename('fwdump_%s' % self.hostname, '.tar.gz')
         if path:
             filename = os.path.join(path, filename)
         self.zip_file = filename
