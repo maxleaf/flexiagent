@@ -28,7 +28,6 @@ from subprocess import Popen, PIPE, STDOUT
 import threading
 import fwglobals
 import fwutils
-import json
 
 tunnel_stats_global = {}
 tunnel_stats_global_lock = threading.RLock()
@@ -58,10 +57,10 @@ def tunnel_stats_get_ping_time(hosts):
     ret = {}
     cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
 
-    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().split('\n'):
-        host = [x.strip() for x in row.strip().split(':')]
-        rtt = [float(x) for x in host[-1].split() if x != '-']
-        ret[host[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines():
+        host_rtt = [x.strip() for x in row.strip().split(':')]
+        rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
+        ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
 
     return ret
 
@@ -112,28 +111,28 @@ def tunnel_stats_test():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    hosts = [x.get('loopback_remote').split(':')[0] for x in tunnel_stats_global_copy.values()]
+    hosts = [x.get('loopback_remote', '').split(':')[0] for x in tunnel_stats_global_copy.values()]
     tunnel_rtt = tunnel_stats_get_ping_time(hosts)
 
-    for key, value in tunnel_stats_global_copy.items():
-        value['sent'] += 1
+    for tunnel_id, stats in tunnel_stats_global_copy.items():
+        stats['sent'] += 1
 
-        rtt = tunnel_rtt.get(value['loopback_remote'], 0)
+        rtt = tunnel_rtt.get(stats['loopback_remote'], 0)
         if rtt > 0:
-            value['received'] += 1
-            value['timestamp'] = time.time()
+            stats['received'] += 1
+            stats['timestamp'] = time.time()
 
-        value['rtt'] = value['rtt'] + (rtt - value['rtt']) / APPROX_FACTOR
-        value['drop_rate'] = 100 - value['received'] * 100 / value['sent']
+        stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
+        stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
 
-        if (value['sent'] == WINDOW_SIZE):
-            value['sent'] = 0
-            value['received'] = 0
+        if (stats['sent'] == WINDOW_SIZE):
+            stats['sent'] = 0
+            stats['received'] = 0
 
     with tunnel_stats_global_lock:
-        for key in list(tunnel_stats_global.keys()):
-            if key in tunnel_stats_global_copy:
-                tunnel_stats_global[key] = tunnel_stats_global_copy[key]
+        for tunnel_id in list(tunnel_stats_global.keys()):
+            if tunnel_id in tunnel_stats_global_copy:
+                tunnel_stats_global[tunnel_id] = tunnel_stats_global_copy[tunnel_id]
 
 def tunnel_stats_get():
     """Return a new tunnel status dictionary.
@@ -148,15 +147,15 @@ def tunnel_stats_get():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    for key, value in tunnel_stats_global_copy.items():
-        tunnel_stats[key] = {}
-        tunnel_stats[key]['rtt'] = value['rtt']
-        tunnel_stats[key]['drop_rate'] = value['drop_rate']
+    for tunnel_id, stats in tunnel_stats_global_copy.items():
+        tunnel_stats[tunnel_id] = {}
+        tunnel_stats[tunnel_id]['rtt'] = stats['rtt']
+        tunnel_stats[tunnel_id]['drop_rate'] = stats['drop_rate']
 
-        if ((value['timestamp'] == 0) or (cur_time - value['timestamp'] > TIMEOUT)):
-            tunnel_stats[key]['status'] = 'down'
+        if ((stats['timestamp'] == 0) or (cur_time - stats['timestamp'] > TIMEOUT)):
+            tunnel_stats[tunnel_id]['status'] = 'down'
         else:
-            tunnel_stats[key]['status'] = 'up'
+            tunnel_stats[tunnel_id]['status'] = 'up'
 
     return tunnel_stats
 
