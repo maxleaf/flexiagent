@@ -55,6 +55,7 @@ def tunnel_stats_get_ping_time(hosts):
     :returns: RTT values on success and 0 otherwise.
     """
     ret = {}
+
     cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
 
     # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
@@ -109,6 +110,9 @@ def tunnel_stats_test():
 
     :returns: None.
     """
+    if not tunnel_stats_global:
+        return
+
     tunnel_stats_global_copy = {}
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
