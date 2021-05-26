@@ -230,7 +230,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 # We use the original interface names in this cache,
                 # but they don't exist when they are under dpdk control and replaced by vppsb interfaces.
                 # Hence, we fill the cache with the backup in the disk
-                fwnetplan.load_netplan_filenames(read_from_disk=(True and vpp_runs))
+                fwnetplan.load_netplan_filenames(read_from_disk=vpp_runs)
             else:
                 fwnetplan.restore_linux_netplan_files()
             return False
