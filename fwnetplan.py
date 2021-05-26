@@ -74,14 +74,23 @@ def restore_linux_netplan_files():
     if files:
         fwutils.netplan_apply('restore_linux_netplan_files')
 
-def load_netplan_filenames(get_only=False):
+def load_netplan_filenames(read_from_disk=False, get_only=False):
     '''Parses currently active netplan yaml files into dict of device info by
     interface name, where device info is represented by tuple:
     (<netplan filename>, <interface name>, <gw>, <dev_id>, <set-name name>).
     Than the parsed info is loaded into fwglobals.g.NETPLAN_FILES cache.
 
+    :param read_from_disk: if True it means that we need to fill the cache with the data that stored on the disk.
     :param get_only: if True the parsed info is not loaded into cache.
     '''
+
+    # If vpp runs
+    if read_from_disk:
+        netplan_filenames = fwglobals.g.db.get('router_api', {}).get('netplan_filenames')
+        if netplan_filenames:
+            fwglobals.g.NETPLAN_FILES = dict(netplan_filenames)
+            return fwglobals.g.NETPLAN_FILES
+
     output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
@@ -95,7 +104,7 @@ def load_netplan_filenames(get_only=False):
             glob.glob("/lib/netplan/*.fw_run_orig") + \
             glob.glob("/run/netplan/*.fw_run_orig")
 
-    if not files or fwutils.vpp_does_run():
+    if not files:
         files = glob.glob("/etc/netplan/*.yaml") + \
                 glob.glob("/lib/netplan/*.yaml") + \
                 glob.glob("/run/netplan/*.yaml")
@@ -138,6 +147,11 @@ def load_netplan_filenames(get_only=False):
             if dev_id:
                 fwglobals.g.NETPLAN_FILES[dev_id] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
                 fwglobals.log.debug('load_netplan_filenames: %s(%s) uses %s' % (ifname, dev_id, fname))
+
+    # Save to disk to be saved even if the service is restarted
+    router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    router_api_db['netplan_filenames'] = fwglobals.g.NETPLAN_FILES
+    fwglobals.g.db['router_api'] = router_api_db
 
 
 def _add_netplan_file(fname):
@@ -242,15 +256,10 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
     dev_id = fwutils.dev_id_to_full(dev_id)
     if dev_id in fwglobals.g.NETPLAN_FILES:
         fname = fwglobals.g.NETPLAN_FILES[dev_id].get('fname')
+        fname_run = fname.replace('yaml', 'fwrun.yaml')
+        _add_netplan_file(fname_run)
 
-        # If netplan files restored when vpp was run
-        if 'fwrun.yaml' in fname:
-            fname_backup = fname.replace('fwrun.yaml', 'yaml.fw_run_orig')
-            fname_run = fname
-        else:
-            fname_run = fname.replace('yaml', 'fwrun.yaml')
-            _add_netplan_file(fname_run)
-            fname_backup = fname + '.fw_run_orig'
+        fname_backup = fname + '.fw_run_orig'
 
         old_ifname = fwglobals.g.NETPLAN_FILES[dev_id].get('ifname')
         set_name   = fwglobals.g.NETPLAN_FILES[dev_id].get('set-name', '')
@@ -262,6 +271,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
     else:
         fname_run = fwglobals.g.NETPLAN_FILE
         _add_netplan_file(fname_run)
+
 
     try:
         with open(fname_run, 'r') as stream:

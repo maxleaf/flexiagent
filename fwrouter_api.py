@@ -226,7 +226,11 @@ class FWROUTER_API(FwCfgRequestHandler):
             if self.state_is_started():
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
-                fwnetplan.load_netplan_filenames()
+                # We use here read_from_disk because we can't fill the netplan cache from scratch when vpp is running.
+                # We use the original interface names in this cache,
+                # but they don't exist when they are under dpdk control and replaced by vppsb interfaces.
+                # Hence, we fill the cache with the backup in the disk
+                fwnetplan.load_netplan_filenames(read_from_disk=(True and vpp_runs))
             else:
                 fwnetplan.restore_linux_netplan_files()
             return False
@@ -923,6 +927,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
         fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwutils.clear_linux_interfaces_cache()
+
+        # Clear the netplan cache from disk
+        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+        router_api_db['netplan_filenames'] = None
+        fwglobals.g.db['router_api'] = router_api_db
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
