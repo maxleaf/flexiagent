@@ -74,14 +74,23 @@ def restore_linux_netplan_files():
     if files:
         fwutils.netplan_apply('restore_linux_netplan_files')
 
-def load_netplan_filenames(get_only=False):
+def load_netplan_filenames(read_from_disk=False, get_only=False):
     '''Parses currently active netplan yaml files into dict of device info by
     interface name, where device info is represented by tuple:
     (<netplan filename>, <interface name>, <gw>, <dev_id>, <set-name name>).
     Than the parsed info is loaded into fwglobals.g.NETPLAN_FILES cache.
 
+    :param read_from_disk: if True it means that we need to fill the cache with the data that stored on the disk.
     :param get_only: if True the parsed info is not loaded into cache.
     '''
+
+    if read_from_disk:
+        netplan_filenames = fwglobals.g.db.get('netplan', {}).get('filenames')
+        if netplan_filenames:
+            fwglobals.log.debug("load_netplan_filenames: loading from disk. %s" % str(netplan_filenames))
+            fwglobals.g.NETPLAN_FILES = dict(netplan_filenames)
+            return fwglobals.g.NETPLAN_FILES
+
     output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
@@ -138,6 +147,14 @@ def load_netplan_filenames(get_only=False):
             if dev_id:
                 fwglobals.g.NETPLAN_FILES[dev_id] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
                 fwglobals.log.debug('load_netplan_filenames: %s(%s) uses %s' % (ifname, dev_id, fname))
+
+    # Save the disk cache for use when needed
+    netplan = fwglobals.g.db.get('netplan')
+    if not netplan:
+        fwglobals.g.db['netplan'] = {}
+    netplan_db = fwglobals.g.db['netplan']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    netplan_db['filenames'] = fwglobals.g.NETPLAN_FILES
+    fwglobals.g.db['netplan'] = netplan_db
 
 
 def _add_netplan_file(fname):
@@ -304,11 +321,11 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     del config_section['match'] # set-name requires 'match' property
                     ethernets[ifname] = config_section
 
-                # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
-                # So for lte with set-name both interfaces should be listed in netplan files.
-                # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
-                if old_ethernets and old_ifname in old_ethernets:
-                    ethernets[old_ifname] = old_ethernets[old_ifname]
+                    # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
+                    # So for lte with set-name both interfaces should be listed in netplan files.
+                    # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
+                    if old_ethernets and old_ifname in old_ethernets:
+                        ethernets[old_ifname] = old_ethernets[old_ifname]
             else:
                 ethernets[ifname] = config_section
         else:
