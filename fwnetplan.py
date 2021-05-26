@@ -84,7 +84,6 @@ def load_netplan_filenames(read_from_disk=False, get_only=False):
     :param get_only: if True the parsed info is not loaded into cache.
     '''
 
-    # If vpp runs
     if read_from_disk:
         netplan_filenames = fwglobals.g.db.get('router_api', {}).get('netplan_filenames')
         if netplan_filenames:
