@@ -1227,7 +1227,7 @@ class Checker:
                         tmp = re.split('\s+', corelist_worker_param.strip())
                         corelist_worker_param_val = tmp[1]
                         if corelist_worker_param_val.isdigit():
-                            corelist_worker_param_min_val = corelist_worker_param_max_val = corelist_worker_param_val
+                            corelist_worker_param_min_val = corelist_worker_param_max_val = int(corelist_worker_param_val)
                         else:
                             corelist_worker_param_min_val = int(corelist_worker_param_val.split('-')[0])
                             corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
@@ -1378,9 +1378,9 @@ class Checker:
                 'libarc4'
             ]
 
-            try:                
-                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHCECKER_LOG_FILE)
-                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHCECKER_LOG_FILE))
+            try:
+                os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHECKER_LOG_FILE)
+                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHECKER_LOG_FILE))
 
                 for module in modules:
                     os.system('rmmod %s 2>/dev/null' % module)
