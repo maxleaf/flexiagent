@@ -303,6 +303,7 @@ class Fwglobals:
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
         self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
+        self.DEFAULT_DNS_SERVERS           = ['8.8.8.8', '8.8.4.4']
         self.request_lock                  = threading.RLock()   # lock to syncronize message processing
 
         # Load configuration from file
