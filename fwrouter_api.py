@@ -228,7 +228,11 @@ class FWROUTER_API(FwCfgRequestHandler):
             if self.state_is_started():
                 fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
-                fwnetplan.load_netplan_filenames()
+                # We use here read_from_disk because we can't fill the netplan cache from scratch when vpp is running.
+                # We use the original interface names in this cache,
+                # but they don't exist when they are under dpdk control and replaced by vppsb interfaces.
+                # Hence, we fill the cache with the backup in the disk
+                fwnetplan.load_netplan_filenames(read_from_disk=vpp_runs)
             else:
                 fwnetplan.restore_linux_netplan_files()
             return False
@@ -875,6 +879,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         :returns: None.
         """
         self.state_change(FwRouterState.STARTING)
+
+        # Clean VPP API trace from previous invocation (if exists)
+        #
+        os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
 
         # Reset sa-id used by tunnels
         #

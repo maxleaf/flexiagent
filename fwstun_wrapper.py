@@ -593,8 +593,8 @@ class FwStunWrap:
             dst_ip = tunnel['dst']
             dst_port = int(tunnel['dstPort'])
             dev_name = fwutils.get_interface_name(src_ip)
-            vni = int(tunnel['vni'])
-            vxLanMsgType = '08000000'
+            vxLanVni      = '%x' % (tunnel['vni'])
+            vxLanMsgType  = '08000000'
             vxLanReserved = '00'
-            msg = vxLanMsgType + str(vni).zfill(6) + vxLanReserved
+            msg = vxLanMsgType + vxLanVni.zfill(6) + vxLanReserved
             fwutils.send_udp_packet(src_ip, src_port, dst_ip, dst_port, dev_name, msg)

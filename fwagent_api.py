@@ -194,7 +194,7 @@ class FWAGENT_API:
             'vpp': fwglobals.g.VPP_LOG_FILE,
             'ospf': fwglobals.g.OSPF_LOG_FILE,
             'hostapd': fwglobals.g.HOSTAPD_LOG_FILE,
-            'agentui': fwglobals.g.AGNET_UI_LOG_FILE
+            'agentui': fwglobals.g.AGENT_UI_LOG_FILE
 	    }
         file = dl_map.get(params['filter'], '')
         try:
@@ -322,43 +322,45 @@ class FWAGENT_API:
             raise Exception("_get_wifi_info: %s" % str(e))
 
     def _get_lte_info(self, params):
-        interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+        try:
+            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
-        sim_status = fwutils.lte_sim_status(params['dev_id'])
-        signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
-        hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
-        packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
-        system_info = fwutils.lte_get_system_info(params['dev_id'])
-        default_settings = fwutils.lte_get_default_settings(params['dev_id'])
-        phone_number = fwutils.lte_get_phone_number(params['dev_id'])
-        pin_state = fwutils.lte_get_pin_state(params['dev_id'])
-        connection_state = fwutils.mbim_connection_state(params['dev_id'])
-        registration_network = fwutils.mbim_registration_state(params['dev_id'])
+            sim_status = fwutils.lte_sim_status(params['dev_id'])
+            signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
+            hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
+            packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
+            system_info = fwutils.lte_get_system_info(params['dev_id'])
+            default_settings = fwutils.lte_get_default_settings(params['dev_id'])
+            phone_number = fwutils.lte_get_phone_number(params['dev_id'])
+            pin_state = fwutils.lte_get_pin_state(params['dev_id'])
+            connection_state = fwutils.mbim_connection_state(params['dev_id'])
+            registration_network = fwutils.mbim_registration_state(params['dev_id'])
 
-        tap_name = fwutils.dev_id_to_tap(params['dev_id'], check_vpp_state=True)
-        if tap_name:
-            interface_name = tap_name
+            tap_name = fwutils.dev_id_to_tap(params['dev_id'], check_vpp_state=True)
+            if tap_name:
+                interface_name = tap_name
 
-        addr = fwutils.get_interface_address(interface_name)
-        connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+            addr = fwutils.get_interface_address(interface_name)
+            connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
-        response = {
-            'address'             : addr,
-            'signals'             : signals,
-            'connectivity'        : connectivity,
-            'packet_service_state': packet_service_state,
-            'hardware_info'       : hardware_info,
-            'system_info'         : system_info,
-            'sim_status'          : sim_status,
-            'default_settings'    : default_settings,
-            'phone_number'        : phone_number,
-            'pin_state'           : pin_state,
-            'connection_state'    : connection_state,
-            'registration_network': registration_network
-        }
-
-        return {'message': response, 'ok': 1}
-
+            response = {
+                'address'             : addr,
+                'signals'             : signals,
+                'connectivity'        : connectivity,
+                'packet_service_state': packet_service_state,
+                'hardware_info'       : hardware_info,
+                'system_info'         : system_info,
+                'sim_status'          : sim_status,
+                'default_settings'    : default_settings,
+                'phone_number'        : phone_number,
+                'pin_state'           : pin_state,
+                'connection_state'    : connection_state,
+                'registration_network': registration_network
+            }
+            return {'message': response, 'ok': 1}
+        except Exception as e:
+            fwglobals.log.error('Failed to get LTE information. %s' % str(e))
+            return {'message': str(e), 'ok': 0}
 
     def _reset_lte(self, params):
         """Reset LTE modem card.

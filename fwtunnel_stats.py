@@ -47,20 +47,25 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     args = shlex.split(cmd)
     return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
 
-def tunnel_stats_get_ping_time(host):
+def tunnel_stats_get_ping_time(hosts):
     """Use fping to get RTT.
 
-    :param host:         IP address to ping.
+    :param hosts:         IP addresses to ping.
 
-    :returns: RTT value on success and 0 otherwise.
+    :returns: RTT values on success and 0 otherwise.
     """
-    host = host.split(':')[0]
-    cmd = "fping {host} -C 1 -q".format(host=host)
-    res = [float(x) for x in tunnel_stats_get_simple_cmd_output(cmd).strip().split(':')[-1].split() if x != '-']
-    if len(res) > 0:
-        return sum(res) / len(res)
-    else:
-        return 0
+    ret = {}
+
+    cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
+
+    # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
+    # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
+    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines():
+        host_rtt = [x.strip() for x in row.strip().split(':')]
+        rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
+        ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+
+    return ret
 
 def tunnel_stats_clear():
     """Clear previously collected statistics.
@@ -105,29 +110,35 @@ def tunnel_stats_test():
 
     :returns: None.
     """
+    if not tunnel_stats_global:
+        return
+
     tunnel_stats_global_copy = {}
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    for key, value in tunnel_stats_global_copy.items():
-        value['sent'] += 1
+    hosts = [x.get('loopback_remote', '').split(':')[0] for x in tunnel_stats_global_copy.values()]
+    tunnel_rtt = tunnel_stats_get_ping_time(hosts)
 
-        rtt = tunnel_stats_get_ping_time(value['loopback_remote'])
+    for tunnel_id, stats in tunnel_stats_global_copy.items():
+        stats['sent'] += 1
+
+        rtt = tunnel_rtt.get(stats['loopback_remote'], 0)
         if rtt > 0:
-            value['received'] += 1
-            value['timestamp'] = time.time()
+            stats['received'] += 1
+            stats['timestamp'] = time.time()
 
-        value['rtt'] = value['rtt'] + (rtt - value['rtt']) / APPROX_FACTOR
-        value['drop_rate'] = 100 - value['received'] * 100 / value['sent']
+        stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
+        stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
 
-        if (value['sent'] == WINDOW_SIZE):
-            value['sent'] = 0
-            value['received'] = 0
+        if (stats['sent'] == WINDOW_SIZE):
+            stats['sent'] = 0
+            stats['received'] = 0
 
     with tunnel_stats_global_lock:
-        for key in list(tunnel_stats_global.keys()):
-            if key in tunnel_stats_global_copy:
-                tunnel_stats_global[key] = tunnel_stats_global_copy[key]
+        for tunnel_id in list(tunnel_stats_global.keys()):
+            if tunnel_id in tunnel_stats_global_copy:
+                tunnel_stats_global[tunnel_id] = tunnel_stats_global_copy[tunnel_id]
 
 def tunnel_stats_get():
     """Return a new tunnel status dictionary.
@@ -142,15 +153,15 @@ def tunnel_stats_get():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    for key, value in tunnel_stats_global_copy.items():
-        tunnel_stats[key] = {}
-        tunnel_stats[key]['rtt'] = value['rtt']
-        tunnel_stats[key]['drop_rate'] = value['drop_rate']
+    for tunnel_id, stats in tunnel_stats_global_copy.items():
+        tunnel_stats[tunnel_id] = {}
+        tunnel_stats[tunnel_id]['rtt'] = stats['rtt']
+        tunnel_stats[tunnel_id]['drop_rate'] = stats['drop_rate']
 
-        if ((value['timestamp'] == 0) or (cur_time - value['timestamp'] > TIMEOUT)):
-            tunnel_stats[key]['status'] = 'down'
+        if ((stats['timestamp'] == 0) or (cur_time - stats['timestamp'] > TIMEOUT)):
+            tunnel_stats[tunnel_id]['status'] = 'down'
         else:
-            tunnel_stats[key]['status'] = 'up'
+            tunnel_stats[tunnel_id]['status'] = 'up'
 
     return tunnel_stats
 

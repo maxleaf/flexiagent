@@ -99,9 +99,10 @@ def add_interface(params):
     int_type  = params.get('type', None)
 
     dnsServers  = params.get('dnsServers', [])
-    if len(dnsServers) == 0:
-        dnsServers = ['8.8.8.8', '8.8.4.4']
-    dnsDomains  = params.get('dnsDomains', None)
+    # If for any reason, static IP interface comes without static dns servers, we set the default automatically
+    if int_type == 'wan' and dhcp == 'no' and len(dnsServers) == 0:
+        dnsServers = fwglobals.g.DEFAULT_DNS_SERVERS
+    dnsDomains  = params.get('dnsDomains')
 
     mtu       = params.get('mtu', None)
     bridge_addr   = params.get('bridge_addr', None)
@@ -124,6 +125,11 @@ def add_interface(params):
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "create tap interface in vpp and linux"
         cmd['cmd']['params']  = ["sudo vppctl create tap host-if-name %s" % fwutils.generate_linux_interface_short_name("tap", iface_name)]
+        cmd['revert'] = {}
+        cmd['revert']['name']    = "exec"
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]},
+                                        "sudo vppctl delete tap sw_if_index DEV-TAP" ]
+        cmd['revert']['descr']  = "delete tap interface in vpp and linux"
         cmd_list.append(cmd)
 
         if is_wifi:
@@ -218,7 +224,7 @@ def add_interface(params):
             cmd['revert'] = {}
             cmd['revert']['name']   = "exec"
             cmd['revert']['descr']  = "Down interface %s in Linux" % iface_name
-            cmd['revert']['params'] = [ "sudo ip link set dev %s down" %  iface_name]
+            cmd['revert']['params'] = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" %  (iface_name, iface_name)]
             cmd_list.append(cmd)
 
             # connect the modem to the cellular provider
@@ -277,8 +283,11 @@ def add_interface(params):
         netplan_params['substs'] = [
             { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
             { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] },
-            { 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] }
         ]
+
+        # If a user doesn't configure static dns servers, we use the servers received from ISP
+        if len(dnsServers) == 0:
+            netplan_params['substs'].append({ 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] })
 
     if bridge_addr:
         netplan_params['args']['ip'] = ''

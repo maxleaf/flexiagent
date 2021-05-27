@@ -188,10 +188,9 @@ class Fwglobals:
         :param filename:    YAML configuration file name.
         :param data_path:   Path to token file.
         """
-        def __init__(self, filename, data_path):
+        def __init__(self, filename, data_path, log=None):
             """Constructor method
             """
-            global log
             DEFAULT_BYPASS_CERT    = False
             DEFAULT_DEBUG          = False
             DEFAULT_MANAGEMENT_URL = 'https://manage.flexiwan.com:443'
@@ -209,14 +208,15 @@ class Fwglobals:
                 self.UUID           = agent_conf.get('uuid',   DEFAULT_UUID)
                 self.MONITOR_UNASSIGNED_INTERFACES = agent_conf.get('monitor_unassigned_interfaces', DEFAULT_MONITOR_UNASSIGNED_INTERFACES)
             except Exception as e:
-                log.excep("%s, set defaults" % str(e))
+                if log:
+                    log.excep("%s, set defaults" % str(e))
                 self.BYPASS_CERT    = DEFAULT_BYPASS_CERT
                 self.DEBUG          = DEFAULT_DEBUG
                 self.MANAGEMENT_URL = DEFAULT_MANAGEMENT_URL
                 self.TOKEN_FILE     = DEFAULT_TOKEN_FILE
                 self.UUID           = DEFAULT_UUID
                 self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERFACES
-            if self.DEBUG:
+            if self.DEBUG and log:
                 log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
 
     class FwCache:
@@ -251,7 +251,7 @@ class Fwglobals:
             self.lte                        = self.db['LTE']
 
 
-    def __init__(self):
+    def __init__(self, log=None):
         """Constructor method
         """
         # Set default configuration
@@ -269,8 +269,8 @@ class Fwglobals:
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
-        self.AGNET_UI_LOG_FILE     = '/var/log/flexiwan/agentui.log'
-        self.SYSTEM_CHCECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
+        self.AGENT_UI_LOG_FILE   = '/var/log/flexiwan/agentui.log'
+        self.SYSTEM_CHECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
         self.REPO_SOURCE_DIR     = '/etc/apt/sources.list.d/'
         self.HOSTAPD_LOG_FILE     = '/var/log/hostapd.log'
         self.SYSLOG_FILE         = '/var/log/syslog'
@@ -280,6 +280,7 @@ class Fwglobals:
         self.VPP_CONFIG_FILE     = '/etc/vpp/startup.conf'
         self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.baseline'
         self.VPP_CONFIG_FILE_RESTORE = '/etc/vpp/startup.conf.orig'
+        self.VPP_TRACE_FILE_EXT  = '.vpp.api'
         self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
@@ -304,10 +305,11 @@ class Fwglobals:
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
         self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
+        self.DEFAULT_DNS_SERVERS           = ['8.8.8.8', '8.8.4.4']
         self.request_lock                  = threading.RLock()   # lock to syncronize message processing
 
         # Load configuration from file
-        self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH)
+        self.cfg = self.FwConfiguration(self.FWAGENT_CONF_FILE, self.DATA_PATH, log=log)
 
         self.db = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! set the db variable regardless of agent initialization
 
@@ -587,8 +589,8 @@ class Fwglobals:
                 else:
                     reply = handler_func(request, result)
             if reply['ok'] == 0:
-                myCmd = 'sudo vppctl api trace save error.api'
-                os.system(myCmd)
+                vpp_trace_file = fwutils.build_timestamped_filename('',self.VPP_TRACE_FILE_EXT)
+                os.system('sudo vppctl api trace save %s' % (vpp_trace_file))
                 raise Exception(reply['message'])
 
             # On router configuration request, e.g. add-interface,
@@ -800,5 +802,5 @@ def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO, quiet=False):
         if quiet:
             log.set_target(to_terminal=False)
         global g
-        g = Fwglobals()
+        g = Fwglobals(log)
         g_initialized = True
