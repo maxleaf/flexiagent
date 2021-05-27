@@ -35,6 +35,7 @@ cli_remove_config_file = os.path.join(cli_path, 'remove-config.cli')
 cli_start_router_file = os.path.join(cli_path, 'start-router.cli')
 cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 
+# "vpp_should_run" and "database_expected_empty" are the expected results of running the command when VPP is running
 tests = [
     { 'api': 'fwagent_cmd', 'args': 'reset -q -d',  'vpp_should_run': False, 'database_expected_empty': True },
     { 'api': 'fwagent_cmd', 'args': 'reset -s',     'vpp_should_run': True,  'database_expected_empty': False },
