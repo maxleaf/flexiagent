@@ -223,7 +223,9 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
     config_section['dhcp4'] = False
     if 'dhcp4-overrides' in config_section:
         del config_section['dhcp4-overrides']
-    config_section['addresses'] = [ip]
+
+    if ip:
+        config_section['addresses'] = [ip]
 
     if not gw or type != 'WAN':
         return config_section
