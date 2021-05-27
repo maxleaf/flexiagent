@@ -386,9 +386,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                     ethernets[ifname] = {}
                     ethernets[ifname]['dhcp4'] = False
 
-            if old_ethernets: # CHECK IF NEEDED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                if old_ifname in old_ethernets:
-                    ethernets[old_ifname] = old_ethernets[old_ifname]
+            # if old_ethernets: # CHECK IF NEEDED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            #     if old_ifname in old_ethernets:
+            #         ethernets[old_ifname] = old_ethernets[old_ifname]
 
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
