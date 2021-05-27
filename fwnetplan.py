@@ -245,7 +245,7 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
 
     return config_section
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, validate_ip=False):
     '''
     :param metric:  integer (whole number)
     '''
