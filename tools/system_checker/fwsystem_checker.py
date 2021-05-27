@@ -1,10 +1,10 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #
-# Copyright (C) 2019  flexiWAN Ltd.
+# Copyright (C) 2021  flexiWAN Ltd.
 #
 # This program is free software: you can redistribute it and/or modify it under
 # the terms of the GNU Affero General Public License as published by the Free
@@ -41,6 +41,7 @@ import importlib
 import platform
 import sys
 import shutil
+import time
 
 globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
 sys.path.append(globals)
@@ -54,14 +55,14 @@ FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION = 0x4
 FW_EXIT_CODE_ERROR_ABORTED_BY_USER                    = 0x8
 
 hard_checkers = [
-    { 'hard_check_sse42'              : [ True , 'critical' , 'support in SSE 4.2 is required' ] },
-    { 'hard_check_ram'                : [ 4 ,    'critical' , 'at least 4GB RAM is required' ] },
-    { 'hard_check_cpu_number'         : [ 2,     'critical' , 'at least 2 logical CPU-s are required' ] },
-    { 'hard_check_nic_number'         : [ 2,     'critical' , 'at least 2 Network Interfaces are required' ] },
-    { 'hard_check_nic_drivers'        : [ True , 'optional' , 'supported network cards' ] },
-    { 'hard_check_kernel_io_modules'  : [ True , 'optional' , 'kernel has i/o modules' ] },
+    { 'hard_check_sse42'              : [ True , 'critical' , 'Support in SSE 4.2 is required' ] },
+    { 'hard_check_ram'                : [ 4 ,    'critical' , 'At least 4GB RAM is required' ] },
+    { 'hard_check_cpu_number'         : [ 2,     'critical' , 'At least 2 logical CPU-s are required' ] },
+    { 'hard_check_nic_number'         : [ 2,     'critical' , 'At least 2 Network Interfaces are required' ] },
+    { 'hard_check_nic_drivers'        : [ True , 'optional' , 'Supported network cards' ] },
+    { 'hard_check_kernel_io_modules'  : [ True , 'optional' , 'Kernel has i/o modules' ] },
     { 'hard_check_wan_connectivity'   : [ True , 'optional' , 'WAN connectivity is required' ] },
-    { 'hard_check_default_route_connectivity' : [ True, 'optional' ,  'default route should have WAN connectivity' ] }
+    { 'hard_check_default_route_connectivity' : [ True, 'optional' ,  'Default route should have WAN connectivity' ] }
 ]
 
 soft_checkers = [
@@ -69,8 +70,8 @@ soft_checkers = [
     { 'soft_check_hostname_syntax'    : { 'severity': 'critical' , 'interactive': 'must' }},   # This check should be before 'soft_check_hostname_in_hosts', as last might insert bad syntax hostname into /etc/hosts file
     { 'soft_check_hostname_in_hosts'  : { 'severity': 'critical' }},
     { 'soft_check_default_route'      : { 'severity': 'critical' , 'interactive': 'must' }},
-    {'soft_check_multiple_interface_definitions': {'severity': 'critical'}},
-    {'soft_check_duplicate_netplan_sections': {'severity': 'critical'}},
+    { 'soft_check_multiple_interface_definitions': {'severity': 'critical'}},
+    { 'soft_check_duplicate_netplan_sections': {'severity': 'critical'}},
     { 'soft_check_default_routes_metric'         : { 'severity': 'critical' }},
     { 'soft_check_resolvconf'         : { 'severity': 'optional' }},
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
@@ -79,19 +80,22 @@ soft_checkers = [
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-	{ 'soft_check_multi_core_support_requires_RSS'   : { 'severity': 'optional' , 'interactive': 'optional' }},
-    { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }}
-
+    { 'soft_check_multi_core_support_requires_rss'   : { 'severity': 'optional' , 'interactive': 'optional' }},
+    { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }},
+    { 'soft_check_lte_modem_configured_in_mbim_mode': { 'severity': 'critical' }},
+    { 'soft_check_wifi_driver': { 'severity': 'critical' }},
 ]
 
 class TXT_COLOR:
-    BG_SUCCESS          = '\x1b[30;42m'  # Green
     BG_FAILURE_CRITICAL = '\x1b[30;41m'  # Red
     BG_FAILURE_OPTIONAL = '\x1b[30;43m'  # Yellow
-    FG_SUCCESS          = '\x1b[32m'       # Green
-    FG_FAILURE_CRITICAL = '\x1b[31m'       # Red
-    FG_FAILURE_OPTIONAL = '\x1b[33m'       # Yellow
+    BG_WARNING          = '\x1b[30;43m'  # Yellow
+    FG_SUCCESS          = '\x1b[32m'     # Green
+    FG_FAILURE_CRITICAL = '\x1b[31m'     # Red
+    FG_FAILURE_OPTIONAL = '\x1b[33m'     # Yellow
+    FG_SKIPPED          = '\x1b[2;36m'   # Faded Cyan
     FG_BOLD             = '\x1b[1m'
+    FG_FADED            = '\x1b[2m'
     FG_UNDERLINE        = '\x1b[4m'
     END                 = '\x1b[0m'
 
@@ -102,28 +106,33 @@ def checker_name_to_description(checker_name):
 
     :returns: Description.
     """
-    return ' '.join(checker_name.split('_')[1:])
+    result_string = ' '.join(checker_name.split('_')[1:])
+    # convert first character to uppercase
+    return result_string[0].upper() + result_string[1:]
 
-def report_checker_result(succeeded, severity, checker_name, description=None):
+def report_checker_result(succeeded, severity, description, failure_reason=None):
     """Report checker results.
 
     :param succeeded:       Success status.
     :param severity:        Severity level.
-    :param checker_name:    Checker name.
     :param description:     Description.
+    :param failure_reason:  Extended failure info.
 
     :returns: None.
     """
-    if not description:
-        description = checker_name_to_description(checker_name)
-    if succeeded:
-        status   = TXT_COLOR.FG_SUCCESS + ' PASSED ' + TXT_COLOR.END
+    if succeeded is None:
+        status   = TXT_COLOR.FG_SKIPPED + ' SKIPPED ' + TXT_COLOR.END
+    elif succeeded is True:
+        status   = TXT_COLOR.FG_SUCCESS + ' PASSED  ' + TXT_COLOR.END
     else:
         if severity == 'optional':
-            status   = TXT_COLOR.BG_FAILURE_OPTIONAL + ' FAILED ' + TXT_COLOR.END
+            status   = TXT_COLOR.BG_FAILURE_OPTIONAL + ' FAILED  ' + TXT_COLOR.END
         else:
-            status   = TXT_COLOR.BG_FAILURE_CRITICAL + ' FAILED ' + TXT_COLOR.END
-    print('%s: %s : %s' % (status, severity.upper(), description))
+            status   = TXT_COLOR.BG_FAILURE_CRITICAL + ' FAILED  ' + TXT_COLOR.END
+    result_string = '%s: %s : %s' % (status, severity.upper(), description)
+    if failure_reason:
+        result_string = result_string + ' : %s' % failure_reason
+    print(result_string)
 
 def check_hard_configuration(checker, check_only):
     """Check hard configuration.
@@ -135,7 +144,7 @@ def check_hard_configuration(checker, check_only):
     """
     succeeded = True
     for element in hard_checkers:
-        (checker_name, checker_params) = element.items()[0]
+        (checker_name, checker_params) = list(element.items())[0]
 
         # Don't run connectivity checkers in check only mode,
         # as every check waits 5 seconds for ping response on every found interface.
@@ -150,7 +159,7 @@ def check_hard_configuration(checker, check_only):
         result = checker_func(args)
         if not result and severity == 'critical':
             succeeded = False
-        report_checker_result(result, severity, checker_name, description)
+        report_checker_result(result, severity, description)
     return succeeded
 
 def check_soft_configuration(checker, fix=False, quiet=False):
@@ -164,55 +173,61 @@ def check_soft_configuration(checker, fix=False, quiet=False):
     """
     succeeded = True
     for element in soft_checkers:
+        (checker_name, checker_params) = list(element.items())[0]
+        description = checker_name_to_description(checker_name)
+        prompt = description + ': '
 
-        (checker_name, checker_params) = element.items()[0]
-        prompt = checker_name_to_description(checker_name) + ': '
+        try:
+            checker_func = getattr(checker, checker_name)
+            severity     = checker_params['severity']
+            result       = checker_func(fix=False, prompt=prompt)
+            report_checker_result(result, severity, description)
+            go_and_fix = fix
+            if go_and_fix:
+                # No need to fix if result is OK.
+                if result:
+                    go_and_fix = False
 
-        checker_func = getattr(checker, checker_name)
-        severity     = checker_params['severity']
-        result       = checker_func(fix=False, prompt=prompt)
-        report_checker_result(result, severity, checker_name)
+                interactive = '' if not 'interactive' in checker_params \
+                                else checker_params['interactive']
 
-        go_and_fix = fix
-        if go_and_fix:
-            # No need to fix if result is OK.
-            if result:
-                go_and_fix = False
+                # If parameter is adjustable and interactive mode was chosen,
+                # fix the parameter even if result is OK. This is to provide
+                # user with ability to change default configuration.
+                if result and not quiet and interactive == 'optional':
+                    go_and_fix = True
 
-            interactive = '' if not 'interactive' in checker_params \
-                             else checker_params['interactive']
+                # Don't fix if silent was specified but user interaction is required
+                if not result and quiet and interactive == 'must':
+                    go_and_fix = False
 
-            # If parameter is adjustable and interactive mode was chosen,
-            # fix the parameter even if result is OK. This is to provide
-            # user with ability to change default configuration.
-            if result and not quiet and interactive == 'optional':
-                go_and_fix = True
+            if not go_and_fix:
+                if not result and severity == 'critical':
+                    succeeded = False
+                continue
 
-            # Don't fix if silent was specified but user interaction is required
-            if not result and quiet and interactive == 'must':
-               go_and_fix = False
 
-        if not go_and_fix:
-            if not result and severity == 'critical':
-                succeeded = False
-            continue
+            run_check = True
+            if not quiet:
+                while True:
+                    choice = input(prompt + "configure? [y/N/q]: ")
+                    if choice == 'y' or choice == 'Y':
+                        break
+                    elif choice == 'n' or choice == 'N' or choice == '':
+                        run_check = False
+                        break
+                    elif choice == 'q' or choice == 'Q':
+                        sys.exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
 
-        if quiet:
-            result = checker_func(fix=True, silently=True, prompt=prompt)
-            report_checker_result(result, severity, checker_name)
-        else:
-            while True:
-                choice = raw_input(prompt + "configure? [y/N/q]: ")
-                if choice == 'y' or choice == 'Y':
-                    result = checker_func(fix=True, silently=False, prompt=prompt)
-                    report_checker_result(result, severity, checker_name)
-                    break
-                elif choice == 'n' or choice == 'N' or choice == '':
-                    break
-                elif choice == 'q' or choice == 'Q':
-                    sys.exit(FW_EXIT_CODE_ERROR_ABORTED_BY_USER)
-        if not result and severity == 'critical':
-            succeeded = False
+            if run_check:
+                result = checker_func(fix=True, silently=quiet, prompt=prompt)
+                report_checker_result(result, severity, description)
+                if not result and severity == 'critical':
+                    succeeded = False
+
+        except Exception as e:
+            report_checker_result(None, severity, description, str(e))
+
     return succeeded
 
 def reset_system_to_defaults(checker):
@@ -227,7 +242,7 @@ def reset_system_to_defaults(checker):
 
     reboot_needed = False
     while True:
-        choice = raw_input("Resetting to Factory Defaults. Are you sure? [y/N]: ")
+        choice = input("Resetting to Factory Defaults. Are you sure? [y/N]: ")
         if choice == 'n' or choice == 'N' or choice == '':
             return True
         elif choice == 'y' or choice == 'Y':
@@ -241,7 +256,7 @@ def reset_system_to_defaults(checker):
 
     if reboot_needed == True:
         while True:
-            choice = raw_input("Reboot the system? [Y/n]: ")
+            choice = input("Reboot the system? [Y/n]: ")
             if choice == 'n' or choice == 'N':
                 print ("Please reboot the system for changes to take effect.")
                 return True
@@ -261,10 +276,6 @@ def main(args):
     module_name = (flavor + version.replace('.', '')).lower()
     module = importlib.import_module(module_name)
     with module.Checker(args.debug) as checker:
-
-        if checker.lte_interfaces_exists():
-            #  'soft_check_utc_timezone'       : { 'severity': 'critical' }},
-            soft_checkers.append({ 'soft_check_LTE_modem_configured_in_mbim_mode': { 'severity': 'critical' }})
 
         # Check hardware requirements
         # -----------------------------------------
@@ -299,11 +310,11 @@ def main(args):
             return  (soft_status_code | hard_status_code)
 
         # Firstly show to user needed configuration adjustments.
-        # The start intercation with user.
+        # The start interaction with user.
         check_soft_configuration(checker, fix=False)
         choice = 'x'
         while not (choice == '' or choice == '0' or choice == '4'):
-            choice = raw_input(
+            choice = input(
                             "\n" +
                             "\t[0] - quit and use fixed parameters\n" +
                             "\t 1  - check system configuration\n" +
@@ -313,13 +324,13 @@ def main(args):
                             "\t------------------------------------------------\n" +
                             "Choose: ")
             if choice == '1':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=False)
             elif choice == '2':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=True, quiet=True)
             elif choice == '3':
-            	print('')
+                print('')
                 success = check_soft_configuration(checker, fix=True, quiet=False)
             elif choice == '4':
                 print ('')
@@ -328,22 +339,25 @@ def main(args):
                 success = True
 
         if choice == '0' or choice == '':   # Note we restart daemon and not use 'fwagent restart' as fwsystem_checker might change python code too ;)
-	        if success == True:
-                    print ("Please wait..")
-                    os.system("sudo systemctl stop flexiwan-router")
-                    checker.save_config()
-                    if checker.update_grub == True:
-		                rebootSys = 'x'
-                                while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
-                                    rebootSys = raw_input("Changes to OS confugration requires system reboot.\n" +
-                                                    "Would you like to reboot now (Y/n)?")
-                                    if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
-                                        print ("Rebooting...")
-                                        os.system('reboot now')
-                                    else:
-                                        print ("Please reboot the system for changes to take effect.")
+            if success == True:
+                print ("Please wait..")
+                os.system("sudo systemctl stop flexiwan-router")
+                checker.save_config()
+                if checker.update_grub == True:
+                    rebootSys = 'x'
+                    while not (rebootSys == "n" or rebootSys == 'N' or rebootSys == 'y' or rebootSys == 'Y'):
+                        rebootSys = input("Changes to OS confugration requires system reboot.\n" +
+                                        "Would you like to reboot now (Y/n)?")
+                        if rebootSys == 'y' or rebootSys == 'Y' or rebootSys == '':
+                            print ("Rebooting...")
+                            os.system('reboot now')
+                        else:
+                            print ("Please reboot the system for changes to take effect.")
 
                 os.system("sudo systemctl start flexiwan-router")
+                # Wait two seconds for the agent to reload the LTE drivers
+                time.sleep(2)
+
                 print ("Done.")
 
         soft_status_code = FW_EXIT_CODE_OK if success else FW_EXIT_CODE_ERROR_FAILED_TO_FIX_SYSTEM_CONFIGURATION
@@ -361,7 +375,7 @@ if __name__ == '__main__':
     # no reason. Note it is too late to check system, if router was started :)
     #
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        subprocess.check_call(['pidof', 'vpp'])
         # If we reached this point, i.e. if no exception occurred, the vpp pid was found
         print ("error: cannot run fwsystem_checker when the router is running, please stop router first")
         sys.exit(FW_EXIT_CODE_OK)

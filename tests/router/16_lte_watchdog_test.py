@@ -44,7 +44,7 @@ cli_stop_router_file = os.path.join(cli_path, 'stop-router.cli')
 ######################################################################
 
 def lte_disconnect():
-    subprocess.check_output('mbimcli -d /dev/cdc-wdm0 --device-open-proxy --disconnect=0', shell=True)
+    subprocess.check_call('mbimcli -d /dev/cdc-wdm0 --device-open-proxy --disconnect=0', shell=True)
 
 def test():
     with fwtests.TestFwagent() as agent:

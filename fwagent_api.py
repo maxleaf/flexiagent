@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -24,29 +24,42 @@ import json
 import loadsimulator
 import yaml
 import sys
+import subprocess
 import os
 from shutil import copyfile
 import fwglobals
+import fwikev2
 import fwstats
 import fwutils
 import fwsystem_api
 import fwrouter_api
 
 fwagent_api = {
-    'get-device-info':               '_get_device_info',
-    'get-device-stats':              '_get_device_stats',
-    'get-device-logs':               '_get_device_logs',
-    'get-device-packet-traces':      '_get_device_packet_traces',
-    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-certificate':        '_get_device_certificate',
     'get-device-config':             '_get_device_config',
-    'upgrade-device-sw':             '_upgrade_device_sw',
+    'get-device-info':               '_get_device_info',
+    'get-device-logs':               '_get_device_logs',
+    'get-device-os-routes':          '_get_device_os_routes',
+    'get-device-packet-traces':      '_get_device_packet_traces',
+    'get-device-stats':              '_get_device_stats',
+    'get-lte-info':                  '_get_lte_info',
+    'get-wifi-info':                 '_get_wifi_info',
+    'modify-lte-pin':                '_modify_lte_pin',
+    'reset-lte':                     '_reset_lte',
     'reset-device':                  '_reset_device_soft',
     'sync-device':                   '_sync_device',
-    'get-wifi-info':                 '_get_wifi_info',
-    'get-lte-info':                  '_get_lte_info',
-    'reset-lte':                     '_reset_lte',
-    'modify-lte-pin':                '_modify_lte_pin',
+    'upgrade-device-sw':             '_upgrade_device_sw',
 }
+
+class LTE_ERROR_MESSAGES():
+    PIN_IS_WRONG = 'PIN_IS_WRONG'
+    PIN_IS_REQUIRED = 'PIN_IS_REQUIRED'
+    PIN_IS_DISABLED = 'PIN_IS_DISABLED'
+
+    NEW_PIN_IS_REQUIRED = 'NEW_PIN_IS_REQUIRED'
+
+    PUK_IS_WRONG = 'PUK_IS_WRONG'
+    PUK_IS_REQUIRED = 'PUK_IS_REQUIRED'
 
 class FWAGENT_API:
     """This class implements fwagent level APIs of flexiEdge device.
@@ -85,12 +98,21 @@ class FWAGENT_API:
                 if tunnel_id in tunnel_ids:
                     # key1-key4 are the crypto keys stored in
                     # the management for each tunnel
+                    key1 = ""
+                    key2 = ""
+                    key3 = ""
+                    key4 = ""
+                    if "ipsec" in params:
+                        key1 = params["ipsec"]["local-sa"]["crypto-key"]
+                        key2 = params["ipsec"]["local-sa"]["integr-key"]
+                        key3 = params["ipsec"]["remote-sa"]["crypto-key"]
+                        key4 = params["ipsec"]["remote-sa"]["integr-key"]
                     tunnel_info.append({
                         "id": str(tunnel_id),
-                        "key1": params["ipsec"]["local-sa"]["crypto-key"],
-                        "key2": params["ipsec"]["local-sa"]["integr-key"],
-                        "key3": params["ipsec"]["remote-sa"]["crypto-key"],
-                        "key4": params["ipsec"]["remote-sa"]["integr-key"]
+                        "key1": key1,
+                        "key2": key2,
+                        "key3": key3,
+                        "key4": key4
                     })
 
             except Exception as e:
@@ -112,8 +134,10 @@ class FWAGENT_API:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
-            info['network']['interfaces'] = fwutils.get_linux_interfaces(cached=False).values()
+            info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
+            if fwglobals.g.ikev2.is_private_key_created():
+                info['ikev2'] = fwglobals.g.ikev2.get_certificate_expiration()
             # Load tunnel info, if requested by the management
             if params and params['tunnels']:
                 info['tunnels'] = self._prepare_tunnel_info(params['tunnels'])
@@ -170,7 +194,7 @@ class FWAGENT_API:
             'vpp': fwglobals.g.VPP_LOG_FILE,
             'ospf': fwglobals.g.OSPF_LOG_FILE,
             'hostapd': fwglobals.g.HOSTAPD_LOG_FILE,
-            'agentui': fwglobals.g.AGNET_UI_LOG_FILE
+            'agentui': fwglobals.g.AGENT_UI_LOG_FILE
 	    }
         file = dl_map.get(params['filter'], '')
         try:
@@ -245,7 +269,7 @@ class FWAGENT_API:
         :returns: Dictionary with status code.
         """
         if fwglobals.g.router_api.state_is_started():
-            fwglobals.g.router_api.call({'message':'stop-router'})   # Stop VPP if it runs
+            fwglobals.g.handle_request({'message':'stop-router'})   # Stop VPP if it runs
         fwutils.reset_device_config()
         return {'ok': 1}
 
@@ -269,7 +293,7 @@ class FWAGENT_API:
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
-        for module_name, module in fwglobals.modules.items():
+        for module_name, module in list(fwglobals.modules.items()):
             if module.get('sync', False) == True:
                 # get api module. e.g router_api, system_api
                 api_module = getattr(fwglobals.g, module.get('object'))
@@ -298,43 +322,45 @@ class FWAGENT_API:
             raise Exception("_get_wifi_info: %s" % str(e))
 
     def _get_lte_info(self, params):
-        interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
+        try:
+            interface_name = fwutils.dev_id_to_linux_if(params['dev_id'])
 
-        sim_status = fwutils.lte_sim_status(params['dev_id'])
-        signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
-        hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
-        packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
-        system_info = fwutils.lte_get_system_info(params['dev_id'])
-        default_settings = fwutils.lte_get_default_settings(params['dev_id'])
-        phone_number = fwutils.lte_get_phone_number(params['dev_id'])
-        pin_state = fwutils.lte_get_pin_state(params['dev_id'])
-        connection_state = fwutils.mbim_connection_state(params['dev_id'])
-        registration_network = fwutils.mbim_registration_state(params['dev_id'])
+            sim_status = fwutils.lte_sim_status(params['dev_id'])
+            signals = fwutils.lte_get_radio_signals_state(params['dev_id'])
+            hardware_info = fwutils.lte_get_hardware_info(params['dev_id'])
+            packet_service_state = fwutils.lte_get_packets_state(params['dev_id'])
+            system_info = fwutils.lte_get_system_info(params['dev_id'])
+            default_settings = fwutils.lte_get_default_settings(params['dev_id'])
+            phone_number = fwutils.lte_get_phone_number(params['dev_id'])
+            pin_state = fwutils.lte_get_pin_state(params['dev_id'])
+            connection_state = fwutils.mbim_connection_state(params['dev_id'])
+            registration_network = fwutils.mbim_registration_state(params['dev_id'])
 
-        is_assigned = fwutils.is_interface_assigned_to_vpp(params['dev_id'])
-        if fwutils.vpp_does_run() and is_assigned:
-            interface_name = fwutils.dev_id_to_tap(params['dev_id'])
+            tap_name = fwutils.dev_id_to_tap(params['dev_id'], check_vpp_state=True)
+            if tap_name:
+                interface_name = tap_name
 
-        addr = fwutils.get_interface_address(interface_name)
-        connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
+            addr = fwutils.get_interface_address(interface_name)
+            connectivity = os.system("ping -c 1 -W 1 -I %s 8.8.8.8 > /dev/null 2>&1" % interface_name) == 0
 
-        response = {
-            'address'             : addr,
-            'signals'             : signals,
-            'connectivity'        : connectivity,
-            'packet_service_state': packet_service_state,
-            'hardware_info'       : hardware_info,
-            'system_info'         : system_info,
-            'sim_status'          : sim_status,
-            'default_settings'    : default_settings,
-            'phone_number'        : phone_number,
-            'pin_state'           : pin_state,
-            'connection_state'    : connection_state,
-            'registration_network': registration_network
-        }
-
-        return {'message': response, 'ok': 1}
-
+            response = {
+                'address'             : addr,
+                'signals'             : signals,
+                'connectivity'        : connectivity,
+                'packet_service_state': packet_service_state,
+                'hardware_info'       : hardware_info,
+                'system_info'         : system_info,
+                'sim_status'          : sim_status,
+                'default_settings'    : default_settings,
+                'phone_number'        : phone_number,
+                'pin_state'           : pin_state,
+                'connection_state'    : connection_state,
+                'registration_network': registration_network
+            }
+            return {'message': response, 'ok': 1}
+        except Exception as e:
+            fwglobals.log.error('Failed to get LTE information. %s' % str(e))
+            return {'message': str(e), 'ok': 0}
 
     def _reset_lte(self, params):
         """Reset LTE modem card.
@@ -354,54 +380,117 @@ class FWAGENT_API:
             reply = {'ok': 0, 'message': str(e)}
         return reply
 
+    def _handle_unblock_sim(self, params):
+        dev_id = params['dev_id']
+        puk = params.get('puk')
+        new_pin = params.get('newPin')
+
+        if not puk:
+            raise Exception(LTE_ERROR_MESSAGES.PUK_IS_REQUIRED)
+
+        if not new_pin:
+            raise Exception(LTE_ERROR_MESSAGES.NEW_PIN_IS_REQUIRED)
+
+        # unblock the sim and get the updated status
+        updated_status = fwutils.qmi_unblocked_pin(dev_id, puk, new_pin)
+        updated_pin_state = updated_status.get('PIN1_STATUS')
+
+        # if SIM status is not one of below statuses, it means that puk code is wrong
+        if updated_pin_state not in['disabled', 'enabled-verified']:
+            raise Exception(LTE_ERROR_MESSAGES.PUK_IS_WRONG)
+
+    def _handle_change_pin_status(self, params):
+        dev_id = params['dev_id']
+        current_pin = params.get('currentPin')
+        enable = params.get('enable', False)
+
+        updated_status, err = fwutils.qmi_set_pin_protection(dev_id, current_pin, enable)
+        if err:
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
+
+        # at this point, pin is verified so we reset wrong pin protection
+        fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
+
+    def _handle_change_pin_code(self, params, is_currently_enabled):
+        dev_id = params['dev_id']
+        current_pin = params.get('currentPin')
+        new_pin = params.get('newPin')
+
+        if not is_currently_enabled: # can't change disabled pin
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_DISABLED)
+        updated_status, err = fwutils.qmi_change_pin(dev_id, current_pin, new_pin)
+        if err:
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
+
+        # at this point, pin is changed so we reset wrong pin protection
+        fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
+
+    def _handle_verify_pin_code(self, params, is_currently_enabled, retries_left):
+        dev_id = params['dev_id']
+        current_pin = params.get('currentPin')
+
+        updated_status, err = fwutils.qmi_verify_pin(dev_id, current_pin)
+        if err and not is_currently_enabled: # can't verify disabled pin
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_DISABLED)
+        if err:
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
+
+        updated_pin_state = updated_status.get('PIN1_STATUS')
+        updated_retries_left = updated_status.get('PIN1_RETRIES', '3')
+        if updated_retries_left != '3' and int(retries_left) > int(updated_retries_left):
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
+        if updated_pin_state not in['disabled', 'enabled-verified']:
+            raise Exception(LTE_ERROR_MESSAGES.PIN_IS_WRONG)
+
+        # at this point, pin is verified so we reset wrong pin protection
+        fwutils.set_lte_db_entry(dev_id, 'wrong_pin', None)
+
     def _modify_lte_pin(self, params):
         try:
             dev_id = params['dev_id']
             new_pin = params.get('newPin')
             current_pin = params.get('currentPin')
             enable = params.get('enable', False)
-            puk = params.get('puk')
 
             current_pin_state = fwutils.lte_get_pin_state(dev_id)
             is_currently_enabled = current_pin_state.get('PIN1_STATUS') != 'disabled'
             retries_left = current_pin_state.get('PIN1_RETRIES', '3')
 
-            # check if blocked and puk isn't provided
-            if retries_left == '0' and not puk:
-                return {'ok': 0, 'message': 'The PIN is locked. Please unblocked it with PUK code'}
+            # Handle blocked SIM card. In order to unblock it a user should provide PUK code and new PIN code
+            if current_pin_state.get('PIN1_STATUS') == 'blocked' or retries_left == '0':
+                self._handle_unblock_sim(params)
+                return {'ok': 1, 'message': { 'err_msg': None, 'data': fwutils.lte_get_pin_state(dev_id)}}
 
-            if current_pin_state.get('PIN1_STATUS') == 'blocked':
-                if not puk or not new_pin:
-                    return {'ok': 0, 'message': 'The PIN is locked. Please provide PUK code and new PIN number'}
-                # unblock
-                updated_status = fwutils.qmi_unblocked_pin(dev_id, puk, new_pin)
-                updated_pin_state = updated_status.get('PIN1_STATUS')
-                if updated_pin_state not in['disabled', 'enabled-verified']:
-                    return {'ok': 0, 'message': 'PUK is wrong'}
-
-                return {'ok': 1, 'message': ''}
-
+            # for the following operations we need current pin
             if not current_pin:
-                return {'ok': 0, 'message': 'PIN is required'}
+                raise Exception(LTE_ERROR_MESSAGES.PIN_IS_REQUIRED)
 
-            # verify pin first
-            updated_status = fwutils.qmi_verify_pin(dev_id, current_pin)
-            updated_pin_state = updated_status.get('PIN1_STATUS')
-            updated_retries_left = updated_status.get('PIN1_RETRIES', 3)
-            if updated_retries_left != '3' and retries_left != updated_retries_left:
-                return {'ok': 0, 'message': 'PIN is wrong'}
-            if updated_pin_state not in['disabled', 'enabled-verified']:
-                return {'ok': 0, 'message': 'PIN is wrong'}
-
-            # check if need to enable/disable
+            need_to_verify = True
+            # check if need to enable/disable PIN
             if is_currently_enabled != enable:
-                fwutils.qmi_set_pin_protection(dev_id, current_pin, enable)
+                self._handle_change_pin_status(params)
+                need_to_verify = False
 
-            # check if need to change
+            # check if need to change PIN
             if new_pin and new_pin != current_pin:
-                fwutils.qmi_change_pin(dev_id, current_pin, new_pin)
+                self._handle_change_pin_code(params, is_currently_enabled)
+                need_to_verify = False
 
-            reply = {'ok': 1, 'message': ''}
+            # verify PIN if no other change requested by the user.
+            # no need to verify if we enabled or disabled the pin since it's already verified
+            if need_to_verify:
+                self._handle_verify_pin_code(params, is_currently_enabled, retries_left)
+
+            reply = {'ok': 1, 'message': { 'err_msg': None, 'data': fwutils.lte_get_pin_state(dev_id)}}
         except Exception as e:
-            reply = {'ok': 0, 'message': str(e)}
+            reply = {'ok': 0, 'message': { 'err_msg': str(e), 'data': fwutils.lte_get_pin_state(dev_id)} }
         return reply
+
+    def _get_device_certificate(self, params):
+        """IKEv2 certificate generation.
+
+        :param params: Parameters from flexiManage.
+
+        :returns: Dictionary with status code.
+        """
+        return fwglobals.g.ikev2.create_private_key(params['days'], params['new'])

@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -44,8 +44,8 @@ template_path = os.path.abspath(TEST_ROOT + '/fwtemplates.yaml')
 
 class TestFwagent:
     def __init__(self):
-        self.fwagent_py = 'python ' + os.path.join(CODE_ROOT, 'fwagent.py')
-        self.fwkill_py  = 'python ' + os.path.join(CODE_ROOT, 'tools', 'common', 'fwkill.py')
+        self.fwagent_py = 'python3 ' + os.path.join(CODE_ROOT, 'fwagent.py')
+        self.fwkill_py  = 'python3 ' + os.path.join(CODE_ROOT, 'tools', 'common', 'fwkill.py')
         self.set_log_start_marker()
 
     def __enter__(self):
@@ -160,11 +160,11 @@ class TestFwagent:
                 #
                 timeout = 120
                 cmd = '%s show --status daemon' % (self.fwagent_py)
-                out = subprocess.check_output(cmd, shell=True)
+                out = subprocess.check_output(cmd, shell=True).decode()
                 while out.strip() != 'running' and timeout > 0:
                     time.sleep(1)
                     timeout -= 1
-                    out = subprocess.check_output(cmd, shell=True)
+                    out = subprocess.check_output(cmd, shell=True).decode()
                 if timeout == 0:
                     return (False, "timeout (%s seconds) on wainting for daemon to start" % (timeout))
             except Exception as e:
@@ -176,7 +176,7 @@ class TestFwagent:
         # created, API command will be run on it, and instance will be destroyed.
         #
         cmd = '%s cli %s -t %s' % (self.fwagent_py, args, template_path)
-        out = subprocess.check_output(cmd, shell=True).strip()
+        out = subprocess.check_output(cmd, shell=True).decode().strip()
 
         # Deserialize object printed by CLI onto STDOUT
         match = re.search('return-value-start (.*) return-value-end', out)
@@ -209,7 +209,7 @@ class TestFwagent:
 
     def show(self, args):
         cmd = '%s show %s' % (self.fwagent_py, args)
-        out = subprocess.check_output(cmd, shell=True)
+        out = subprocess.check_output(cmd, shell=True).decode()
         return out.rstrip()
 
     def grep_log(self, pattern, print_findings=True, since=None):
@@ -219,7 +219,7 @@ class TestFwagent:
 
         grep_cmd = "sudo grep -a -E '%s' /var/log/flexiwan/agent.log" % pattern
         try:
-            out = subprocess.check_output(grep_cmd, shell=True)
+            out = subprocess.check_output(grep_cmd, shell=True).decode()
             if out:
                 lines = out.splitlines()
                 for (idx, line) in enumerate(lines):
@@ -262,7 +262,7 @@ def vpp_does_run():
 
 def vpp_pid():
     try:
-        pid = subprocess.check_output(['pidof', 'vpp'])
+        pid = subprocess.check_output(['pidof', 'vpp']).decode()
     except:
         pid = None
     return pid
@@ -270,14 +270,14 @@ def vpp_pid():
 def fwagent_daemon_pid():
     try:
         cmd = "ps -ef | egrep 'fwagent.* daemon' | grep -v grep | tr -s ' ' | cut -d ' ' -f2"
-        pid = subprocess.check_output(cmd, shell=True)
+        pid = subprocess.check_output(cmd, shell=True).decode()
     except:
         pid = None
     return pid
 
 def linux_interfaces_count():
     cmd = 'ls -A /sys/class/net | wc -l'
-    count = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).strip()
+    count = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).decode().strip()
     return int(count)
 
 def linux_interfaces_are_configured(expected_count, print_error=True):
@@ -296,7 +296,7 @@ def vpp_is_configured(config_entities, print_error=True):
         # We need it to read output of 'vppctl' command that might exit abnormally
         # on 'clib_socket_init: connect (fd 3, '/run/vpp/cli.sock'): Connection refused' error.
         p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        (out, _) = p.communicate()
+        out = p.communicate()[0].decode()
         retcode = p.poll()
         return (retcode, out.rstrip())
 
@@ -330,8 +330,8 @@ def vpp_is_configured(config_entities, print_error=True):
         if e == 'tunnels':
             # Count number of existing tunnel
             # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
-            cmd          = "sudo vppctl sh ipsec gre tunnel | grep src | wc -l"
-            cmd_on_error = "sudo vppctl sh ipsec gre tunnel"
+            cmd          = "sudo vppctl sh gre tunnel | grep src | wc -l"
+            cmd_on_error = "sudo vppctl sh gre tunnel"
             if not _check_command_output(cmd, output, 'tunnels', cmd_on_error, print_error):
                 cmd          = "sudo vppctl show vxlan tunnel | grep src | wc -l"
                 cmd_on_error = "sudo vppctl show vxlan tunnel"
@@ -344,7 +344,7 @@ def vpp_is_configured(config_entities, print_error=True):
             continue
         if e == 'multilink-policies':
             # Count number of existing tunnel
-            # Firstly try ipsec gre tunnels. If not found, try the vxlan tunnels.
+            # Firstly try  tunnels. If not found, try the vxlan tunnels.
             cmd          = "sudo vppctl show fwabf policy | grep fwabf: | wc -l"
             cmd_on_error = "sudo vppctl show fwabf policy"
             if not _check_command_output(cmd, output, 'multilink-policies', cmd_on_error, print_error):
@@ -420,7 +420,7 @@ def wait_vpp_to_be_configured(cfg_to_check, timeout=1000000):
 
 def file_exists(filename, check_size=True):
     try:
-        file_size_str = subprocess.check_output("sudo stat -c %%s %s 2>/dev/null" % filename, shell=True)
+        file_size_str = subprocess.check_output("sudo stat -c %%s %s 2>/dev/null" % filename, shell=True).decode()
     except subprocess.CalledProcessError:
         return False
     if check_size and int(file_size_str.rstrip()) == 0:
@@ -428,16 +428,16 @@ def file_exists(filename, check_size=True):
     return True
 
 def router_is_configured(expected_cfg_dump_filename,
-                         fwagent_py='python /usr/share/flexiwan/agent/fwagent.py',
+                         fwagent_py='python3 /usr/share/flexiwan/agent/fwagent.py',
                          print_error=True):
     # Dumps current agent configuration into temporary file and checks
     # if the dump file is equal to the provided expected dump file.
     actual_cfg_dump_filename = expected_cfg_dump_filename + ".actual.txt"
     replaced_expected_cfg_dump_filename = expected_cfg_dump_filename + ".replaced.txt"
 
-    dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True)
-    dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True)
-    dump_system = subprocess.check_output("sudo %s show --configuration system" % fwagent_py, shell=True)
+    dump_configuration = subprocess.check_output("sudo %s show --configuration router" % fwagent_py, shell=True).decode()
+    dump_multilink = subprocess.check_output("sudo %s show --configuration multilink-policy" % fwagent_py, shell=True).decode()
+    dump_system = subprocess.check_output("sudo %s show --configuration system" % fwagent_py, shell=True).decode()
 
     actual_json = json.loads(dump_configuration)
     if dump_multilink.strip():

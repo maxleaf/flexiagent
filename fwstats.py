@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -21,7 +21,9 @@
 ################################################################################
 
 # Handle device statistics
+import fwikev2
 import fwutils
+import math
 import time
 import loadsimulator
 import psutil
@@ -74,8 +76,8 @@ def update_stats():
                 if_bytes = {}
                 tunnel_stats = tunnel_stats_get()
                 fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
-                for intf, counts in stats['last'].items():
-                    if (intf.startswith('ipsec-gre') or
+                for intf, counts in list(stats['last'].items()):
+                    if (intf.startswith('gre') or
                         intf.startswith('loop')): continue
                     prev_stats_if = prev_stats['last'].get(intf, None)
                     if prev_stats_if != None:
@@ -91,7 +93,7 @@ def update_stats():
                             }
                         if (intf.startswith('vxlan_tunnel')):
                             vxlan_id = int(intf[12:])
-                            tunnel_id = vxlan_id/2
+                            tunnel_id = math.floor(vxlan_id/2)
                             t_stats = tunnel_stats.get(tunnel_id)
                             if t_stats:
                                 t_stats.update(calc_stats)
@@ -144,10 +146,12 @@ def get_system_health():
     try:
         temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
         all_temp = psutil.sensors_temperatures()
-        for ttype, templist in all_temp.items():
-            for temp in templist:
-                if temp.current > temp_stats['value']:
-                    temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}
+        for ttype, templist in list(all_temp.items()):
+            if ttype == 'coretemp':
+                temp = templist[0]
+                if temp.current: temp_stats['value'] = temp.current
+                if temp.high: temp_stats['high'] = temp.high
+                if temp.critical: temp_stats['critical'] = temp.critical
     except Exception as e:
         fwglobals.log.excep("Error getting temperature stats: %s" % str(e))
 
@@ -162,6 +166,7 @@ def get_stats():
     del updates_list[:]
 
     reconfig = fwutils.get_reconfig_hash()
+    ikev2_certificate_expiration = fwglobals.g.ikev2.get_certificate_expiration()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
@@ -175,7 +180,7 @@ def get_stats():
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()
     if not res_update_list:
-        res_update_list.append({
+        info = {
             'ok': stats['ok'],
             'running': status,
             'state': state,
@@ -186,13 +191,18 @@ def get_stats():
             'period': 0,
             'utc': time.time(),
             'reconfig': reconfig
-        })
+        }
+        if fwglobals.g.ikev2.is_private_key_created():
+            info['ikev2'] = ikev2_certificate_expiration
+        res_update_list.append(info)
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
         res_update_list[-1]['health'] = get_system_health()
+        if fwglobals.g.ikev2.is_private_key_created():
+            res_update_list[-1]['ikev2'] = ikev2_certificate_expiration
 
     return {'message': res_update_list, 'ok': 1}
 
@@ -211,4 +221,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False, 'ikev2':''}

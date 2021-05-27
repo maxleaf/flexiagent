@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -41,7 +41,7 @@ def _copyfile(source_name, dest_name, buffer_size=1024*1024):
             fwutils.file_write_and_flush(dest, copy_buffer)
 
 def backup_linux_netplan_files():
-    for values in fwglobals.g.NETPLAN_FILES.values():
+    for values in list(fwglobals.g.NETPLAN_FILES.values()):
         fname = values.get('fname')
         fname_backup = fname + '.fw_run_orig'
         fname_run = fname.replace('yaml', 'fwrun.yaml')
@@ -74,15 +74,24 @@ def restore_linux_netplan_files():
     if files:
         fwutils.netplan_apply('restore_linux_netplan_files')
 
-def load_netplan_filenames(get_only=False):
+def load_netplan_filenames(read_from_disk=False, get_only=False):
     '''Parses currently active netplan yaml files into dict of device info by
     interface name, where device info is represented by tuple:
     (<netplan filename>, <interface name>, <gw>, <dev_id>, <set-name name>).
     Than the parsed info is loaded into fwglobals.g.NETPLAN_FILES cache.
 
+    :param read_from_disk: if True it means that we need to fill the cache with the data that stored on the disk.
     :param get_only: if True the parsed info is not loaded into cache.
     '''
-    output = subprocess.check_output('ip route show default', shell=True).strip()
+
+    if read_from_disk:
+        netplan_filenames = fwglobals.g.db.get('netplan', {}).get('filenames')
+        if netplan_filenames:
+            fwglobals.log.debug("load_netplan_filenames: loading from disk. %s" % str(netplan_filenames))
+            fwglobals.g.NETPLAN_FILES = dict(netplan_filenames)
+            return fwglobals.g.NETPLAN_FILES
+
+    output = subprocess.check_output('ip route show default', shell=True).decode().strip()
     routes = output.splitlines()
 
     devices = {}
@@ -130,7 +139,7 @@ def load_netplan_filenames(get_only=False):
     if get_only:
         return our_files
 
-    for fname, devices in our_files.items():
+    for fname, devices in list(our_files.items()):
         for dev in devices:
             dev_id = dev.get('dev_id')
             ifname = dev.get('ifname')
@@ -138,6 +147,14 @@ def load_netplan_filenames(get_only=False):
             if dev_id:
                 fwglobals.g.NETPLAN_FILES[dev_id] = {'fname': fname, 'ifname': ifname, 'set-name': set_name}
                 fwglobals.log.debug('load_netplan_filenames: %s(%s) uses %s' % (ifname, dev_id, fname))
+
+    # Save the disk cache for use when needed
+    netplan = fwglobals.g.db.get('netplan')
+    if not netplan:
+        fwglobals.g.db['netplan'] = {}
+    netplan_db = fwglobals.g.db['netplan']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    netplan_db['filenames'] = fwglobals.g.NETPLAN_FILES
+    fwglobals.g.db['netplan'] = netplan_db
 
 
 def _add_netplan_file(fname):
@@ -161,16 +178,84 @@ def _dump_netplan_file(fname):
               % (fname, str(e))
             fwglobals.log.error(err_str)
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_name=None, wan_failover=False):
+def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsServers, dnsDomains):
+    if 'dhcp6' in config_section:
+        del config_section['dhcp6']
+
+    nameservers = config_section.get('nameservers', {})
+    if dnsServers:
+        nameservers['addresses'] = dnsServers
+        config_section['nameservers'] = nameservers
+
+    if dnsDomains:
+        nameservers['search'] = dnsDomains
+        config_section['nameservers'] = nameservers
+
+    if re.match('yes', dhcp):
+        if 'addresses' in config_section:
+            del config_section['addresses']
+        if 'routes' in config_section:
+            del config_section['routes']
+        if 'gateway4' in config_section:
+            del config_section['gateway4']
+
+        config_section['dhcp4'] = True
+        config_section['dhcp4-overrides'] = {'route-metric': metric}
+
+        # If a user doesn't specify static DNS servers and domains, use DNS that received from DHCP
+        if not dnsServers and not dnsDomains and 'nameservers' in config_section:
+            del config_section['nameservers']
+
+        # Override DNS info received from DHCP server with those configured by the user
+        if dnsServers:
+            config_section['dhcp4-overrides']['use-dns'] = False
+        elif config_section.get('nameservers', {}).get('addresses'):
+            del config_section['nameservers']['addresses']
+
+        if dnsDomains:
+            config_section['dhcp4-overrides']['use-domains'] = False
+        elif config_section.get('nameservers', {}).get('search'):
+            del config_section['nameservers']['search']
+
+        return config_section
+
+    # Static IP
+    config_section['dhcp4'] = False
+    if 'dhcp4-overrides' in config_section:
+        del config_section['dhcp4-overrides']
+    config_section['addresses'] = [ip]
+
+    if not gw or type != 'WAN':
+        return config_section
+
+    # WAN interface configuration
+    default_route_found = False
+    routes = config_section.get('routes', [])
+    for route in routes:
+        if route['to'] == '0.0.0.0/0':
+            default_route_found = True
+            route['metric']     = metric
+            route['via']        = gw
+            break
+    if not default_route_found:
+        routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
+        config_section['routes'] = routes   # Handle case where there is no 'routes' section
+    if 'gateway4' in config_section:
+        del config_section['gateway4']
+
+    return config_section
+
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
     '''
     :param metric:  integer (whole number)
     '''
-    config_section = {}
+
     old_ethernets = {}
 
     fwglobals.log.debug(
-        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, if_name=%s, wan_failover=%s" % \
-        (is_add, dev_id, ip, gw, metric, dhcp, type, if_name, str(wan_failover)))
+        "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
+         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(wan_failover)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -216,45 +301,25 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
 
         ethernets = network['ethernets']
 
+        config_section = {}
         if old_ethernets:
             if old_ifname in old_ethernets:
-                config_section = old_ethernets[old_ifname]
+                config_section = dict(old_ethernets[old_ifname])
 
-        if 'dhcp6' in config_section:
-            del config_section['dhcp6']
+        if mtu:
+            config_section['mtu'] = mtu
 
-        if re.match('yes', dhcp):
-            if 'addresses' in config_section:
-                del config_section['addresses']
-            if 'routes' in config_section:
-                del config_section['routes']
-            if 'gateway4' in config_section:
-                del config_section['gateway4']
-            if 'nameservers' in config_section:
-                del config_section['nameservers']
+        # Configure DHCP related logic
+        config_section = _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsServers, dnsDomains)
 
-            config_section['dhcp4'] = True
-            config_section['dhcp4-overrides'] = {'route-metric': metric}
-        else:
-            config_section['dhcp4'] = False
-            if 'dhcp4-overrides' in config_section:
-                del config_section['dhcp4-overrides']
-            config_section['addresses'] = [ip]
-
-            if gw and type == 'WAN':
-                default_route_found = False
-                routes = config_section.get('routes', [])
-                for route in routes:
-                    if route['to'] == '0.0.0.0/0':
-                        default_route_found = True
-                        route['metric']     = metric
-                        route['via']        = gw
-                        break
-                if not default_route_found:
-                    routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
-                    config_section['routes'] = routes   # Handle case where there is no 'routes' section
-                if 'gateway4' in config_section:
-                    del config_section['gateway4']
+        # Note, for the LTE interface we have two interfaces.
+        # The physical interface (wwan0) and the vppsb(vppX) interface.
+        # Both of them have the same dev_id, so we return True from `is_lte_interface()` for both of them.
+        # We set the IP configuration only on the vppsb.
+        # But if the user has configured in the netplan file also the LTE with set-name option,
+        # we need to make sure that in any action, of any kind, that set-name will apply to the physical interface.
+        # Note the comments below in the appropriate places.
+        is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
 
         if is_add == 1:
             if old_ifname in ethernets:
@@ -262,17 +327,58 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
             if set_name in ethernets:
                 del ethernets[set_name]
 
+            # For LTE interface with set-name we need to keep the `set-name` on the physical interface and not for the vppsb (see explanation above)
             if set_name:
-                ethernets[set_name] = config_section
+                if not is_lte:
+                    ethernets[set_name] = config_section
+                else:
+                    del config_section['set-name']
+                    del config_section['match'] # set-name requires 'match' property
+                    ethernets[ifname] = config_section
+
+                    # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
+                    # So for lte with set-name both interfaces should be listed in netplan files.
+                    # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
+                    if old_ethernets and old_ifname in old_ethernets:
+                        ethernets[old_ifname] = old_ethernets[old_ifname]
+
+                        # When vpp runs, we don't need the nameservers on the physical interface but the vppsb
+                        if 'nameservers' in ethernets[old_ifname]:
+                            del ethernets[old_ifname]['nameservers']
             else:
                 ethernets[ifname] = config_section
         else:
+            # remove interface
             if set_name:
-                if set_name in ethernets:
-                    del ethernets[set_name]
+                # For the LTE interface with set-name,
+                # when we want to remove it from netplan, we have here three variables:
+                #    'set_name' which is the new name for the physical interface(WANLTE)
+                #    'ifname' which is the vppsb interface name (vpp1).
+                #    'old_ifname' which is the original lte interface name (wwan0)
+                #
+                # 'ethernets' at this point looks:
+                # {
+                #   'eno1': ...,
+                #   'eno2': ...,
+                #   'vpp1': {
+                #       'addresses': ['10.95.246.39/28'],
+                #       'dhcp4': False,
+                #       'mtu': 1500,
+                #       'nameservers': {'addresses': ['91.135.104.8', '91.135.102.8']},
+                #       'routes': [{'metric': 150, 'to': '0.0.0.0/0', 'via': '10.95.246.40'}]},
+                #    'wwan0': {'match': {'macaddress': 'ba:2a:be:44:38:e8'}, 'set-name': 'WANLTE'}
+                # }
+                # So we need to clear the ip configuration for vpp1, and keep the the set-name on the wwan0
+                if is_lte:
+                    if ifname in ethernets:
+                        del ethernets[ifname]
+                else:
+                    if set_name in ethernets:
+                        del ethernets[set_name]
             else:
                 if ifname in ethernets:
                     del ethernets[ifname]
+
             if old_ethernets:
                 if old_ifname in old_ethernets:
                     ethernets[old_ifname] = old_ethernets[old_ifname]
@@ -282,11 +388,15 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, if_
             stream.flush()
             os.fsync(stream.fileno())
 
+        # Remove default route from ip table because Netplan is not doing it.
+        if not is_add and type == 'WAN':
+            fwutils.remove_linux_default_route(ifname)
+
         fwutils.netplan_apply('add_remove_netplan_interface')
 
         # make sure IP address is applied in Linux.
         if is_add and set_name:
-            if set_name != ifname:
+            if set_name != ifname and not is_lte:
                 cmd = 'ip link set %s name %s' % (ifname, set_name)
                 fwglobals.log.debug(cmd)
                 os.system(cmd)
@@ -379,7 +489,7 @@ def _has_ip(if_name, dhcp):
     #   to the previous configuration
     #
     if dhcp:
-        (_, dev, _) = fwutils.get_default_route()
+        (_, dev, _, _) = fwutils.get_default_route()
         if if_name != dev:
             return True
 

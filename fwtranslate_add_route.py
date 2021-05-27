@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -102,7 +102,7 @@ def get_request_key(params):
     else:
         key = 'add-route:%s:%s' % (params['addr'], params['via'])
 
-    if 'metric' in params.keys() and len(str(params['metric'])) > 0:
+    if params.get('metric'):
         key += ':' + str(params['metric'])
 
     return key

@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -101,21 +101,35 @@ def add_interface(params):
     dhcp      = params.get('dhcp', 'no')
     int_type  = params.get('type', None)
 
+    dnsServers  = params.get('dnsServers', [])
+    # If for any reason, static IP interface comes without static dns servers, we set the default automatically
+    if int_type == 'wan' and dhcp == 'no' and len(dnsServers) == 0:
+        dnsServers = fwglobals.g.DEFAULT_DNS_SERVERS
+    dnsDomains  = params.get('dnsDomains')
+
+    mtu       = params.get('mtu', None)
+
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
     is_non_dpdk = is_wifi or is_lte
 
     if is_non_dpdk:
-        # create tap for this interface in vpp and linux
+        # Create tap interface in linux and vpp.
+        # This command will create three interfaces:
+        #   1. linux tap interface.
+        #   2. vpp tap interface in vpp.
+        #   3. linux interface for tap-inject.
+        #
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'configure_tap_in_linux_and_vpp',
-                    'args': { 'linux_if_name': iface_name }
-        }
-        cmd['cmd']['descr'] = "create tap interface in linux and vpp"
+        cmd['cmd']['name']    = "exec"
+        cmd['cmd']['descr']   = "create tap interface in vpp and linux"
+        cmd['cmd']['params']  = ["sudo vppctl create tap host-if-name %s" % fwutils.generate_linux_interface_short_name("tap", iface_name)]
+        cmd['revert'] = {}
+        cmd['revert']['name']    = "exec"
+        cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]},
+                                        "sudo vppctl delete tap sw_if_index DEV-TAP" ]
+        cmd['revert']['descr']  = "delete tap interface in vpp and linux"
         cmd_list.append(cmd)
 
         if is_wifi:
@@ -210,7 +224,7 @@ def add_interface(params):
             cmd['revert'] = {}
             cmd['revert']['name']   = "exec"
             cmd['revert']['descr']  = "Down interface %s in Linux" % iface_name
-            cmd['revert']['params'] = [ "sudo ip link set dev %s down" %  iface_name]
+            cmd['revert']['params'] = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" %  (iface_name, iface_name)]
             cmd_list.append(cmd)
 
             # connect the modem to the cellular provider
@@ -258,15 +272,22 @@ def add_interface(params):
                     'gw'       : gw,
                     'metric'   : metric,
                     'dhcp'     : dhcp,
-                    'type'     : int_type
+                    'type'     : int_type,
+                    'mtu'      : mtu,
+                    'dnsServers': dnsServers,
+                    'dnsDomains': dnsDomains
         }
     }
 
     if is_lte:
         netplan_params['substs'] = [
             { 'add_param':'ip', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'ip'] },
-            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] }
+            { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] },
         ]
+
+        # If a user doesn't configure static dns servers, we use the servers received from ISP
+        if len(dnsServers) == 0:
+            netplan_params['substs'].append({ 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] })
 
     cmd = {}
     cmd['cmd'] = {}
@@ -279,6 +300,18 @@ def add_interface(params):
     cmd['revert']['params']['args']['is_add'] = 0
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
+
+    if mtu:
+        # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "sw_interface_set_mtu"
+        cmd['cmd']['descr']   = "set mtu=%s to interface" % (mtu)
+        cmd['cmd']['params']  = {
+            'substs':[{ 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
+            'mtu': [ mtu , 0, 0, 0 ]
+            }
+        cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
     if not is_wifi and 'multilink' in params and 'labels' in params['multilink']:
@@ -330,10 +363,9 @@ def add_interface(params):
         cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
         cmd['cmd']['params']    = {
                                     'module': 'fwutils',
-                                    'func':   'vpp_nat_addr_update_on_interface_add',
+                                    'func':   'vpp_nat_interface_add',
                                     'args':   {
                                         'dev_id': dev_id,
-                                        'metric': metric,
                                         'remove': False
                                     }
                                   }
@@ -342,10 +374,9 @@ def add_interface(params):
         cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
         cmd['revert']['params'] = {
                                     'module': 'fwutils',
-                                    'func':   'vpp_nat_addr_update_on_interface_add',
+                                    'func':   'vpp_nat_interface_add',
                                     'args':   {
                                         'dev_id': dev_id,
-                                        'metric': metric,
                                         'remove': True
                                     }
                                   }
@@ -356,12 +387,12 @@ def add_interface(params):
         cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
         cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
         cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':1, 'is_inside':0 }
+                                    'is_add':1 }
         cmd['revert'] = {}
         cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
         cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
         cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':0, 'is_inside':0 }
+                                    'is_add':0 }
         cmd_list.append(cmd)
 
         # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
@@ -442,7 +473,7 @@ def add_interface(params):
                     'args': {
                             'dev_id'  : dev_id,
                             'gw'      : '',
-                            'mac'     : '00:00:00:00:00:00',
+                            'mac'     : 'ff:ff:ff:ff:ff:ff',
                     },
                     'substs': [ { 'add_param':'gw', 'val_by_func':'lte_get_ip_configuration', 'arg':[dev_id, 'gateway'] }]
         }
@@ -459,7 +490,7 @@ def add_interface(params):
         cmd['revert']['name']   = "exec"
         cmd['revert']['descr']  = "remove arp entry on linux for lte interface"
         cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'gateway'] } ]},
-                                    "sudo arp -d DEV-STUB" ]
+                                    "sudo arp -d DEV-STUB || true" ]
         cmd_list.append(cmd)
 
         cmd = {}

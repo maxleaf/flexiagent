@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -23,20 +23,13 @@
 import json
 import loadsimulator
 import os
+import shutil
+import glob
 
-
-# Try with PY3 else, use PY2
-try:
-    from urllib import request as ureq
-    from urllib import parse as uparse
-    from urllib import error as uerr
-    from http import server as hsvr
-    raw_input = input   # Python 2 has raw_input, and it doesn't support function aliasing, so downgrade :)
-except ImportError:
-    import urllib2 as ureq
-    import urllib as uparse
-    import urllib2 as uerr
-    import BaseHTTPServer as hsvr
+from urllib import request as ureq
+from urllib import parse as uparse
+from urllib import error as uerr
+from http import server as hsvr
 
 import websocket
 import ssl
@@ -53,6 +46,8 @@ import threading
 import traceback
 import yaml
 import fwglobals
+import fwikev2
+import fwmultilink
 import fwstats
 import fwutils
 from fwlog import Fwlog
@@ -146,6 +141,75 @@ class FwAgent:
             os.remove(fwglobals.g.CONN_FAILURE_FILE)
             fwglobals.log.debug("_clean_connection_failure")
 
+    def _setup_repository(self, repo):
+        # Extract repo info. e.g. 'https://deb.flexiwan.com|flexiWAN|main'
+        repo_split = repo.split('|')
+        if len(repo_split) != 3:
+            fwglobals.log.error("Registration error: Incorrect repository info %s" % (repo))
+            return False
+        repo_server, repo_repo, repo_name = repo_split[0], repo_split[1], repo_split[2]
+        # Get current repo configuration
+        repo_files = glob.glob(fwglobals.g.REPO_SOURCE_DIR + "flexiwan*")
+        if len(repo_files) != 1:
+            fwglobals.log.error("Registration error: Folder %s must include a single repository file, found %d" %
+                (fwglobals.g.REPO_SOURCE_DIR, len(repo_files)))
+            return False
+        repo_file = repo_files[0]
+        with open(repo_file, 'r') as f:
+            repo_config = f.readline().strip()
+        # format of repo_config is, get all parameters
+        # deb [ arch=amd64 ] https://deb.flexiwan.com/flexiWAN bionic main
+        repo_match = re.match(r'^deb[ \t]+\[[ \t]+arch=(.+)[ \t]+\][ \t]+(http.*)/(.+)[ \t]+(.+)[ \t]+(.+)$',
+            repo_config)
+        if not repo_match:
+            fwglobals.log.error("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
+                (repo_file, repo_config))
+            return False
+        (found_arch, found_server, found_repo, found_distro, found_name) = repo_match.group(1,2,3,4,5)
+        # Check if not the same as configured
+        if (found_server != repo_server or found_repo != repo_repo or found_name != repo_name):
+            new_repo_config = "deb [ arch=%s ] %s/%s %s %s\n" % (found_arch, repo_server, repo_repo, found_distro, repo_name)
+            with open(repo_file, 'w') as f:
+                fwutils.file_write_and_flush(f, new_repo_config)
+            fwglobals.log.info("Overwriting repository from token, token_repo=%s, prev_repo_config=%s, new_repo_config=%s" %
+                (repo, repo_config, new_repo_config))
+        return True
+
+    def _decode_token_and_setup_environment(self, token):
+        """Decode token and setup environment variables if required.
+        The environment setup is needed when the non default flexiManage server is used.
+        This could be on test, a dedicated, or a self hosting flexiManage setup.
+        After installing the flexiEdge software, it contains the default server and repository.
+        The software can be installed as a debian install on Linux, an ISO installation or,
+        pre installed by the hardware vendor.
+        In this case the server and repository flexiEdge has are different than what should be used.
+        The token is generated in flexiManage and installed on the device.
+        The token may encode the server and the repository parameters.
+        When the token is installed on flexiEdge, we check the server and repository decoded and
+        setup the system accordingly.
+        We call this function before registration when the token file is first processed
+
+        :returns: `True` if succeeded, `False` otherwise.
+        """
+        parsed_token = jwt.decode(token, options={"verify_signature": False})
+
+        # If repository defined in token, make sure device works with that repo
+        # Repo is sent if device is connected to a flexiManage that doesn't work with
+        # the default flexiWAN repository
+        repo = parsed_token.get('repo')
+        if repo:
+            if not self._setup_repository(repo): return False
+
+        # Setup the flexiManage server to work with
+        server = parsed_token.get('server')
+        if server:
+            # Use server from token
+            fwglobals.g.cfg.MANAGEMENT_URL = server
+            fwglobals.log.info("Using management url from token: %s" % (server))
+
+        # Setup passed, return True
+        return True
+
     def register(self):
         """Registers device with the flexiManage.
         To do that the Fwagent establishes secure HTTP connection to the manager
@@ -175,16 +239,13 @@ class FwAgent:
             fwglobals.log.error(err)
             return False
 
+        # Token found, decode token and setup environment parameters from token
         try:
-            parsed_token = jwt.decode(self.token, options={"verify_signature": False})
-            server = parsed_token.get('server')
-            if server:
-                # User server from token
-                fwglobals.g.cfg.MANAGEMENT_URL = server
-                fwglobals.log.info("Using management url from token: %s" % (server))
-        except Exception as e:
-                fwglobals.log.error("Failed to decode token: " + str(e))
+            if not self._decode_token_and_setup_environment(self.token):
                 return False
+        except Exception as e:
+            fwglobals.log.excep("Failed to decode and setup environment: %s (%s)" %(str(e), traceback.format_exc()))
+            return False
 
         if fwutils.vpp_does_run():
             fwglobals.log.error("register: router is running, it by 'fwagent stop' and retry by 'fwagent start'")
@@ -200,8 +261,8 @@ class FwAgent:
 
         machine_name = socket.gethostname()
         all_ip_list = socket.gethostbyname_ex(machine_name)[2]
-        interfaces          = fwutils.get_linux_interfaces(cached=False).values()
-        (dr_via, dr_dev, _) = fwutils.get_default_route()
+        interfaces          = list(fwutils.get_linux_interfaces(cached=False).values())
+        (dr_via, dr_dev, _, _) = fwutils.get_default_route()
         # get up to 4 IPs
         ip_list = ', '.join(all_ip_list[0:min(4,len(all_ip_list))])
         serial = fwutils.get_machine_serial()
@@ -247,14 +308,19 @@ class FwAgent:
         except uerr.URLError as e:
             if hasattr(e, 'code'):
                 server_response = e.read().decode()
+                latestVersion = e.headers.get('latestVersion','None')
                 fwglobals.log.error('register: got %s - %s' % (str(e.code), hsvr.BaseHTTPRequestHandler.responses[e.code][0]))
                 fwglobals.log.error('register: Server response: %s' % server_response)
+                fwglobals.log.error('latestVersion: %s' % (latestVersion))
                 try:
                     register_response = json.loads(server_response)
                     if 'error' in register_response:
                         self.register_error = register_response['error'].lower()
                 except:
                     pass
+                if e.code == 403: # version too low, try to upgrade immediately
+                    fwglobals.log.error('Trying device auto upgrade...')
+                    fwglobals.g.handle_request({'message':'upgrade-device-sw','params':{'version':latestVersion}})
             elif hasattr(e, 'reason'):
                 fwglobals.log.error('register: failed to connect to %s: %s' % (fwglobals.g.cfg.MANAGEMENT_URL, e.reason))
             return False
@@ -474,24 +540,30 @@ class FwAgent:
                 # avoid false alarm and unnecessary disconnection check the
                 # self.handling_request flag.
                 #
-                timeout = 30
-                if (slept % timeout) == 0:
-                    if self.received_request or self.handling_request:
-                        self.received_request = False
-                    else:
-                        fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
-                        ws.close()
-                        fwglobals.log.debug("connect: connection was terminated")
-                        break
-                # Every 30 seconds update statistics
-                if (slept % timeout) == 0:
-                    if loadsimulator.g.enabled():
-                        if loadsimulator.g.started:
-                            loadsimulator.g.update_stats()
+
+                try:  # Ensure thread doesn't exit on exception
+                    timeout = 30
+                    if (slept % timeout) == 0:
+                        if self.received_request or self.handling_request:
+                            self.received_request = False
                         else:
+                            fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
+                            ws.close()
+                            fwglobals.log.debug("connect: connection was terminated")
                             break
-                    else:
-                        fwstats.update_stats()
+
+                        # Every 30 seconds update statistics
+                        if loadsimulator.g.enabled():
+                            if loadsimulator.g.started:
+                                loadsimulator.g.update_stats()
+                            else:
+                                break
+                        else:
+                            fwstats.update_stats()
+                except Exception as e:
+                    fwglobals.log.excep("%s: %s (%s)" %
+                        (threading.current_thread().getName(), str(e), traceback.format_exc()))
+                    pass
 
                 # Sleep 1 second and make another iteration
                 time.sleep(1)
@@ -567,29 +639,32 @@ class FwAgent:
         :returns: (reply, msg), where reply is reply to be sent back to server,
                   msg is normalized received message.
         """
-        self.received_request = True
-        self.handling_request = True
+        try:
+            self.received_request = True
+            self.handling_request = True
 
-        msg = fwutils.fix_received_message(received_msg)
+            msg = fwutils.fix_received_message(received_msg)
 
-        print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
-        print_message = False if msg['message'] == 'add-application' else print_message
-        if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
-            print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
-        if print_message:
-            fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
+            print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
+            print_message = False if msg['message'] == 'add-application' else print_message
+            if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
+                print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
+            if print_message:
+                fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
-        reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
+            reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
+            if not 'entity' in reply and 'entity' in msg:
+                reply.update({'entity': msg['entity'] + 'Reply'})
+            if not 'message' in reply:
+                reply.update({'message': 'success'})
 
-        if not 'entity' in reply and 'entity' in msg:
-            reply.update({'entity': msg['entity'] + 'Reply'})
-        if not 'message' in reply:
-            reply.update({'message': 'success'})
+            if print_message:
+                fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
 
-        if print_message:
-            fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
-
-        self.handling_request = False
+            self.handling_request = False
+        except Exception as e:
+             fwglobals.log.error("handle_received_request failed: %s" + str(e))
+             return {'ok': 0, 'message': str(e)}
         return reply
 
     def inject_requests(self, filename, ignore_errors=False, json_requests=None):
@@ -645,7 +720,7 @@ def version():
         print(delimiter)
         print('Device %s' % versions['device'])
         print(delimiter)
-        for component in sorted(versions['components'].keys()):
+        for component in sorted(list(versions['components'].keys())):
             print('%s %s' % (component.ljust(width), versions['components'][component]['version']))
         print(delimiter)
 
@@ -674,12 +749,15 @@ def reset(soft=False, quiet=False, start_daemon=True):
         fwutils.reset_device_config()
         return
 
+    with fwikev2.FwIKEv2() as ike:
+        ike.reset()
+
     reset_device = True
     if not quiet:
         CSTART = "\x1b[0;30;43m"
         CEND = "\x1b[0m"
-        choice = raw_input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
-                      "Already deleted in flexiManage y/n [n]" + CEND)
+        choice = input(CSTART + "Device must be deleted in flexiManage before resetting the agent. " +
+                        "Already deleted in flexiManage y/n [n]" + CEND)
         if choice != 'y' and choice != 'Y':
             reset_device = False
 
@@ -773,13 +851,15 @@ def show(agent, configuration, database, status):
             fwglobals.log.info(out, to_syslog=False)
 
     if database:
-        if database == 'all':
-            fwutils.print_router_config(full=True)
-            fwutils.print_system_config(full=True)
-        elif database == 'router':
+        if database == 'router':
             fwutils.print_router_config(full=True)
         elif database == 'system':
             fwutils.print_system_config(full=True)
+        elif database == 'general':
+            fwutils.print_general_database()
+        elif database == 'multilink':
+            with fwmultilink.FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
+                print(multilink_db.dumps())
 
     if status:
         if status == 'daemon':
@@ -852,7 +932,7 @@ class FwagentDaemon(object):
         root = os.path.dirname(os.path.realpath(__file__))
         checker = os.path.join(root, 'tools' , 'system_checker' , 'fwsystem_checker.py')
         try:
-            subprocess.check_call(['python' , checker , '--check_only'])
+            subprocess.check_call(['python3' , checker , '--check_only'])
             return True
         except subprocess.CalledProcessError as err:
             fwglobals.log.excep("+====================================================")
@@ -921,7 +1001,7 @@ class FwagentDaemon(object):
         # Stop vpp ASAP, as no more requests can arrive on connection
         if stop_router:
             try:
-                fwglobals.g.router_api.call({'message':'stop-router'})
+                fwglobals.g.handle_request({'message':'stop-router'})
                 fwglobals.log.debug("router stopped")
             except Exception as e:
                 fwglobals.log.excep("failed to stop router: " + str(e))
@@ -1219,8 +1299,8 @@ if __name__ == '__main__':
     parser_show.add_argument('--configuration', const='all', nargs='?',
                         choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
-    parser_show.add_argument('--database', const='all', nargs='?',
-                        choices=['all', 'router', 'system'],
+    parser_show.add_argument('--database',
+                        choices=['general', 'multilink', 'router', 'system'],
                         help="show whole flexiEdge database")
     parser_show.add_argument('--status', choices=['daemon', 'router'],
                         help="show flexiEdge status")

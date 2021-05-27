@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -27,11 +27,11 @@ import fwutils
 import time
 
 try:
-    from vpp_papi import VPP
+    from vpp_papi import VPPApiClient
     vppWrapper = False
-except:
-    fwglobals.log.warning("vpp_papi library not found, using VPP dummy wrapper. Only for testing!!!")
-    from vpp_papi_dummy import VPP
+except Exception as e:
+    print(str(e) + ": use dummy VPP wrapper. Only for testing!!!")
+    from vpp_papi_dummy import VPPApiClient
     vppWrapper = True
 
 class VPP_API:
@@ -65,7 +65,8 @@ class VPP_API:
         if not self.jsonfiles and not vppWrapper:
             raise Exception("connect_to_vpp: no vpp api files were found")
         fwglobals.log.debug("connect_to_vpp: connecting")
-        self.vpp = VPP(self.jsonfiles)
+
+        self.vpp = VPPApiClient(apifiles=self.jsonfiles, use_socket=False, read_timeout=30)
         num_retries = 5
         for i in range(num_retries):
             try:
@@ -78,7 +79,7 @@ class VPP_API:
                 if i == num_retries-1:
                     raise e
                 else:
-                    time.sleep(10)
+                    time.sleep(20)
         self.connected_to_vpp = True
         fwglobals.log.debug("connect_to_vpp: connected")
 

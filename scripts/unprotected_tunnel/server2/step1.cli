@@ -1,0 +1,40 @@
+[
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "encryption-mode": "none",
+    "src": "192.168.0.104",
+    "dst": "192.168.0.105",
+    "dstPort": "4789",
+    "dev_id": "pci:0000:00:03.00",
+    "tunnel-id": 1,
+    "loopback-iface": {
+      "addr":"10.100.0.6/31",
+      "mac":"02:00:27:fd:00:05",
+      "mtu":1350,
+      "routing":"ospf"
+    }
+  }
+},
+{
+  "entity": "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+     {
+	"dev_id": "pci:0000:00:03.00",
+	"addr": "192.168.0.104/24",
+	"gateway": "192.168.0.1",
+	"type":"WAN"
+     },
+     {
+	"dev_id": "pci:0000:00:08.00",
+	"addr": "20.20.20.1/24",
+	"routing":"ospf",
+	"type":"LAN"
+     }
+   ]  
+  }
+}
+]

@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -81,9 +81,13 @@ class FwCfgRequestHandler:
 
         :returns: dictionary with status code and optional error message.
         """
+        whitelist = None
         try:
             # Translate request to list of commands to be executed
-            cmd_list = self._translate(request)
+            if re.match('modify-', request['message']):
+                cmd_list, whitelist = self._translate_modify(request)
+            else:
+                cmd_list = self._translate(request)
 
             # Execute list of commands. Do it only if vpp runs.
             # Some 'remove-XXX' requests must be executed
@@ -100,7 +104,7 @@ class FwCfgRequestHandler:
             # needed to restore VPP configuration on device reboot or start of
             # crashed VPP by watchdog.
             try:
-                self.cfg_db.update(request, cmd_list, execute)
+                self.cfg_db.update(request, cmd_list, execute, whitelist)
             except Exception as e:
                 self._revert(cmd_list)
                 raise e
@@ -354,6 +358,21 @@ class FwCfgRequestHandler:
         if params is None:
             return
 
+        # Perform substitutions in nested dictionaries and lists
+        #
+        if type(params)==list:
+            for p in params:
+                if type(p)==list or\
+                (type(p)==dict and not 'substs' in p):  # Escape 'substs' element
+                    self.substitute(cache, p)
+        elif type(params)==dict:
+            for item in list(params.items()):
+                key = item[0]
+                p   = item[1]
+                if (type(p)==dict or type(p)==list) and \
+                key != 'substs':                       # Escape 'substs' element
+                    self.substitute(cache, p)
+
         # Fetch list of substitutions
         substs = None
         if type(params)==dict and 'substs' in params:
@@ -397,9 +416,9 @@ class FwCfgRequestHandler:
                 if type(params) is dict:
                     raise Exception("fwutils.py:substitute: 'replace' is not supported for dictionary in '%s'" % format(params))
                 else:  # list
-                    for (idx, p) in enumerate(params):
-                        if fwutils.is_str(p):
-                            params.insert(idx, p.replace(old, new))
+                    for (idx, p) in list(enumerate(params)):
+                        if type(p) == str:
+                            params.insert(idx, p.replace(old, str(new))) # new variable might be vpp_sw_interface_index which is number, so we stringify it
                             params.remove(p)
             else:
                 raise Exception("fwutils.py.substitute: not supported type of substitution in '%s'" % format(params))
@@ -417,6 +436,7 @@ class FwCfgRequestHandler:
 
         :returns: list of commands.
         """
+        whitelist = None
         req    = request['message']
         params = request.get('params')
         old_params  = self.cfg_db.get_request_params(request)
@@ -424,12 +444,12 @@ class FwCfgRequestHandler:
         # First of all check if the received parameters differs from the existing ones
         same = fwutils.compare_request_params(params, old_params)
         if same:
-            return []
+            return ([], None)
 
         api_defs = self.translators.get(req)
         if not api_defs:
             # This 'modify-X' is not supported (yet?)
-            return []
+            return ([], None)
 
         module = api_defs.get('module')
         assert module, 'there is no module for request "%s"' % req
@@ -441,7 +461,17 @@ class FwCfgRequestHandler:
         assert func, 'there is no api function for request "%s"' % req
 
         cmd_list = func(params, old_params)
-        return cmd_list
+
+        if isinstance(cmd_list, list):
+            new_cmd_list = []
+            for cmd in cmd_list:
+                if 'modify' in cmd:
+                    whitelist = cmd['whitelist']
+                else:
+                    new_cmd_list.append(cmd)
+            return (new_cmd_list, whitelist)
+        else:
+            return (cmd_list, None)
 
     def _strip_noop_request(self, request):
         """Checks if the request has no impact on configuration.
@@ -481,20 +511,20 @@ class FwCfgRequestHandler:
             elif re.match('start-router', req) and fwutils.vpp_does_run():
                 # start-router & stop-router break add-/remove-/modify- convention.
                 return True
-            elif re.match('modify-', req):
+            elif re.match('modify-interface', req):
                 # For modification request ensure that it goes to modify indeed:
                 # translate request into commands to execute in order to modify
                 # configuration item in Linux/VPP. If this list is empty,
                 # the request can be stripped out.
                 #
-                cmd_list = self._translate_modify(__request)
+                cmd_list, _ = self._translate_modify(__request)
                 if not cmd_list:
                     # Save modify request into database, as it might contain parameters
                     # that don't impact on interface configuration in Linux or in VPP,
                     # like PublicPort, PublicIP, useStun, etc.
                     #
                     # !!!!!!!!!!!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!!!!!
-                    # We assume the 'modify-X' request includes full set of
+                    # We assume the 'modify-interface' request includes full set of
                     # parameters and not only modified ones!
                     # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     #
@@ -563,7 +593,7 @@ class FwCfgRequestHandler:
             raise Exception(" _sync_device: router full sync failed: " + str(reply.get('message')))
 
     def sync(self, incoming_requests, full_sync=False):
-        incoming_requests = list(filter(lambda x: x['message'] in self.translators, incoming_requests))
+        incoming_requests = list([x for x in incoming_requests if x['message'] in self.translators])
 
         if len(incoming_requests) == 0:
             return True

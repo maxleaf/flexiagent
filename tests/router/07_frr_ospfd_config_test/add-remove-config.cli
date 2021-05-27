@@ -12,7 +12,7 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-      "src": "__INTERFACE_1__addr",
+      "src": "__INTERFACE_1__addr_no_mask",
       "dev_id":"__INTERFACE_1__dev_id",
       "dst": "20.0.0.4",
       "tunnel-id": 1,

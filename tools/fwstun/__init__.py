@@ -109,8 +109,8 @@ def b2a_hexstr(abytes):
 
 def _initialize():
     global dictValToAttr, dictValToMsgType
-    dictValToAttr= {v: k for k, v in dictAttrToVal.items()}
-    dictValToMsgType = {v: k for k, v in dictMsgTypeToVal.items()}
+    dictValToAttr= {v: k for k, v in list(dictAttrToVal.items())}
+    dictValToMsgType = {v: k for k, v in list(dictMsgTypeToVal.items())}
 
 def set_log(log):
     global g_stun_log
@@ -303,7 +303,7 @@ def get_ip_info(source_ip="0.0.0.0", source_port=4789, stun_host=None,
     try:
         stun_log("get_ip_info, binding to %s:%d" %(source_ip, source_port))
         if dev_name != None:
-            s.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
+            s.setsockopt(socket.SOL_SOCKET, 25, dev_name.encode())
         s.bind((source_ip, source_port))
     except Exception as e:
         stun_log("get_ip_info: bind: %s" % str(e))
@@ -347,7 +347,7 @@ def get_remote_ip_info(source_ip="0.0.0.0", source_port=4789, dev_name = None):
     try:
         stun_log("Tunnel: binding to %s:%d" %(source_ip, source_port))
         if dev_name != None:
-            sock.setsockopt(socket.SOL_SOCKET, 25, dev_name + '\0')
+            sock.setsockopt(socket.SOL_SOCKET, 25, dev_name.encode())
         sock.bind((source_ip, source_port))
     except Exception as e:
         stun_log("Tunnel: bind: %s" % str(e))
