@@ -315,8 +315,8 @@ def vpp_is_configured(config_entities, print_error=True):
         output = str(amount)
         if e == 'interfaces':
             # Count number of interfaces that are UP
-            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tapcli).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure if not found!
-            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tapcli).* \(up\)'"
+            cmd          = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tap).* \(up\)' | wc -l"  # Don't use 'grep -c'! It exits with failure if not found!
+            cmd_on_error = r"sudo vppctl sh int addr | grep -E '^(loop|Gigabit|TenGigabit|vmxnet3|tap).* \(up\)'"
             if not _check_command_output(cmd, output, 'UP interfaces', cmd_on_error, print_error):
                 return False
         if e == 'tunnels':
