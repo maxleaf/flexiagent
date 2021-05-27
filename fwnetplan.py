@@ -226,6 +226,9 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
 
     if ip:
         config_section['addresses'] = [ip]
+    elif 'addresses' in config_section:
+        del config_section['addresses']
+
 
     if not gw or type != 'WAN':
         return config_section

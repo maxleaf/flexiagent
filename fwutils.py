@@ -55,7 +55,6 @@ from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
 from fwikev2        import FwIKEv2
-from fwtranslate_add_bridge import generate_bridge_id
 
 
 dpdk = __import__('dpdk-devbind')
@@ -487,9 +486,6 @@ def set_linux_interfaces_stun(dev_id, public_ip, public_port, nat_type):
 def clear_linux_interfaces_cache():
     with fwglobals.g.cache.lock:
         fwglobals.g.cache.linux_interfaces.clear()
-
-def iface_addr_to_bridge_id(addr):
-    return generate_bridge_id(addr)
 
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.

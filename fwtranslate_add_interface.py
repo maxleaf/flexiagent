@@ -313,7 +313,7 @@ def add_interface(params):
         cmd['cmd']['params']  = {
             'substs': [
                 { 'add_param':'rx_sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': bridge_addr }
+                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_bridge.get_bridge_id', 'arg': bridge_addr }
             ],
             'enable':1, 'port_type':0
         }
@@ -323,7 +323,7 @@ def add_interface(params):
         cmd['revert']['params'] = {
             'substs': [
                 { 'add_param':'rx_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                { 'add_param':'bd_id', 'val_by_func': 'iface_addr_to_bridge_id', 'arg': bridge_addr }
+                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_bridge.get_bridge_id', 'arg': bridge_addr }
             ],
             'enable':0
         }
