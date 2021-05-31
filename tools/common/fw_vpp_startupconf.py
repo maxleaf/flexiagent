@@ -136,9 +136,9 @@ class FwStartupConf:
 		T('key4', L[])
 	]
 
-	User should create an instance of that class, and then call the load() API, with the file name. The return
-	value of load is a populated L-type list. Several APIs are created to help traverse the DB, add elements and
-	remove them, etc.
+	User should create an instance of that class, than call the get_root_element() API.
+	This API returns populated L-type list. Several API-s are created to help
+	user to traverse the DB, to add and remove element, etc.
 
 	When editing to DB is finished, user should call the dump API to dump the DB back to a file.
 	"""
@@ -148,7 +148,7 @@ class FwStartupConf:
 	ADD_SINGLE_LINE_LIST	   = 3
 	CLOSE_LIST                 = 4
 
-	def __init__(self):
+	def __init__(self, filename=None):
 		# The DB is a list of tuples. This is the main list.
 		self.main_list  = L([])
 		# use to follow the tree when we are dealing with a list inside a list (and so on)
@@ -160,6 +160,10 @@ class FwStartupConf:
 		self.key        = ''
 		self.value      = ''
 		self.current_list  = self.main_list
+
+		if filename:
+			self.main_list = self._load(filename)
+
 
 	def _create_list(self, lst):
 		"""
@@ -272,14 +276,13 @@ class FwStartupConf:
 		elif line == '}':
 			return self.CLOSE_LIST
 
-	def load(self, file_name):
+	def _load(self, filename):
 		"""
-		API.
 		This function reads the startup.conf file, and load it to the DB.
 
-		:param file_name:    The configuration file to read. Usually this will be startup.conf
+		:param filename:    The configuration file to read. Usually this will be startup.conf
 		"""
-		with open(file_name, "r") as self.in_fp:
+		with open(filename, "r") as self.in_fp:
 			for new_line in self.in_fp:
 				line = new_line.strip()
 				if len(line) == 0 or line.startswith('#'):
@@ -378,7 +381,7 @@ class FwStartupConf:
 				return element
 		return None
 
-	def get_main_list(self):
+	def get_root_element(self):
 		"""
 		API.
 		Returns the head of the DB
@@ -466,3 +469,135 @@ class FwStartupConf:
 		"""
 		self.out_fp.write("  " * indent + value)
 		return
+
+	def get_cpu_workers(self):
+		'''Retrieves number of worker threads based on value of the cpu.corelist-workers field
+		'''
+		root = self.get_root_element()
+		if root['cpu'] == None:
+			return 0   # If CPU section does not present in startup.conf, vpp runs in single thread
+		key = self.get_element(root['cpu'],'corelist-workers')
+		if not key:
+			return 0	# If 'corelist-workers' parameter is not set in startup.conf, it is single thread
+		tuple = self.get_tuple_from_key(root['cpu'], key)
+		if not tuple:
+			return 0
+		corelist_workers_string = tuple[0]
+
+		# Parse "corelist-workers 1-5" or "corelist-workers 2" string into list
+		corelist_workers_list = re.split('[-|\s]+', corelist_workers_string.strip())
+		if len(corelist_workers_list) < 3:
+			raise Exception("get_cpu_workers: not supported format: '%s'" % corelist_workers_string)
+		if len(corelist_workers_list) == 3:
+			return int(corelist_workers_list[2])
+		return int(corelist_workers_list[3]) - int(corelist_workers_list[2]) + 1
+
+
+	def set_cpu_workers(self, num_workers, num_interfaces=2):
+		'''Sets worker threads related parameters:
+			- cpu.main-core
+			- cpu.corelist-workers
+			- buffers.buffers-per-numa
+			- dpdk.dev default.num-rx-queues4
+		Worker threads forward received packets.
+
+		If num_workers is 0, deletes all these parameters,
+		otherwise sets them as follows:
+			- cpu.main-core = 0	 (main thread always runs on core #0, workers - on the rest)
+			- cpu.corelist-workers = 1-<num_workers>
+			- dpdk.dev default.num-rx-queues = <num_workers>
+			- buffers.buffers-per-numa = see in code documentation
+
+		:param num_workers:    number of worker threads to be configured
+		:param num_interfaces: number of interfaces served by workers
+		                       Default value is 2 - 1 LAN and 1 WAN.
+		'''
+		# To simplify code we just delete all related parameters and than recreate them
+		self.delete_cpu_workers()
+		if num_workers == 0:
+			return
+
+		root = self.get_root_element()
+
+		if root['cpu'] == None:
+			tuple = self.create_element('cpu')
+			root.append(tuple)
+		root['cpu'].append(self.create_element('main-core 0'))
+		if num_workers == 1:
+			root['cpu'].append(self.create_element('corelist-workers 1'))
+		else:
+			root['cpu'].append(self.create_element('corelist-workers 1-%d' % (num_workers)))
+
+		if root['buffers'] == None:
+			tuple = self.create_element('buffers')
+			root.append(tuple)
+
+		# Based on analysis of vpp extras/vpp_config/extras/vpp_config.py:
+		# 	buffers-per-numa = ((rx_queues * desc_entries) + (tx_queues * desc_entries)) * total_ports_per_numa * 2
+		#
+		rx_queues            = num_workers      # We use RX queue per worker
+		desc_entries         = 1024             # Taken from vpp_config.py
+		tx_queues            = num_workers      # Every worker has dedicated TX queue
+		total_ports_per_numa = num_interfaces   # Port = Interface
+		buffers = (rx_queues + tx_queues) * desc_entries * total_ports_per_numa * 2
+
+		root['buffers'].append(self.create_element('buffers-per-numa %d' % buffers))
+
+		if root['dpdk'] == None:
+			tuple = self.create_element('dpdk')
+			root.append(tuple)
+		if root['dpdk']['dev default'] == None:
+			root['dpdk'].append(self.create_element('dev default'))
+		root['dpdk']['dev default'].append(self.create_element('num-rx-queues %d' % (num_workers)))
+
+
+	def delete_cpu_workers(self):
+		'''Deletes all parameters that are related to the worker threads,
+		so the default values will be used, and vpp will run in single thread mode.
+				- cpu.main-core
+				- cpu.corelist-workers
+				- buffers.buffers-per-numa
+				- dpdk.dev default.num-rx-queues
+		'''
+		root = self.get_root_element()
+		if root['cpu'] != None:
+
+			key = self.get_element(root['cpu'],'main-core')
+			if key:
+				tuple = self.get_tuple_from_key(root['cpu'], key)
+				if tuple:
+					key = tuple[0]
+					self.remove_element(root['cpu'], key)
+
+			key = self.get_element(root['cpu'],'corelist-workers')
+			if key:
+				tuple = self.get_tuple_from_key(root['cpu'], key)
+				if tuple:
+					key = tuple[0]
+					self.remove_element(root['cpu'], key)
+
+			if len(root['cpu']) == 0:
+				self.remove_element(root, 'cpu')
+
+		if root['buffers'] != None:
+			key = self.get_element(root['buffers'],'buffers-per-numa')
+			if key:
+				tuple = self.get_tuple_from_key(root['buffers'], key)
+				if tuple:
+					key = tuple[0]
+					self.remove_element(root['buffers'], key)
+				if len(root['buffers']) == 0:
+					self.remove_element(root, 'buffers')
+
+		if root['dpdk'] != None:
+			if root['dpdk']['dev default'] != None:
+				key = self.get_element(root['dpdk']['dev default'],'num-rx-queues')
+				if key:
+					tuple = self.get_tuple_from_key(root['dpdk']['dev default'], key)
+					if tuple:
+						key = tuple[0]
+						self.remove_element(root['dpdk']['dev default'], key)
+						if len(root['dpdk']['dev default']) == 0:
+							self.remove_element(root['dpdk'], 'dev default')
+						if len(root['dpdk']) == 0:
+							self.remove_element(root, 'dpdk')

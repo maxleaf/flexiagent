@@ -85,8 +85,8 @@ class Checker:
         self.nameservers            = None
         self.detected_nics          = None
         self.supported_nics         = None
-        self.fw_ac_db               = FwStartupConf()
-        self.vpp_configuration      = self.fw_ac_db.load(self.CFG_VPP_CONF_FILE)
+        self.vpp_startup_conf       = FwStartupConf(self.CFG_VPP_CONF_FILE)
+        self.vpp_configuration      = self.vpp_startup_conf.get_root_element()
         self.vpp_config_modified    = False
         self.update_grub            = False
 
@@ -96,7 +96,7 @@ class Checker:
 
     def save_config (self):
         if self.vpp_config_modified:
-            self.fw_ac_db.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
+            self.vpp_startup_conf.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
             self.update_grub_file()
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE, fwglobals.g.VPP_CONFIG_FILE_BACKUP)
 
@@ -109,7 +109,7 @@ class Checker:
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
         if self.vpp_config_modified:
-            self.fw_ac_db.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
+            self.vpp_startup_conf.dump(self.vpp_configuration, self.CFG_VPP_CONF_FILE)
 
     def hard_check_sse42(self, supported):
         """Check SSE 4.2 support.
@@ -905,9 +905,9 @@ class Checker:
         conf    = self.vpp_configuration
         conf_param = None
         if conf and conf['dpdk'] != None:
-            key = self.fw_ac_db.get_element(conf['dpdk'], 'num-mbufs')
+            key = self.vpp_startup_conf.get_element(conf['dpdk'], 'num-mbufs')
             if key:
-                tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'], key)
+                tup = self.vpp_startup_conf.get_tuple_from_key(conf['dpdk'], key)
                 if tup:
                     buffers = int(tup[0].split(' ')[1])
                     conf_param = tup[0]
@@ -927,20 +927,20 @@ class Checker:
             return True     # No need to update
 
         if conf_param:
-            self.fw_ac_db.remove_element(conf['dpdk'], conf_param)
+            self.vpp_startup_conf.remove_element(conf['dpdk'], conf_param)
             conf_param = 'num-mbufs %d' % (buffers)
-            tup = self.fw_ac_db.create_element(conf_param)
+            tup = self.vpp_startup_conf.create_element(conf_param)
             conf['dpdk'].append(tup)
             self.vpp_config_modified = True
             return True
 
         if not conf:
-            conf = self.fw_ac_db.get_main_list()
+            conf = self.vpp_startup_conf.get_root_element()
         if conf['dpdk'] == None:
-            tup = self.fw_ac_db.create_element('dpdk')
+            tup = self.vpp_startup_conf.create_element('dpdk')
             conf.append(tup)
 
-        conf['dpdk'].append(self.fw_ac_db.create_element('num-mbufs %d' %(buffers)))
+        conf['dpdk'].append(self.vpp_startup_conf.create_element('num-mbufs %d' %(buffers)))
         self.vpp_config_modified = True
         return True
 
@@ -981,157 +981,13 @@ class Checker:
             except Exception as e:
                 print(prompt + str(e))
 
-        conf = self.vpp_configuration
-        need_to_update = False
-
-        main_core_param                 = None
-        main_core_param_val             = 0
-        corelist_worker_param_min_val   = 0
-        corelist_worker_param_max_val   = 0
-        corelist_worker_param           = None
-        corelist_worker_param_val       = None
-        num_of_rx_queues_param          = None
-        num_of_rx_queues_param_val      = -1
-        dev_default_key                 = 'dev default' # to avoid errors and mistypes
-
-        # if configuration files does not exist, create it, and create the 'cpu' and 'dpdk' sections.
-        if not conf:
-            conf = self.fw_ac_db.get_main_list()
-            tup = self.fw_ac_db.create_element('cpu')
-            conf.append(tup)
-            conf['cpu'].append(self.fw_ac_db.create_element('main-core 0'))
-            if input_cores == 0:
-                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 0'))
-            elif input_cores == 1:
-                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1'))
-            else:
-                conf['cpu'].append(self.fw_ac_db.create_element('corelist-workers 1-%d' % (input_cores)))
-            conf['cpu'].append(self.fw_ac_db.create_element('workers %d' % (input_cores)))
-            self.vpp_config_modified = True
-
-            conf.append(self.fw_ac_db.create_element('dpdk'))
-            self._add_tup_to_dpdk(input_cores)
-            self.vpp_config_modified = True
-            self.update_grub = True
+        current_workers = self.vpp_startup_conf.get_cpu_workers()
+        if current_workers == input_cores:
             return True
 
-        # configuration file exist
-        if conf and conf['cpu'] == None:
-            conf.append(self.fw_ac_db.create_element('cpu'))
-        string = self.fw_ac_db.get_element(conf['cpu'],'main-core')
-        if string:
-            tup_main_core = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
-            if tup_main_core:
-                main_core_param = tup_main_core[0]
-                tmp = re.split('\s+', main_core_param.strip())
-                main_core_param_val = int(tmp[1])
-
-        string = self.fw_ac_db.get_element(conf['cpu'],'corelist-workers')
-        if string:
-            tup_core_list = self.fw_ac_db.get_tuple_from_key(conf['cpu'],string)
-            if tup_core_list:
-                corelist_worker_param = tup_core_list[0]
-                tmp = re.split('\s+', corelist_worker_param.strip())
-                corelist_worker_param_val = tmp[1]
-                if corelist_worker_param_val.isdigit():
-                    corelist_worker_param_min_val = corelist_worker_param_max_val = corelist_worker_param_val
-                else:
-                    corelist_worker_param_min_val = int(corelist_worker_param_val.split('-')[0])
-                    corelist_worker_param_max_val = int(corelist_worker_param_val.split('-')[1])
-
-        if conf and conf['dpdk'] == None:
-            conf.append(self.fw_ac_db.create_element('dpdk'))
-        if conf['dpdk'][dev_default_key] != None:
-            string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key],'num-rx-queues')
-            if string:
-                tup_num_rx = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
-                if tup_num_rx:
-                    num_of_rx_queues_param = tup_num_rx[0]
-                    tmp = re.split('\s+', num_of_rx_queues_param.strip())
-                    num_of_rx_queues_param_val = int(tmp[1])
-
-        # we assume the following configuration in 'cpu' and 'dpdk' sections:
-        # main-core 0
-        # corelist_workers 1-%input_cores
-        # num-rx-queues %input_cores
-
-        # in case no multi core requested
-        if input_cores == 0:
-            if main_core_param:
-                self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
-
-            if corelist_worker_param:
-                self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-
-            if num_of_rx_queues_param:
-                if conf['dpdk'][dev_default_key] != None:
-                    self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], num_of_rx_queues_param)
-                    if len(conf['dpdk'][dev_default_key]) == 0:
-                        self.fw_ac_db.remove_element(conf['dpdk'],dev_default_key)
-            self.vpp_config_modified = True
-            self.update_grub = True
-            return True
-
-        # in case multi core configured
-        if input_cores != 0:
-            new_main_core_param = 'main-core 0'
-            if main_core_param:
-                if main_core_param_val != 0:
-                    self.fw_ac_db.remove_element(conf['cpu'], main_core_param)
-                    conf['cpu'].append(self.fw_ac_db.create_element(new_main_core_param))
-                    self.vpp_config_modified = True
-            else:
-                conf['cpu'].append(self.fw_ac_db.create_element(new_main_core_param))
-                self.vpp_config_modified = True
-
-            if input_cores == 1:
-                new_corelist_worker_param = 'corelist-workers 1'
-            else:
-                new_corelist_worker_param = 'corelist-workers 1-%d' % (input_cores)
-            if corelist_worker_param:
-                if corelist_worker_param_min_val != 1 or corelist_worker_param_max_val != input_cores:
-                    self.fw_ac_db.remove_element(conf['cpu'], corelist_worker_param)
-                    conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
-                    self.vpp_config_modified = True
-            else:
-                conf['cpu'].append(self.fw_ac_db.create_element(new_corelist_worker_param))
-                self.vpp_config_modified = True
-
-            if num_of_rx_queues_param_val != input_cores:
-                if conf['dpdk'] != None:
-                    if conf['dpdk'][dev_default_key] != None:
-                        new_num_of_rx_queues_param = 'num-rx-queues %d' % (input_cores)
-                        string = self.fw_ac_db.get_element(conf['dpdk'][dev_default_key], 'num-rx-queues')
-                        if string:
-                            tup = self.fw_ac_db.get_tuple_from_key(conf['dpdk'][dev_default_key], string)
-                            if tup:
-                                self.fw_ac_db.remove_element(conf['dpdk'][dev_default_key], string)
-                        conf['dpdk'][dev_default_key].append(self.fw_ac_db.create_element(new_num_of_rx_queues_param))
-                    else:
-                        self._add_tup_to_dpdk(input_cores)
-                        self.vpp_config_modified = True
-
-            if self.vpp_config_modified == True:
-                self.update_grub = True
-            return True
-
-    def _add_tup_to_dpdk(self, num_of_cores):
-        """
-        adds 'def default' tuple to 'dpdk' and sets 'num-rx-queue' value
-
-        :param num_of_cores:  num of cores to handle incoming traffic
-
-        :returns True
-        """
-        # This function does the following:
-        # 1. create a new sub tuple in 'dpdk'
-        # 2. populated it with num-rx-queues %value
-        cfg = self.vpp_configuration
-        dev_default_key = 'dev default'
-        if cfg['dpdk'][dev_default_key] == None:
-            cfg['dpdk'].append(self.fw_ac_db.create_element(dev_default_key))
-            cfg['dpdk'][dev_default_key].append(self.fw_ac_db.create_element('num-rx-queues %d' % (num_of_cores)))
-
+        self.vpp_startup_conf.set_cpu_workers(input_cores)
+        self.vpp_config_modified = True
+        self.update_grub = True
         return True
 
     def soft_check_cpu_power_saving(self, fix=False, silently=False, prompt=''):
@@ -1157,9 +1013,9 @@ class Checker:
         conf            = self.vpp_configuration
         conf_param      = None
         if conf and conf['unix']:
-            string = self.fw_ac_db.get_element(conf['unix'], 'poll-sleep-usec')
+            string = self.vpp_startup_conf.get_element(conf['unix'], 'poll-sleep-usec')
             if string:
-                tup = self.fw_ac_db.get_tuple_from_key(conf['unix'],string)
+                tup = self.vpp_startup_conf.get_tuple_from_key(conf['unix'],string)
                 if tup:
                     tmp = re.split('\s+', tup[0].strip())
                     usec = int(tmp[1])
@@ -1180,22 +1036,22 @@ class Checker:
             if usec == usec_rest:
                 return True   #nothing to do
             elif not conf:
-                    conf = self.fw_ac_db.get_main_list()
+                    conf = self.vpp_startup_conf.get_root_element()
                     if conf['unix'] is None:
-                        tup = self.fw_ac_db.create_element(conf,'unix')
-                        tup.append(self.fw_ac_db.create_elemen('poll-sleep-usec %d' %(usec_rest)))
+                        tup = self.vpp_startup_conf.create_element(conf,'unix')
+                        tup.append(self.vpp_startup_conf.create_elemen('poll-sleep-usec %d' %(usec_rest)))
                         self.vpp_config_modified = True
                         return True
             else:
                 if conf_param:
-                    self.fw_ac_db.remove_element(conf['unix'], conf_param)
+                    self.vpp_startup_conf.remove_element(conf['unix'], conf_param)
                 conf_param = 'poll-sleep-usec %d' % usec_rest
-                conf['unix'].append(self.fw_ac_db.create_element(conf_param))
+                conf['unix'].append(self.vpp_startup_conf.create_element(conf_param))
                 self.vpp_config_modified = True
                 return True
         else: # enable_ps_mode is False
             if conf_param:
-                self.fw_ac_db.remove_element(conf['unix'], conf_param)
+                self.vpp_startup_conf.remove_element(conf['unix'], conf_param)
                 self.vpp_config_modified = True
                 return True
 
@@ -1219,9 +1075,9 @@ class Checker:
         if reset==False:
             cfg = self.vpp_configuration
             if cfg and cfg['cpu']:
-                string = self.fw_ac_db.get_element(cfg['cpu'],'corelist-workers')
+                string = self.vpp_startup_conf.get_element(cfg['cpu'],'corelist-workers')
                 if string:
-                    tup_core_list = self.fw_ac_db.get_tuple_from_key(cfg['cpu'],string)
+                    tup_core_list = self.vpp_startup_conf.get_tuple_from_key(cfg['cpu'],string)
                     if tup_core_list:
                         corelist_worker_param = tup_core_list[0]
                         tmp = re.split('\s+', corelist_worker_param.strip())

@@ -42,8 +42,8 @@ from tools.common.fw_vpp_startupconf import FwStartupConf
 VPP_CONFIG_FILE = '/etc/vpp/startup.conf'
 
 def vpp_startup_conf_add_nat(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
+    p = FwStartupConf(vpp_config_filename)
+    config = p.get_root_element()
     if config['nat'] == None:
         tup = p.create_element('nat')
         config.append(tup)
@@ -56,8 +56,8 @@ def vpp_startup_conf_add_nat(vpp_config_filename):
     p.dump(config, vpp_config_filename)
 
 def vpp_startup_conf_remove_nat(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
+    p = FwStartupConf(vpp_config_filename)
+    config = p.get_root_element()
     key = p.get_element(config, 'nat')
     if key:
         p.remove_element(config,key)
