@@ -1538,6 +1538,10 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
+def vpp_startup_conf_remove_param(filename, path):
+    with FwStartupConf(filename) as conf:
+        conf.del_simple_param(path)
+
 def vpp_startup_conf_add_nopci(vpp_config_filename):
     p = FwStartupConf(vpp_config_filename)
     config = p.get_root_element()

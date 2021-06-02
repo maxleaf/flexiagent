@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "fwagent daemon",
             "type": "python",
             "request": "launch",
@@ -132,7 +139,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/fwagent.py",
             "args": [
-                "daemon", "--dont_connect"
+                "daemon",
+                "--dont_connect"
             ],
             "cwd": "${workspaceRoot}",
             "env": {

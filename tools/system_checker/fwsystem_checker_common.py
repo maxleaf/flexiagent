@@ -883,67 +883,6 @@ class Checker:
         os.system('sysctl -p %s' %(vpp_hugepages_file))
         return True
 
-    def soft_check_dpdk_num_buffers(self, fix=False, silently=False, prompt=''):
-        """Check if there is enough DPDK buffers available.
-
-        :param fix:             Fix problem.
-        :param silently:        Do not prompt user.
-        :param prompt:          User prompt prefix.
-
-        :returns: 'True' if check is successful and 'False' otherwise.
-        """
-        # This function sets "num-mbufs 16384" into "dpdk" section in /etc/vpp/startup.conf
-
-        # 'Fix' and 'silently' has no meaning for vpp configuration parameters,
-        # as any value is good for it, and if no value was configured,
-        # the default will be used.
-        if not fix or silently:
-            return True
-
-        # Fetch current value if exists
-        buffers = 16384  # Set default
-        conf    = self.vpp_configuration
-        conf_param = None
-        if conf and conf['dpdk'] != None:
-            key = self.vpp_startup_conf.get_element(conf['dpdk'], 'num-mbufs')
-            if key:
-                tup = self.vpp_startup_conf.get_tuple_from_key(conf['dpdk'], key)
-                if tup:
-                    buffers = int(tup[0].split(' ')[1])
-                    conf_param = tup[0]
-
-        old = buffers
-        while True:
-            str_buffers = input(prompt + "Enter number of memory buffers per CPU core [%d]: " % (buffers))
-            try:
-                if len(str_buffers) == 0:
-                    break
-                buffers = int(str_buffers)
-                break
-            except Exception as e:
-                print(prompt + str(e))
-
-        if old == buffers:
-            return True     # No need to update
-
-        if conf_param:
-            self.vpp_startup_conf.remove_element(conf['dpdk'], conf_param)
-            conf_param = 'num-mbufs %d' % (buffers)
-            tup = self.vpp_startup_conf.create_element(conf_param)
-            conf['dpdk'].append(tup)
-            self.vpp_config_modified = True
-            return True
-
-        if not conf:
-            conf = self.vpp_startup_conf.get_root_element()
-        if conf['dpdk'] == None:
-            tup = self.vpp_startup_conf.create_element('dpdk')
-            conf.append(tup)
-
-        conf['dpdk'].append(self.vpp_startup_conf.create_element('num-mbufs %d' %(buffers)))
-        self.vpp_config_modified = True
-        return True
-
     def soft_check_multi_core_support_requires_rss(self, fix=False, silently=False, prompt=''):
         """Check and set number of worker cores to process incoming packets. Requires RSS support
 
@@ -1039,7 +978,7 @@ class Checker:
                     conf = self.vpp_startup_conf.get_root_element()
                     if conf['unix'] is None:
                         tup = self.vpp_startup_conf.create_element(conf,'unix')
-                        tup.append(self.vpp_startup_conf.create_elemen('poll-sleep-usec %d' %(usec_rest)))
+                        tup.append(self.vpp_startup_conf.create_element('poll-sleep-usec %d' %(usec_rest)))
                         self.vpp_config_modified = True
                         return True
             else:
