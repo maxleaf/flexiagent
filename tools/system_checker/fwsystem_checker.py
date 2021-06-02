@@ -79,7 +79,6 @@ soft_checkers = [
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
     { 'soft_check_disable_transparent_hugepages' : { 'severity': 'optional' }},
     { 'soft_check_hugepage_number'    : { 'severity': 'optional' , 'interactive': 'optional' }},
-    { 'soft_check_dpdk_num_buffers'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_multi_core_support_requires_rss'   : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_lte_modem_configured_in_mbim_mode': { 'severity': 'critical' }},
