@@ -110,7 +110,7 @@ class L(list):
 		s = s + ']'
 		return s
 
-class FwStartupConf:
+class FwStartupConfParsed:
 	"""
 	This is the main class of the startupconf parser/dumper.
 	It loads the startup.conf file, and parse it line by line. Based on the content of each line,
@@ -136,9 +136,9 @@ class FwStartupConf:
 		T('key4', L[])
 	]
 
-	User should create an instance of that class, and then call the load() API, with the file name. The return
-	value of load is a populated L-type list. Several APIs are created to help traverse the DB, add elements and
-	remove them, etc.
+	User should create an instance of that class, than call the get_root_element() API.
+	This API returns populated L-type list. Several API-s are created to help
+	user to traverse the DB, to add and remove element, etc.
 
 	When editing to DB is finished, user should call the dump API to dump the DB back to a file.
 	"""
@@ -148,7 +148,7 @@ class FwStartupConf:
 	ADD_SINGLE_LINE_LIST	   = 3
 	CLOSE_LIST                 = 4
 
-	def __init__(self):
+	def __init__(self, filename=None):
 		# The DB is a list of tuples. This is the main list.
 		self.main_list  = L([])
 		# use to follow the tree when we are dealing with a list inside a list (and so on)
@@ -160,6 +160,23 @@ class FwStartupConf:
 		self.key        = ''
 		self.value      = ''
 		self.current_list  = self.main_list
+		self.filename   = filename
+		self.modified   = False
+
+		if self.filename:
+			self.main_list = self._load(self.filename)
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, exc_type, exc_value, traceback):
+		# The three arguments to `__exit__` describe the exception
+		# caused the `with` statement execution to fail. If the `with`
+		# statement finishes without an exception being raised, these
+		# arguments will be `None`.
+		if self.modified:
+			self.dump()
+		return
 
 	def _create_list(self, lst):
 		"""
@@ -272,14 +289,13 @@ class FwStartupConf:
 		elif line == '}':
 			return self.CLOSE_LIST
 
-	def load(self, file_name):
+	def _load(self, filename):
 		"""
-		API.
 		This function reads the startup.conf file, and load it to the DB.
 
-		:param file_name:    The configuration file to read. Usually this will be startup.conf
+		:param filename:    The configuration file to read. Usually this will be startup.conf
 		"""
-		with open(file_name, "r") as self.in_fp:
+		with open(filename, "r") as self.in_fp:
 			for new_line in self.in_fp:
 				line = new_line.strip()
 				if len(line) == 0 or line.startswith('#'):
@@ -378,24 +394,45 @@ class FwStartupConf:
 				return element
 		return None
 
-	def get_main_list(self):
+	def get_root_element(self):
 		"""
 		API.
 		Returns the head of the DB
 		"""
 		return self.main_list
 
-	def dump(self, db, file_name):
+	def get_element_value(self, lst, key):
+		"""
+		API.
+		Returns the value of element.
+		"""
+		element = self.get_element(lst, key)
+		if not element:
+			return None
+		tuple = self.get_tuple_from_key(lst, element)
+		if not tuple:
+			return None
+		return tuple[0]
+
+	def dump(self, element=None, filename=None):
 		"""
 		API.
 		This function takes the DB and dumps it to the file_name, ususally startup.conf
 
-		:param db:        The database to dump to the file
-		:param file_name: The file name to dump the DB into
+		:param element:   The element to dump into the file.
+		                  If not provided, the root element with whole tree will be dumped
+		:param filename:  The file name to dump the DB into.
+		                  If not provided, the one set on FwStartupCpnfParsed construction
+						  will be used.
 		"""
-		with open (file_name, 'w') as self.out_fp:
+		if not filename:
+			filename = self.filename
+		if not element:
+			element = self.get_root_element()
+		with open (filename, 'w') as self.out_fp:
 			indent = 0
-			self._dump_list(db,indent)
+			self._dump_list(element, indent)
+			self.modified = False
 
 	def _dump_list(self, value, indent):
 		"""
@@ -466,3 +503,196 @@ class FwStartupConf:
 		"""
 		self.out_fp.write("  " * indent + value)
 		return
+
+	def get_simple_param(self, path):
+		'''Retrieves simple parameter by path.
+		Simple parameter has format of "<name> <value>", e.g.
+			dpdk {
+				dev default { num-rx-queues 5 }
+			}
+		Here the <name> is "num-rx-queues", the value is "5".
+		The 'path' is "dpdk.dev default.num-rx-queues".
+
+		:returns: the value of the parameter as a string, or None if not found.
+		'''
+		param = path.split('.')[-1]
+		path  = path.split('.')[:-1]
+
+		element = self.get_root_element()
+		for step in path:
+			if element[step] == None:
+				return None
+			element = element[step]
+
+		return self.get_element_value(element, param)
+
+
+	def set_simple_param(self, path, val, commit=False):
+		'''Sets value for the simple parameter identified by path.
+		Simple parameter has format of "<name> <value>", e.g.
+			dpdk {
+				dev default { num-rx-queues 5 }
+			}
+		Here the <name> is "num-rx-queues", the value is "5".
+		The 'path' is "dpdk.dev default.num-rx-queues".
+
+		:param path:   The path to the most inner section that includes the parameter.
+		               If any of sections in path does not exist, it will be created.
+					   If parameter does not exists, it will be created too.
+		:param val:    The value to be set for this parameter.
+		               Can be of any type, that supports casting to string by str().
+		:param commit: If True, the modification will be flushed into underlying
+		               file immediately'.
+		'''
+
+		val = str(val)	# Enable integers and other as a parameter value :)
+
+		param = path.split('.')[-1]
+		path  = path.split('.')[:-1]
+
+		element = self.get_root_element()
+		for step in path:
+			if element[step] == None:
+				element.append(self.create_element(step))
+			element = element[step]
+
+		# If parameter exists, delete it before adding the new one, than add.
+		#
+		old_val = self.get_element_value(element, param)
+		if old_val != None:
+			self.remove_element(element, old_val)
+
+		element.append(self.create_element('%s %s' % (param, val)))
+
+		self.modified = True
+		if commit:
+			self.dump()
+
+
+	def del_simple_param(self, path, commit=False):
+		'''Deletes simple parameter identified by path.
+		Simple parameter has format of "<name> <value>", e.g.
+			dpdk {
+				dev default { num-rx-queues 5 }
+			}
+		Here the <name> is "num-rx-queues", the value is "5".
+		The 'path' is "dpdk.dev default.num-rx-queues".
+
+		:param path:   The path to the most inner section that includes the parameter.
+		               If the inner sections become empty as a result or parameter
+					   deletion, they will be deleted as well.
+		:param commit: If True, the modification will be flushed into underlying
+		               file immediately'.
+		'''
+		def _clean_empty_sections(_element, _path):
+			if len(_element[_path[0]]) == None:
+				return
+			if len(_element[_path[0]]) == 0:
+				self.remove_element(_element, _path[0])
+				return
+			if len(_path) == 1:  # We reached leaf element
+				return
+			_clean_empty_sections(_element[_path[0]], path[1:])
+
+
+		param = path.split('.')[-1]
+		path  = path.split('.')[:-1]
+
+		element = self.get_root_element()
+		for step in path:
+			if element[step] == None:
+				return
+			element = element[step]
+
+		val = self.get_element_value(element, param)
+		if val == None:
+			return
+		self.remove_element(element, val)
+
+		# Now clean up - remove sub sections that became empty as a result of parameter deletion
+		#
+		_clean_empty_sections(self.get_root_element(), path)
+
+		self.modified = True
+		if commit:
+			self.dump()
+
+
+
+class FwStartupConf(FwStartupConfParsed):
+	"""
+	The wrapper of the /etc/vpp/startup.conf file that provides convenient API-s
+	to modify parameters stored in this file.
+	This class inherits from the FwStartupConfParsed while wrapping generic
+	API-s for access file parameters with the one-liner functions that modify
+	specific parameter.
+	"""
+
+	def get_cpu_workers(self):
+		'''Retrieves number of worker threads based on value of the cpu.corelist-workers field
+		'''
+		corelist_workers_string = self.get_simple_param('cpu.corelist-workers')
+		if not corelist_workers_string:
+			return 0
+
+		# Parse "corelist-workers 1-5" or "corelist-workers 2" string into list
+		#
+		corelist_workers_list = re.split('[-|\s]+', corelist_workers_string.strip())
+		if len(corelist_workers_list) < 3:
+			raise Exception("get_cpu_workers: not supported format: '%s'" % corelist_workers_string)
+		if len(corelist_workers_list) == 3:
+			return int(corelist_workers_list[2])
+		return int(corelist_workers_list[3]) - int(corelist_workers_list[2]) + 1
+
+
+	def set_cpu_workers(self, num_workers, num_interfaces=2, rx_queues=None, tx_queues=None, commit=False):
+		'''Sets worker threads related parameters:
+			- cpu.main-core
+			- cpu.corelist-workers
+			- buffers.buffers-per-numa
+			- dpdk.dev default.num-rx-queues4
+		Worker threads forward received packets.
+
+		If num_workers is 0, deletes all these parameters,
+		otherwise sets them as follows:
+			- cpu.main-core = 0	 (main thread always runs on core #0, workers - on the rest)
+			- cpu.corelist-workers = 1-<num_workers>
+			- dpdk.dev default.num-rx-queues = <num_workers>
+			- buffers.buffers-per-numa = see in code documentation
+
+		:param num_workers:    number of worker threads to be configured
+		:param num_interfaces: number of interfaces served by workers
+		                       Default value is 2 -> 1 LAN and 1 WAN.
+		:param rx_queues: 	   number of RX queues if network cards support RSS.
+		                       Default value is 'num_workers'.
+		:param tx_queues: 	   number of TX queues.
+		                       Default value is 'num_workers'.
+		'''
+		# To simplify code we just delete all related parameters and than
+		# recreate them if needed
+		#
+		self.del_simple_param('cpu.main-core')
+		self.del_simple_param('cpu.corelist-workers')
+		self.del_simple_param('buffers.buffers-per-numa')
+		self.del_simple_param('dpdk.dev default.num-rx-queues')
+
+		if num_workers == 0:
+			return
+
+		self.set_simple_param('cpu.main-core', 0)
+		num_workers_str = "1" if num_workers == 1 else "1-%d" % (num_workers)
+		self.set_simple_param('cpu.corelist-workers', num_workers_str)
+
+		self.set_simple_param('dpdk.dev default.num-rx-queues', num_workers)
+
+		# Based on analysis of vpp extras/vpp_config/extras/vpp_config.py:
+		# 	buffers-per-numa = ((rx_queues * desc_entries) + (tx_queues * desc_entries)) * total_ports_per_numa * 2
+		#
+		desc_entries         = 1024             # Taken from vpp_config.py
+		if not rx_queues:
+			rx_queues        = num_workers      # We use RX queue per worker
+		if not tx_queues:
+			tx_queues        = num_workers      # We use TX queue per worker
+		total_ports_per_numa = num_interfaces   # Port = Interface
+		buffers = (rx_queues + tx_queues) * desc_entries * total_ports_per_numa * 2
+		self.set_simple_param('buffers.buffers-per-numa', buffers)

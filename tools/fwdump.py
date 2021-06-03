@@ -61,6 +61,7 @@ g_dumpers = {
     'linux_lsb_release':            { 'shell_cmd': 'cp /etc/lsb-release <temp_folder>/linux_lsb-release.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_lspci':                  { 'shell_cmd': 'lspci -Dvmmn > <dumper_out_file>' },
+    'linux_meminfo':                { 'shell_cmd': 'cat /proc/meminfo > <dumper_out_file>' },
     'linux_neighbors':              { 'shell_cmd': 'ip neigh > <dumper_out_file>' },
     'linux_netplan':                { 'shell_cmd': 'mkdir -p <temp_folder>/linux_netplan/etc/ && ' +
                                                    'cp /etc/netplan/*yaml* <temp_folder>/linux_netplan/etc 2>/dev/null && ' +
@@ -146,11 +147,13 @@ g_dumpers = {
     'vpp_acl_dump':                 { 'shell_cmd': 'echo acl_dump > vat.txt && vpp_api_test script in vat.txt > <dumper_out_file> 2>&1 ; rm -rf vat.txt' },
     'vpp_adj':                      { 'shell_cmd': 'vppctl sh adj > <dumper_out_file>' },
     'vpp_bridge':                   { 'shell_cmd': 'vppctl sh bridge > <dumper_out_file>' },
+    'vpp_buffers':                  { 'shell_cmd': 'vppctl sh buffers > <dumper_out_file>' },
     'vpp_ike_sa':                   { 'shell_cmd': 'vppctl sh ike sa > <dumper_out_file>' },
-    'vpp_interfaces_hw':            { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
-    'vpp_interfaces_sw':            { 'shell_cmd': 'vppctl sh int > <dumper_out_file>' },
     'vpp_interfaces_addresses':     { 'shell_cmd': 'vppctl sh int addr > <dumper_out_file>' },
-    'vpp_interfaces_vmxnet3':       { 'shell_cmd': 'vppctl show vmxnet3 > <dumper_out_file>' },
+    'vpp_interfaces_hw':            { 'shell_cmd': 'vppctl sh hard > <dumper_out_file>' },
+    'vpp_interfaces_rx_placement':  { 'shell_cmd': 'vppctl sh int rx > <dumper_out_file>' },
+    'vpp_interfaces_sw':            { 'shell_cmd': 'vppctl sh int > <dumper_out_file>' },
+    'vpp_interfaces_vmxnet3':       { 'shell_cmd': 'vppctl sh vmxnet3 > <dumper_out_file>' },
     'vpp_ipsec_sa':                 { 'shell_cmd': 'vppctl sh ipsec sa > <dumper_out_file>' },
     'vpp_ipsec_tunnel':             { 'shell_cmd': 'vppctl sh ipsec tunnel > <dumper_out_file>' },
     'vpp_fib_entries':              { 'shell_cmd': 'vppctl sh fib entry > <dumper_out_file>' },

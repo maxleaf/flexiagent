@@ -1538,9 +1538,13 @@ def obj_dump_attributes(obj, level=1):
             print(level*' ' + a + ':')
             obj_dump_attributes(val, level=level+1)
 
+def vpp_startup_conf_remove_param(filename, path):
+    with FwStartupConf(filename) as conf:
+        conf.del_simple_param(path)
+
 def vpp_startup_conf_add_nopci(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
+    p = FwStartupConf(vpp_config_filename)
+    config = p.get_root_element()
 
     if config['dpdk'] == None:
         tup = p.create_element('dpdk')
@@ -1551,8 +1555,8 @@ def vpp_startup_conf_add_nopci(vpp_config_filename):
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_nopci(vpp_config_filename):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
+    p = FwStartupConf(vpp_config_filename)
+    config = p.get_root_element()
 
     if config['dpdk'] == None:
        return (True, None)
@@ -1563,8 +1567,8 @@ def vpp_startup_conf_remove_nopci(vpp_config_filename):
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_add_devices(vpp_config_filename, devices):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
+    p = FwStartupConf(vpp_config_filename)
+    config = p.get_root_element()
 
     if config['dpdk'] == None:
         tup = p.create_element('dpdk')
@@ -1588,8 +1592,8 @@ def vpp_startup_conf_add_devices(vpp_config_filename, devices):
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
 def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
-    p = FwStartupConf()
-    config = p.load(vpp_config_filename)
+    p = FwStartupConf(vpp_config_filename)
+    config = p.get_root_element()
 
     if config['dpdk'] == None:
         return

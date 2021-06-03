@@ -487,7 +487,7 @@ def adjust_environment_variables():
     for netplan in netplan_paths:
         with open(netplan, "r+") as fd:
             netplan_json = yaml.load(fd)
-            for if_name, val in list(netplan_json['network']['ethernets'].items()):
+            for if_name, val in dict(netplan_json['network']['ethernets']).items():
                 replaced_name = str(data[if_name.split('name')[0]]['name'])
                 netplan_json['network']['ethernets'][replaced_name] = netplan_json['network']['ethernets'].pop(if_name)
                 interface = netplan_json['network']['ethernets'][replaced_name]
