@@ -35,10 +35,13 @@ def get_bridge_id(addr):
     if bridge_id:
         return bridge_id
 
-    bridge_id = router_api_db['bridges'].get('last_bridge_id', 20000)
+    # bridge domain id in VPP is up to 16mb (65535).
+    # So we dedicate the range of 60000-61000 for this purpose
+    bridge_id = router_api_db['bridges'].get('last_bridge_id', 59999)
     bridge_id += 1
-    if bridge_id >= 25000: # bridge_id is up to 16 mb in vpp
-        bridge_id = 20000
+
+    if bridge_id == 61000:
+        bridge_id = 60000
 
     router_api_db['bridges']['last_bridge_id'] = bridge_id
     router_api_db['bridges'][addr] = bridge_id
@@ -55,7 +58,8 @@ def add_bridge(params):
     """
     cmd_list = []
 
-    bridge_id = get_bridge_id(params['addr'])
+    addr = params['addr']
+    bridge_id = get_bridge_id(addr)
 
     ret_attr = 'sw_if_index'
     cache_key = 'loop_bridge_%d' % bridge_id
@@ -64,11 +68,11 @@ def add_bridge(params):
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "bridge_domain_add_del"
     cmd['cmd']['params']    = { 'bd_id': bridge_id , 'is_add':1, 'learn':1, 'forward':1, 'uu_flood':1, 'flood':1, 'arp_term':0}
-    cmd['cmd']['descr']     = "create bridge %d for %s" % (bridge_id, params['addr'])
+    cmd['cmd']['descr']     = "create bridge %d for %s" % (bridge_id, addr)
     cmd['revert'] = {}
     cmd['revert']['name']   = 'bridge_domain_add_del'
     cmd['revert']['params'] = { 'bd_id': bridge_id , 'is_add':0 }
-    cmd['revert']['descr']  = "delete bridge %d for %s" % (bridge_id, params['addr'])
+    cmd['revert']['descr']  = "delete bridge %d for %s" % (bridge_id, addr)
     cmd_list.append(cmd)
 
     cmd = {}
@@ -99,25 +103,25 @@ def add_bridge(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "set %s to loopback interface in Linux" % params['addr']
+    cmd['cmd']['descr']     = "set %s to loopback interface in Linux" % addr
     cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
-                                "sudo ip addr add %s dev DEV-STUB" % (params['addr']) ]
+                                "sudo ip addr add %s dev DEV-STUB" % addr ]
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "unset %s from loopback interface in Linux" % params['addr']
+    cmd['revert']['descr']  = "unset %s from loopback interface in Linux" % addr
     cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
-                                "sudo ip addr del %s dev DEV-STUB" % (params['addr']) ]
+                                "sudo ip addr del %s dev DEV-STUB" % addr ]
     cmd_list.append(cmd)
 
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP loopback interface %s in Linux" % params['addr']
+    cmd['cmd']['descr']     = "UP loopback interface %s in Linux" % addr
     cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
                                 "sudo ip link set dev DEV-STUB up" ]
     cmd['revert'] = {}
     cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN loopback interface %s in Linux" % params['addr']
+    cmd['revert']['descr']  = "DOWN loopback interface %s in Linux" % addr
     cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':cache_key} ]},
                                 "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)

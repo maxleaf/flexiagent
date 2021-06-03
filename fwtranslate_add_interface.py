@@ -78,9 +78,7 @@ def add_interface(params):
     cmd_list = []
 
     dev_id  = params['dev_id']
-
     iface_addr = params.get('addr', '')
-
     iface_name = fwutils.dev_id_to_linux_if(dev_id)
 
     ######################################################################
@@ -105,7 +103,13 @@ def add_interface(params):
     dnsDomains  = params.get('dnsDomains')
 
     mtu       = params.get('mtu', None)
-    bridge_addr   = params.get('bridge_addr', None)
+
+    # To enable multiple LAN interfaces on the same subnet, we put them all into a bridge in VPP.
+    # if an interface needs to be inside a bridge, we indicate it with a bridge_addr field from flexiManage.
+    # In this case, we create in VPP a bridge (see fwtranslate_add_bridge) with a loopback vbi interface.
+    # Then, we put the IP address on the VBI interface. Therefore in the netplan files, we will set an empty IP.
+    # Then, we will also add this interface to the L2 bridge.
+    bridge_addr   = params.get('bridge_addr')
     if bridge_addr:
         iface_addr = bridge_addr
 
