@@ -402,6 +402,11 @@ class FwCfgRequestHandler:
                 new  = func(*old) if type(old) == list else func(old)
                 if new is None:
                     raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
+
+                # The `new` might be dict, tuple, list, etc.
+                # Sometimes we want to get specific item from it
+                if 'specific_key' in s:
+                    new = new[s['specific_key']]
             elif 'val_by_key' in s:
                 new = cache[s['val_by_key']]
             else:

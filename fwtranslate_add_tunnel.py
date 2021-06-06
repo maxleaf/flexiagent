@@ -168,6 +168,16 @@ def generate_sa_id():
     fwglobals.g.db['router_api'] = router_api_db
     return sa_id
 
+def validate_tunnel_id(tunnel_id):
+    bridge_id = tunnel_id*2
+    min, max = fwglobals.g.TUNNEL_LOOPBACK_ID_RANGE
+
+    if min <= bridge_id <= max:
+        return (True, None)
+
+    return (False,
+        "bridge id %d for tunnel_id %d must be in the range between %d-%d" % (bridge_id, tunnel_id, min, max))
+
 def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     """Add loopback command into the list.
 
@@ -1086,6 +1096,20 @@ def add_tunnel(params):
 
     # Add loop1-bridge-vxlan
     vxlan_ips = {'src':params['src'], 'dst':params['dst']}
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "validate tunnel id"
+    cmd['cmd']['params']    = {
+                                'module': 'fwtranslate_add_tunnel',
+                                'func':   'validate_tunnel_id',
+                                'args': {
+                                    'tunnel_id': params['tunnel-id']
+                                }
+                            }
+    # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
+    cmd_list.append(cmd)
 
     if encryption_mode == "none":
         loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}

@@ -304,6 +304,8 @@ class Fwglobals:
         self.WAN_FAILOVER_WND_SIZE         = 20         # 20 pings, every ping waits a second for response
         self.WAN_FAILOVER_THRESHOLD        = 12         # 60% of pings lost - enter the bad state, 60% of pings are OK - restore to good state
         self.WAN_FAILOVER_METRIC_WATERMARK = 2000000000 # Bad routes will have metric above 2000000000
+        self.SWITCH_LOOPBACK_ID_RANGE         = [16300, 16384] # Loopback id in vpp is up to 16384, so we use this range for switch feature
+        self.TUNNEL_LOOPBACK_ID_RANGE        = [0, 16300]  # Loopback id in vpp is up to 16384, so we use this range for tunnels
         self.DUMP_FOLDER                   = '/var/log/flexiwan/fwdump'
         self.DEFAULT_DNS_SERVERS           = ['8.8.8.8', '8.8.4.4']
         self.request_lock                  = threading.RLock()   # lock to syncronize message processing
