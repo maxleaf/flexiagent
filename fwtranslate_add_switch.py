@@ -95,7 +95,7 @@ def get_bridge_id(addr, result_cache=None):
 
     return (bridge_id, None)
 
-def add_bridge(params):
+def add_switch(params):
     """Generate commands to add a VPP l2 bridge with bvi interface.
 
     :param params:        Parameters from flexiManage.
@@ -117,7 +117,7 @@ def add_bridge(params):
     cmd['cmd']['descr']     = "get bridge id for address %s" % addr
     cmd['cmd']['cache_ret_val'] = (bridge_ret_attr, bridge_cache_key)
     cmd['cmd']['params']    = {
-        'module': 'fwtranslate_add_bridge',
+        'module': 'fwtranslate_add_switch',
         'func':   'get_bridge_id',
         'args':   {
             'addr': addr,
@@ -127,7 +127,7 @@ def add_bridge(params):
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "remove bridge id for address %s" % addr
     cmd['revert']['params'] = {
-        'module': 'fwtranslate_add_bridge',
+        'module': 'fwtranslate_add_switch',
         'func':   'delete_bridge_id',
         'args':   {
             'addr': addr,
@@ -217,5 +217,5 @@ def get_request_key(params):
 
     :returns: request key for add-lte request.
     """
-    key = 'add-bridge-%s' % params['addr']
+    key = 'add-switch-%s' % params['addr']
     return key

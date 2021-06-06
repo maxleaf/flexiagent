@@ -63,8 +63,8 @@ fwrouter_translators = {
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
-    'add-bridge':               {'module': __import__('fwtranslate_add_bridge'),      'api':'add_bridge'},
-    'remove-bridge':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-switch':               {'module': __import__('fwtranslate_add_switch'),      'api':'add_switch'},
+    'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -707,7 +707,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Than the 'add-X' requests should follow in opposite order:
         #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
         #
-        add_order    = [ 'add-bridge', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
+        add_order    = [ 'add-switch', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')
         remove_order.reverse()
@@ -730,8 +730,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         # It is based on the first appearance of the preprocessor requests.
         #
         indexes = {
-            'remove-bridge'           : -1,
-            'add-bridge'              : -1,
+            'remove-switch'           : -1,
+            'add-switch'              : -1,
             'remove-interface'        : -1,
             'add-interface'           : -1,
             'remove-application'      : -1,
@@ -941,7 +941,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Apply router configuration on successful VPP start.
         """
         types = [
-            'add-bridge',
+            'add-switch',
             'add-interface',
             'add-tunnel',
             'add-application',

@@ -106,7 +106,7 @@ def add_interface(params):
 
     # To enable multiple LAN interfaces on the same subnet, we put them all into a bridge in VPP.
     # if an interface needs to be inside a bridge, we indicate it with a bridge_addr field from flexiManage.
-    # In this case, we create in VPP a bridge (see fwtranslate_add_bridge) with a loopback vbi interface.
+    # In this case, we create in VPP a bridge (see fwtranslate_add_switch) with a loopback vbi interface.
     # Then, we put the IP address on the VBI interface. Therefore in the netplan files, we will set an empty IP.
     # Then, we will also add this interface to the L2 bridge.
     bridge_addr   = params.get('bridge_addr')
@@ -317,7 +317,7 @@ def add_interface(params):
         cmd['cmd']['params']  = {
             'substs': [
                 { 'add_param':'rx_sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_bridge.get_bridge_id', 'specific_key': 0, 'arg': bridge_addr }
+                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_switch.get_bridge_id', 'specific_key': 0, 'arg': bridge_addr }
             ],
             'enable':1, 'port_type':0
         }
@@ -327,7 +327,7 @@ def add_interface(params):
         cmd['revert']['params'] = {
             'substs': [
                 { 'add_param':'rx_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
-                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_bridge.get_bridge_id', 'specific_key': 0, 'arg': bridge_addr }
+                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_switch.get_bridge_id', 'specific_key': 0, 'arg': bridge_addr }
             ],
             'enable':0
         }
