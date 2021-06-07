@@ -1243,7 +1243,7 @@ def reset_router_api_db_bridges():
     #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024)
     # Therefor we choose range for bridge id to be 16300-16384
     #
-    router_api_db = fwglobals.g.db['router_api']
+    router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
     min_id, max_id = fwglobals.g.LOOPBACK_ID_SWITCH
     router_api_db['bridges'] = {
         'vacant_ids': list(range(min_id, max_id, 2)) # vppsb creates taps for even names only e.g. loop10010 (due to flexiWAN specific logic, see tap_inject_interface_add_del())
@@ -1251,7 +1251,7 @@ def reset_router_api_db_bridges():
     fwglobals.g.db['router_api'] = router_api_db
 
 def reset_router_api_db_sa_id():
-    router_api_db = fwglobals.g.db['router_api']
+    router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
     router_api_db['sa_id'] = 0
     fwglobals.g.db['router_api'] = router_api_db
 
