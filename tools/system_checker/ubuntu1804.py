@@ -114,7 +114,7 @@ class Checker(fwsystem_checker_common.Checker):
 
                                 print(prompt + ret_str + ' to add ' + server)
                             elif server == 'q':
-                                ret = 0 if server_added == True else 1
+                                ret = not server_added # ret=0 is the wanted result
                                 break
                             else:
                                 continue
