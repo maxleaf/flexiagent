@@ -169,14 +169,12 @@ def generate_sa_id():
     return sa_id
 
 def validate_tunnel_id(tunnel_id):
-    bridge_id = tunnel_id*2
-    min, max = fwglobals.g.LOOPBACK_ID_TUNNEL
-
+    bridge_id = tunnel_id*2+1 # each tunnel uses two bridges - one with id=tunnel_id*2 and one with id=tunnel_id*2+1
+    min, max = fwglobals.g.LOOPBACK_ID_TUNNELS
     if min <= bridge_id <= max:
         return (True, None)
-
     return (False,
-        "bridge id %d for tunnel_id %d must be in the range between %d-%d" % (bridge_id, tunnel_id, min, max))
+        "tunnel_id %d can't be served due to out of available bridge id-s" % (tunnel_id))
 
 def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     """Add loopback command into the list.
