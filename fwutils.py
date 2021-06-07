@@ -1230,7 +1230,30 @@ def reset_device_config():
     if 'lte' in fwglobals.g.db:
         fwglobals.g.db['lte'] = {}
 
+    reset_router_api_db_sa_id()
+    reset_router_api_db_bridges()
+
     reset_dhcpd()
+
+def reset_router_api_db_bridges():
+    # Bridge domain id in VPP is up to 24 bits (see #define L2_BD_ID_MAX ((1<<24)-1))
+    # In addition, we use bridge domain id as id for loopback BVI interface set on this bridge.
+    # BVI interface is the only interface on the bridge that might have IP address.
+    # As loopback interface id is limitied by 16,384 in vpp\src\vnet\ethernet\interface.c:
+    #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024)
+    # Therefor we choose range for bridge id to be 16300-16384
+    #
+    router_api_db = fwglobals.g.db['router_api']
+    min_id, max_id = fwglobals.g.LOOPBACK_ID_SWITCH
+    router_api_db['bridges'] = {
+        'vacant_ids': list(range(min_id, max_id, 2)) # vppsb creates taps for even names only e.g. loop10010 (due to flexiWAN specific logic, see tap_inject_interface_add_del())
+    }
+    fwglobals.g.db['router_api'] = router_api_db
+
+def reset_router_api_db_sa_id():
+    router_api_db = fwglobals.g.db['router_api']
+    router_api_db['sa_id'] = 0
+    fwglobals.g.db['router_api'] = router_api_db
 
 def print_system_config(full=False):
     """Print router configuration.

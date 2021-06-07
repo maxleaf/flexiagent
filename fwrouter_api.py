@@ -102,36 +102,16 @@ class FWROUTER_API(FwCfgRequestHandler):
         #
         if not 'router_api' in fwglobals.g.db:
             fwglobals.g.db['router_api'] = {}
-            self.reset_router_api_db_sa_id()
-
+        if not 'sa_id' in fwglobals.g.db['router_api']:
+            fwutils.reset_router_api_db_sa_id()
         if not 'bridges' in fwglobals.g.db['router_api']:
-            self.reset_router_api_db_bridges()
+            fwutils.reset_router_api_db_bridges()
 
     def finalize(self):
         """Destructor method
         """
         self._stop_threads()  # IMPORTANT! Do that before rest of finalizations!
         self.vpp_api.finalize()
-
-    def reset_router_api_db_bridges(self):
-        # Bridge domain id in VPP is up to 24 bits (see #define L2_BD_ID_MAX ((1<<24)-1))
-        # In addition, we use bridge domain id as id for loopback BVI interface set on this bridge.
-        # BVI interface is the only interface on the bridge that might have IP address.
-        # As loopback interface id is limitied by 16,384 in vpp\src\vnet\ethernet\interface.c:
-        #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024)
-        # Therefor we choose range for bridge id to be 16300-16384
-        #
-        router_api_db = fwglobals.g.db['router_api']
-        min_id, max_id = fwglobals.g.LOOPBACK_ID_SWITCH
-        router_api_db['bridges'] = {
-            'vacant_ids': list(range(min_id, max_id, 2)) # vppsb creates taps for even names only e.g. loop10010 (due to flexiWAN specific logic, see tap_inject_interface_add_del())
-        }
-        fwglobals.g.db['router_api'] = router_api_db
-
-    def reset_router_api_db_sa_id(self):
-        router_api_db = fwglobals.g.db['router_api']
-        router_api_db['sa_id'] = 0
-        fwglobals.g.db['router_api'] = router_api_db
 
     def watchdog(self):
         """Watchdog thread.
@@ -908,13 +888,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         #
         os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
 
-        # Reset sa-id used by tunnels
-        #
-        router_api = fwglobals.g.db.get('router_api')
-        if not router_api:
-            fwglobals.g.db['router_api'] = {}
-        self.reset_router_api_db_sa_id()
-        self.reset_router_api_db_bridges()
+        fwutils.reset_router_api_db_sa_id() # Reset sa-id used by tunnels
+        fwutils.reset_router_api_db_bridges() # Reset bridges used by switches
 
         fwutils.vmxnet3_unassigned_interfaces_up()
 
