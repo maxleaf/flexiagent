@@ -24,10 +24,13 @@
 import os
 import re
 import subprocess
+import sys
 
 import fwsystem_checker_common
-import ipaddress
 
+globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
+sys.path.append(globals)
+import fwutils
 class Checker(fwsystem_checker_common.Checker):
     """This is Checker class representation.
     """
@@ -92,19 +95,26 @@ class Checker(fwsystem_checker_common.Checker):
                             return False
                     # Now add DNS servers to it's configuration, if no servers present
                     if len(self.nameservers) == 0:
+                        server_added = False
                         while True:
                             server = input(prompt + "enter DNS Server address, e.g. 8.8.8.8 (for exit enter 'q'): ")
 
                             if server and server != 'q':
                                 # Validate user input
-                                if server and not self.is_ip(server):
+                                if not fwutils.is_ip(server):
                                     print(prompt + '%s is not a valid IP' % server)
                                     continue
 
                                 ret = os.system('printf "nameserver %s\n" >> %s' % (server, config_filename))
-                                ret_str = 'succeeded' if ret == 0 else 'failed'
+                                if ret == 0:
+                                    server_added = True
+                                    ret_str = 'succeeded'
+                                else:
+                                    ret_str = 'failed'
+
                                 print(prompt + ret_str + ' to add ' + server)
                             elif server == 'q':
+                                ret = 0 if server_added == True else 1
                                 break
                             else:
                                 continue
@@ -285,10 +295,3 @@ class Checker(fwsystem_checker_common.Checker):
         if ret != 0:
             return False
         return True
-
-    def is_ip(self, str_to_check):
-        try:
-            ipaddress.ip_address(str_to_check)
-            return True
-        except:
-            return False
