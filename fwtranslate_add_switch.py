@@ -22,69 +22,40 @@
 
 import fwglobals
 
-def delete_bridge_id(addr):
+def release_bridge_id(addr):
     router_api_db = fwglobals.g.db['router_api']
-    if not 'bridges' in router_api_db:
-        return (True, None)
     bridges_db = router_api_db['bridges']
 
     bridge_id = bridges_db.get(addr)
     if not bridge_id:
         return (True, None)
-
     del bridges_db[addr]
 
-    if not 'released_bridge_id' in bridges_db:
-        bridges_db['released_bridge_id'] = []
-
-    bridges_db['released_bridge_id'].append(bridge_id)
+    bridges_db['vacant_ids'].append(bridge_id)
+    bridges_db['vacant_ids'].sort()
 
     # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
     fwglobals.g.db['router_api']['bridges'] = bridges_db
     fwglobals.g.db['router_api'] = router_api_db
 
 
-def get_bridge_id(addr, result_cache=None):
+def allocate_bridge_id(addr, result_cache=None):
     """Get bridge identifier.
 
     :returns: A bridge identifier.
     """
     router_api_db = fwglobals.g.db['router_api']
-    if not 'bridges' in router_api_db:
-        router_api_db['bridges'] = {}
     bridges_db = router_api_db['bridges']
 
     # Check if bridge id already created for this address
     bridge_id = bridges_db.get(addr)
 
-    # Check if there are released numbers that not in use anymore
+    # Allocate new id
     if not bridge_id:
-        if 'released_bridge_id' in bridges_db and len(bridges_db['released_bridge_id']) > 0:
-            bridge_id = bridges_db['released_bridge_id'].pop(0)
-
-    # Genereate new bridge id
-    if not bridge_id:
-        # Bridge domain id in VPP is up to 24 bits (see #define L2_BD_ID_MAX ((1<<24)-1))
-        # In addition, we use bridge domain id as id for loopback BVI interface set on this bridge.
-        # BVI interface is the only interface on the bridge that might have IP address.
-        # As loopback interface id is limitied by 16,384 in vpp\src\vnet\ethernet\interface.c:
-        #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024)
-        # Therefor we choose range for bridge id to be 16300-16384
-        #
-        min, max = fwglobals.g.SWITCH_LOOPBACK_ID_RANGE
-        bridge_id = bridges_db.get('last_bridge_id', min - 2)
-        bridge_id += 2 # vppsb creates taps for even names only e.g. loop10010 (due to flexiWAN specific logic, see tap_inject_interface_add_del())
-
-        # In range?
-        if bridge_id >= max:
-            return (False, "Bridge id %d must be up to %e" % (bridge_id, max))
-
-        bridges_db['last_bridge_id'] = bridge_id
-
-    bridges_db[addr] = bridge_id
+        bridge_id = bridges_db['vacant_ids'].pop(0)
 
     # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-    router_api_db['bridges'] = bridges_db
+    router_api_db['bridges'][addr] = bridge_id
     fwglobals.g.db['router_api'] = router_api_db
 
     # Store 'bridge_id' in cache if provided by caller.
@@ -118,7 +89,7 @@ def add_switch(params):
     cmd['cmd']['cache_ret_val'] = (bridge_ret_attr, bridge_cache_key)
     cmd['cmd']['params']    = {
         'module': 'fwtranslate_add_switch',
-        'func':   'get_bridge_id',
+        'func':   'allocate_bridge_id',
         'args':   {
             'addr': addr,
         }
@@ -128,7 +99,7 @@ def add_switch(params):
     cmd['revert']['descr']  = "remove bridge id for address %s" % addr
     cmd['revert']['params'] = {
         'module': 'fwtranslate_add_switch',
-        'func':   'delete_bridge_id',
+        'func':   'release_bridge_id',
         'args':   {
             'addr': addr,
         }

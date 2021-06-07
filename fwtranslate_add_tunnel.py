@@ -170,7 +170,7 @@ def generate_sa_id():
 
 def validate_tunnel_id(tunnel_id):
     bridge_id = tunnel_id*2
-    min, max = fwglobals.g.TUNNEL_LOOPBACK_ID_RANGE
+    min, max = fwglobals.g.LOOPBACK_ID_TUNNEL
 
     if min <= bridge_id <= max:
         return (True, None)
