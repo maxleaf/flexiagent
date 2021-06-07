@@ -391,8 +391,7 @@ class FwCfgRequestHandler:
 
             # Find the new value to be added to params
             if 'val_by_func' in s:
-                module = fwutils
-                func_name = s['val_by_func']
+                module , func_name = fwutils , s['val_by_func']
                 if '.' in func_name:
                     module_name, func_name = func_name.split('.', 1)
                     module = __import__(module_name)
@@ -402,11 +401,6 @@ class FwCfgRequestHandler:
                 new  = func(*old) if type(old) == list else func(old)
                 if new is None:
                     raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
-
-                # The `new` might be dict, tuple, list, etc.
-                # Sometimes we want to get specific item from it
-                if 'specific_key' in s:
-                    new = new[s['specific_key']]
             elif 'val_by_key' in s:
                 new = cache[s['val_by_key']]
             else:

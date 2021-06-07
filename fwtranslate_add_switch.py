@@ -35,9 +35,12 @@ def release_bridge_id(addr):
     bridges_db['vacant_ids'].sort()
 
     # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-    fwglobals.g.db['router_api']['bridges'] = bridges_db
     fwglobals.g.db['router_api'] = router_api_db
 
+def get_bridge_id(addr):
+    router_api_db = fwglobals.g.db['router_api']
+    bridges_db = router_api_db['bridges']
+    return bridges_db.get(addr)
 
 def allocate_bridge_id(addr, result_cache=None):
     """Get bridge identifier.
@@ -48,13 +51,16 @@ def allocate_bridge_id(addr, result_cache=None):
     bridges_db = router_api_db['bridges']
 
     # Check if bridge id already created for this address
-    bridge_id = bridges_db.get(addr)
+    bridge_id = get_bridge_id(addr)
 
     # Allocate new id
     if not bridge_id:
+        if not 'vacant_ids' in bridges_db['vacant_ids']:
+            return (None, "Failed to allocate bridge id. vacant_ids is empty")
         bridge_id = bridges_db['vacant_ids'].pop(0)
 
     # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    router_api_db = fwglobals.g.db['router_api']
     router_api_db['bridges'][addr] = bridge_id
     fwglobals.g.db['router_api'] = router_api_db
 
