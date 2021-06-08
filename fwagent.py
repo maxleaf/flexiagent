@@ -48,6 +48,7 @@ import yaml
 import fwglobals
 import fwikev2
 import fwmultilink
+import fwapplications
 import fwstats
 import fwutils
 from fwlog import Fwlog
@@ -855,8 +856,11 @@ def show(agent, configuration, database, status):
         elif database == 'general':
             fwutils.print_general_database()
         elif database == 'multilink':
-            with fwmultilink.FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as multilink_db:
+            with fwmultilink.FwMultilink(fwglobals.g.MULTILINK_DB_FILE, fill_if_empty=False) as multilink_db:
                 print(multilink_db.dumps())
+        elif database == 'applications':
+            with fwapplications.FwApps(fwglobals.g.APP_REC_DB_FILE) as app_db:
+                print(app_db.dumps())
 
     if status:
         if status == 'daemon':
@@ -1295,7 +1299,7 @@ if __name__ == '__main__':
                         choices=['all', 'router', 'system', 'multilink-policy', 'signature'],
                         help="show flexiEdge configuration")
     parser_show.add_argument('--database',
-                        choices=['general', 'multilink', 'router', 'system'],
+                        choices=['applications', 'general', 'multilink', 'router', 'system'],
                         help="show whole flexiEdge database")
     parser_show.add_argument('--status', choices=['daemon', 'router'],
                         help="show flexiEdge status")

@@ -27,11 +27,15 @@ from sqlitedict import SqliteDict
 class FwMultilink:
     """This is object that encapsulates data used by multi-link feature.
     """
-    def __init__(self, db_file):
+    def __init__(self, db_file, fill_if_empty=True):
         self.db_filename = db_file
         # The DB contains:
         # db['labels']     - map of label strings (aka names) into integers (aka id-s) used by VPP.
         # db['vacant_ids'] - pool of available id-s.
+
+        if not fill_if_empty:
+            return
+
         self.db = SqliteDict(db_file, autocommit=True)
         if not 'labels' in self.db:
             self.db['labels'] = {}
