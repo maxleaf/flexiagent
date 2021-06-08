@@ -33,10 +33,11 @@ class FwMultilink:
         # db['labels']     - map of label strings (aka names) into integers (aka id-s) used by VPP.
         # db['vacant_ids'] - pool of available id-s.
 
+        self.db = SqliteDict(db_file, autocommit=True)
+      
         if not fill_if_empty:
             return
-
-        self.db = SqliteDict(db_file, autocommit=True)
+            
         if not 'labels' in self.db:
             self.db['labels'] = {}
         if not 'vacant_ids' in self.db:
