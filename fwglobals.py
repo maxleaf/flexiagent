@@ -385,6 +385,10 @@ class Fwglobals:
         # OSPF need that to be able to discover more neighbors on adjacent links
         fwutils.set_linux_igmp_max_memberships(4096)
 
+        # Increase allowed max socket receive buffer size to 2Mb
+        # VPPSB need that to handle more netlink events on a heavy load
+        fwutils.set_linux_socket_max_receive_buffer_size(2048000)
+
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
         self.router_api.restore_vpp_if_needed()

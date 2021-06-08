@@ -3497,6 +3497,16 @@ def set_linux_igmp_max_memberships(value = 4096):
     else:
         fwglobals.log.debug("Set limit of multicast group membership command successfully executed: %s" % (sys_cmd))
 
+def set_linux_socket_max_receive_buffer_size(value = 1024000):
+    """ Set maximum socket receive buffer size which may be set by using the SO_RCVBUF socket option
+    """
+    sys_cmd = 'sysctl -w net.core.rmem_max=%d > /dev/null' % (value)
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Set maximum socket receive buffer size command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Set maximum socket receive buffer size command successfully executed: %s" % (sys_cmd))
+
 def update_linux_metric(prefix, dev, metric):
     """Invokes 'ip route' commands to update metric on the provide device.
     """
