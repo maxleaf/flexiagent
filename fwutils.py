@@ -3302,12 +3302,15 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
+def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, vtysh_cfg_file, router_id):
     '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
     ensures that ospf is switched on in the frr configuration'''
 
     # Ensure that ospfd is switched on in /etc/frr/daemons.
     subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
+
+    # Ensure that integrated-vtysh-config is disabled in /etc/frr/vtysh.conf.
+    subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % vtysh_cfg_file, shell=True)
 
     if os.path.exists(ospfd_cfg_file):
         return
