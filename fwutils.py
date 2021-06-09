@@ -2706,10 +2706,10 @@ def get_at_port(dev_id):
             for usb_port in tty_devices:
                 try:
                     with serial.Serial('/dev/%s' % usb_port, 115200, timeout=1) as ser:
-                        ser.write('AT\r')
+                        ser.write(bytes('AT\r', 'utf-8')) # check response to AT command
                         t_end = time.time() + 1
                         while time.time() < t_end:
-                            response = ser.readline()
+                            response = ser.readline().decode()
                             if "OK" in response:
                                 at_ports.append(ser.name)
                                 break
@@ -2727,7 +2727,9 @@ def lte_set_modem_to_mbim(dev_id):
         if lte_driver == 'cdc_mbim':
             return (True, None)
 
-        hardware_info = lte_get_hardware_info(dev_id)
+        hardware_info, err = lte_get_hardware_info(dev_id)
+        if err:
+            raise Exception(str(err))
 
         vendor = hardware_info['Vendor']
         model =  hardware_info['Model']
@@ -2740,10 +2742,12 @@ def lte_set_modem_to_mbim(dev_id):
             if at_serial_port and len(at_serial_port) > 0:
                 ser = serial.Serial(at_serial_port[0])
                 for at in at_commands:
-                    ser.write(at + '\r')
+                    at_cmd = bytes(at + '\r', 'utf-8')
+                    ser.write(at_cmd)
                     time.sleep(0.5)
                 ser.close()
-                time.sleep(10)
+                time.sleep(10) # reset modem might take few seconds
+                os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
                 return (True, None)
             return (False, 'AT port not found. dev_id: %s' % dev_id)
         elif 'Sierra Wireless' in vendor:
@@ -2751,12 +2755,15 @@ def lte_set_modem_to_mbim(dev_id):
             _run_qmicli_command(dev_id, 'dms-swi-set-usb-composition=8')
             _run_qmicli_command(dev_id, 'dms-set-operating-mode=offline')
             _run_qmicli_command(dev_id, 'dms-set-operating-mode=reset')
-            time.sleep(10)
+            time.sleep(10)  # reset modem might take few seconds
+            os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
             return (True, None)
         else:
             print("Your card is not officially supported. It might work, But you have to switch manually to the MBIM modem")
             return (False, 'vendor or model are not supported. (vendor: %s, model: %s)' % (vendor, model))
     except Exception as e:
+        # Modem cards sometimes get stuck and recover only after disconnecting the router from the power supply
+        print("Failed to switch modem to MBIM. You can unplug the router, wait a few seconds and try again. (%s)" % str(e))
         return (False, str(e))
 
 
@@ -3081,27 +3088,32 @@ def lte_get_hardware_info(dev_id):
         'Imei': '',
     }
     try:
-        lines, _ = qmi_get_manufacturer(dev_id)
+        lines, err = qmi_get_manufacturer(dev_id)
+        if err:
+            raise Exception(err)
         for line in lines:
             if 'Manufacturer' in line:
                 result['Vendor'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines, _ = qmi_get_model(dev_id)
+        lines, err = qmi_get_model(dev_id)
+        if err:
+            raise Exception(err)
         for line in lines:
             if 'Model' in line:
                 result['Model'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines, _ = qmi_get_imei(dev_id)
+        lines, err = qmi_get_imei(dev_id)
+        if err:
+            raise Exception(err)
         for line in lines:
             if 'IMEI' in line:
                 result['Imei'] = line.split(':')[-1].strip().replace("'", '')
                 break
-
-    except Exception:
-        pass
-    return result
+    except Exception as e:
+        return (result, str(e))
+    return (result, None)
 
 def lte_get_packets_state(dev_id):
     result = {
