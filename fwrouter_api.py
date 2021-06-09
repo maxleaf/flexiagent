@@ -880,6 +880,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         #
         os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
 
+        # Clean FRR OSPFD config
+        if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
+            os.remove(fwglobals.g.FRR_OSPFD_FILE)
+
         # Reset sa-id used by tunnels
         #
         router_api = fwglobals.g.db.get('router_api')
