@@ -66,7 +66,6 @@ import fwutils
 #      ospf router-id 192.168.56.107
 #      network 192.168.56.107/24 area 0.0.0.0
 #
-#    07. sudo systemctl restart frr
 #
 def add_interface(params):
     """Generate commands to configure interface in Linux and VPP
@@ -428,39 +427,25 @@ def add_interface(params):
                                     'args': {
                                         'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
                                         'ospfd_cfg_file':   ospfd_file,
+                                        'vtysh_cfg_file':   fwglobals.g.FRR_VTYSH_FILE,
                                         'router_id':        iface_addr.split('/')[0]   # Get rid of address length
                                     }
                                 }
         # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
         cmd_list.append(cmd)
 
-        # Escape slash in address with length to prevent sed confusing
-        addr = iface_addr.split('/')[0] + r"\/" + iface_addr.split('/')[1]
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   =  "add %s to %s" % (iface_addr , ospfd_file)
-        cmd['cmd']['params']  = [
-            'if [ -z "$(grep \'network %s\' %s)" ]; then sed -i -E "s/([ ]+)(ospf router-id .*)/\\1\\2\\n\\1network %s area 0.0.0.0/" %s; fi' %
-            (addr , ospfd_file , addr , ospfd_file) ]
+        cmd['cmd']['params']  = [ 
+            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['descr']   =  "remove %s from %s" % (iface_addr , ospfd_file)
-        # Delete 'network' parameter from ospfd.conf.
-        # If no more networks are configured, delete file itself. This is to clean the 'ospf router-id' field.
-        # Note more sophisticated code is needed to replace 'ospf router-id' value with other network
-        # that might exist in ospfd.conf after removal of this interface. Implement it on demand :)
-        cmd['revert']['params']  = [
-            'sed -i -E "/[ ]+network %s area 0.0.0.0.*/d" %s; if [ -z "$(grep \' network \' %s)" ]; then rm -rf %s; fi; sudo systemctl restart frr' %
-            (addr , ospfd_file , ospfd_file , ospfd_file) ]
+        cmd['revert']['params']  = [ 
+            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
         cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = 'exec'
-        cmd['cmd']['params']  = [ 'sudo systemctl restart frr; if [ -z "$(pgrep frr)" ]; then exit 1; fi' ]
-        cmd['cmd']['descr']   = "restart frr"
         cmd_list.append(cmd)
 
     if is_lte:
