@@ -529,6 +529,9 @@ class FwStunWrap:
         """ Assume that tunnel in down state has remote edge behind symmetric NAT.
             Try to discover the remote edge address/port from incoming packets.
         """
+        if not fwglobals.g.router_api.state_is_started():
+            return
+
         if not self.sym_nat_cache:
             return
 
@@ -584,6 +587,9 @@ class FwStunWrap:
             we have to send VxLAN packet to the remote end of the tunnel in order to pinhole the NAT.
             Otherwise the remote end, which is IKE initiator, will be not able to intiate the IKE negotiation.
         """
+        if not fwglobals.g.router_api.state_is_started():
+            return
+
         if not self.sym_nat_tunnels_cache:
             return
 
