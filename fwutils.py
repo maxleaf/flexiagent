@@ -45,7 +45,7 @@ import yaml
 from netaddr import IPNetwork, IPAddress
 import threading
 import serial
-
+import ipaddress
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
@@ -4060,3 +4060,10 @@ def build_timestamped_filename(filename, ext=''):
         fwdump_EdgeDevice01_20210510_131900.tar.gz
     '''
     return filename + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ext
+
+def is_ip(str_to_check):
+    try:
+        ipaddress.ip_address(str_to_check)
+        return True
+    except:
+        return False
