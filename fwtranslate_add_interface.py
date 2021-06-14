@@ -445,7 +445,6 @@ def add_interface(params):
         cmd['revert']['descr']   =  "remove %s from %s" % (iface_addr , ospfd_file)
         cmd['revert']['params']  = [ 
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
-        cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
         cmd_list.append(cmd)
 
     if is_lte:
