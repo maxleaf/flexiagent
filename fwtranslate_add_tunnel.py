@@ -1130,7 +1130,6 @@ def add_tunnel(params):
         cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % params['loopback-iface']['addr']
         cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
             'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
-        cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
         cmd_list.append(cmd)
 
         # Add network for the tunnel interface.
@@ -1147,7 +1146,6 @@ def add_tunnel(params):
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % params['loopback-iface']['addr']
         cmd['revert']['params']  = [
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
-        cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
         cmd_list.append(cmd)
 
     cmd = {}
