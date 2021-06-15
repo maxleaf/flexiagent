@@ -1170,19 +1170,21 @@ def add_tunnel(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "preprocess tunnel add"
+    cmd['cmd']['descr']   = "postprocess add-tunnel"
     cmd['cmd']['params']  = {
-                    'module': 'fwutils',
-                    'func'  : 'tunnel_change_postprocess',
-                    'args'  : { 'add': True, 'addr': params['loopback-iface']['addr']},
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_add_tunnel_after',
+                    'args'  : {},
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "preprocess tunnel remove"
+    cmd['revert']['descr']  = "preprocess remove-tunnel"
     cmd['revert']['params'] = {
-                    'module': 'fwutils',
-                    'func'  : 'tunnel_change_postprocess',
-                    'args'  : { 'add': False, 'addr': params['loopback-iface']['addr']},
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_remove_tunnel_before',
+                    'args'  : {},
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
     }
     cmd_list.append(cmd)
 

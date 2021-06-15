@@ -1063,13 +1063,8 @@ def vpp_sw_if_index_to_name(sw_if_index):
 
      :returns: VPP interface name.
      """
-    name = ''
-
-    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
-        if sw_if_index == sw_if.sw_if_index:
-            name = sw_if.interface_name.rstrip(' \t\r\n\0')
-
-    return name
+    sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
+    return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
@@ -1838,8 +1833,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     """
     op = 'add' if add else 'del'
 
-    lan_vpp_name_list      = get_interface_vpp_names(type='lan')
-    loopback_vpp_name_list = get_tunnel_interface_vpp_names()
+    lan_vpp_name_list      = list(fwglobals.g.db['router_api']['vpp_if_name_to_sw_if_index']['lan'].keys())
+    loopback_vpp_name_list = list(fwglobals.g.db['router_api']['vpp_if_name_to_sw_if_index']['tunnel'].keys())
     interfaces = lan_vpp_name_list + loopback_vpp_name_list
 
     if not add:
@@ -1898,25 +1893,6 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
-
-def get_interface_vpp_names(type=None):
-    res = []
-    interfaces = fwglobals.g.router_cfg.get_interfaces()
-    for params in interfaces:
-        if type == None or re.match(type, params['type'], re.IGNORECASE):
-            sw_if_index = dev_id_to_vpp_sw_if_index(params['dev_id'])
-            if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-            res.append(if_vpp_name)
-    return res
-
-def get_tunnel_interface_vpp_names():
-    res = []
-    tunnels = fwglobals.g.router_cfg.get_tunnels()
-    for params in tunnels:
-        sw_if_index = vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-        if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-        res.append(if_vpp_name)
-    return res
 
 def add_static_route(addr, via, metric, remove, dev_id=None):
     """Add static route.
@@ -2011,25 +1987,19 @@ def vpp_set_dhcp_detect(dev_id, remove):
 
     return True
 
-def tunnel_change_postprocess(add, addr):
+
+def tunnel_change_postprocess(remove, vpp_if_name):
     """Tunnel add/remove postprocessing
 
-    :param params: params - rule parameters:
-                        add -  True if tunnel is added, False otherwise.
-                        addr - loopback address
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    :param remove:      True if tunnel is removed, False if added
+    :param vpp_if_name: name of the vpp software interface, e.g. "loop4"
     """
     policies = fwglobals.g.policies.policies_get()
     if len(policies) == 0:
         return
 
-    sw_if_index = vpp_ip_to_sw_if_index(addr)
-    if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-    remove = not add
-
     for policy_id, priority in list(policies.items()):
-        vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
+        vpp_multilink_attach_policy_rule(vpp_if_name, int(policy_id), priority, 0, remove)
 
 
 # The messages received from flexiManage are not perfect :)

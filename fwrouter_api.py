@@ -96,10 +96,23 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.thread_static_route = None
 
         FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
+
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
-            fwglobals.g.db['router_api'] = { 'sa_id' : 0 }
+            fwglobals.g.db['router_api'] = {}
+        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+        # Init sa-id used by tunnels
+        if not 'sa_id' in router_api_db:
+            router_api_db['sa_id'] = 0
+        # Init vpp interface caches
+        if not 'sw_if_index_to_vpp_if_name' in router_api_db:
+            router_api_db['sw_if_index_to_vpp_if_name'] = {}
+        if not 'vpp_if_name_to_sw_if_index' in router_api_db:
+            router_api_db['vpp_if_name_to_sw_if_index'] = {
+                'tunnel': {}, 'lan': {}, 'wan': {} }
+        fwglobals.g.db['router_api'] = router_api_db
+
 
     def finalize(self):
         """Destructor method
@@ -884,13 +897,12 @@ class FWROUTER_API(FwCfgRequestHandler):
         if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
             os.remove(fwglobals.g.FRR_OSPFD_FILE)
 
-        # Reset sa-id used by tunnels
+        # Reset persistent caches
         #
-        router_api = fwglobals.g.db.get('router_api')
-        if not router_api:
-            fwglobals.g.db['router_api'] = {}
         router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
         router_api_db['sa_id'] = 0
+        router_api_db['sw_if_index_to_vpp_if_name'] = {}
+        router_api_db['vpp_if_name_to_sw_if_index'] = {'tunnel':{}, 'lan':{}, 'wan':{}}
         fwglobals.g.db['router_api'] = router_api_db
 
         fwutils.vmxnet3_unassigned_interfaces_up()
@@ -935,6 +947,62 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
         fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwutils.clear_linux_interfaces_cache()
+
+    def _on_add_interface_after(self, type, sw_if_index):
+        """add-interface postprocessing
+
+        :param type:        "wan"/"lan"
+        :param sw_if_index: vpp sw_if_index of the interface
+        """
+        self._update_cache_sw_if_index(sw_if_index, type, True)
+
+    def _on_remove_interface_before(self, type, sw_if_index):
+        """remove-interface preprocessing
+
+        :param type:        "wan"/"lan"
+        :param sw_if_index: vpp sw_if_index of the interface
+        """
+        self._update_cache_sw_if_index(sw_if_index, type, False)
+
+    def _on_add_tunnel_after(self, sw_if_index):
+        """add-tunnel postprocessing
+
+        :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
+        :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
+        """
+        vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', True)
+        fwutils.tunnel_change_postprocess(False, vpp_if_name)
+
+    def _on_remove_tunnel_before(self, sw_if_index):
+        """remove-tunnel preprocessing
+
+        :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
+        :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
+        """
+        vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
+        fwutils.tunnel_change_postprocess(True, vpp_if_name)
+
+    def _update_cache_sw_if_index(self, sw_if_index, type, add):
+        """Updates persistent caches that store mapping of sw_if_index into
+        name of vpp interface and via versa.
+
+        :param sw_if_index: vpp sw_if_index of the vpp software interface
+        :param type:        "wan"/"lan"/"tunnel" - type of interface
+        :param add:         True to add to cache, False to remove from cache
+        """
+        router_api_db  = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+        cache_by_index = router_api_db['sw_if_index_to_vpp_if_name']
+        cache_by_name  = router_api_db['vpp_if_name_to_sw_if_index'][type]
+        if add:
+            vpp_if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
+            cache_by_name[vpp_if_name]  = sw_if_index
+            cache_by_index[sw_if_index] = vpp_if_name
+        else:
+            vpp_if_name = cache_by_index[sw_if_index]
+            del cache_by_name[vpp_if_name]
+            del cache_by_index[sw_if_index]
+        fwglobals.g.db['router_api'] = router_api_db
+        return vpp_if_name
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.
