@@ -76,7 +76,7 @@ class Checker:
     def __init__(self, debug=False):
         """Constructor method
         """
-        fwglobals.initialize()
+        fwglobals.initialize(quiet=True)
 
         self.CFG_VPP_CONF_FILE      = fwglobals.g.VPP_CONFIG_FILE
         self.CFG_FWAGENT_CONF_FILE  = fwglobals.g.FWAGENT_CONF_FILE
