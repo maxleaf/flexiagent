@@ -880,7 +880,9 @@ class FWROUTER_API(FwCfgRequestHandler):
         #
         os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
 
-        # Clean FRR OSPFD config
+        # Clean FRR config files
+        if os.path.exists(fwglobals.g.FRR_CONFIG_FILE):
+            os.remove(fwglobals.g.FRR_CONFIG_FILE)
         if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
             os.remove(fwglobals.g.FRR_OSPFD_FILE)
 

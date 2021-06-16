@@ -267,6 +267,13 @@ def start_router(params=None):
     cmd['revert']['params'] = [ 'sudo systemctl stop frr' ]
     cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "Setup FRR configuration"
+    cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'frr_setup_config'}
+    cmd_list.append(cmd)
+
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
     # Note we do it here and not on 'add-interface' as 'modify-interface' is translated

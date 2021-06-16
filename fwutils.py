@@ -1208,6 +1208,8 @@ def reset_device_config():
         system_cfg.clean()
     if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
         os.remove(fwglobals.g.ROUTER_STATE_FILE)
+    if os.path.exists(fwglobals.g.FRR_CONFIG_FILE):
+        os.remove(fwglobals.g.FRR_CONFIG_FILE)
     if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
         os.remove(fwglobals.g.FRR_OSPFD_FILE)
     if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
@@ -3314,30 +3316,21 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, vtysh_cfg_file, router_id):
-    '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
+def frr_setup_config():
+    '''Setup the /etc/frr/frr.conf file, initializes it and
     ensures that ospf is switched on in the frr configuration'''
 
     # Ensure that ospfd is switched on in /etc/frr/daemons.
-    subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
+    subprocess.check_call('if [ -n "$(grep ospfd=no %s)" ]; then sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s; sudo systemctl restart frr; fi'
+            % (fwglobals.g.FRR_DAEMONS_FILE,fwglobals.g.FRR_DAEMONS_FILE), shell=True)
 
     # Ensure that integrated-vtysh-config is disabled in /etc/frr/vtysh.conf.
-    subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % vtysh_cfg_file, shell=True)
+    subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
-    if os.path.exists(ospfd_cfg_file):
-        return
-
-    # Initialize ospfd.conf
-    with open(ospfd_cfg_file,"w") as f:
-        file_write_and_flush(f,
-            'hostname ospfd\n' + \
-            'password zebra\n' + \
-            'log file /var/log/frr/ospfd.log informational\n' + \
-            'log stdout\n' + \
-            '!\n' + \
-            'router ospf\n' + \
-            '    ospf router-id ' + router_id + '\n' + \
-            '!\n')
+    # Setup basics on frr.conf.
+    subprocess.check_call('sudo /usr/bin/vtysh -c "configure" -c "password zebra" '\
+        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"; '\
+        'sudo /usr/bin/vtysh -c "write"', shell=True)
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content
