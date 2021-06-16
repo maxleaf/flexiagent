@@ -412,37 +412,17 @@ def add_interface(params):
 
         cmd_list.append(cmd)
 
-    # Update ospfd.conf.
-    ospfd_file = fwglobals.g.FRR_OSPFD_FILE
+    # Update ospfd configuration.
     if 'routing' in params and params['routing'].lower() == 'ospf':
-
-        # Create /etc/frr/ospfd.conf file if it does not exist yet
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "python"
-        cmd['cmd']['descr']     = "create ospfd file if needed"
-        cmd['cmd']['params']    = {
-                                    'module': 'fwutils',
-                                    'func':   'frr_create_ospfd',
-                                    'args': {
-                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
-                                        'ospfd_cfg_file':   ospfd_file,
-                                        'vtysh_cfg_file':   fwglobals.g.FRR_VTYSH_FILE,
-                                        'router_id':        iface_addr.split('/')[0]   # Get rid of address length
-                                    }
-                                }
-        # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
-        cmd_list.append(cmd)
-
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   =  "add %s to %s" % (iface_addr , ospfd_file)
+        cmd['cmd']['descr']   =  "add network %s to OSPF" % (iface_addr)
         cmd['cmd']['params']  = [ 
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   =  "remove %s from %s" % (iface_addr , ospfd_file)
+        cmd['revert']['descr']   =  "remove network %s from OSPF" % (iface_addr)
         cmd['revert']['params']  = [ 
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
         cmd_list.append(cmd)
