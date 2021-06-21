@@ -414,19 +414,79 @@ def add_interface(params):
 
     # Update ospfd configuration.
     if 'routing' in params and params['routing'].lower() == 'ospf':
-        area = params.get('ospf', {}).get('area', '0.0.0.0')
+        ospf = params.get('ospf', {})
+        area = ospf.get('area', '0.0.0.0')
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   =  "add network %s to OSPF" % (iface_addr)
-        cmd['cmd']['params']  = [ 
+        cmd['cmd']['params']  = [
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area %s"; sudo /usr/bin/vtysh -c "write"' % (iface_addr, area) ]
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['descr']   =  "remove network %s from OSPF" % (iface_addr)
-        cmd['revert']['params']  = [ 
+        cmd['revert']['params']  = [
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area %s"; sudo /usr/bin/vtysh -c "write"' % (iface_addr, area) ]
         cmd_list.append(cmd)
+
+        helloInterval = ospf.get('helloInterval')
+        if helloInterval:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['descr']   =  "add hello interval %s to interface %s in OSPF" % (helloInterval, iface_addr)
+            cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf hello-interval %s"; sudo /usr/bin/vtysh -c "write"' % helloInterval]
+            cmd['revert'] = {}
+            cmd['revert']['name']    = "exec"
+            cmd['revert']['descr']   =  "remove hello interval %s from interface %s in OSPF" % (helloInterval, iface_addr)
+            cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf hello-interval %s"; sudo /usr/bin/vtysh -c "write"' % helloInterval]
+            cmd_list.append(cmd)
+
+        deadInterval = ospf.get('deadInterval')
+        if deadInterval:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['descr']   =  "add dead interval %s to interface %s in OSPF" % (deadInterval, iface_addr)
+            cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf dead-interval %s"; sudo /usr/bin/vtysh -c "write"' % deadInterval]
+            cmd['revert'] = {}
+            cmd['revert']['name']    = "exec"
+            cmd['revert']['descr']   =  "remove dead interval %s from interface %s in OSPF" % (deadInterval, iface_addr)
+            cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf dead-interval %s"; sudo /usr/bin/vtysh -c "write"' % deadInterval]
+            cmd_list.append(cmd)
+
+        keyId = ospf.get('keyId')
+        key = ospf.get('key')
+        if keyId and key:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['descr']   =  "add authentication to interface %s in OSPF" % iface_addr
+            cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf message-digest-key %s md5 %s"; sudo /usr/bin/vtysh -c "write"' % (keyId, key)]
+            cmd['revert'] = {}
+            cmd['revert']['name']    = "exec"
+            cmd['revert']['descr']   =  "add authentication to interface %s in OSPF" % iface_addr
+            cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf message-digest-key %s md5 %s"; sudo /usr/bin/vtysh -c "write"' % (keyId, key)]
+            cmd_list.append(cmd)
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['descr']   =  "set md5 authentication to interface %s in OSPF" % iface_addr
+            cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf authentication message-digest"; sudo /usr/bin/vtysh -c "write"']
+            cmd['revert'] = {}
+            cmd['revert']['name']    = "exec"
+            cmd['revert']['descr']   =  "unset md5 authentication to interface %s in OSPF" % iface_addr
+            cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf authentication message-digest"; sudo /usr/bin/vtysh -c "write"']
+            cmd_list.append(cmd)
 
     if is_lte:
         cmd = {}
