@@ -71,7 +71,8 @@ class FwRouterCfg(FwCfgDatabase):
                 'add-route',		# routes should come after tunnels, as they might use them
                 'add-dhcp-config',
                 'add-application',
-                'add-multilink-policy'
+                'add-multilink-policy',
+                'add-ospf',
             ]
 
         return FwCfgDatabase.dump(self, types, escape, full, keys)
@@ -92,7 +93,8 @@ class FwRouterCfg(FwCfgDatabase):
             'add-tunnel':           "========== TUNNELS ==========",
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",
             'add-application':      "============ APPLICATIONS ============",
-            'add-multilink-policy': "============= POLICIES ============="
+            'add-multilink-policy': "============= POLICIES =============",
+            'add-ospf':              "============= OSPF ============="
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)

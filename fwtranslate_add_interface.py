@@ -414,17 +414,18 @@ def add_interface(params):
 
     # Update ospfd configuration.
     if 'routing' in params and params['routing'].lower() == 'ospf':
+        area = params.get('ospf', {}).get('area', '0.0.0.0')
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   =  "add network %s to OSPF" % (iface_addr)
         cmd['cmd']['params']  = [ 
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
+            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area %s"; sudo /usr/bin/vtysh -c "write"' % (iface_addr, area) ]
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['descr']   =  "remove network %s from OSPF" % (iface_addr)
         cmd['revert']['params']  = [ 
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
+            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area %s"; sudo /usr/bin/vtysh -c "write"' % (iface_addr, area) ]
         cmd_list.append(cmd)
 
     if is_lte:

@@ -104,6 +104,8 @@ request_handlers = {
     'remove-application':           {'name': '_call_router_api', 'sign': True},
     'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
+    'add-ospf':                     {'name': '_call_router_api', 'sign': True},
+    'remove-ospf':                  {'name': '_call_router_api', 'sign': True},
 
     # System API
     'add-lte':                        {'name': '_call_system_api'},
