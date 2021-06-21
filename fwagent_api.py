@@ -293,6 +293,11 @@ class FWAGENT_API:
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
+        # Check that all messages are supported
+        non_supported_messages = list([x for x in params['requests'] if x['message'] not in fwglobals.request_handlers])
+        if len(non_supported_messages):
+            raise Exception("_sync_device: Unsupported requests found: %s" % str(non_supported_messages))
+
         for module_name, module in list(fwglobals.modules.items()):
             if module.get('sync', False) == True:
                 # get api module. e.g router_api, system_api
