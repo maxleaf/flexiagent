@@ -459,6 +459,21 @@ def add_interface(params):
                 'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf dead-interval %s"; sudo /usr/bin/vtysh -c "write"' % deadInterval]
             cmd_list.append(cmd)
 
+        cost = ospf.get('cost')
+        if cost:
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['descr']   =  "add cost %s to interface %s in OSPF" % (cost, iface_addr)
+            cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf cost %s"; sudo /usr/bin/vtysh -c "write"' % cost]
+            cmd['revert'] = {}
+            cmd['revert']['name']    = "exec"
+            cmd['revert']['descr']   =  "remove cost %s to interface %s in OSPF" % (cost, iface_addr)
+            cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
+                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf cost %s"; sudo /usr/bin/vtysh -c "write"' % cost]
+            cmd_list.append(cmd)
+
         keyId = ospf.get('keyId')
         key = ospf.get('key')
         if keyId and key:
