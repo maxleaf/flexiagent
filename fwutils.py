@@ -3316,6 +3316,23 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
+def frr_vtysh_run(flags, restart_frr_service=False):
+    '''Run vtysh command to configure router
+
+    :param flags:               flags of commands
+    :param restart_frr_service: some OSPF configurations require restarting the service in order to apply them
+    '''
+    try:
+        vtysh_cmd = 'sudo /usr/bin/vtysh %s; sudo /usr/bin/vtysh -c "write"' % flags
+        output = os.popen(vtysh_cmd).read()
+
+        if restart_frr_service:
+            os.system('systemctl restart frr')
+
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))
+
 def frr_setup_config():
     '''Setup the /etc/frr/frr.conf file, initializes it and
     ensures that ospf is switched on in the frr configuration'''

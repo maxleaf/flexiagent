@@ -418,19 +418,30 @@ def add_interface(params):
         area = ospf.get('area', '0.0.0.0')
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   =  "add network %s to OSPF" % (iface_addr)
-        cmd['cmd']['params']  = [
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area %s"; sudo /usr/bin/vtysh -c "write"' % (iface_addr, area) ]
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['descr']   =  "add network %s to OSPF" % iface_addr
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'flags': '-c "configure" -c "router ospf" -c "network %s area %s"' % (iface_addr, area)
+                }
+        }
         cmd['revert'] = {}
-        cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   =  "remove network %s from OSPF" % (iface_addr)
-        cmd['revert']['params']  = [
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area %s"; sudo /usr/bin/vtysh -c "write"' % (iface_addr, area) ]
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'flags': '-c "configure" -c "router ospf" -c "no network %s area %s"' % (iface_addr, area)
+                }
+        }
+        cmd['revert']['descr']   =  "remove network %s from OSPF" % iface_addr
         cmd_list.append(cmd)
 
         # OSPF per interface configuration
         vty_commands = []
+        restart_frr = False
         helloInterval = ospf.get('helloInterval')
         if helloInterval:
             vty_commands.append('ip ospf hello-interval %s' % helloInterval)
@@ -446,23 +457,39 @@ def add_interface(params):
         keyId = ospf.get('keyId')
         key = ospf.get('key')
         if keyId and key:
+            restart_frr = True
             vty_commands.append('ip ospf message-digest-key %s md5 %s' % (keyId, key))
             vty_commands.append('ip ospf authentication message-digest')
 
         if vty_commands:
             frr_cmd = ' -c '.join(map(lambda x: '"%s"' % x, vty_commands))
             frr_cmd_revert = ' -c '.join(map(lambda x: '"no %s"' % x, vty_commands))
+
             cmd = {}
             cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['name']   = "python"
+            cmd['cmd']['params'] = {
+                    'module': 'fwutils',
+                    'func': 'frr_vtysh_run',
+                    'args': {
+                        'flags'              : '-c "configure" -c "interface DEV-STUB" -c %s' % frr_cmd,
+                        'restart_frr_service': restart_frr
+                    },
+                    'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+            }
             cmd['cmd']['descr']   =  "add OSPF per link configuration of interface %s" % iface_addr
-            cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
-                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c %s; sudo /usr/bin/vtysh -c "write"' % frr_cmd]
             cmd['revert'] = {}
-            cmd['revert']['name']    = "exec"
+            cmd['revert']['name']   = "python"
+            cmd['revert']['params'] = {
+                    'module': 'fwutils',
+                    'func': 'frr_vtysh_run',
+                    'args': {
+                        'flags'              : '-c "configure" -c "interface DEV-STUB" -c %s' % frr_cmd_revert,
+                        'restart_frr_service': restart_frr
+                    },
+                    'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+            }
             cmd['revert']['descr']   =  "remove OSPF per link configuration of interface %s" % iface_addr
-            cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]},
-                'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c %s; sudo /usr/bin/vtysh -c "write"' % frr_cmd_revert]
             cmd_list.append(cmd)
 
     if is_lte:

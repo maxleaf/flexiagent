@@ -414,7 +414,13 @@ class FwCfgRequestHandler:
             elif 'replace' in s:
                 old = s['replace']
                 if type(params) is dict:
-                    raise Exception("fwutils.py:substitute: 'replace' is not supported for dictionary in '%s'" % format(params))
+                    if 'args' in params:
+                        for key in params['args']:
+                            val = params['args'][key]
+                            if type(val) == str and old in val:
+                                params['args'][key] = val.replace(old, str(new))
+                    else:
+                        raise Exception("fwutils.py:substitute: 'replace' is not supported for the given dictionary in '%s'" % format(params))
                 else:  # list
                     for (idx, p) in list(enumerate(params)):
                         if type(p) == str:

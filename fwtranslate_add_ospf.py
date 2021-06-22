@@ -34,16 +34,29 @@ def add_ospf(params):
     if routerId:
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
+        cmd['cmd']['name']   = "python"
         cmd['cmd']['descr']   =  "add routerId %s to OSPF" % routerId
-        cmd['cmd']['params']  = [
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "ospf router-id %s"; sudo /usr/bin/vtysh -c "write"' % routerId ]
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'flags'              : '-c "configure" -c "router ospf" -c "ospf router-id %s"' % routerId,
+                    'restart_frr_service': True,
+                }
+        }
         cmd['revert'] = {}
-        cmd['revert']['name']    = "exec"
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'flags'              : '-c "configure" -c "router ospf" -c "no ospf router-id %s"' % routerId,
+                    'restart_frr_service': True,
+                }
+        }
         cmd['revert']['descr']   =  "remove routerId %s from OSPF" % routerId
-        cmd['revert']['params']  = [
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no ospf router-id %s"; sudo /usr/bin/vtysh -c "write"' % routerId ]
         cmd_list.append(cmd)
+
     return cmd_list
 
 def get_request_key(params):
