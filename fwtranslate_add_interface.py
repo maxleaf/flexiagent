@@ -28,6 +28,7 @@ import fwglobals
 import fwnetplan
 import fwtranslate_revert
 import fwutils
+import fw_nat_command_helpers
 
 # add_interface
 # --------------------------------------
@@ -350,67 +351,9 @@ def add_interface(params):
             }
             cmd_list.append(cmd)
 
-    # Enable NAT.
-    # On WAN interfaces run
-    #   'nat44 add interface address GigabitEthernet0/9/0'
-    #   'set interface nat44 out GigabitEthernet0/9/0 output-feature'
-    # nat.api.json: nat44_add_del_interface_addr() & nat44_interface_add_del_output_feature(inside=0)
+    # Setup NAT config on WAN interface
     if 'type' not in params or params['type'].lower() == 'wan':
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "python"
-        cmd['cmd']['descr']     = "enable NAT for interface address %s" % dev_id
-        cmd['cmd']['params']    = {
-                                    'module': 'fwutils',
-                                    'func':   'vpp_nat_interface_add',
-                                    'args':   {
-                                        'dev_id': dev_id,
-                                        'remove': False
-                                    }
-                                  }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "python"
-        cmd['revert']['descr']  = "disable NAT for interface %s" % dev_id
-        cmd['revert']['params'] = {
-                                    'module': 'fwutils',
-                                    'func':   'vpp_nat_interface_add',
-                                    'args':   {
-                                        'dev_id': dev_id,
-                                        'remove': True
-                                    }
-                                  }
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = "nat44_interface_add_del_output_feature"
-        cmd['cmd']['descr']   = "add interface %s (%s) to output path" % (dev_id, iface_addr)
-        cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':1 }
-        cmd['revert'] = {}
-        cmd['revert']['name']   = "nat44_interface_add_del_output_feature"
-        cmd['revert']['descr']  = "remove interface %s (%s) from output path" % (dev_id, iface_addr)
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                    'is_add':0 }
-        cmd_list.append(cmd)
-
-        # nat.api.json: nat44_add_del_identity_mapping (..., is_add, ...)
-        vxlan_port = 4789
-        udp_proto = 17
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']          = "nat44_add_del_identity_mapping"
-        cmd['cmd']['params']        = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':1 }
-        cmd['cmd']['descr']         = "create nat identity mapping %s -> %s" % (dev_id, vxlan_port)
-        cmd['revert'] = {}
-        cmd['revert']['name']       = 'nat44_add_del_identity_mapping'
-        cmd['revert']['params']     = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ],
-                                        'port':vxlan_port, 'protocol':udp_proto, 'is_add':0 }
-        cmd['revert']['descr']      = "delete nat identity mapping %s -> %s" % (dev_id, vxlan_port)
-
-        cmd_list.append(cmd)
+        cmd_list.extend(fw_nat_command_helpers.get_nat_wan_setup_config(dev_id))
 
     # Update ospfd configuration.
     if 'routing' in params and params['routing'].lower() == 'ospf':
