@@ -12,15 +12,17 @@ __version__ = '1.0.0'
 
 g_stun_log = None # log object
 
-# FLEXIWAN_FIX: updated list of STUN server, as some are not working any more
 STUN_SERVERS = (
+    'stun.l.google.com:19302',
+    'stun1.l.google.com:19302',
     'stun2.l.google.com:19302',
     'stun3.l.google.com:19302',
     'stun4.l.google.com:19302',
-    'stunserver.org:3478',
-    'stun.ekiga.net',
-    'stun.pjsip.org',
-    'stun.voipstunt.com',
+    'stun.ekiga.net:3478',
+    'stun.cheapvoip.com:3478',
+    'stun.gmx.de:3478',
+    'stun.gmx.net:3478',
+    'stun.stunprotocol.org:3478',
 )
 
 """
@@ -32,6 +34,7 @@ STUN_SERVERS = (
 """
 
 stun_servers_list = STUN_SERVERS
+MagicCookie = '2112a442'
 
 DEFAULTS = {
     'stun_port': 3478,
@@ -52,7 +55,7 @@ ErrorCode = '0009'
 UnknownAttribute = '000A'
 ReflectedFrom = '000B'
 XorOnly = '0021'
-XorMappedAddress = '8020'
+XorMappedAddress = '0020'
 ServerName = '8022'
 SecondaryAddress = '8050'  # Non standard extension
 
@@ -107,6 +110,17 @@ ChangedAddressError = "Error"
 def b2a_hexstr(abytes):
     return binascii.b2a_hex(abytes).decode("ascii")
 
+def xor_convert(abytes, xor_str):
+    bytes_len = len(abytes)
+    if (bytes_len != len(xor_str)/2 or len(xor_str)%2 !=0):
+        stun_log("Stun: missmatch xor_convert. %s, %s" % (str(abytes), xor_str))
+        return abytes
+    xor_bytes = binascii.a2b_hex(xor_str)
+    res = bytearray(bytes_len)
+    for i in range(bytes_len):
+        res[i] = abytes[i] ^ xor_bytes[i]
+    return res
+
 def _initialize():
     global dictValToAttr, dictValToMsgType
     dictValToAttr= {v: k for k, v in list(dictAttrToVal.items())}
@@ -117,7 +131,7 @@ def set_log(log):
     g_stun_log = log
 
 def gen_tran_id():
-    a = ''.join(random.choice('0123456789ABCDEF') for i in range(32))
+    a = ''.join(random.choice('0123456789ABCDEF') for i in range(24))
     # return binascii.a2b_hex(a)
     return a
 
@@ -126,7 +140,7 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
               'SourceIP': None, 'SourcePort': None, 'ChangedIP': None,
               'ChangedPort': None}
     str_len = "%#04d" % (len(send_data) / 2)
-    trans_id = gen_tran_id()
+    trans_id = MagicCookie + gen_tran_id()
     str_data = ''.join([BindRequestMsg, str_len, trans_id, send_data])
     data = binascii.a2b_hex(str_data)
 
@@ -173,6 +187,16 @@ def stun_test(sock, host, port, source_ip, source_port, send_data=""):
                     str(int(b2a_hexstr(buf[base + 9:base + 10]), 16)),
                     str(int(b2a_hexstr(buf[base + 10:base + 11]), 16)),
                     str(int(b2a_hexstr(buf[base + 11:base + 12]), 16))
+                ])
+                retVal['ExternalIP'] = ip
+                retVal['ExternalPort'] = port
+            if attr_type == XorMappedAddress:
+                port = int(b2a_hexstr(xor_convert(buf[base + 6:base + 8], MagicCookie[0:4])), 16)
+                ip = ".".join([
+                    str(int(b2a_hexstr(xor_convert(buf[base + 8:base + 9], MagicCookie[0:2])), 16)),
+                    str(int(b2a_hexstr(xor_convert(buf[base + 9:base + 10], MagicCookie[2:4])), 16)),
+                    str(int(b2a_hexstr(xor_convert(buf[base + 10:base + 11], MagicCookie[4:6])), 16)),
+                    str(int(b2a_hexstr(xor_convert(buf[base + 11:base + 12], MagicCookie[6:8])), 16))
                 ])
                 retVal['ExternalIP'] = ip
                 retVal['ExternalPort'] = port
