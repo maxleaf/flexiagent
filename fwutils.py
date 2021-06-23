@@ -3345,9 +3345,27 @@ def frr_setup_config():
     subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
     # Setup basics on frr.conf.
-    subprocess.check_call('sudo /usr/bin/vtysh -c "configure" -c "password zebra" '\
-        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"; '\
-        'sudo /usr/bin/vtysh -c "write"', shell=True)
+    frr_vtysh_run('-c "configure" -c "password zebra" '\
+        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"')
+
+    # When we add a static route, OSPF sees it as a kernel route, not a static one.
+    # That is why we are forced to set in OSPF - redistribution of *kernel* routes.
+    # But, of course, we don't want to redistribute them all, so we create a filter.
+    # We pre-enable the setting to redistribute kernel routes with this filter.
+    # At this point, the list is empty so there is no route to be redistributed.
+    # Whenever we want to redistribute a static route, we will add it to the list.
+    #
+    # This is how the OSPF file looks after these settings:
+    # router ospf
+    #   redistribute kernel route-map fw-redist--ospf-rm
+    # !
+    # route-map fw-redist--ospf-rm permit 1
+    #  match ip address fw-redist-ospf-acl
+    # !
+    #
+    frr_vtysh_run('-c "configure" -c "route-map %s permit 1" '\
+        '-c "match ip address %s"' % (fwglobals.g.FRR_OSPF_ROUTE_MAP, fwglobals.g.FRR_OSPF_ACL))
+    frr_vtysh_run('-c "configure" -c "router ospf" -c "redistribute kernel route-map %s"' % fwglobals.g.FRR_OSPF_ROUTE_MAP)
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content

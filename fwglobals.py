@@ -285,6 +285,8 @@ class Fwglobals:
         self.FRR_CONFIG_FILE     = '/etc/frr/frr.conf'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.FRR_VTYSH_FILE      = '/etc/frr/vtysh.conf'
+        self.FRR_OSPF_ACL       = 'fw-redist-ospf-acl'
+        self.FRR_OSPF_ROUTE_MAP = 'fw-redist-ospf-rm'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
