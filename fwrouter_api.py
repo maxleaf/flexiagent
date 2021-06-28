@@ -950,11 +950,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         types = [
             'add-ospf',
-            'add-bgp',
             'add-interface',
             'add-tunnel',
             'add-application',
             'add-multilink-policy',
+            'add-bgp',              # BGP should come after tunnels, as they might use them!
             'add-route',            # Routes should come after tunnels, as they might use them!
             'add-dhcp-config'
         ]
