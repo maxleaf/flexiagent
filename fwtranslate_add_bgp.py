@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+from netaddr import *
 import fwglobals
 # {
 #   "entity": "agent",
@@ -88,35 +89,58 @@ def add_bgp(params):
     cmd['revert']['descr']   =  "remove bgp router with %s ASN" % localASN
     cmd_list.append(cmd)
 
-
     vty_commands = []
+    filter_reverse_commands = []
     restart_frr = False
 
     routerId = params.get('routerId')
+    neighbors = params.get('neighbors', [])
+    keepaliveInterval = params.get('keepaliveInterval')
+    holdInterval = params.get('holdInterval')
+    networks = params.get('networks', [])
+
+    # add remote tunnels IP as neighbors
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for tunnel in tunnels:
+        # calc remote IP based on local
+        ip  = IPNetwork(tunnel['loopback-iface']['addr'])     # 10.100.0.4 / 10.100.0.5
+        ip.value  ^= IPAddress('0.0.0.1').value               # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
+        neighbors.append({
+            'ip': str(ip.ip),
+            'remoteASN': localASN # we create an iBGP session between tunnels interfaces
+        })
+
     if routerId:
         vty_commands.append('bgp router-id %s' % routerId)
         restart_frr = True
 
-    neighbors = params.get('neighbors')
-    keepaliveInterval = params.get('keepaliveInterval')
-    holdInterval = params.get('holdInterval')
-    if neighbors:
-        for neighbor in neighbors:
-            ip = neighbor['ip']
-            remoteASN = neighbor['remoteASN']
-            vty_commands.append('neighbor %s remote-as %s' % (ip, remoteASN))
+    for neighbor in neighbors:
+        ip = neighbor['ip']
+        remoteASN = neighbor['remoteASN']
+        vty_commands.append('neighbor %s remote-as %s' % (ip, remoteASN))
 
-            password = neighbor.get('password')
-            if password:
-                vty_commands.append('neighbor %s password %s' % (ip, password))
+        password = neighbor.get('password')
+        if password:
+            vty_commands.append('neighbor %s password %s' % (ip, password))
 
-            if keepaliveInterval and holdInterval:
-                vty_commands.append('neighbor %s timers %s %s' % (ip, keepaliveInterval, holdInterval))
+        if keepaliveInterval and holdInterval:
+            vty_commands.append('neighbor %s timers %s %s' % (ip, keepaliveInterval, holdInterval))
+
+    if networks:
+        vty_commands.append('address-family ipv4 unicast')
+        for network in networks:
+            vty_commands.append('network %s' % network['ipv4'])
+        vty_commands.append('exit-address-family')
+
+        # no need to run revers commands. if there is no "network", the frr remove it automatically
+        filter_reverse_commands.append('exit-address-family')
+        filter_reverse_commands.append('address-family ipv4 unicast')
 
     if vty_commands:
         frr_cmd = ' -c '.join(map(lambda x: '"%s"' % x, vty_commands))
         # reverse the frr_cmd_revert because we need to start removing from the last config
         #
+        vty_commands = list(filter(lambda x: not x in filter_reverse_commands, vty_commands))
         frr_cmd_revert = ' -c '.join(map(lambda x: '"no %s"' % x, list(reversed(vty_commands))))
 
         cmd = {}
