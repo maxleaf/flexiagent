@@ -73,6 +73,7 @@ class FwRouterCfg(FwCfgDatabase):
                 'add-application',
                 'add-multilink-policy',
                 'add-ospf',
+                'add-bgp',
             ]
 
         return FwCfgDatabase.dump(self, types, escape, full, keys)
@@ -94,7 +95,8 @@ class FwRouterCfg(FwCfgDatabase):
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",
             'add-application':      "============ APPLICATIONS ============",
             'add-multilink-policy': "============= POLICIES =============",
-            'add-ospf':              "============= OSPF ============="
+            'add-ospf':             "============= OSPF =============",
+            'add-bgp':              "============= BGP =============",
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)

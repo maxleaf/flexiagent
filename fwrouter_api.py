@@ -65,6 +65,8 @@ fwrouter_translators = {
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert'),          'api':'revert'},
     'add-ospf':                 {'module': __import__('fwtranslate_add_ospf'),        'api':'add_ospf'},
     'remove-ospf':              {'module': __import__('fwtranslate_revert'),          'api':'revert'},
+    'add-bgp':                  {'module': __import__('fwtranslate_add_bgp'),         'api':'add_bgp'},
+    'remove-bgp':               {'module': __import__('fwtranslate_revert'),          'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -707,7 +709,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Than the 'add-X' requests should follow in opposite order:
         #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
         #
-        add_order    = [ 'add-ospf', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
+        add_order    = [
+            'add-ospf', 'add-bgp', 'add-interface', 'add-tunnel', 'add-route',
+            'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router'
+        ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')
         remove_order.reverse()
@@ -945,6 +950,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         types = [
             'add-ospf',
+            'add-bgp',
             'add-interface',
             'add-tunnel',
             'add-application',
