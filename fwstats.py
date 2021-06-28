@@ -60,7 +60,7 @@ def update_stats():
         reset_stats()
         vpp_pid = current_vpp_pid
 
-    if not vpp_pid:
+    if not vpp_pid or not fwglobals.g.router_api.state_is_started():
         stats['ok'] = 0
     else:
         new_stats = fwutils.get_vpp_if_count()

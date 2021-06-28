@@ -888,6 +888,12 @@ class FWROUTER_API(FwCfgRequestHandler):
         #
         os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
 
+        # Clean FRR config files
+        if os.path.exists(fwglobals.g.FRR_CONFIG_FILE):
+            os.remove(fwglobals.g.FRR_CONFIG_FILE)
+        if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
+            os.remove(fwglobals.g.FRR_OSPFD_FILE)
+
         fwutils.reset_router_api_db_sa_id() # Reset sa-id used by tunnels
         fwutils.reset_router_api_db_bridges() # Reset bridges used by switches
 

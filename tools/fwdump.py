@@ -130,6 +130,7 @@ g_dumpers = {
     'hostapd.log':                  { 'shell_cmd': 'cp %s <temp_folder>/hostapd.log 2>/dev/null ;' % (g.HOSTAPD_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
+    'fwagent_db_applications':      { 'shell_cmd': 'fwagent show --database applications > <dumper_out_file>' },
     'fwagent_db_general':           { 'shell_cmd': 'fwagent show --database general > <dumper_out_file>' },
     'fwagent_db_multilink':         { 'shell_cmd': 'fwagent show --database multilink > <dumper_out_file>' },
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --configuration multilink-policy > <dumper_out_file>' },

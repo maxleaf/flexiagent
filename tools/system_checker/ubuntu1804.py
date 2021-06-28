@@ -24,8 +24,13 @@
 import os
 import re
 import subprocess
+import sys
 
 import fwsystem_checker_common
+
+globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..')
+sys.path.append(globals)
+import fwutils
 
 class Checker(fwsystem_checker_common.Checker):
     """This is Checker class representation.
@@ -91,11 +96,30 @@ class Checker(fwsystem_checker_common.Checker):
                             return False
                     # Now add DNS servers to it's configuration, if no servers present
                     if len(self.nameservers) == 0:
+                        server_added = False
                         while True:
-                            server = input(prompt + "enter DNS Server address, e.g. 8.8.8.8: ")
-                            ret = os.system('printf "nameserver %s\n" >> %s' % (server, config_filename))
-                            ret_str = 'succeeded' if ret == 0 else 'failed'
-                            print(prompt + ret_str + ' to add ' + server)
+                            server = input(prompt + "enter DNS Server address, e.g. 8.8.8.8 (for exit enter 'q'): ")
+
+                            if server and server != 'q':
+                                # Validate user input
+                                if not fwutils.is_ip(server):
+                                    print(prompt + '%s is not a valid IP' % server)
+                                    continue
+
+                                ret = os.system('printf "nameserver %s\n" >> %s' % (server, config_filename))
+                                if ret == 0:
+                                    server_added = True
+                                    ret_str = 'succeeded'
+                                else:
+                                    ret_str = 'failed'
+
+                                print(prompt + ret_str + ' to add ' + server)
+                            elif server == 'q':
+                                ret = not server_added # ret=0 is the wanted result
+                                break
+                            else:
+                                continue
+
                             choice = input(prompt + "repeat? [y/N]: " )
                             if choice == 'y' or choice == 'Y':
                                 continue

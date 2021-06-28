@@ -45,7 +45,7 @@ import yaml
 from netaddr import IPNetwork, IPAddress
 import threading
 import serial
-
+import ipaddress
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
@@ -1208,6 +1208,8 @@ def reset_device_config():
         system_cfg.clean()
     if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
         os.remove(fwglobals.g.ROUTER_STATE_FILE)
+    if os.path.exists(fwglobals.g.FRR_CONFIG_FILE):
+        os.remove(fwglobals.g.FRR_CONFIG_FILE)
     if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
         os.remove(fwglobals.g.FRR_OSPFD_FILE)
     if os.path.exists(fwglobals.g.VPP_CONFIG_FILE_BACKUP):
@@ -2729,10 +2731,10 @@ def get_at_port(dev_id):
             for usb_port in tty_devices:
                 try:
                     with serial.Serial('/dev/%s' % usb_port, 115200, timeout=1) as ser:
-                        ser.write('AT\r')
+                        ser.write(bytes('AT\r', 'utf-8')) # check response to AT command
                         t_end = time.time() + 1
                         while time.time() < t_end:
-                            response = ser.readline()
+                            response = ser.readline().decode()
                             if "OK" in response:
                                 at_ports.append(ser.name)
                                 break
@@ -2750,7 +2752,9 @@ def lte_set_modem_to_mbim(dev_id):
         if lte_driver == 'cdc_mbim':
             return (True, None)
 
-        hardware_info = lte_get_hardware_info(dev_id)
+        hardware_info, err = lte_get_hardware_info(dev_id)
+        if err:
+            raise Exception(str(err))
 
         vendor = hardware_info['Vendor']
         model =  hardware_info['Model']
@@ -2763,10 +2767,12 @@ def lte_set_modem_to_mbim(dev_id):
             if at_serial_port and len(at_serial_port) > 0:
                 ser = serial.Serial(at_serial_port[0])
                 for at in at_commands:
-                    ser.write(at + '\r')
+                    at_cmd = bytes(at + '\r', 'utf-8')
+                    ser.write(at_cmd)
                     time.sleep(0.5)
                 ser.close()
-                time.sleep(10)
+                time.sleep(10) # reset modem might take few seconds
+                os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
                 return (True, None)
             return (False, 'AT port not found. dev_id: %s' % dev_id)
         elif 'Sierra Wireless' in vendor:
@@ -2774,12 +2780,15 @@ def lte_set_modem_to_mbim(dev_id):
             _run_qmicli_command(dev_id, 'dms-swi-set-usb-composition=8')
             _run_qmicli_command(dev_id, 'dms-set-operating-mode=offline')
             _run_qmicli_command(dev_id, 'dms-set-operating-mode=reset')
-            time.sleep(10)
+            time.sleep(10)  # reset modem might take few seconds
+            os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
             return (True, None)
         else:
             print("Your card is not officially supported. It might work, But you have to switch manually to the MBIM modem")
             return (False, 'vendor or model are not supported. (vendor: %s, model: %s)' % (vendor, model))
     except Exception as e:
+        # Modem cards sometimes get stuck and recover only after disconnecting the router from the power supply
+        print("Failed to switch modem to MBIM. You can unplug the router, wait a few seconds and try again. (%s)" % str(e))
         return (False, str(e))
 
 
@@ -3104,27 +3113,32 @@ def lte_get_hardware_info(dev_id):
         'Imei': '',
     }
     try:
-        lines, _ = qmi_get_manufacturer(dev_id)
+        lines, err = qmi_get_manufacturer(dev_id)
+        if err:
+            raise Exception(err)
         for line in lines:
             if 'Manufacturer' in line:
                 result['Vendor'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines, _ = qmi_get_model(dev_id)
+        lines, err = qmi_get_model(dev_id)
+        if err:
+            raise Exception(err)
         for line in lines:
             if 'Model' in line:
                 result['Model'] = line.split(':')[-1].strip().replace("'", '')
                 break
 
-        lines, _ = qmi_get_imei(dev_id)
+        lines, err = qmi_get_imei(dev_id)
+        if err:
+            raise Exception(err)
         for line in lines:
             if 'IMEI' in line:
                 result['Imei'] = line.split(':')[-1].strip().replace("'", '')
                 break
-
-    except Exception:
-        pass
-    return result
+    except Exception as e:
+        return (result, str(e))
+    return (result, None)
 
 def lte_get_packets_state(dev_id):
     result = {
@@ -3325,27 +3339,21 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_create_ospfd(frr_cfg_file, ospfd_cfg_file, router_id):
-    '''Creates the /etc/frr/ospfd.conf file, initializes it with router id and
+def frr_setup_config():
+    '''Setup the /etc/frr/frr.conf file, initializes it and
     ensures that ospf is switched on in the frr configuration'''
 
     # Ensure that ospfd is switched on in /etc/frr/daemons.
-    subprocess.check_call('sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s' % frr_cfg_file, shell=True)
+    subprocess.check_call('if [ -n "$(grep ospfd=no %s)" ]; then sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s; sudo systemctl restart frr; fi'
+            % (fwglobals.g.FRR_DAEMONS_FILE,fwglobals.g.FRR_DAEMONS_FILE), shell=True)
 
-    if os.path.exists(ospfd_cfg_file):
-        return
+    # Ensure that integrated-vtysh-config is disabled in /etc/frr/vtysh.conf.
+    subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
-    # Initialize ospfd.conf
-    with open(ospfd_cfg_file,"w") as f:
-        file_write_and_flush(f,
-            'hostname ospfd\n' + \
-            'password zebra\n' + \
-            'log file /var/log/frr/ospfd.log informational\n' + \
-            'log stdout\n' + \
-            '!\n' + \
-            'router ospf\n' + \
-            '    ospf router-id ' + router_id + '\n' + \
-            '!\n')
+    # Setup basics on frr.conf.
+    subprocess.check_call('sudo /usr/bin/vtysh -c "configure" -c "password zebra" '\
+        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"; '\
+        'sudo /usr/bin/vtysh -c "write"', shell=True)
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content
@@ -3519,6 +3527,16 @@ def set_linux_igmp_max_memberships(value = 4096):
         fwglobals.log.error("Set limit of multicast group membership command failed : %s" % (sys_cmd))
     else:
         fwglobals.log.debug("Set limit of multicast group membership command successfully executed: %s" % (sys_cmd))
+
+def set_linux_socket_max_receive_buffer_size(value = 1024000):
+    """ Set maximum socket receive buffer size which may be set by using the SO_RCVBUF socket option
+    """
+    sys_cmd = 'sysctl -w net.core.rmem_max=%d > /dev/null' % (value)
+    rc = os.system(sys_cmd)
+    if rc:
+        fwglobals.log.error("Set maximum socket receive buffer size command failed : %s" % (sys_cmd))
+    else:
+        fwglobals.log.debug("Set maximum socket receive buffer size command successfully executed: %s" % (sys_cmd))
 
 def update_linux_metric(prefix, dev, metric):
     """Invokes 'ip route' commands to update metric on the provide device.
@@ -4062,11 +4080,18 @@ def send_udp_packet(src_ip, src_port, dst_ip, dst_port, dev_name, msg):
 
     s.close()
 
-def build_timestamped_filename(filename, ext=''):
+def build_timestamped_filename(filename, ext='', separator='_'):
     '''Incorporates date and time into the filename in format "%Y%M%d_%H%M%S".
     Example:
         build_timestamped_filename("fwdump_EdgeDevice01_", ext='.tar.gz')
         ->
         fwdump_EdgeDevice01_20210510_131900.tar.gz
     '''
-    return filename + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ext
+    return filename + separator + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ext
+
+def is_ip(str_to_check):
+    try:
+        ipaddress.ip_address(str_to_check)
+        return True
+    except:
+        return False

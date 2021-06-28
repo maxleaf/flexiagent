@@ -135,7 +135,6 @@ from netaddr import *
 #             ospf router-id 192.168.56.101
 #             network 192.168.56.0/24 area 0.0.0.0
 #             network 10.100.0.7/31 area 0.0.0.0
-#    sudo systemctl restart
 #
 #  This command sequence implements following scheme:
 #
@@ -1139,24 +1138,6 @@ def add_tunnel(params):
     # Restart frr
     # --------------------------------------------------------------------------
     if 'routing' in params['loopback-iface'] and params['loopback-iface']['routing'] == 'ospf':
-        ospfd_file = fwglobals.g.FRR_OSPFD_FILE
-
-        # Create /etc/frr/ospfd.conf file if it does not exist yet
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "python"
-        cmd['cmd']['descr']     = "create ospfd file if needed"
-        cmd['cmd']['params']    = {
-                                    'module': 'fwutils',
-                                    'func':   'frr_create_ospfd',
-                                    'args': {
-                                        'frr_cfg_file':     fwglobals.g.FRR_CONFIG_FILE,
-                                        'ospfd_cfg_file':   ospfd_file,
-                                        'router_id':        params['loopback-iface']['addr'].split('/')[0]   # Get rid of address length
-                                    }
-                                  }
-        # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
-        cmd_list.append(cmd)
 
         # Add point-to-point type of interface for the tunnel address
         cmd = {}
@@ -1164,43 +1145,29 @@ def add_tunnel(params):
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % params['loopback-iface']['addr']
         cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
-            'if [ -z "$(grep \'interface DEV-STUB\' %s)" ]; then sudo printf "' % ospfd_file + \
-            'interface DEV-STUB\n' + \
-            '    ip ospf network point-to-point\n' + \
-            '!\n' + \
-            '" >> %s; fi' % ospfd_file]
+            'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
+
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % params['loopback-iface']['addr']
         cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
-            'sed -i -E "/interface DEV-STUB/,+2d" %s; sudo systemctl restart frr' % ospfd_file ]
-        cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
+            'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
         cmd_list.append(cmd)
 
         # Add network for the tunnel interface.
-        addr = params['loopback-iface']['addr']  # Escape slash in address with length to prevent sed confusing
-        addr = addr.split('/')[0] + r"\/" + addr.split('/')[1]
+        addr = params['loopback-iface']['addr']
 
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "add loopback interface %s to ospf" % params['loopback-iface']['addr']
-        cmd['cmd']['params']  = [
-            'if [ -z "$(grep \'network %s\' %s)" ]; then sed -i -E "s/([ ]+)(ospf router-id .*)/\\1\\2\\n\\1network %s area 0.0.0.0/" %s; fi' %
-            (addr , ospfd_file , addr , ospfd_file) ]
+        cmd['cmd']['params']  = [ 
+            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % params['loopback-iface']['addr']
         cmd['revert']['params']  = [
-            'sed -i -E "/[ ]+network %s area 0.0.0.0.*/d" %s; sudo systemctl restart frr' % (addr , ospfd_file) ]
-        cmd['revert']['filter']  = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
-        cmd_list.append(cmd)
-
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']    = 'exec'
-        cmd['cmd']['params']  = [ 'sudo systemctl restart frr; if [ -z "$(pgrep frr)" ]; then exit 1; fi' ]
-        cmd['cmd']['descr']   = "restart frr"
+            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
         cmd_list.append(cmd)
 
     cmd = {}

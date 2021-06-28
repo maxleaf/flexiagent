@@ -281,8 +281,10 @@ class Fwglobals:
         self.VPP_CONFIG_FILE_BACKUP   = '/etc/vpp/startup.conf.baseline'
         self.VPP_CONFIG_FILE_RESTORE = '/etc/vpp/startup.conf.orig'
         self.VPP_TRACE_FILE_EXT  = '.vpp.api'
-        self.FRR_CONFIG_FILE     = '/etc/frr/daemons'
+        self.FRR_DAEMONS_FILE    = '/etc/frr/daemons'
+        self.FRR_CONFIG_FILE     = '/etc/frr/frr.conf'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
+        self.FRR_VTYSH_FILE      = '/etc/frr/vtysh.conf'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
@@ -388,6 +390,10 @@ class Fwglobals:
         # Increase allowed multicast group membership from default 20 to 4096
         # OSPF need that to be able to discover more neighbors on adjacent links
         fwutils.set_linux_igmp_max_memberships(4096)
+
+        # Increase allowed max socket receive buffer size to 2Mb
+        # VPPSB need that to handle more netlink events on a heavy load
+        fwutils.set_linux_socket_max_receive_buffer_size(2048000)
 
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
