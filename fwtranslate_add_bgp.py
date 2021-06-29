@@ -168,6 +168,53 @@ def add_bgp(params):
         cmd['revert']['descr']   =  "remove BGP configurations"
         cmd_list.append(cmd)
 
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+            'module': 'fwutils',
+            'func': 'frr_vtysh_run',
+            'args': {
+                'flags': '-c "configure" -c "route-map %s permit 2" -c "match ip address %s"' % (fwglobals.g.FRR_BGP_ROUTE_MAP, fwglobals.g.FRR_BGP_ACL)
+            },
+    }
+    cmd['cmd']['descr']   =  "add %s route-map for bgp redistribution" % fwglobals.g.FRR_BGP_ROUTE_MAP
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func': 'frr_vtysh_run',
+            'args': {
+                'flags': '-c "configure" -c "no route-map %s permit 2"' % (fwglobals.g.FRR_BGP_ROUTE_MAP)
+            },
+    }
+    cmd['revert']['descr']   =  "remove %s route-map for bgp redistribution" % fwglobals.g.FRR_BGP_ROUTE_MAP
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+            'module': 'fwutils',
+            'func': 'frr_vtysh_run',
+            'args': {
+                'flags': '-c "configure" -c "%s" -c "redistribute kernel route-map %s"' % (router_bgp_asn, fwglobals.g.FRR_BGP_ROUTE_MAP)
+            },
+    }
+    cmd['cmd']['descr']   =  "add %s route-map for bgp redistribution" % fwglobals.g.FRR_BGP_ROUTE_MAP
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func': 'frr_vtysh_run',
+            'args': {
+                'flags': '-c "configure" -c "%s" -c "no redistribute kernel route-map %s"' % (router_bgp_asn, fwglobals.g.FRR_BGP_ROUTE_MAP)
+            },
+    }
+    cmd['revert']['descr']   =  "remove %s route-map for bgp redistribution" % fwglobals.g.FRR_BGP_ROUTE_MAP
+    cmd_list.append(cmd)
+
     return cmd_list
 
 def get_request_key(params):
