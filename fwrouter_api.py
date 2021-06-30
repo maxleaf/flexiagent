@@ -44,6 +44,7 @@ from fwcfg_request_handler import FwCfgRequestHandler
 from fwikev2 import FwIKEv2
 
 import fwtunnel_stats
+import fw_vpp_coredump_utils
 
 
 fwrouter_translators = {
@@ -112,6 +113,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         Its function is to monitor if VPP process is alive.
         Otherwise it will start VPP and restore configuration from DB.
         """
+        pending_coredump_processing = True
         while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
@@ -127,6 +129,11 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
+
+                    # Process if any VPP coredump
+                    pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
+                elif pending_coredump_processing:
+                    pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
 
                     fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
