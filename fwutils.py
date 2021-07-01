@@ -949,12 +949,56 @@ def dev_id_to_tap(dev_id, check_vpp_state=False):
         cache[dev_id_full] = tap
     return tap
 
-# 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
-# into name of the vpp interface.
+def set_dev_id_to_tap(dev_id, tap):
+    """Update cache.
+
+    :param dev_id:          Bus address.
+    :param tap:             TAP name
+    """
+    if not dev_id:
+        return
+
+    dev_id_full = dev_id_to_full(dev_id)
+    cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
+    cache[dev_id_full] = tap
+
+# 'vpp_get_tap_info' returns mappings between TAPs and VPP interfaces.
 # To do that it greps output of 'vppctl sh tap-inject' by the tap interface name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
+def vpp_get_tap_info():
+    """Get tap information
+
+     :returns: tap info in list
+     """
+    tap_to_vpp_if_name = {}
+    vpp_if_name_to_tap = {}
+    if not vpp_does_run():
+        fwglobals.log.debug("tap_info_get: VPP is not running")
+        return ({}, {})
+
+    taps = _vppctl_read("show tap-inject")
+    if not taps:
+        fwglobals.log.debug("tap_info_get: no TAPs configured")
+        return ({}, {})
+
+    # check if tap-inject is configured and enabled
+    if 'not enabled' in taps:
+        fwglobals.log.debug("tap_info_get: %s" % taps)
+        return ({}, {})
+
+    taps = taps.splitlines()
+
+    for line in taps:
+        tap_info = line.split(' -> ')
+        tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
+        vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
+
+    return (tap_to_vpp_if_name, vpp_if_name_to_tap)
+
+# 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
+# into name of the vpp interface.
 def tap_to_vpp_if_name(tap):
     """Convert Linux interface created by tap-inject into VPP interface name.
 
@@ -962,32 +1006,14 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    taps = _vppctl_read("show tap-inject")
-
-    if taps is None:
-        raise Exception("tap_to_vpp_if_name: failed to fetch tap info from VPP")
-
-    taps = taps.splitlines()
-    for line in taps:
-        # check if tap-inject is configured and enabled
-        if ' -> ' not in line:
-            fwglobals.log.debug("tap_to_vpp_if_name: vpp was not started yet ('%s')" % line)
-            break
-
-        tap_info = line.split(' -> ')
-        if tap_info[1] == tap:
-            return tap_info[0]
+    tap_to_vpp_if_name, _ = vpp_get_tap_info()
+    if tap in tap_to_vpp_if_name:
+        return tap_to_vpp_if_name[tap]
 
     return None
 
-
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
-# To do that it greps output of 'vppctl sh tap-inject' by the interface name:
-#   root@ubuntu-server-1:/# vppctl sh tap-inject
-#       GigabitEthernet0/8/0 -> vpp0
-#       GigabitEthernet0/9/0 -> vpp1
-#       loop0 -> vpp2
 def vpp_if_name_to_tap(vpp_if_name):
     """Convert VPP interface name into Linux TAP interface name.
 
@@ -995,18 +1021,11 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
-    # vpp_api.cli() throw exception in vpp 19.01 (and works in vpp 19.04)
-    # taps = fwglobals.g.router_api.vpp_api.cli("show tap-inject")
-    taps = _vppctl_read("show tap-inject")
-    if taps is None:
-        raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
+    _, vpp_if_name_to_tap = vpp_get_tap_info()
+    if vpp_if_name in vpp_if_name_to_tap:
+        return vpp_if_name_to_tap[vpp_if_name]
 
-    pattern = '%s -> ([a-zA-Z0-9_]+)' % vpp_if_name
-    match = re.search(pattern, taps)
-    if match is None:
-        return None
-    tap = match.group(1)
-    return tap
+    return None
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
     """
