@@ -422,10 +422,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             # As well re-initialize the interface name by dev id.
             # Note 'dev_id' is None for tap-inject (vppX) of tapcli-X interfaces used for LTE/WiFi devices.
             #
-            cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
-            if dev_id_full in cache:
-                del cache[dev_id_full]
-            ifname = fwutils.dev_id_to_tap(dev_id)
+            fwutils.set_dev_id_to_tap(dev_id, ifname)
             fwglobals.log.debug("Interface name in cache is %s, dev_id %s" % (ifname, dev_id_full))
 
         if not wan_failover: # Failover might be easily caused by interface down so no need to validate IP
