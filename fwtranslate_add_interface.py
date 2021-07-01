@@ -78,12 +78,7 @@ def add_interface(params):
     cmd_list = []
 
     dev_id  = params['dev_id']
-
     iface_addr = params.get('addr', '')
-    iface_addr_bytes = ''
-    if iface_addr:
-        iface_addr_bytes, _ = fwutils.ip_str_to_bytes(iface_addr)
-
     iface_name = fwutils.dev_id_to_linux_if(dev_id)
 
     ######################################################################
@@ -108,6 +103,15 @@ def add_interface(params):
     dnsDomains  = params.get('dnsDomains')
 
     mtu       = params.get('mtu', None)
+
+    # To enable multiple LAN interfaces on the same subnet, we put them all into a bridge in VPP.
+    # if interface needs to be inside a bridge, we indicate it with a 'bridge_addr' field of the 'add-interface' request.
+    # In this case, we create in VPP a bridge (see fwtranslate_add_switch) with a loopback BVI interface.
+    # Then, we put the IP address on the BVI interface. Therefore the physical interface should have no IP.
+    # Then, we will also add this interface to the L2 bridge.
+    bridge_addr   = params.get('bridge_addr')
+    if bridge_addr:
+        iface_addr = bridge_addr
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
@@ -289,6 +293,10 @@ def add_interface(params):
         if len(dnsServers) == 0:
             netplan_params['substs'].append({ 'add_param':'dnsServers', 'val_by_func':'lte_get_ip_configuration', 'arg': [dev_id, 'dns_servers'] })
 
+    if bridge_addr:
+        netplan_params['args']['ip'] = ''
+        netplan_params['args']['validate_ip'] = False
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']   = "python"
@@ -300,6 +308,30 @@ def add_interface(params):
     cmd['revert']['params']['args']['is_add'] = 0
     cmd['revert']['descr'] = "remove interface from netplan config file"
     cmd_list.append(cmd)
+
+    if bridge_addr:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "sw_interface_set_l2_bridge"
+        cmd['cmd']['descr']   = "add interface %s to bridge" % iface_name
+        cmd['cmd']['params']  = {
+            'substs': [
+                { 'add_param':'rx_sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
+                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_switch.get_bridge_id', 'arg': bridge_addr }
+            ],
+            'enable':1, 'port_type':0
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = 'sw_interface_set_l2_bridge'
+        cmd['revert']['descr']  = "remove interface %s from bridge" % iface_name
+        cmd['revert']['params'] = {
+            'substs': [
+                { 'add_param':'rx_sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg':dev_id },
+                { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_switch.get_bridge_id', 'arg': bridge_addr }
+            ],
+            'enable':0
+        }
+        cmd_list.append(cmd)
 
     if mtu:
         # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)

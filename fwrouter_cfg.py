@@ -67,6 +67,7 @@ class FwRouterCfg(FwCfgDatabase):
             types = [
                 'start-router',
                 'add-interface',
+                'add-switch',
                 'add-tunnel',
                 'add-route',		# routes should come after tunnels, as they might use them
                 'add-dhcp-config',
@@ -88,6 +89,7 @@ class FwRouterCfg(FwCfgDatabase):
                                     #
             'start-router':         "======= START COMMAND =======",
             'add-interface':        "======== INTERFACES ========",
+            'add-switch':           "======== SWITCHES ========",
             'add-route':            "========= ROUTES =========",
             'add-tunnel':           "========== TUNNELS ==========",
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",

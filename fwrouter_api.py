@@ -63,6 +63,8 @@ fwrouter_translators = {
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-switch':               {'module': __import__('fwtranslate_add_switch'),      'api':'add_switch'},
+    'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
     'remove-firewall-policy':   {'module': __import__('fwtranslate_revert'),          'api':'revert'},
 }
@@ -101,7 +103,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Initialize global data that persists device reboot / daemon restart.
         #
         if not 'router_api' in fwglobals.g.db:
-            fwglobals.g.db['router_api'] = { 'sa_id' : 0 }
+            fwglobals.g.db['router_api'] = {}
+        if not 'sa_id' in fwglobals.g.db['router_api']:
+            fwutils.reset_router_api_db_sa_id()
+        if not 'bridges' in fwglobals.g.db['router_api']:
+            fwutils.reset_router_api_db_bridges()
 
     def finalize(self):
         """Destructor method
@@ -756,8 +762,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
         #     'add-application', 'add-multilink-policy', 'add-firewall-policy' ]
         #
-
-        add_order    = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
+        add_order    = [ 'add-switch', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
             'add-application', 'add-multilink-policy', 'add-firewall-policy', 'start-router' ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')
@@ -780,6 +785,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         # It is based on the first appearance of the preprocessor requests.
         #
         indexes = {
+            'remove-switch'           : -1,
+            'add-switch'              : -1,
             'remove-interface'        : -1,
             'add-interface'           : -1,
             'remove-application'      : -1,
@@ -981,14 +988,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
             os.remove(fwglobals.g.FRR_OSPFD_FILE)
 
-        # Reset sa-id used by tunnels
-        #
-        router_api = fwglobals.g.db.get('router_api')
-        if not router_api:
-            fwglobals.g.db['router_api'] = {}
-        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-        router_api_db['sa_id'] = 0
-        fwglobals.g.db['router_api'] = router_api_db
+        fwutils.reset_router_api_db_sa_id() # Reset sa-id used by tunnels
+        fwutils.reset_router_api_db_bridges() # Reset bridges used by switches
 
         fwutils.vmxnet3_unassigned_interfaces_up()
 
@@ -1037,6 +1038,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Apply router configuration on successful VPP start.
         """
         types = [
+            'add-switch',
             'add-interface',
             'add-tunnel',
             'add-application',

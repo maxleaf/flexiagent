@@ -391,8 +391,12 @@ class FwCfgRequestHandler:
 
             # Find the new value to be added to params
             if 'val_by_func' in s:
-                func_name = s['val_by_func']
-                func = getattr(fwutils, func_name)
+                module , func_name = fwutils , s['val_by_func']
+                if '.' in func_name:
+                    module_name, func_name = func_name.split('.', 1)
+                    module = __import__(module_name)
+
+                func = getattr(module, func_name)
                 old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
                 func_uses_cmd_cache = s['func_uses_cmd_cache']  if 'func_uses_cmd_cache' in s else False
                 if func_uses_cmd_cache:

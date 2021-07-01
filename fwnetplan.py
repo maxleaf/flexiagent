@@ -223,7 +223,12 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
     config_section['dhcp4'] = False
     if 'dhcp4-overrides' in config_section:
         del config_section['dhcp4-overrides']
-    config_section['addresses'] = [ip]
+
+    if ip:
+        config_section['addresses'] = [ip]
+    elif 'addresses' in config_section:
+        del config_section['addresses']
+
 
     if not gw or type != 'WAN':
         return config_section
@@ -245,7 +250,7 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
 
     return config_section
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, wan_failover=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, validate_ip=False):
     '''
     :param metric:  integer (whole number)
     '''
@@ -254,8 +259,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
 
     fwglobals.log.debug(
         "add_remove_netplan_interface: is_add=%d, dev_id=%s, ip=%s, gw=%s, metric=%d, dhcp=%s, type=%s, \
-         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, wan_failover=%s" %
-        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(wan_failover)))
+         dnsServers=%s, dnsDomains=%s, mtu=%s, if_name=%s, validate_ip=%s" %
+        (is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, str(mtu), if_name, str(validate_ip)))
 
     fo_metric = get_wan_failover_metric(dev_id, metric)
     if fo_metric != metric:
@@ -348,7 +353,9 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             else:
                 ethernets[ifname] = config_section
         else:
-            # remove interface
+            # This part of the function is executed when the VPP is running, and we will not stop it.
+            # This means that the interface will remain under VPP control and will not be released to Linux control.
+            # Hence, when we come to remove an interface, the intention is only to clear its configuration.
             if set_name:
                 # For the LTE interface with set-name,
                 # when we want to remove it from netplan, we have here three variables:
@@ -371,17 +378,16 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 # So we need to clear the ip configuration for vpp1, and keep the the set-name on the wwan0
                 if is_lte:
                     if ifname in ethernets:
-                        del ethernets[ifname]
+                        ethernets[ifname] = {}
+                        ethernets[ifname]['dhcp4'] = False
                 else:
                     if set_name in ethernets:
-                        del ethernets[set_name]
+                        ethernets[set_name] = {}
+                        ethernets[set_name]['dhcp4'] = False
             else:
                 if ifname in ethernets:
-                    del ethernets[ifname]
-
-            if old_ethernets:
-                if old_ifname in old_ethernets:
-                    ethernets[old_ifname] = old_ethernets[old_ifname]
+                    ethernets[ifname] = {}
+                    ethernets[ifname]['dhcp4'] = False
 
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
@@ -425,7 +431,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             fwutils.set_dev_id_to_tap(dev_id, ifname)
             fwglobals.log.debug("Interface name in cache is %s, dev_id %s" % (ifname, dev_id_full))
 
-        if not wan_failover: # Failover might be easily caused by interface down so no need to validate IP
+        if validate_ip: # Failover might be easily caused by interface down so no need to validate IP
             if is_add and not _has_ip(ifname, (dhcp=='yes')):
                 raise Exception("ip was not assigned")
 
