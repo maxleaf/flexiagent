@@ -197,6 +197,34 @@ def _add_app_info(params, cmd_list, cache_key):
     }
     cmd_list.append(cmd)
 
+
+def _add_traffic_identification(params, cmd_list):
+
+    cmd = {}
+
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "Add Traffic Identification %s" % (params['id'])
+    cmd['cmd']['params'] = {
+                'object': 'fwglobals.g.traffic_identifications',
+                'func':   'add_traffic_identification',
+                'args': {
+                    'traffic':      params
+                }
+    }
+
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "Delete Traffic Identification %s" % (params['id'])
+    cmd['revert']['params'] = {
+                'object': 'fwglobals.g.traffic_identifications',
+                'func':   'remove_traffic_identification',
+                'args': {
+                    'traffic':      params
+                }
+    }
+    cmd_list.append(cmd)
+
 def add_app(params):
     """Generate App commands.
 
@@ -209,6 +237,7 @@ def add_app(params):
     for app in params['applications']:
         _add_acl(app, cmd_list, 'acl_index')
         _add_app_info(app, cmd_list, 'acl_index')
+        _add_traffic_identification(app, cmd_list)
 
     return cmd_list
 

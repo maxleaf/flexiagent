@@ -31,6 +31,7 @@ import traceback
 import yaml
 import fwutils
 import threading
+import fw_vpp_coredump_utils
 
 from sqlitedict import SqliteDict
 
@@ -47,6 +48,7 @@ from fwsystem_cfg import FwSystemCfg
 from fwstun_wrapper import FwStunWrap
 from fwwan_monitor import FwWanMonitor
 from fwikev2 import FwIKEv2
+from fw_traffic_identification import FwTrafficIdentifications
 
 # sync flag indicated if module implement sync logic. 
 # IMPORTANT! Please keep the list order. It indicates the sync priorities
@@ -106,6 +108,8 @@ request_handlers = {
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
     'add-switch':                   {'name': '_call_router_api', 'sign': True},
     'remove-switch':                {'name': '_call_router_api', 'sign': True},
+    'add-firewall-policy':          {'name': '_call_router_api', 'sign': True},
+    'remove-firewall-policy':       {'name': '_call_router_api', 'sign': True},
 
     # System API
     'add-lte':                        {'name': '_call_system_api'},
@@ -133,6 +137,7 @@ request_handlers = {
     'abf_policy_add_del':           {'name': '_call_vpp_api'},
     'acl_add_replace':              {'name': '_call_vpp_api'},
     'acl_del':                      {'name': '_call_vpp_api'},
+    'acl_interface_set_acl_list':   {'name': '_call_vpp_api'},
     'bridge_domain_add_del':        {'name': '_call_vpp_api'},
     'create_loopback_instance':     {'name': '_call_vpp_api'},
     'delete_loopback':              {'name': '_call_vpp_api'},
@@ -161,6 +166,8 @@ request_handlers = {
     'nat44_interface_add_del_output_feature':   {'name': '_call_vpp_api'},
     'nat44_forwarding_enable_disable':          {'name': '_call_vpp_api'},
     'nat44_plugin_enable_disable':              {'name': '_call_vpp_api'},
+    'nat44_add_del_static_mapping':             {'name': '_call_vpp_api'},
+    'nat44_add_del_identity_mapping':           {'name': '_call_vpp_api'},
     'sw_interface_add_del_address': {'name': '_call_vpp_api'},
     'sw_interface_set_flags':       {'name': '_call_vpp_api'},
     'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
@@ -290,6 +297,7 @@ class Fwglobals:
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
+        self.TRAFFIC_ID_DB_FILE     = self.DATA_PATH + '.traffic_identification.sqlite'
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.orig'
         self.HOSTAPD_CONFIG_DIRECTORY = '/etc/hostapd/'
         self.NETPLAN_FILES       = {}
@@ -391,11 +399,16 @@ class Fwglobals:
         # OSPF need that to be able to discover more neighbors on adjacent links
         fwutils.set_linux_igmp_max_memberships(4096)
 
+        # Set sys params to setup VPP coredump
+        fw_vpp_coredump_utils.vpp_coredump_sys_setup()
+
         # Increase allowed max socket receive buffer size to 2Mb
         # VPPSB need that to handle more netlink events on a heavy load
         fwutils.set_linux_socket_max_receive_buffer_size(2048000)
 
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
+
+        self.traffic_identifications = FwTrafficIdentifications(self.TRAFFIC_ID_DB_FILE)
 
         self.router_api.restore_vpp_if_needed()
 
@@ -427,6 +440,7 @@ class Fwglobals:
         del self.stun_wrapper
         del self.apps
         del self.policies
+        del self.traffic_identifications
         del self.os_api
         del self.router_api
         del self.agent_api
@@ -531,6 +545,8 @@ class Fwglobals:
                 func = getattr(self.apps, params['func'])
             elif params['object'] == 'fwglobals.g.ikev2':
                 func = getattr(self.ikev2, params['func'])
+            elif params['object'] == 'fwglobals.g.traffic_identifications':
+                func = getattr(self.traffic_identifications, params['func'])
             else:
                 raise Exception("object '%s' is not supported" % (params['object']))
         else:

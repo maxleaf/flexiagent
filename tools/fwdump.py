@@ -37,6 +37,7 @@ agent_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..'
 sys.path.append(agent_root_dir)
 import fwutils
 import fwglobals
+from fw_vpp_coredump_utils import vpp_coredump_copy_cores
 
 g = fwglobals.Fwglobals()
 
@@ -174,13 +175,14 @@ g_dumpers = {
 }
 
 class FwDump:
-    def __init__(self, temp_folder=None, quiet=False):
+    def __init__(self, temp_folder=None, quiet=False, include_vpp_core=None):
 
         self.temp_folder    = temp_folder
         self.quiet          = quiet
         self.prompt         = 'fwdump>> '
         self.zip_file       = None
         self.hostname       = os.uname()[1]
+        self.include_vpp_core = include_vpp_core
 
         if not temp_folder:
             timestamp = fwutils.build_timestamped_filename('')
@@ -257,6 +259,10 @@ class FwDump:
     def dump_all(self):
         dumpers = list(g_dumpers.keys())
         self._dump(dumpers)
+        if self.include_vpp_core:
+            corefile_dir = self.temp_folder + "/corefiles/"
+            os.makedirs(corefile_dir)
+            vpp_coredump_copy_cores(corefile_dir, self.include_vpp_core)
 
     def dump_multilink(self):
         dumpers = [
@@ -283,7 +289,8 @@ class FwDump:
         self._dump(dumpers)
 
 def main(args):
-    with FwDump(temp_folder=args.temp_folder, quiet=args.quiet) as dump:
+    with FwDump(temp_folder=args.temp_folder, quiet=args.quiet,
+                include_vpp_core=args.include_vpp_core) as dump:
 
         if args.feature:
             method_name = 'dump_'+ args.feature
@@ -322,5 +329,7 @@ if __name__ == '__main__':
                         help="folder where to keep not zipped dumped info")
     parser.add_argument('--zip_file', default=None,
                         help="filename to be used for the final archive, can be full/relative. If not specified, default name will be used and printed on exit.")
+    parser.add_argument('-c', '--include_vpp_core', nargs='?', const=3, type=int, choices=range(1, 4),
+                        help="Include VPP coredumps to be part of fwdump")
     args = parser.parse_args()
     main(args)

@@ -1,0 +1,31 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "inbound": {
+                "edgeAccess": {
+                    "rules": [
+                        {
+                            "id": "1",
+                            "classification": {
+                                "destination": {
+                                    "protocols": [
+                                        "tcp",
+                                        "udp"
+                                    ],
+                                    "ports": "1024"
+                                },
+                                "source": {
+                                    "ipPort": {
+                                        "ip": "12.12.12.1"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+]

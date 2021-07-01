@@ -131,6 +131,11 @@ class FwRouterCfg(FwCfgDatabase):
     def get_applications(self):
         return self.get_params('add-application')
 
+    def get_firewall_policy(self):
+        if 'add-firewall-policy' in self.db:
+            return self.db['add-firewall-policy']['params']
+        return None
+
     def get_wan_interface_gw(self, ip):
         import fwutils
         interfaces = self.get_interfaces(type='wan', ip=ip)
