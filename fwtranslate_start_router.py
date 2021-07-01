@@ -274,6 +274,39 @@ def start_router(params=None):
     cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'frr_setup_config'}
     cmd_list.append(cmd)
 
+    # We set up the redistribution filter now. We don't want to set it on every add_route translation.
+    # At this time, the filter list will be empty, so no kernel route will be redistributed.
+    # When we need to redistribute a static route, we'll add it to the filter list.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+            'module': 'fwutils',
+            'func':   'frr_create_redistribution_filter',
+            'args': {
+                'router': 'router ospf',
+                'acl': fwglobals.g.FRR_OSPF_ACL,
+                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
+                'route_map_num': '1', # 1 is for OSPF, 2 is for BGP
+            }
+    }
+    cmd['cmd']['descr']   =  "add ospf redistribution filter"
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func':   'frr_create_redistribution_filter',
+            'args': {
+                'router': 'router ospf',
+                'acl': fwglobals.g.FRR_OSPF_ACL,
+                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
+                'route_map_num': '1', # 1 is for OSPF, 2 is for BGP
+                'revert': True
+            }
+    }
+    cmd['revert']['descr']   =  "remove ospf redistribution filter"
+    cmd_list.append(cmd)
+
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
     # Note we do it here and not on 'add-interface' as 'modify-interface' is translated

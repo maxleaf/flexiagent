@@ -3324,7 +3324,9 @@ def frr_vtysh_run(flags, restart_frr_service=False):
     '''
     try:
         vtysh_cmd = 'sudo /usr/bin/vtysh %s; sudo /usr/bin/vtysh -c "write"' % flags
-        output = os.popen(vtysh_cmd).read()
+        output = os.popen(vtysh_cmd).read().splitlines()
+
+        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, output=%s" % (vtysh_cmd, output[0] if output else ''))
 
         if restart_frr_service:
             os.system('systemctl restart frr')
@@ -3341,9 +3343,6 @@ def frr_setup_config():
     subprocess.check_call('if [ -n "$(grep ospfd=no %s)" ]; then sudo sed -i -E "s/ospfd=no/ospfd=yes/" %s; sudo systemctl restart frr; fi'
             % (fwglobals.g.FRR_DAEMONS_FILE,fwglobals.g.FRR_DAEMONS_FILE), shell=True)
 
-    subprocess.check_call('if [ -n "$(grep bgpd=no %s)" ]; then sudo sed -i -E "s/bgpd=no/bgpd=yes/" %s; sudo systemctl restart frr; fi'
-            % (fwglobals.g.FRR_DAEMONS_FILE,fwglobals.g.FRR_DAEMONS_FILE), shell=True)
-
     # Ensure that integrated-vtysh-config is disabled in /etc/frr/vtysh.conf.
     subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
@@ -3351,24 +3350,26 @@ def frr_setup_config():
     frr_vtysh_run('-c "configure" -c "password zebra" '\
         '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"')
 
+def frr_create_redistribution_filter(router , acl, route_map, route_map_num, revert=False):
     # When we add a static route, OSPF sees it as a kernel route, not a static one.
-    # That is why we are forced to set in OSPF - redistribution of *kernel* routes.
+    # That is why we are forced to set in OSPF/BGP - redistribution of *kernel* routes.
     # But, of course, we don't want to redistribute them all, so we create a filter.
-    # We pre-enable the setting to redistribute kernel routes with this filter.
-    # At this point, the list is empty so there is no route to be redistributed.
-    # Whenever we want to redistribute a static route, we will add it to the list.
     #
-    # This is how the OSPF file looks after these settings:
+    # This is content in OSPF file after the filter settings (bgp is similar):
     # router ospf
-    #   redistribute kernel route-map fw-redist--ospf-rm
+    #   redistribute kernel route-map fw-redist-ospf-rm
     # !
-    # route-map fw-redist--ospf-rm permit 1
+    # route-map fw-redist-ospf-rm permit 1
     #   match ip address fw-redist-ospf-acl
     # !
     #
-    frr_vtysh_run('-c "configure" -c "route-map %s permit 1" '\
-        '-c "match ip address %s"' % (fwglobals.g.FRR_OSPF_ROUTE_MAP, fwglobals.g.FRR_OSPF_ACL))
-    frr_vtysh_run('-c "configure" -c "router ospf" -c "redistribute kernel route-map %s"' % fwglobals.g.FRR_OSPF_ROUTE_MAP)
+    route_map_cmd = '-c "%sroute-map %s permit %s"' % ('no ' if revert else '', route_map, route_map_num)
+    if not revert:
+        route_map_cmd += ' -c "match ip address %s"' % acl
+    frr_vtysh_run('-c "configure" %s' % route_map_cmd)
+
+    redistribute_cmd = '%sredistribute kernel route-map %s' % ('no ' if revert else '', route_map)
+    frr_vtysh_run('-c "configure" -c "%s" -c "%s"' % (router, redistribute_cmd))
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content
