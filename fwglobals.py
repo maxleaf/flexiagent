@@ -31,6 +31,7 @@ import traceback
 import yaml
 import fwutils
 import threading
+import fw_vpp_coredump_utils
 
 from sqlitedict import SqliteDict
 
@@ -393,6 +394,9 @@ class Fwglobals:
         # Increase allowed multicast group membership from default 20 to 4096
         # OSPF need that to be able to discover more neighbors on adjacent links
         fwutils.set_linux_igmp_max_memberships(4096)
+
+        # Set sys params to setup VPP coredump
+        fw_vpp_coredump_utils.vpp_coredump_sys_setup()
 
         # Increase allowed max socket receive buffer size to 2Mb
         # VPPSB need that to handle more netlink events on a heavy load

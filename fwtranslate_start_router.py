@@ -137,6 +137,17 @@ def start_router(params=None):
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "enable coredump to %s" % vpp_filename
+    cmd['cmd']['params']  = {
+        'module': 'fw_vpp_coredump_utils',
+        'func'  : 'vpp_coredump_setup_startup_conf',
+        'args'  : { 'vpp_config_filename' : vpp_filename, 'enable': 1 }
+    }
+    cmd_list.append(cmd)
+
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
     # Other interfaces will be not captured by vpp even if they are DOWN.
