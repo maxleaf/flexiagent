@@ -35,7 +35,7 @@ FW_VPP_COREDUMP_START_STR = "core-vpp"
 FW_VPP_COREDUMP_END_STR = "-dump"
 FW_MAX_CORE_RETAIN_LIMIT = 3
 FW_VPP_COREDUMP_LOCK = threading.Lock()
-FW_APT_REPO_FILE = "/etc/apt/sources.list.d/flexiwan.source.list"
+FW_APT_REPO_FILE = "/etc/apt/sources.list.d/flexiwan*source.list"
 
 
 class FwVppCoredumpProcess(threading.Thread):
@@ -65,7 +65,9 @@ class FwVppCoredumpProcess(threading.Thread):
         shutil.copy2(fwglobals.g.VERSIONS_FILE, version_file)
         tar_file.add(version_file, arcname=os.path.basename(version_file))
         repo_file = FW_VPP_COREDUMP_LOCATION + "fw_repo-" + ts_str + ".list"
-        shutil.copy2(FW_APT_REPO_FILE, repo_file)
+        for filepath in glob.glob(FW_APT_REPO_FILE):
+            shutil.copy2(filepath, repo_file)
+            break
         tar_file.add(repo_file, arcname=os.path.basename(repo_file))
         tar_file.close()
 
