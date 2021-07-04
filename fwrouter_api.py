@@ -44,7 +44,7 @@ from fwcfg_request_handler import FwCfgRequestHandler
 from fwikev2 import FwIKEv2
 
 import fwtunnel_stats
-
+import fw_vpp_coredump_utils
 
 fwrouter_translators = {
     'start-router':             {'module': __import__('fwtranslate_start_router'),    'api':'start_router'},
@@ -63,6 +63,10 @@ fwrouter_translators = {
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-switch':               {'module': __import__('fwtranslate_add_switch'),      'api':'add_switch'},
+    'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
+    'remove-firewall-policy':   {'module': __import__('fwtranslate_revert'),          'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -97,22 +101,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         FwCfgRequestHandler.__init__(self, fwrouter_translators, cfg, self._on_revert_failed)
 
-        # Initialize global data that persists device reboot / daemon restart.
-        #
-        if not 'router_api' in fwglobals.g.db:
-            fwglobals.g.db['router_api'] = {}
-        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-        # Init sa-id used by tunnels
-        if not 'sa_id' in router_api_db:
-            router_api_db['sa_id'] = 0
-        # Init vpp interface caches
-        if not 'sw_if_index_to_vpp_if_name' in router_api_db:
-            router_api_db['sw_if_index_to_vpp_if_name'] = {}
-        if not 'vpp_if_name_to_sw_if_index' in router_api_db:
-            router_api_db['vpp_if_name_to_sw_if_index'] = {
-                'tunnel': {}, 'lan': {}, 'wan': {} }
-        fwglobals.g.db['router_api'] = router_api_db
-
+        fwutils.reset_router_api_db() # Initialize cache that persists device reboot / daemon restart
 
     def finalize(self):
         """Destructor method
@@ -125,6 +114,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         Its function is to monitor if VPP process is alive.
         Otherwise it will start VPP and restore configuration from DB.
         """
+        pending_coredump_processing = True
         while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
@@ -140,6 +130,11 @@ class FWROUTER_API(FwCfgRequestHandler):
 
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
+
+                    # Process if any VPP coredump
+                    pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
+                elif pending_coredump_processing:
+                    pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
 
                     fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
@@ -449,9 +444,11 @@ class FWROUTER_API(FwCfgRequestHandler):
             # just save the requests in database and return.
             #
             if router_was_started == False and \
-               (req == 'add-application' or req == 'add-multilink-policy'):
-               self.cfg_db.update(request)
-               return {'ok':1}
+                (req == 'add-application' or
+                req == 'add-multilink-policy' or
+                req == 'add-firewall-policy'):
+                self.cfg_db.update(request)
+                return {'ok':1}
 
             execute = False
             filter = None
@@ -594,7 +591,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         req     = request['message']
         params  = request.get('params')
-        updated = False
+        changes = {}
 
         # 'modify-X' preprocessing:
         #  1. Replace 'modify-X' with 'remove-X' and 'add-X' pair.
@@ -604,13 +601,14 @@ class FWROUTER_API(FwCfgRequestHandler):
             req     = 'aggregated'
             params  = { 'requests' : _preprocess_modify_X(request) }
             request = {'message': req, 'params': params}
-            updated = True
+            changes['insert'] = True
             # DON'T RETURN HERE !!! FURTHER PREPROCESSING IS NEEDED !!!
         elif req == 'aggregated':
             new_requests = []
             for _request in params['requests']:
                 if re.match('modify-interface', _request['message']):
                     new_requests += _preprocess_modify_X(_request)
+                    changes['insert'] = True
                 else:
                     new_requests.append(_request)
             params['requests'] = new_requests
@@ -638,11 +636,13 @@ class FWROUTER_API(FwCfgRequestHandler):
         # the case, there is nothing to remove yet, so removal will fail.
         ########################################################################
         if self.state_is_stopped():
-            if updated:
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+            if changes.get('insert'):
+                fwglobals.log.debug("_preprocess_request: Simple request was \
+                        replaced with %s" % json.dumps(request))
             return request
 
         multilink_policy_params = self.cfg_db.get_multilink_policy()
+        firewall_policy_params = self.cfg_db.get_firewall_policy()
 
         # 'add-application' preprocessing:
         # 1. The currently configured applications should be removed firstly.
@@ -655,18 +655,20 @@ class FWROUTER_API(FwCfgRequestHandler):
         application_params = self.cfg_db.get_applications()
         if application_params:
             if req == 'add-application':
-                updated_requests = [
-                    { 'message': 'remove-application', 'params' : application_params },
-                    { 'message': 'add-application',    'params' : params }
-                ]
-                params = { 'requests' : updated_requests }
-
+                pre_requests = [ { 'message': 'remove-application', 'params' : application_params } ]
+                process_requests = [ { 'message': 'add-application', 'params' : params } ]
                 if multilink_policy_params:
-                    params['requests'][0:0]   = [ { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }]
-                    params['requests'][-1:-1] = [ { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }]
+                    pre_requests.insert(0, { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params })
+                    process_requests.append({ 'message': 'add-multilink-policy', 'params' : multilink_policy_params })
+                if firewall_policy_params:
+                    pre_requests.insert(0, { 'message': 'remove-firewall-policy', 'params' : firewall_policy_params })
+                    process_requests.append({ 'message': 'add-firewall-policy', 'params' : firewall_policy_params })
 
+                updated_requests = pre_requests + process_requests
+                params = { 'requests' : updated_requests }
                 request = {'message': 'aggregated', 'params': params}
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                fwglobals.log.debug("_preprocess_request: Application request \
+                        was replaced with %s" % json.dumps(request))
                 return request
 
         # 'add-multilink-policy' preprocessing:
@@ -681,7 +683,20 @@ class FWROUTER_API(FwCfgRequestHandler):
                     { 'message': 'add-multilink-policy',    'params' : params }
                 ]
                 request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                fwglobals.log.debug("_preprocess_request: Multilink \
+                        request was replaced with %s" % json.dumps(request))
+                return request
+
+        # Setup remove-firewall-policy before executing add-firewall-policy
+        if firewall_policy_params:
+            if req == 'add-firewall-policy':
+                updated_requests = [
+                    { 'message': 'remove-firewall-policy', 'params' : firewall_policy_params },
+                    { 'message': 'add-firewall-policy',    'params' : params }
+                ]
+                request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
+                fwglobals.log.debug("_preprocess_request: Fiirewall request \
+                        was replaced with %s" % json.dumps(request))
                 return request
 
         # 'add/remove-application' preprocessing:
@@ -689,21 +704,42 @@ class FWROUTER_API(FwCfgRequestHandler):
         #    should be removed before application removal/adding and should be
         #    added again after it.
         #
-        if multilink_policy_params:
+        if multilink_policy_params or firewall_policy_params:
             if re.match('(add|remove)-(application)', req):
-                params  = { 'requests' : [
-                    { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
-                    { 'message': req, 'params' : params },
-                    { 'message': 'add-multilink-policy',    'params' : multilink_policy_params }
-                ] }
+                if multilink_policy_params and firewall_policy_params:
+                    pre_add_requests = [
+                        { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params },
+                        { 'message': 'remove-firewall-policy', 'params' : firewall_policy_params },
+                    ]
+                    post_add_requests = [
+                        { 'message': 'add-multilink-policy', 'params' : multilink_policy_params },
+                        { 'message': 'add-firewall-policy', 'params' : firewall_policy_params },
+                    ]
+                elif multilink_policy_params:
+                    pre_add_requests = [
+                        { 'message': 'remove-multilink-policy', 'params' : multilink_policy_params }
+                    ]
+                    post_add_requests = [
+                        { 'message': 'add-multilink-policy', 'params' : multilink_policy_params }
+                    ]
+                else:
+                    pre_add_requests = [
+                        { 'message': 'remove-firewall-policy', 'params' : firewall_policy_params }
+                    ]
+                    post_add_requests = [
+                        { 'message': 'add-firewall-policy', 'params' : firewall_policy_params },
+                    ]
+                params['requests'] = pre_add_requests
+                params['requests'].append({ 'message': req, 'params' : params })
+                params['requests'].extend(post_add_requests)
                 request = {'message': 'aggregated', 'params': params}
-                fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+                fwglobals.log.debug("_preprocess_request: Aggregated request \
+                        with application config was replaced with %s" % json.dumps(request))
                 return request
 
         # No preprocessing is needed for rest of simple requests, return.
         if req != 'aggregated':
             return request
-
 
         ########################################################################
         # Handle 'aggregated' request.
@@ -714,11 +750,14 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Go over all requests and rearrange them, as order of requests is
         # important for proper configuration of VPP!
         # The list should start with the 'remove-X' requests in following order:
-        #   [ 'add-multilink-policy', 'add-application', 'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
+        #   [ 'add-firewall-policy', 'add-multilink-policy', 'add-application',
+        #     'add-dhcp-config', 'add-route', 'add-tunnel', 'add-interface' ]
         # Than the 'add-X' requests should follow in opposite order:
-        #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy' ]
+        #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
+        #     'add-application', 'add-multilink-policy', 'add-firewall-policy' ]
         #
-        add_order    = [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config', 'add-application', 'add-multilink-policy', 'start-router' ]
+        add_order    = [ 'add-switch', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
+            'add-application', 'add-multilink-policy', 'add-firewall-policy', 'start-router' ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')
         remove_order.reverse()
@@ -732,7 +771,6 @@ class FWROUTER_API(FwCfgRequestHandler):
                 if re.match(req_name, _request['message']):
                     requests.append(_request)
         if requests != params['requests']:
-            fwglobals.log.debug("_preprocess_request: rearranged aggregation: %s" % json.dumps(requests))
             params['requests'] = requests
         requests = params['requests']
 
@@ -741,15 +779,20 @@ class FWROUTER_API(FwCfgRequestHandler):
         # It is based on the first appearance of the preprocessor requests.
         #
         indexes = {
+            'remove-switch'           : -1,
+            'add-switch'              : -1,
             'remove-interface'        : -1,
             'add-interface'           : -1,
             'remove-application'      : -1,
             'add-application'         : -1,
             'remove-multilink-policy' : -1,
-            'add-multilink-policy'    : -1
+            'add-multilink-policy'    : -1,
+            'remove-firewall-policy'  : -1,
+            'add-firewall-policy'     : -1
         }
 
         reinstall_multilink_policy = True
+        reinstall_firewall_policy = True
 
         for (idx , _request) in enumerate(requests):
             for req_name in indexes:
@@ -758,16 +801,18 @@ class FWROUTER_API(FwCfgRequestHandler):
                         indexes[req_name] = idx
                     if req_name == 'remove-multilink-policy':
                         reinstall_multilink_policy = False
+                    if req_name == 'remove-firewall-policy':
+                        reinstall_firewall_policy = False
                     break
 
-        def _insert_request(requests, idx, req_name, params, updated):
+        def _insert_request(requests, idx, req_name, params):
             requests.insert(idx, { 'message': req_name, 'params': params })
             # Update indexes
             indexes[req_name] = idx
             for name in indexes:
                 if name != req_name and indexes[name] >= idx:
                     indexes[name] += 1
-            updated = True
+            changes['insert'] = True
 
         # Now preprocess 'add-application': insert 'remove-application' if:
         # - there are applications to be removed
@@ -777,7 +822,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             if indexes['remove-application'] == -1:
                 # If list has no 'remove-application' at all just add it before 'add-applications'.
                 idx = indexes['add-application']
-                _insert_request(requests, idx, 'remove-application', application_params, updated)
+                _insert_request(requests, idx, 'remove-application', application_params)
             elif indexes['remove-application'] > indexes['add-application']:
                 # If list has 'remove-application' after the 'add-applications',
                 # it is not supported yet ;) Implement on demand
@@ -788,22 +833,38 @@ class FWROUTER_API(FwCfgRequestHandler):
         # - there are interfaces to be removed or to be added
         # - the 'add-multilink-policy' was found in requests
         #
-        if multilink_policy_params and indexes['add-multilink-policy'] > -1:
-            if indexes['remove-multilink-policy'] == -1:
-                # If list has no 'remove-multilink-policy' at all just add it before 'add-multilink-policy'.
-                idx = indexes['add-multilink-policy']
-                _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
-            elif indexes['remove-multilink-policy'] > indexes['add-multilink-policy']:
-                # If list has 'remove-multilink-policy' after the 'add-multilink-policy',
-                # it is not supported yet ;) Implement on demand
-                raise Exception("_preprocess_request: 'remove-multilink-policy' was found after 'add-multilink-policy': NOT SUPPORTED")
+        def add_corresponding_remove_policy_message(requests, indexes, request_name, params):
+            if request_name == 'multilink':
+                add_request_name = 'add-multilink-policy'
+                remove_request_name = 'remove-multilink-policy'
+            elif request_name == 'firewall':
+                add_request_name = 'add-firewall-policy'
+                remove_request_name = 'remove-firewall-policy'
+            if params and indexes[add_request_name] > -1:
+                if indexes[remove_request_name] == -1:
+                    # If list has no 'remove-X-policy' at all just add it before 'add-X-policy'.
+                    idx = indexes[add_request_name]
+                    _insert_request(requests, idx, remove_request_name, params)
+                    changes['insert'] = True
+                elif indexes[remove_request_name] > indexes[add_request_name]:
+                    # If list has 'remove-X-policy' after the 'add-X-policy',
+                    # it is not supported yet ;) Implement on demand
+                    raise Exception("_preprocess_request: 'remove-X-policy' was found after \
+                            'add-X-policy': NOT SUPPORTED")
+                fwglobals.log.debug("_add_corresponding_remove_policy_message: %s" % request_name)
+
+        add_corresponding_remove_policy_message(requests, indexes, 'multilink',
+                multilink_policy_params)
+
+        add_corresponding_remove_policy_message(requests, indexes, 'firewall',
+                firewall_policy_params)
 
         # Now preprocess 'add/remove-application' and 'add/remove-interface':
         # reinstall multilink policy if:
         # - any of 'add/remove-application', 'add/remove-interface' appears in request
         # - the original request does not have 'remove-multilink-policy'
         #
-        if multilink_policy_params:
+        if multilink_policy_params or firewall_policy_params:
             # Firstly find the right place to insert the 'remove-multilink-policy' - idx.
             # It should be the first appearance of one of the preprocessing requests.
             # As well find the right place to insert the 'add-multilink-policy' - idx_last.
@@ -821,27 +882,49 @@ class FWROUTER_API(FwCfgRequestHandler):
                 # No requests to preprocess were found, return
                 return request
 
-            # Now add policy reinstallation if needed.
-            #
-            if indexes['remove-multilink-policy'] > idx:
-                # Move 'remove-multilink-policy' to the idx position:
-                # insert it as the idx position and delete the original 'remove-multilink-policy'.
-                idx_policy = indexes['remove-multilink-policy']
-                _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
-                del requests[idx_policy + 1]
-            if indexes['add-multilink-policy'] > -1 and indexes['add-multilink-policy'] < idx_last:  # We exploit the fact that only one 'add-multilink-policy' is possible
-                # Move 'add-multilink-policy' to the idx_last+1 position to be after all other 'add-X':
-                # insert it at the idx_last position and delete the original 'add-multilink-policy'.
-                idx_policy = indexes['add-multilink-policy']
-                _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
-                del requests[idx_policy]
-            if indexes['remove-multilink-policy'] == -1:
-                _insert_request(requests, idx, 'remove-multilink-policy', multilink_policy_params, updated)
-                idx_last += 1
-            if indexes['add-multilink-policy'] == -1 and reinstall_multilink_policy:
-                _insert_request(requests, idx_last+1, 'add-multilink-policy', multilink_policy_params, updated)
 
-        if updated:
+            def update_policy_message_positions(requests, request_name, params,
+                    indexes, max_idx, reinstall_needed):
+                insert_count = 0
+                if request_name == 'multilink':
+                    add_request_name = 'add-multilink-policy'
+                    remove_request_name = 'remove-multilink-policy'
+                elif request_name == 'firewall':
+                    add_request_name = 'add-firewall-policy'
+                    remove_request_name = 'remove-firewall-policy'
+
+                if indexes[remove_request_name] > idx:
+                    # Move 'remove-X-policy' to the min position:
+                    # insert it as the min position and delete the original 'remove-X-policy'.
+                    idx_policy = indexes[remove_request_name]
+                    _insert_request(requests, idx, remove_request_name, params)
+                    del requests[idx_policy + 1]
+                if indexes[add_request_name] > -1 and indexes[add_request_name] < max_idx:
+                    # We exploit the fact that only one 'add-X-policy' is possible
+                    # Move 'add-multilink-policy' to the idx_last+1 position to be after all other 'add-X':
+                    # insert it at the idx_last position and delete the original 'add-multilink-policy'.
+                    idx_policy = indexes[add_request_name]
+                    _insert_request(requests, max_idx + 1, add_request_name, params)
+                    del requests[idx_policy]
+                if indexes[remove_request_name] == -1:
+                    _insert_request(requests, idx, remove_request_name, params)
+                    insert_count += 1
+                    max_idx += 1
+                if indexes[add_request_name] == -1 and reinstall_needed:
+                    _insert_request(requests, max_idx + 1, add_request_name, params)
+                    insert_count += 1
+                return insert_count
+
+            # Now add policy reinstallation if needed.
+            if multilink_policy_params:
+                idx_last +=update_policy_message_positions(requests, 'multilink',
+                        multilink_policy_params, indexes, idx_last, reinstall_multilink_policy)
+
+            if firewall_policy_params:
+                update_policy_message_positions(requests, 'firewall', firewall_policy_params,
+                        indexes, idx_last, reinstall_firewall_policy)
+
+        if changes.get('insert'):
             fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
         return request
 
@@ -893,22 +976,17 @@ class FWROUTER_API(FwCfgRequestHandler):
         #
         os.system('sudo rm -rf /tmp/*%s' % fwglobals.g.VPP_TRACE_FILE_EXT)
 
-        # Clean FRR OSPFD config
+        # Clean FRR config files
+        if os.path.exists(fwglobals.g.FRR_CONFIG_FILE):
+            os.remove(fwglobals.g.FRR_CONFIG_FILE)
         if os.path.exists(fwglobals.g.FRR_OSPFD_FILE):
             os.remove(fwglobals.g.FRR_OSPFD_FILE)
 
-        # Reset persistent caches
-        #
-        router_api_db = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-        router_api_db['sa_id'] = 0
-        router_api_db['sw_if_index_to_vpp_if_name'] = {}
-        router_api_db['vpp_if_name_to_sw_if_index'] = {'tunnel':{}, 'lan':{}, 'wan':{}}
-        fwglobals.g.db['router_api'] = router_api_db
+        fwutils.reset_router_api_db(enforce=True)
 
         fwutils.vmxnet3_unassigned_interfaces_up()
 
         fwnetplan.load_netplan_filenames()
-
 
     def _on_start_router_after(self):
         """Handles post start VPP activities.
@@ -1008,10 +1086,12 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Apply router configuration on successful VPP start.
         """
         types = [
+            'add-switch',
             'add-interface',
             'add-tunnel',
             'add-application',
             'add-multilink-policy',
+            'add-firewall-policy',
             'add-route',            # Routes should come after tunnels, as they might use them!
             'add-dhcp-config'
         ]

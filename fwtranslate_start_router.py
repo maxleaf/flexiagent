@@ -27,6 +27,7 @@ import fwnetplan
 import fwglobals
 import fwikev2
 import fwutils
+import fw_nat_command_helpers
 
 # start_router
 # --------------------------------------
@@ -136,6 +137,17 @@ def start_router(params=None):
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "enable coredump to %s" % vpp_filename
+    cmd['cmd']['params']  = {
+        'module': 'fw_vpp_coredump_utils',
+        'func'  : 'vpp_coredump_setup_startup_conf',
+        'args'  : { 'vpp_config_filename' : vpp_filename, 'enable': 1 }
+    }
+    cmd_list.append(cmd)
+
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
     # Other interfaces will be not captured by vpp even if they are DOWN.
@@ -227,12 +239,7 @@ def start_router(params=None):
     cmd['cmd']['params']  = { 'enable':1, 'flags': 1,  # nat.h: _(0x01, IS_ENDPOINT_DEPENDENT)
                               'sessions':  100000 }    # Defaults: users=1024, sessions=10x1024, in multicore these parameters are per worker thread
     cmd_list.append(cmd)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
-    cmd['cmd']['descr']   = "enable NAT forwarding"
-    cmd['cmd']['params']  = { 'enable':1 }
-    cmd_list.append(cmd)
+    
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
@@ -266,6 +273,17 @@ def start_router(params=None):
     cmd['revert']['descr']  = "stop frr"
     cmd['revert']['params'] = [ 'sudo systemctl stop frr' ]
     cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "Setup FRR configuration"
+    cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'frr_setup_config'}
+    cmd_list.append(cmd)
+
+    # Setup Global VPP NAT parameters
+    # Post VPP NAT/Firewall changes - The param need to be false
+    cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(False))
 
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)

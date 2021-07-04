@@ -76,7 +76,7 @@ class Checker:
     def __init__(self, debug=False):
         """Constructor method
         """
-        fwglobals.initialize()
+        fwglobals.initialize(quiet=True)
 
         self.CFG_VPP_CONF_FILE      = fwglobals.g.VPP_CONFIG_FILE
         self.CFG_FWAGENT_CONF_FILE  = fwglobals.g.FWAGENT_CONF_FILE
@@ -172,19 +172,19 @@ class Checker:
         def _print_without_line_feed(str):
             # So odd print is needed to enforce no line feed, so next print()
             # will override this line.
-            print (str,)
+            #### print (str,) - python 2
+            print (str, end = '')
             sys.stdout.flush() # Need this as tail ',' removes the 'newline' in print(), so the print is not flushed immediately
 
         self.wan_interfaces = []
         interfaces = [ str(iface) for iface in psutil.net_if_addrs() if str(iface) != "lo" ]
         for iface in interfaces:
-            for _ in range(5):
-                ret = os.system("ping -c 1 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
-                if ret == 0:
-                    self.wan_interfaces.append(str(iface))
-                    return True
-                _print_without_line_feed("\rcheck WAN connectivity on %s" % iface)
+            _print_without_line_feed("\rcheck WAN connectivity on %s ..." % iface)
+            ret = os.system("ping -c 1 -I %s 8.8.8.8 > /dev/null 2>&1" % iface)
             _print_without_line_feed("\r                                              \r")  # Clean the line on screen
+            if ret == 0:
+                self.wan_interfaces.append(str(iface))
+                return True
         return False
 
     def hard_check_kernel_io_modules(self, supported):

@@ -67,6 +67,7 @@ class FwRouterCfg(FwCfgDatabase):
             types = [
                 'start-router',
                 'add-interface',
+                'add-switch',
                 'add-tunnel',
                 'add-route',		# routes should come after tunnels, as they might use them
                 'add-dhcp-config',
@@ -88,6 +89,7 @@ class FwRouterCfg(FwCfgDatabase):
                                     #
             'start-router':         "======= START COMMAND =======",
             'add-interface':        "======== INTERFACES ========",
+            'add-switch':           "======== SWITCHES ========",
             'add-route':            "========= ROUTES =========",
             'add-tunnel':           "========== TUNNELS ==========",
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",
@@ -128,6 +130,11 @@ class FwRouterCfg(FwCfgDatabase):
 
     def get_applications(self):
         return self.get_params('add-application')
+
+    def get_firewall_policy(self):
+        if 'add-firewall-policy' in self.db:
+            return self.db['add-firewall-policy']['params']
+        return None
 
     def get_wan_interface_gw(self, ip):
         import fwutils
