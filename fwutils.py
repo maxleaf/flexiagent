@@ -959,7 +959,7 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    taps = _vppctl_read("show tap-inject")
+    taps = _vppctl_read("show tap-inject").strip()
 
     if taps is None:
         raise Exception("tap_to_vpp_if_name: failed to fetch tap info from VPP")
