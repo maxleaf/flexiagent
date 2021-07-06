@@ -192,7 +192,7 @@ def get_nat_1to1_config(sw_if_index, internal_ip):
         'is_add': 1,
         'external_sw_if_index': sw_if_index,
         'local_ip_address': ip_bytes,
-        'flags': 12
+        'flags': 12 #[IS_OUT2IN_ONLY(0x4) | IS_ADDR_ONLY (0x8)]
     }
 
     revert_params = copy.deepcopy(add_params)
