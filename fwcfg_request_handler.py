@@ -294,6 +294,9 @@ class FwCfgRequestHandler:
                     if self.revert_failure_callback:
                         self.revert_failure_callback(err_str)
 
+                    return   # Don't continue, system is in undefined state now!
+
+
     # 'substitute' takes parameters in form of list or dictionary and
     # performs substitutions found in params.
     # Substitutions are kept in special element which is part of parameter list/dictionary.

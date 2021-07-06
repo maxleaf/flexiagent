@@ -978,7 +978,7 @@ def vpp_get_tap_info():
         fwglobals.log.debug("tap_info_get: VPP is not running")
         return ({}, {})
 
-    taps = _vppctl_read("show tap-inject")
+    taps = _vppctl_read("show tap-inject").strip()
     if not taps:
         fwglobals.log.debug("tap_info_get: no TAPs configured")
         return ({}, {})
