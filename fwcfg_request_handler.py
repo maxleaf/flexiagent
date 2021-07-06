@@ -400,6 +400,9 @@ class FwCfgRequestHandler:
                 old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
                 func_uses_cmd_cache = s['func_uses_cmd_cache']  if 'func_uses_cmd_cache' in s else False
                 if func_uses_cmd_cache:
+                    # The parameter indicates that the command cache need to be passed as
+                    # parameter to the transforming function
+                    # (For an example: refer function add_interface_attachment())
                     new = func(old, cache)
                 else:
                     new  = func(*old) if type(old) == list else func(old)
