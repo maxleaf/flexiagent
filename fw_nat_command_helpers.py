@@ -239,6 +239,8 @@ def get_nat_port_forward_config(sw_if_index, protocols, ports, internal_ip,
 
     for port in range(port_from, (port_to + 1)):
 
+        if not protocols:
+            protocols = ['tcp', 'udp']
         for proto in protocols:
 
             if (fwutils.proto_map[proto] != fwutils.proto_map['tcp'] and
@@ -293,6 +295,8 @@ def get_nat_identity_config(sw_if_index, protocols, ports):
 
     for port in range(port_from, (port_to + 1)):
 
+        if not protocols:
+            protocols = ['tcp', 'udp']
         for proto in protocols:
 
             if (fwutils.proto_map[proto] != fwutils.proto_map['tcp'] and
