@@ -962,6 +962,24 @@ def set_dev_id_to_tap(dev_id, tap):
     cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
     cache[dev_id_full] = tap
 
+def vpp_enable_tap_inject():
+    """Enable tap-inject plugin
+     """
+    vppctl_cmd = "enable tap-inject"
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+    subprocess.check_call("vppctl %s" % vppctl_cmd, shell=True)
+
+    if not vpp_does_run():
+        return (False, "VPP is not running")
+
+    taps = _vppctl_read("show tap-inject").strip()
+
+    # check if tap-inject is configured and enabled
+    if taps and 'not enabled' in taps:
+        return (False, "%s" % taps)
+
+    return (True, None)
+
 # 'vpp_get_tap_info' returns mappings between TAPs and VPP interfaces.
 # To do that it greps output of 'vppctl sh tap-inject' by the tap interface name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
