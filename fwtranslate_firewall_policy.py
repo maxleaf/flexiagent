@@ -56,13 +56,16 @@ def add_firewall_policy(params):
         dest_rule_params = {}
         rule_array = []
 
-        ports = destination['ports']
+        ports = destination.get('ports')
         protocols = destination.get('protocols')
-        for proto in protocols:
-            rule_array.append({
-                'ports': ports,
-                'protocol': proto
-            })
+        if ports:
+            if not protocols:
+                protocols = ['tcp', 'udp']
+            for proto in protocols:
+                rule_array.append({
+                    'ports': ports,
+                    'protocol': proto
+                })
         dest_rule_params['ipProtoPort'] = rule_array
         return dest_rule_params
 
@@ -124,11 +127,11 @@ def add_firewall_policy(params):
                             sw_if_index, action['internalIP']))
                     elif rule_type == InboundNatType.PORT_FORWARD:
                         cmd_list.extend(fw_nat_command_helpers.get_nat_port_forward_config(
-                            sw_if_index, destination['protocols'], destination['ports'],
+                            sw_if_index, destination.get('protocols'), destination['ports'],
                             action['internalIP'], action['internalPortStart']))
                     elif rule_type == InboundNatType.IDENTITY_MAPPING:
                         cmd_list.extend(fw_nat_command_helpers.get_nat_identity_config(
-                            sw_if_index, destination['protocols'], destination['ports']))
+                            sw_if_index, destination.get('protocols'), destination['ports']))
 
         # Generate Per Interface ACL commands
         for dev_id, value in intf_attachments.items():

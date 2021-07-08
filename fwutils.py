@@ -962,6 +962,24 @@ def set_dev_id_to_tap(dev_id, tap):
     cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
     cache[dev_id_full] = tap
 
+def vpp_enable_tap_inject():
+    """Enable tap-inject plugin
+     """
+    vppctl_cmd = "enable tap-inject"
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+    subprocess.check_call("vppctl %s" % vppctl_cmd, shell=True)
+
+    if not vpp_does_run():
+        return (False, "VPP is not running")
+
+    taps = _vppctl_read("show tap-inject").strip()
+
+    # check if tap-inject is configured and enabled
+    if taps and 'not enabled' in taps:
+        return (False, "%s" % taps)
+
+    return (True, None)
+
 # 'vpp_get_tap_info' returns mappings between TAPs and VPP interfaces.
 # To do that it greps output of 'vppctl sh tap-inject' by the tap interface name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
@@ -978,7 +996,7 @@ def vpp_get_tap_info():
         fwglobals.log.debug("tap_info_get: VPP is not running")
         return ({}, {})
 
-    taps = _vppctl_read("show tap-inject")
+    taps = _vppctl_read("show tap-inject").strip()
     if not taps:
         fwglobals.log.debug("tap_info_get: no TAPs configured")
         return ({}, {})
@@ -3376,6 +3394,25 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
+def frr_vtysh_run(flags, restart_frr_service=False):
+    '''Run vtysh command to configure router
+
+    :param flags:               flags of commands
+    :param restart_frr_service: some OSPF configurations require restarting the service in order to apply them
+    '''
+    try:
+        vtysh_cmd = 'sudo /usr/bin/vtysh %s; sudo /usr/bin/vtysh -c "write"' % flags
+        output = os.popen(vtysh_cmd).read().splitlines()
+
+        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, output=%s" % (vtysh_cmd, output[0] if output else ''))
+
+        if restart_frr_service:
+            os.system('systemctl restart frr')
+
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))
+
 def frr_setup_config():
     '''Setup the /etc/frr/frr.conf file, initializes it and
     ensures that ospf is switched on in the frr configuration'''
@@ -3388,9 +3425,29 @@ def frr_setup_config():
     subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
     # Setup basics on frr.conf.
-    subprocess.check_call('sudo /usr/bin/vtysh -c "configure" -c "password zebra" '\
-        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"; '\
-        'sudo /usr/bin/vtysh -c "write"', shell=True)
+    frr_vtysh_run('-c "configure" -c "password zebra" '\
+        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"')
+
+def frr_create_redistribution_filter(router , acl, route_map, route_map_num, revert=False):
+    # When we add a static route, OSPF sees it as a kernel route, not a static one.
+    # That is why we are forced to set in OSPF/BGP - redistribution of *kernel* routes.
+    # But, of course, we don't want to redistribute them all, so we create a filter.
+    #
+    # This is content in OSPF file after the filter settings (bgp is similar):
+    # router ospf
+    #   redistribute kernel route-map fw-redist-ospf-rm
+    # !
+    # route-map fw-redist-ospf-rm permit 1
+    #   match ip address fw-redist-ospf-acl
+    # !
+    #
+    route_map_cmd = '-c "%sroute-map %s permit %s"' % ('no ' if revert else '', route_map, route_map_num)
+    if not revert:
+        route_map_cmd += ' -c "match ip address %s"' % acl
+    frr_vtysh_run('-c "configure" %s' % route_map_cmd)
+
+    redistribute_cmd = '%sredistribute kernel route-map %s' % ('no ' if revert else '', route_map)
+    frr_vtysh_run('-c "configure" -c "%s" -c "%s"' % (router, redistribute_cmd))
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content

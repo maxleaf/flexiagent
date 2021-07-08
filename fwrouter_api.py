@@ -62,7 +62,7 @@ fwrouter_translators = {
     'add-application':          {'module': __import__('fwtranslate_add_app'),         'api':'add_app'},
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
-    'remove-multilink-policy':  {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
+    'remove-multilink-policy':  {'module': __import__('fwtranslate_revert'),          'api':'revert'},
     'add-switch':               {'module': __import__('fwtranslate_add_switch'),      'api':'add_switch'},
     'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
@@ -1042,6 +1042,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         """Apply router configuration on successful VPP start.
         """
         types = [
+            'add-ospf',
             'add-switch',
             'add-interface',
             'add-tunnel',
