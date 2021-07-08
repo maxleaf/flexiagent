@@ -229,8 +229,6 @@ class FWAGENT_API:
         if routing_table == None:
             raise Exception("_get_device_os_routes: failed to get device routes: %s" % format(sys.exc_info()[1]))
 
-        # Remove empty lines and the headers of the 'route' command
-        # routing_table = [ el for el in routing_table if (el is not "" and routing_table.index(el)) > 1 ]
         route_entries = []
 
         def _get_nexthop_parent_data(route):
