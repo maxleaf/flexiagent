@@ -67,6 +67,8 @@ fwrouter_translators = {
     'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
     'remove-firewall-policy':   {'module': __import__('fwtranslate_revert'),          'api':'revert'},
+    'add-ospf':                 {'module': __import__('fwtranslate_add_ospf'),        'api':'add_ospf'},
+    'remove-ospf':              {'module': __import__('fwtranslate_revert'),          'api':'revert'},
 }
 
 class FwRouterState(enum.Enum):
@@ -762,8 +764,10 @@ class FWROUTER_API(FwCfgRequestHandler):
         #   [ 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
         #     'add-application', 'add-multilink-policy', 'add-firewall-policy' ]
         #
-        add_order    = [ 'add-switch', 'add-interface', 'add-tunnel', 'add-route', 'add-dhcp-config',
-            'add-application', 'add-multilink-policy', 'add-firewall-policy', 'start-router' ]
+        add_order = [
+            'add-ospf', 'add-switch', 'add-interface', 'add-tunnel', 'add-route',
+            'add-dhcp-config', 'add-application', 'add-multilink-policy', 'add-firewall-policy', 'start-router'
+        ]
         remove_order = [ re.sub('add-','remove-', name) for name in add_order if name != 'start-router' ]
         remove_order.append('stop-router')
         remove_order.reverse()
@@ -1043,8 +1047,8 @@ class FWROUTER_API(FwCfgRequestHandler):
             'add-tunnel',
             'add-application',
             'add-multilink-policy',
-            'add-firewall-policy',
-            'add-route',            # Routes should come after tunnels, as they might use them!
+            'add-firewall-policy'
+            'add-route',            # Routes should come after tunnels as they might use them!
             'add-dhcp-config'
         ]
         messages = self.cfg_db.dump(types=types)

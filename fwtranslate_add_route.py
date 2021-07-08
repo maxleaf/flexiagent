@@ -86,6 +86,32 @@ def add_route(params):
                                 }
                               }
     cmd_list.append(cmd)
+
+    # Add this static route to the ACL permit filter
+    if params.get('redistributeViaOSPF', False) == True:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'flags': '-c "configure" -c "router ospf" -c "access-list %s permit %s"' % (fwglobals.g.FRR_OSPF_ACL, params['addr'])
+                },
+        }
+        cmd['cmd']['descr']   =  "add %s to the allowed redistribution filter list" % params['addr']
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'flags': '-c "configure" -c "router ospf" -c "no access-list %s permit %s"' % (fwglobals.g.FRR_OSPF_ACL, params['addr'])
+                },
+        }
+        cmd['revert']['descr']   =  "remove %s from the allowed redistribution filter list" % params['addr']
+        cmd_list.append(cmd)
+
     return cmd_list
 
 def get_request_key(params):
