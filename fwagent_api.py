@@ -33,6 +33,7 @@ import fwstats
 import fwutils
 import fwsystem_api
 import fwrouter_api
+import re
 
 fwagent_api = {
     'get-device-certificate':        '_get_device_certificate',
@@ -229,21 +230,62 @@ class FWAGENT_API:
             raise Exception("_get_device_os_routes: failed to get device routes: %s" % format(sys.exc_info()[1]))
 
         # Remove empty lines and the headers of the 'route' command
-        routing_table = [ el for el in routing_table if (el is not "" and routing_table.index(el)) > 1 ]
+        # routing_table = [ el for el in routing_table if (el is not "" and routing_table.index(el)) > 1 ]
         route_entries = []
 
-        for route in routing_table:
+        def _get_nexthop_parent_data(route):
+            data = re.findall(r'((?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
+            return (data[0], data[1])
+
+        for idx, route in enumerate(routing_table):
+            if route == '':
+                continue
+
             fields = route.split()
-            if len(fields) < 8:
-                raise Exception("_get_device_os_routes: failed to get device routes: parsing failed")
+
+            dest = ''
+            gateway = ''
+            interface = ''
+            protocol = ''
+            metric = ''
+
+            if 'default' in route:
+                data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+|(?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
+                dest = '0.0.0.0'
+                gateway = data[0]
+                interface = data[1]
+                protocol = data[2]
+                metric = data[3]
+
+            elif route != routing_table[-1] and 'nexthop' in routing_table[idx + 1] and not 'nexthop' in route:
+                continue
+
+            elif 'nexthop' in route:
+                search_idx = idx -1
+                destinationData = routing_table[search_idx]
+                while 'nexthop' in destinationData:
+                    search_idx -= 1
+                    destinationData = routing_table[search_idx]
+
+                protocol, metric = _get_nexthop_parent_data(destinationData)
+                dest = destinationData.split()[0]
+
+                data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
+                gateway = data[0]
+                interface = data[1]
+
+            else:
+                data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
+                interface = data[0]
+                protocol = data[1]
+                dest = fields[0]
 
             route_entries.append({
-                'destination': fields[0],
-                'gateway': fields[1],
-                'mask': fields[2],
-                'flags': fields[3],
-                'metric': fields[4],
-                'interface': fields[7],
+                'destination': dest,
+                'gateway': gateway,
+                'metric': metric,
+                'interface': interface,
+                'protocol': protocol
             })
 
         return {'message': route_entries, 'ok': 1}

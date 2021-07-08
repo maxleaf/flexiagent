@@ -218,7 +218,7 @@ def get_os_routing_table():
     :returns: List of routes.
     """
     try:
-        routing_table = subprocess.check_output(['route', '-n']).decode().split('\n')
+        routing_table = subprocess.check_output(['ip', 'route']).decode().split('\n')
         return routing_table
     except:
         return (None)
