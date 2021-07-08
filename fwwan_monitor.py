@@ -364,7 +364,7 @@ class FwWanMonitor:
 
                 (success, err_str) = fwnetplan.add_remove_netplan_interface(\
                                         True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
-                                        mtu, if_name=route.dev, wan_failover=True)
+                                        mtu, if_name=route.dev, validate_ip=False)
                 if not success:
                     route.ok = prev_ok
                     fwglobals.log.error("failed to update metric in netplan: %s" % err_str)

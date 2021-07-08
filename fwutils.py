@@ -55,7 +55,9 @@ from fwmultilink    import FwMultilink
 from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
 from fwikev2        import FwIKEv2
+from fw_traffic_identification import FwTrafficIdentifications
 
+proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
 
@@ -889,6 +891,7 @@ def pci_bytes_to_str(pci_bytes):
 # e.g. 'GigabitEthernet0/8/0', than we dump all VPP interfaces and search for interface
 # with this name. If found - return interface index.
 
+
 def dev_id_to_vpp_sw_if_index(dev_id):
     """Convert device bus address into VPP sw_if_index.
 
@@ -946,12 +949,74 @@ def dev_id_to_tap(dev_id, check_vpp_state=False):
         cache[dev_id_full] = tap
     return tap
 
-# 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
-# into name of the vpp interface.
+def set_dev_id_to_tap(dev_id, tap):
+    """Update cache.
+
+    :param dev_id:          Bus address.
+    :param tap:             TAP name
+    """
+    if not dev_id:
+        return
+
+    dev_id_full = dev_id_to_full(dev_id)
+    cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
+    cache[dev_id_full] = tap
+
+def vpp_enable_tap_inject():
+    """Enable tap-inject plugin
+     """
+    vppctl_cmd = "enable tap-inject"
+    fwglobals.log.debug("vppctl " + vppctl_cmd)
+    subprocess.check_call("vppctl %s" % vppctl_cmd, shell=True)
+
+    if not vpp_does_run():
+        return (False, "VPP is not running")
+
+    taps = _vppctl_read("show tap-inject").strip()
+
+    # check if tap-inject is configured and enabled
+    if taps and 'not enabled' in taps:
+        return (False, "%s" % taps)
+
+    return (True, None)
+
+# 'vpp_get_tap_info' returns mappings between TAPs and VPP interfaces.
 # To do that it greps output of 'vppctl sh tap-inject' by the tap interface name:
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
+def vpp_get_tap_info():
+    """Get tap information
+
+     :returns: tap info in list
+     """
+    tap_to_vpp_if_name = {}
+    vpp_if_name_to_tap = {}
+    if not vpp_does_run():
+        fwglobals.log.debug("tap_info_get: VPP is not running")
+        return ({}, {})
+
+    taps = _vppctl_read("show tap-inject").strip()
+    if not taps:
+        fwglobals.log.debug("tap_info_get: no TAPs configured")
+        return ({}, {})
+
+    # check if tap-inject is configured and enabled
+    if 'not enabled' in taps:
+        fwglobals.log.debug("tap_info_get: %s" % taps)
+        return ({}, {})
+
+    taps = taps.splitlines()
+
+    for line in taps:
+        tap_info = line.split(' -> ')
+        tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
+        vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
+
+    return (tap_to_vpp_if_name, vpp_if_name_to_tap)
+
+# 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
+# into name of the vpp interface.
 def tap_to_vpp_if_name(tap):
     """Convert Linux interface created by tap-inject into VPP interface name.
 
@@ -959,32 +1024,14 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    taps = _vppctl_read("show tap-inject")
-
-    if taps is None:
-        raise Exception("tap_to_vpp_if_name: failed to fetch tap info from VPP")
-
-    taps = taps.splitlines()
-    for line in taps:
-        # check if tap-inject is configured and enabled
-        if ' -> ' not in line:
-            fwglobals.log.debug("tap_to_vpp_if_name: vpp was not started yet ('%s')" % line)
-            break
-
-        tap_info = line.split(' -> ')
-        if tap_info[1] == tap:
-            return tap_info[0]
+    tap_to_vpp_if_name, _ = vpp_get_tap_info()
+    if tap in tap_to_vpp_if_name:
+        return tap_to_vpp_if_name[tap]
 
     return None
 
-
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
-# To do that it greps output of 'vppctl sh tap-inject' by the interface name:
-#   root@ubuntu-server-1:/# vppctl sh tap-inject
-#       GigabitEthernet0/8/0 -> vpp0
-#       GigabitEthernet0/9/0 -> vpp1
-#       loop0 -> vpp2
 def vpp_if_name_to_tap(vpp_if_name):
     """Convert VPP interface name into Linux TAP interface name.
 
@@ -992,18 +1039,11 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
-    # vpp_api.cli() throw exception in vpp 19.01 (and works in vpp 19.04)
-    # taps = fwglobals.g.router_api.vpp_api.cli("show tap-inject")
-    taps = _vppctl_read("show tap-inject")
-    if taps is None:
-        raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
+    _, vpp_if_name_to_tap = vpp_get_tap_info()
+    if vpp_if_name in vpp_if_name_to_tap:
+        return vpp_if_name_to_tap[vpp_if_name]
 
-    pattern = '%s -> ([a-zA-Z0-9_]+)' % vpp_if_name
-    match = re.search(pattern, taps)
-    if match is None:
-        return None
-    tap = match.group(1)
-    return tap
+    return None
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
     """
@@ -1225,6 +1265,8 @@ def reset_device_config():
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
 
+    with FwTrafficIdentifications(fwglobals.g.TRAFFIC_ID_DB_FILE) as traffic_db:
+        traffic_db.clean()
     fwnetplan.restore_linux_netplan_files()
     with FwIKEv2() as ike:
         ike.clean()
@@ -1232,7 +1274,30 @@ def reset_device_config():
     if 'lte' in fwglobals.g.db:
         fwglobals.g.db['lte'] = {}
 
+    reset_router_api_db_sa_id()
+    reset_router_api_db_bridges()
+
     reset_dhcpd()
+
+def reset_router_api_db_bridges():
+    # Bridge domain id in VPP is up to 24 bits (see #define L2_BD_ID_MAX ((1<<24)-1))
+    # In addition, we use bridge domain id as id for loopback BVI interface set on this bridge.
+    # BVI interface is the only interface on the bridge that might have IP address.
+    # As loopback interface id is limitied by 16,384 in vpp\src\vnet\ethernet\interface.c:
+    #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024)
+    # Therefor we choose range for bridge id to be 16300-16384
+    #
+    router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    min_id, max_id = fwglobals.g.LOOPBACK_ID_SWITCHES
+    router_api_db['bridges'] = {
+        'vacant_ids': list(range(min_id, max_id, 2)) # vppsb creates taps for even names only e.g. loop10010 (due to flexiWAN specific logic, see tap_inject_interface_add_del())
+    }
+    fwglobals.g.db['router_api'] = router_api_db
+
+def reset_router_api_db_sa_id():
+    router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+    router_api_db['sa_id'] = 0
+    fwglobals.g.db['router_api'] = router_api_db
 
 def print_system_config(full=False):
     """Print router configuration.
@@ -1442,6 +1507,19 @@ def ip_str_to_bytes(ip_str):
     addr_ip = ip_str.split('/')[0]
     addr_len = int(ip_str.split('/')[1]) if len(ip_str.split('/')) > 1 else 32
     return socket.inet_pton(socket.AF_INET, addr_ip), addr_len
+
+def ports_str_to_range(ports_str):
+    """Convert Ports string range into ports_from and ports_to
+
+     :param ports_str:         Ports range string.
+
+     :returns: port_from and port_to
+     """
+    ports_range = ports_str.split('-')
+    port_from = port_to = int(ports_range[0])
+    if len(ports_range) > 1:
+        port_to = int(ports_range[1])
+    return port_from, port_to
 
 def mac_str_to_bytes(mac_str):      # "08:00:27:fd:12:01" -> bytes
     """Convert MAC address string into bytes.
@@ -3667,6 +3745,20 @@ def vpp_nat_interface_add(dev_id, remove):
         fwglobals.log.debug("failed vppctl_cmd=%s" % vppctl_cmd)
         return False
 
+def vpp_wan_tap_inject_configure(dev_id, remove):
+
+    vpp_if_name = dev_id_to_vpp_if_name(dev_id)
+    fwglobals.log.debug("Forward tap-inject WAN packets to ip4-output - \
+        (%s is_delete: %s)" % (vpp_if_name, remove))
+    if remove:
+        vppctl_cmd = 'tap-inject enable-ip4-output interface %s \
+            del' % (vpp_if_name)
+    else:
+        vppctl_cmd = 'tap-inject enable-ip4-output interface %s' % vpp_if_name
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None:
+        fwglobals.log.debug("failed vppctl_cmd=%s" % vppctl_cmd)
+        return False
 
 def get_min_metric_device(skip_dev_id):
 
@@ -4095,6 +4187,16 @@ def send_udp_packet(src_ip, src_port, dst_ip, dst_port, dev_name, msg):
         return
 
     s.close()
+
+def map_keys_to_acl_ids(acl_ids, arg):
+    # arg carries command cache
+    keys = acl_ids['keys']
+    i = 0
+    while i < len(keys):
+        keys[i] = arg[keys[i]]
+        i += 1
+    return keys
+
 
 def build_timestamped_filename(filename, ext='', separator='_'):
     '''Incorporates date and time into the filename in format "%Y%M%d_%H%M%S".

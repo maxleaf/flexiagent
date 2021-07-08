@@ -1,0 +1,18 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "outbound": {
+                "rules": [
+                    {
+                        "id": "1",
+                        "action": {
+                            "permit": true
+                        }
+                    }
+                ]
+            }
+        }
+    }
+]

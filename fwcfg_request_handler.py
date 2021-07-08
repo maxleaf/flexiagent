@@ -294,6 +294,9 @@ class FwCfgRequestHandler:
                     if self.revert_failure_callback:
                         self.revert_failure_callback(err_str)
 
+                    return   # Don't continue, system is in undefined state now!
+
+
     # 'substitute' takes parameters in form of list or dictionary and
     # performs substitutions found in params.
     # Substitutions are kept in special element which is part of parameter list/dictionary.
@@ -391,10 +394,21 @@ class FwCfgRequestHandler:
 
             # Find the new value to be added to params
             if 'val_by_func' in s:
-                func_name = s['val_by_func']
-                func = getattr(fwutils, func_name)
+                module , func_name = fwutils , s['val_by_func']
+                if '.' in func_name:
+                    module_name, func_name = func_name.split('.', 1)
+                    module = __import__(module_name)
+
+                func = getattr(module, func_name)
                 old  = s['arg'] if 'arg' in s else cache[s['arg_by_key']]
-                new  = func(*old) if type(old) == list else func(old)
+                func_uses_cmd_cache = s['func_uses_cmd_cache']  if 'func_uses_cmd_cache' in s else False
+                if func_uses_cmd_cache:
+                    # The parameter indicates that the command cache need to be passed as
+                    # parameter to the transforming function
+                    # (For an example: refer function add_interface_attachment())
+                    new = func(old, cache)
+                else:
+                    new  = func(*old) if type(old) == list else func(old)
                 if new is None:
                     raise Exception("fwutils.py:substitute: %s failed to map %s in '%s'" % (func, old, format(params)))
             elif 'val_by_key' in s:
