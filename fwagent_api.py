@@ -249,53 +249,57 @@ class FWAGENT_API:
             protocol = ''
             metric = '0'
 
-            if 'default' in route:
-                data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+|(?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
-                dest = '0.0.0.0'
-                gateway = data[0]
-                interface = data[1]
+            try:
+                if 'default' in route:
+                    data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+|(?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
+                    dest = '0.0.0.0'
+                    gateway = data[0]
+                    interface = data[1]
 
-                if len(data) == 3:
-                    metric = data[2]
-                else:
-                    protocol = data[2]
-                    metric = data[3]
+                    if len(data) == 3:
+                        metric = data[2]
+                    else:
+                        protocol = data[2]
+                        metric = data[3]
 
-            elif route != routing_table[-1] and 'nexthop' in routing_table[idx + 1] and not 'nexthop' in route:
-                continue
+                elif route != routing_table[-1] and 'nexthop' in routing_table[idx + 1] and not 'nexthop' in route:
+                    continue
 
-            elif 'nexthop' in route:
-                search_idx = idx -1
-                destinationData = routing_table[search_idx]
-                while 'nexthop' in destinationData:
-                    search_idx -= 1
+                elif 'nexthop' in route:
+                    search_idx = idx -1
                     destinationData = routing_table[search_idx]
+                    while 'nexthop' in destinationData:
+                        search_idx -= 1
+                        destinationData = routing_table[search_idx]
 
-                protocol, metric = _get_nexthop_parent_data(destinationData)
-                dest = destinationData.split()[0]
+                    protocol, metric = _get_nexthop_parent_data(destinationData)
+                    dest = destinationData.split()[0]
 
-                data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
-                gateway = data[0]
-                interface = data[1]
-
-            else:
-                dest = fields[0]
-                if 'proto' in route:
-                    data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
-                    interface = data[0]
-                    protocol = data[1]
-                elif 'via' in route:
                     data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
                     gateway = data[0]
                     interface = data[1]
 
-            route_entries.append({
-                'destination': dest,
-                'gateway': gateway,
-                'metric': metric,
-                'interface': interface,
-                'protocol': protocol
-            })
+                else:
+                    dest = fields[0]
+                    if 'proto' in route:
+                        data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
+                        interface = data[0]
+                        protocol = data[1]
+                    elif 'via' in route:
+                        data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
+                        gateway = data[0]
+                        interface = data[1]
+
+                route_entries.append({
+                    'destination': dest,
+                    'gateway': gateway,
+                    'metric': metric,
+                    'interface': interface,
+                    'protocol': protocol
+                })
+            except Exception as e:
+                fwglobals.log.error("_get_device_os_routes: failed to get data for route %s." % (route. str(e)))
+                pass
 
         return {'message': route_entries, 'ok': 1}
 
