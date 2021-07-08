@@ -247,15 +247,19 @@ class FWAGENT_API:
             gateway = ''
             interface = ''
             protocol = ''
-            metric = ''
+            metric = '0'
 
             if 'default' in route:
                 data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+|(?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
                 dest = '0.0.0.0'
                 gateway = data[0]
                 interface = data[1]
-                protocol = data[2]
-                metric = data[3]
+
+                if len(data) == 3:
+                    metric = data[2]
+                else:
+                    protocol = data[2]
+                    metric = data[3]
 
             elif route != routing_table[-1] and 'nexthop' in routing_table[idx + 1] and not 'nexthop' in route:
                 continue
@@ -275,10 +279,15 @@ class FWAGENT_API:
                 interface = data[1]
 
             else:
-                data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
-                interface = data[0]
-                protocol = data[1]
                 dest = fields[0]
+                if 'proto' in route:
+                    data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
+                    interface = data[0]
+                    protocol = data[1]
+                elif 'via' in route:
+                    data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
+                    gateway = data[0]
+                    interface = data[1]
 
             route_entries.append({
                 'destination': dest,
