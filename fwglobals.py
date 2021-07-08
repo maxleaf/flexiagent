@@ -108,8 +108,6 @@ request_handlers = {
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
     'add-ospf':                     {'name': '_call_router_api', 'sign': True},
     'remove-ospf':                  {'name': '_call_router_api', 'sign': True},
-    'add-bgp':                      {'name': '_call_router_api', 'sign': True},
-    'remove-bgp':                   {'name': '_call_router_api', 'sign': True},
     'add-switch':                   {'name': '_call_router_api', 'sign': True},
     'remove-switch':                {'name': '_call_router_api', 'sign': True},
     'add-firewall-policy':          {'name': '_call_router_api', 'sign': True},
@@ -295,12 +293,9 @@ class Fwglobals:
         self.FRR_DAEMONS_FILE    = '/etc/frr/daemons'
         self.FRR_CONFIG_FILE     = '/etc/frr/frr.conf'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
-        self.FRR_BGPD_FILE      = '/etc/frr/bgpd.conf'
         self.FRR_VTYSH_FILE      = '/etc/frr/vtysh.conf'
         self.FRR_OSPF_ACL       = 'fw-redist-ospf-acl'
         self.FRR_OSPF_ROUTE_MAP = 'fw-redist-ospf-rm'
-        self.FRR_BGP_ACL       = 'fw-redist-bgp-acl'
-        self.FRR_BGP_ROUTE_MAP = 'fw-redist-bgp-rm'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'

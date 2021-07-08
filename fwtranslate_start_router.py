@@ -294,7 +294,7 @@ def start_router(params=None):
                 'router': 'router ospf',
                 'acl': fwglobals.g.FRR_OSPF_ACL,
                 'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
-                'route_map_num': '1', # 1 is for OSPF, 2 is for BGP
+                'route_map_num': '1', # 1 is for OSPF
             }
     }
     cmd['cmd']['descr']   =  "add ospf redistribution filter"
@@ -307,7 +307,7 @@ def start_router(params=None):
                 'router': 'router ospf',
                 'acl': fwglobals.g.FRR_OSPF_ACL,
                 'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
-                'route_map_num': '1', # 1 is for OSPF, 2 is for BGP
+                'route_map_num': '1', # 1 is for OSPF
                 'revert': True
             }
     }

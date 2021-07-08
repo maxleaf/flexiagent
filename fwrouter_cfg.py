@@ -74,7 +74,6 @@ class FwRouterCfg(FwCfgDatabase):
                 'add-application',
                 'add-multilink-policy',
                 'add-ospf',
-                'add-bgp',
             ]
 
         return FwCfgDatabase.dump(self, types, escape, full, keys)
@@ -98,7 +97,6 @@ class FwRouterCfg(FwCfgDatabase):
             'add-application':      "============ APPLICATIONS ============",
             'add-multilink-policy': "============= POLICIES =============",
             'add-ospf':             "============= OSPF =============",
-            'add-bgp':              "============= BGP =============",
         }
 
         cfg = self.dump(types=types, escape=escape, full=full, keys=True)
@@ -121,9 +119,6 @@ class FwRouterCfg(FwCfgDatabase):
 
     def get_routes(self):
         return self.get_requests('add-route')
-
-    def get_bgp(self):
-        return self.get_requests('add-bgp')
 
     def get_tunnels(self):
         return self.get_requests('add-tunnel')
