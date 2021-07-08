@@ -39,6 +39,9 @@ TEST_ROOT = CODE_ROOT + '/tests/'
 sys.path.append(CODE_ROOT)
 sys.path.append(TEST_ROOT)
 import fwutils
+import fwglobals
+
+g = fwglobals.Fwglobals()
 
 template_path = os.path.abspath(TEST_ROOT + '/fwtemplates.yaml')
 
@@ -209,7 +212,7 @@ class TestFwagent:
         if not since:
             since = self.start_time
 
-        grep_cmd = "sudo grep -a -E '%s' /var/log/flexiwan/agent.log" % pattern
+        grep_cmd = "sudo grep -a -E '%s' %s" % (pattern, g.ROUTER_LOG_FILE)
         try:
             out = subprocess.check_output(grep_cmd, shell=True).decode()
             if out:

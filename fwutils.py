@@ -1362,8 +1362,13 @@ def update_device_config_signature(request):
     new         = hash_object.hexdigest()
 
     fwglobals.g.db['signature'] = new
-    fwglobals.log.debug("sha1: new=%s, current=%s, delta=%s" %
-                        (str(new), str(current), str(delta)))
+
+    log_line = "sha1: new=%s, current=%s, delta=%s" % (str(new), str(current), str(delta))
+    fwglobals.log.debug(log_line)
+    for r in request:  # If 'add-application' is in delta, the line in main log will be truncated, so print it into application logger ass well
+        logger = fwglobals.g.get_logger(r)
+        if logger:
+            logger.debug(log_line)
 
 def get_device_config_signature():
     if not 'signature' in fwglobals.g.db:
@@ -3831,7 +3836,7 @@ def dump(filename=None, path=None, clean_log=False):
     '''This function invokes 'fwdump' utility while ensuring no DoS on disk space.
 
     :param filename:  the name of the final file where to dump will be tar.gz-ed
-    :param clean_log: if True, /var/log/flexiwan/agent.log will be cleaned
+    :param clean_log: if True, agent log files will be cleaned
     '''
     try:
         cmd = 'fwdump'
@@ -3852,6 +3857,7 @@ def dump(filename=None, path=None, clean_log=False):
 
         if clean_log:
             os.system("echo '' > %s" % fwglobals.g.ROUTER_LOG_FILE)
+            os.system("echo '' > %s" % fwglobals.g.APPLICATION_IDS_LOG_FILE)
     except Exception as e:
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 

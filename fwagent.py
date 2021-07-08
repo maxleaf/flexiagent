@@ -51,9 +51,7 @@ import fwmultilink
 import fwapplications
 import fwstats
 import fwutils
-from fwlog import Fwlog
 import loadsimulator
-import pprint
 import jwt
 
 # Global signal handler for clean exit
@@ -640,6 +638,7 @@ class FwAgent:
         :returns: (reply, msg), where reply is reply to be sent back to server,
                   msg is normalized received message.
         """
+        logger = None
         try:
             self.received_request = True
             self.handling_request = True
@@ -647,11 +646,16 @@ class FwAgent:
             msg = fwutils.fix_received_message(received_msg)
 
             print_message = False if re.match('get-device-', msg['message']) else fwglobals.g.cfg.DEBUG
-            print_message = False if msg['message'] == 'add-application' else print_message
-            if msg['message'] == 'aggregated' and len([r for r in msg['params']['requests'] if r['message']=='add-application']) > 0:
-                print_message = False   # Don't print message if it includes 'add-application' request which is huge. It is printed by caller.
+
+            # 'add-application' request is huge, so we log it into dedicated file.
+            # This is in addition to log into default file, where lines are truncated to 4K.
+            #
+            logger = fwglobals.g.get_logger(msg)
+
             if print_message:
                 fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
+                if logger:
+                    logger.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
 
             reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
             if not 'entity' in reply and 'entity' in msg:
@@ -661,8 +665,11 @@ class FwAgent:
 
             if print_message:
                 fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
+                if logger:
+                    logger.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
 
             self.handling_request = False
+
         except Exception as e:
              fwglobals.log.error("handle_received_request failed: %s" + str(e))
              return {'ok': 0, 'message': str(e)}

@@ -31,7 +31,7 @@ class FwTrafficIdentifications(object):
     Each traffic identifier is a set of rules with match conditions and  carries traffic tags like
     category type, traffic class type and traffic importance
     """
-    def __init__(self, db_file):
+    def __init__(self, db_file, logger=None):
         # Traffic id to match rules
         self.traffic_id_map = SqliteDict(
             db_file, 'traffic_id', autocommit=True)
@@ -43,6 +43,7 @@ class FwTrafficIdentifications(object):
         # Importance to traffic id(s)
         self.importance_map = SqliteDict(
             db_file, 'importance', autocommit=True)
+        self.log = logger if logger else fwglobals.log
 
     def finalize(self):
         """
@@ -90,7 +91,7 @@ class FwTrafficIdentifications(object):
         traffic_class = traffic.get("serviceClass")
         importance = traffic.get("importance")
         self.traffic_id_map[traffic_id] = traffic
-        fwglobals.log.info('Add traffic identification: ' + traffic_id)
+        self.log.info('Add traffic identification: ' + traffic_id)
         if category:
             self.__add_traffic_id(self.category_map, category, traffic_id)
         if traffic_class:
@@ -107,7 +108,7 @@ class FwTrafficIdentifications(object):
         category = traffic.get("category")
         traffic_class = traffic.get("serviceClass")
         importance = traffic.get("importance")
-        fwglobals.log.info('Remove traffic identification: ' + traffic_id)
+        self.log.info('Remove traffic identification: ' + traffic_id)
         if traffic_id in self.traffic_id_map:
             del self.traffic_id_map[traffic_id]
         if category:
