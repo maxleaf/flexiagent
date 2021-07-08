@@ -247,7 +247,7 @@ class FWAGENT_API:
             gateway = ''
             interface = ''
             protocol = ''
-            metric = '0'
+            metric = ''
 
             try:
                 if 'default' in route:
