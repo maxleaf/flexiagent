@@ -31,11 +31,6 @@ WAN_INTERFACE_SERVICES = [
         "name": "VXLAN Tunnel",
         "port": 4789,
         "protocol": "udp"
-    },
-    {
-        "name": "DHCP Client",
-        "port": 68,
-        "protocol": "udp"
     }
 ]
 
