@@ -1103,13 +1103,8 @@ def vpp_sw_if_index_to_name(sw_if_index):
 
      :returns: VPP interface name.
      """
-    name = ''
-
-    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
-        if sw_if_index == sw_if.sw_if_index:
-            name = sw_if.interface_name.rstrip(' \t\r\n\0')
-
-    return name
+    sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
+    return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
@@ -1274,29 +1269,45 @@ def reset_device_config():
     if 'lte' in fwglobals.g.db:
         fwglobals.g.db['lte'] = {}
 
-    reset_router_api_db_sa_id()
-    reset_router_api_db_bridges()
+    reset_router_api_db_sa_id() # sa_id-s are used in translations of router configuration, so clean them too.
 
     reset_dhcpd()
-
-def reset_router_api_db_bridges():
-    # Bridge domain id in VPP is up to 24 bits (see #define L2_BD_ID_MAX ((1<<24)-1))
-    # In addition, we use bridge domain id as id for loopback BVI interface set on this bridge.
-    # BVI interface is the only interface on the bridge that might have IP address.
-    # As loopback interface id is limitied by 16,384 in vpp\src\vnet\ethernet\interface.c:
-    #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024)
-    # Therefor we choose range for bridge id to be 16300-16384
-    #
-    router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
-    min_id, max_id = fwglobals.g.LOOPBACK_ID_SWITCHES
-    router_api_db['bridges'] = {
-        'vacant_ids': list(range(min_id, max_id, 2)) # vppsb creates taps for even names only e.g. loop10010 (due to flexiWAN specific logic, see tap_inject_interface_add_del())
-    }
-    fwglobals.g.db['router_api'] = router_api_db
 
 def reset_router_api_db_sa_id():
     router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
     router_api_db['sa_id'] = 0
+    fwglobals.g.db['router_api'] = router_api_db
+
+def reset_router_api_db(enforce=False):
+
+    if not 'router_api' in fwglobals.g.db:
+        fwglobals.g.db['router_api'] = {}
+    router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
+
+    if not 'sa_id' in fwglobals.g.db['router_api'] or enforce:
+        router_api_db['sa_id'] = 0
+    if not 'bridges' in fwglobals.g.db['router_api'] or enforce:
+        #
+        # Bridge domain id in VPP is up to 24 bits (see #define L2_BD_ID_MAX ((1<<24)-1))
+        # In addition, we use bridge domain id as id for loopback BVI interface set on this bridge.
+        # BVI interface is the only interface on the bridge that might have IP address.
+        # As loopback interface id is limitied by 16,384 in vpp\src\vnet\ethernet\interface.c:
+        #   #define LOOPBACK_MAX_INSTANCE		(16 * 1024),
+        # we choose range for bridge id to be 16300-16384.
+        # Note vppsb creates taps for even names only e.g. loop10010
+        # (due to flexiWAN specific logic, see tap_inject_interface_add_del()),
+        # hence step of '2' in the range.
+        #
+        min_id, max_id = fwglobals.g.LOOPBACK_ID_SWITCHES
+        router_api_db['bridges'] = {
+            'vacant_ids': list(range(min_id, max_id, 2))
+        }
+    if not 'sw_if_index_to_vpp_if_name' in router_api_db or enforce:
+        router_api_db['sw_if_index_to_vpp_if_name'] = {}
+    if not 'vpp_if_name_to_sw_if_index' in router_api_db or enforce:
+        router_api_db['vpp_if_name_to_sw_if_index'] = {
+            'tunnel': {}, 'lan': {}, 'wan': {} }
+
     fwglobals.g.db['router_api'] = router_api_db
 
 def print_system_config(full=False):
@@ -1918,8 +1929,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     """
     op = 'add' if add else 'del'
 
-    lan_vpp_name_list      = get_interface_vpp_names(type='lan')
-    loopback_vpp_name_list = get_tunnel_interface_vpp_names()
+    lan_vpp_name_list      = list(fwglobals.g.db['router_api']['vpp_if_name_to_sw_if_index']['lan'].keys())
+    loopback_vpp_name_list = list(fwglobals.g.db['router_api']['vpp_if_name_to_sw_if_index']['tunnel'].keys())
     interfaces = lan_vpp_name_list + loopback_vpp_name_list
 
     if not add:
@@ -1978,25 +1989,6 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
         return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
 
     return (True, None)
-
-def get_interface_vpp_names(type=None):
-    res = []
-    interfaces = fwglobals.g.router_cfg.get_interfaces()
-    for params in interfaces:
-        if type == None or re.match(type, params['type'], re.IGNORECASE):
-            sw_if_index = dev_id_to_vpp_sw_if_index(params['dev_id'])
-            if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-            res.append(if_vpp_name)
-    return res
-
-def get_tunnel_interface_vpp_names():
-    res = []
-    tunnels = fwglobals.g.router_cfg.get_tunnels()
-    for params in tunnels:
-        sw_if_index = vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-        if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-        res.append(if_vpp_name)
-    return res
 
 def add_static_route(addr, via, metric, remove, dev_id=None):
     """Add static route.
@@ -2091,25 +2083,19 @@ def vpp_set_dhcp_detect(dev_id, remove):
 
     return True
 
-def tunnel_change_postprocess(add, addr):
+
+def tunnel_change_postprocess(remove, vpp_if_name):
     """Tunnel add/remove postprocessing
 
-    :param params: params - rule parameters:
-                        add -  True if tunnel is added, False otherwise.
-                        addr - loopback address
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    :param remove:      True if tunnel is removed, False if added
+    :param vpp_if_name: name of the vpp software interface, e.g. "loop4"
     """
     policies = fwglobals.g.policies.policies_get()
     if len(policies) == 0:
         return
 
-    sw_if_index = vpp_ip_to_sw_if_index(addr)
-    if_vpp_name = vpp_sw_if_index_to_name(sw_if_index)
-    remove = not add
-
     for policy_id, priority in list(policies.items()):
-        vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, remove)
+        vpp_multilink_attach_policy_rule(vpp_if_name, int(policy_id), priority, 0, remove)
 
 
 # The messages received from flexiManage are not perfect :)
