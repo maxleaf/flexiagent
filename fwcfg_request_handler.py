@@ -20,7 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-from hashlib import new
 import fwglobals
 import fwutils
 import traceback

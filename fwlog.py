@@ -186,12 +186,12 @@ class FwSyslog(Fwlog):
 
 
 class FwLogFile(Fwlog):
-    def __init__(self, filename, level=FWLOG_LEVEL_INFO):
+    def __init__(self, filename, max_size=10000000, level=FWLOG_LEVEL_INFO):
         """Constructor method
         """
         Fwlog.__init__(self, level=level, name=filename)
         self.filepath, self.filename = os.path.split(filename)
-        self.max_size = 10000000  # 10 MB
+        self.max_size = max_size  # 10 MB by default
         self.cur_size = 0
 
         if os.path.exists(filename):
