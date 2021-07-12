@@ -191,6 +191,9 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
         nameservers['search'] = dnsDomains
         config_section['nameservers'] = nameservers
 
+    if type == 'LAN' and 'gateway4' in config_section :
+        del config_section['gateway4']
+
     if re.match('yes', dhcp):
         if 'addresses' in config_section:
             del config_section['addresses']

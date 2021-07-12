@@ -21,12 +21,8 @@
 ################################################################################
 
 import copy
-import os
-import re
 
 import fwglobals
-import fwnetplan
-import fwtranslate_revert
 import fwutils
 import fw_nat_command_helpers
 
@@ -547,6 +543,28 @@ def add_interface(params):
         ]
         cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
         cmd_list.append(cmd)
+
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "postprocess add-interface"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_add_interface_after',
+                    'args'  : { 'type': str(int_type).lower() },
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "preprocess remove-interface"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_remove_interface_before',
+                    'args'  : { 'type': str(int_type).lower() },
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]
+    }
+    cmd_list.append(cmd)
 
     return cmd_list
 

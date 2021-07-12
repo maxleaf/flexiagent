@@ -125,8 +125,6 @@ class FwMultilink:
 
         gc_after = len(labels)
 
-        fwglobals.log.debug("get_label_ids_by_names: gc=%d, input:  %s, remove=%s" % \
-                            (gc_before ,names, str(remove)))
-        fwglobals.log.debug("get_label_ids_by_names: gc=%d, output: %s" % \
-                            (gc_after, ','.join(map(str, ids))))
+        fwglobals.log.debug("get_label_ids_by_names: input=%s, remove=%s, output=%s, gc: %d -> %d" % \
+            (names, str(remove), ','.join(map(str, ids)), gc_before, gc_after))
         return ids
