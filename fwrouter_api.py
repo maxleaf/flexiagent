@@ -29,12 +29,9 @@ import threading
 import traceback
 import json
 import subprocess
-import fwagent
 import fwglobals
-import fwikev2
 import fwutils
 import fwnetplan
-import fwtranslate_add_tunnel
 
 from fwapplications import FwApps
 from fwmultilink import FwMultilink
@@ -329,88 +326,97 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         :returns: dictionary with status code and optional error message.
         """
-        # First of all strip out requests that have no impact on configuration,
-        # like 'remove-X' for not existing configuration items and 'add-X' for
-        # existing configuration items.
-        #
-        new_request = self._strip_noop_request(request)
-        if not new_request:
-            fwglobals.log.debug("call: ignore no-op request: %s" % json.dumps(request))
-            return { 'ok': 1, 'message':'request has no impact' }
-        request = new_request
+        prev_logger = self.set_request_logger(request)   # Use request specific logger (this is to offload heavy 'add-application' logging)
+        try:
 
-        # Now find out if:
-        # 1. VPP should be restarted as a result of request execution.
-        #    It should be restarted on addition/removal interfaces in order
-        #    to capture new interface /release old interface back to Linux.
-        # 2. Agent should reconnect proactively to flexiManage.
-        #    It should reconnect on add-/remove-/modify-interface, as they might
-        #    impact on connection under the connection legs. So it might take
-        #    a time for connection to detect the change, to report error and to
-        #    reconnect again by the agent infinite connection loop with random
-        #    sleep between retrials.
-        # 3. Gateway of WAN interfaces are going to be modified.
-        #    In this case we have to ping the GW-s after modification.
-        #    See explanations on that workaround later in this function.
-        #
-        (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
+            # First of all strip out requests that have no impact on configuration,
+            # like 'remove-X' for not existing configuration items and 'add-X' for
+            # existing configuration items.
+            #
+            new_request = self._strip_noop_request(request)
+            if not new_request:
+                self.log.debug("call: ignore no-op request: %s" % json.dumps(request))
+                self.set_logger(prev_logger)  # Restore logger if was changed
+                return { 'ok': 1, 'message':'request has no impact' }
+            request = new_request
 
-        # Some requests require preprocessing.
-        # For example before handling 'add-application' the currently configured
-        # applications should be removed. The simplest way to do that is just
-        # to simulate 'remove-application' receiving. Hence need in preprocessing.
-        # The preprocessing adds the simulated 'remove-application' request to the
-        # the real received 'add-application' forming thus new aggregation request.
-        #
-        request = self._preprocess_request(request)
+            # Now find out if:
+            # 1. VPP should be restarted as a result of request execution.
+            #    It should be restarted on addition/removal interfaces in order
+            #    to capture new interface /release old interface back to Linux.
+            # 2. Agent should reconnect proactively to flexiManage.
+            #    It should reconnect on add-/remove-/modify-interface, as they might
+            #    impact on connection under the connection legs. So it might take
+            #    a time for connection to detect the change, to report error and to
+            #    reconnect again by the agent infinite connection loop with random
+            #    sleep between retrials.
+            # 3. Gateway of WAN interfaces are going to be modified.
+            #    In this case we have to ping the GW-s after modification.
+            #    See explanations on that workaround later in this function.
+            #
+            (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
 
-        # Stop vpp if it should be restarted.
-        #
-        if restart_router:
-            fwglobals.g.router_api._call_simple({'message':'stop-router'})
+            # Some requests require preprocessing.
+            # For example before handling 'add-application' the currently configured
+            # applications should be removed. The simplest way to do that is just
+            # to simulate 'remove-application' receiving. Hence need in preprocessing.
+            # The preprocessing adds the simulated 'remove-application' request to the
+            # the real received 'add-application' forming thus new aggregation request.
+            #
+            request = self._preprocess_request(request)
 
-        # Finally handle the request
-        #
+            # Stop vpp if it should be restarted.
+            #
+            if restart_router:
+                fwglobals.g.router_api._call_simple({'message':'stop-router'})
 
-        reply = FwCfgRequestHandler.call(self, request, dont_revert_on_failure)
+            # Finally handle the request
+            #
 
-        # Start vpp if it should be restarted
-        #
-        if restart_router:
-            fwglobals.g.router_api._call_simple({'message':'start-router'})
+            reply = FwCfgRequestHandler.call(self, request, dont_revert_on_failure)
 
-        # Reconnect agent if needed
-        #
-        if reconnect_agent:
-            fwglobals.g.fwagent.reconnect()
+            # Start vpp if it should be restarted
+            #
+            if restart_router:
+                fwglobals.g.router_api._call_simple({'message':'start-router'})
+
+            # Reconnect agent if needed
+            #
+            if reconnect_agent:
+                fwglobals.g.fwagent.reconnect()
 
 
-        ########################################################################
-        # Workaround for following problem:
-        # Today 'modify-interface' request is replaced by pair of correspondent
-        # 'remove-interface' and 'add-interface' requests. if 'modify-interface'
-        # request changes IP or GW of WAN interface, the correspondent
-        # 'remove-interface' removes GW from the Linux neighbor table, but the
-        # consequent 'add-interface' does not add it back.
-        # As a result the VPP FIB is stuck with DROP rule for that interface,
-        # and traffic on that interface is dropped.
-        # The workaround below enforces Linux to update the neighbor table with
-        # the latest GW-s. That causes VPPSB to propagate the ARP information
-        # into VPP FIB.
-        # Note we do this even if 'modify-interface' failed, as before failure
-        # it might succeed to remove few interfaces from Linux.
-        ########################################################################
-        if gateways:
-            # Delay 5 seconds to make sure Linux interfaces were initialized
-            time.sleep(5)
-            for gw in gateways:
-                try:
-                    cmd = 'ping -c 3 %s' % gw
-                    output = subprocess.check_output(cmd, shell=True).decode()
-                    fwglobals.log.debug("call: %s: %s" % (cmd, output))
-                except Exception as e:
-                    fwglobals.log.debug("call: %s: %s" % (cmd, str(e)))
+            ########################################################################
+            # Workaround for following problem:
+            # Today 'modify-interface' request is replaced by pair of correspondent
+            # 'remove-interface' and 'add-interface' requests. if 'modify-interface'
+            # request changes IP or GW of WAN interface, the correspondent
+            # 'remove-interface' removes GW from the Linux neighbor table, but the
+            # consequent 'add-interface' does not add it back.
+            # As a result the VPP FIB is stuck with DROP rule for that interface,
+            # and traffic on that interface is dropped.
+            # The workaround below enforces Linux to update the neighbor table with
+            # the latest GW-s. That causes VPPSB to propagate the ARP information
+            # into VPP FIB.
+            # Note we do this even if 'modify-interface' failed, as before failure
+            # it might succeed to remove few interfaces from Linux.
+            ########################################################################
+            if gateways:
+                # Delay 5 seconds to make sure Linux interfaces were initialized
+                time.sleep(5)
+                for gw in gateways:
+                    try:
+                        cmd = 'ping -c 3 %s' % gw
+                        output = subprocess.check_output(cmd, shell=True).decode()
+                        self.log.debug("call: %s: %s" % (cmd, output))
+                    except Exception as e:
+                        self.log.debug("call: %s: %s" % (cmd, str(e)))
 
+        except Exception as e:
+            self.set_logger(prev_logger)  # Restore logger if was changed
+            raise e
+
+        self.set_logger(prev_logger)  # Restore logger if was changed
         return reply
 
 
@@ -462,7 +468,7 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         except Exception as e:
             err_str = "FWROUTER_API::_call_simple: %s" % str(traceback.format_exc())
-            fwglobals.log.error(err_str)
+            self.log.error(err_str)
             if req == 'start-router':
                 self.state_change(FwRouterState.FAILED, 'failed to start router')
             raise e
@@ -637,7 +643,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         ########################################################################
         if self.state_is_stopped():
             if changes.get('insert'):
-                fwglobals.log.debug("_preprocess_request: Simple request was \
+                self.log.debug("_preprocess_request: Simple request was \
                         replaced with %s" % json.dumps(request))
             return request
 
@@ -667,7 +673,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 updated_requests = pre_requests + process_requests
                 params = { 'requests' : updated_requests }
                 request = {'message': 'aggregated', 'params': params}
-                fwglobals.log.debug("_preprocess_request: Application request \
+                self.log.debug("_preprocess_request: Application request \
                         was replaced with %s" % json.dumps(request))
                 return request
 
@@ -683,7 +689,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     { 'message': 'add-multilink-policy',    'params' : params }
                 ]
                 request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
-                fwglobals.log.debug("_preprocess_request: Multilink \
+                self.log.debug("_preprocess_request: Multilink \
                         request was replaced with %s" % json.dumps(request))
                 return request
 
@@ -695,7 +701,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     { 'message': 'add-firewall-policy',    'params' : params }
                 ]
                 request = {'message': 'aggregated', 'params': { 'requests' : updated_requests }}
-                fwglobals.log.debug("_preprocess_request: Fiirewall request \
+                self.log.debug("_preprocess_request: Firewall request \
                         was replaced with %s" % json.dumps(request))
                 return request
 
@@ -733,7 +739,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 params['requests'].append({ 'message': req, 'params' : params })
                 params['requests'].extend(post_add_requests)
                 request = {'message': 'aggregated', 'params': params}
-                fwglobals.log.debug("_preprocess_request: Aggregated request \
+                self.log.debug("_preprocess_request: Aggregated request \
                         with application config was replaced with %s" % json.dumps(request))
                 return request
 
@@ -851,7 +857,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     # it is not supported yet ;) Implement on demand
                     raise Exception("_preprocess_request: 'remove-X-policy' was found after \
                             'add-X-policy': NOT SUPPORTED")
-                fwglobals.log.debug("_add_corresponding_remove_policy_message: %s" % request_name)
+                self.log.debug("_add_corresponding_remove_policy_message: %s" % request_name)
 
         add_corresponding_remove_policy_message(requests, indexes, 'multilink',
                 multilink_policy_params)
@@ -925,7 +931,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                         indexes, idx_last, reinstall_firewall_policy)
 
         if changes.get('insert'):
-            fwglobals.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
+            self.log.debug("_preprocess_request: request was replaced with %s" % json.dumps(request))
         return request
 
     def _start_threads(self):
@@ -995,7 +1001,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
         fwutils.clear_linux_interfaces_cache()
-        fwglobals.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
+        self.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):
         """Handles pre-VPP stop activities.
@@ -1007,7 +1013,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         self._stop_threads()
         fwutils.reset_dhcpd()
         fwglobals.g.cache.dev_id_to_vpp_tap_name.clear()
-        fwglobals.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
+        self.log.info("router is being stopped: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_after(self):
         """Handles post-VPP stop activities.
@@ -1102,17 +1108,17 @@ class FWROUTER_API(FwCfgRequestHandler):
                 return reply
 
     def sync_full(self, incoming_requests):
-        fwglobals.log.debug("_sync_device: start router full sync")
+        self.log.debug("_sync_device: start router full sync")
 
         restart_router = False
         if self.state_is_started():
-            fwglobals.log.debug("_sync_device: restart_router=True")
+            self.log.debug("_sync_device: restart_router=True")
             restart_router = True
-            fwglobals.g.handle_request({'message':'stop-router'})
+            self.g.handle_request({'message':'stop-router'})
 
         FwCfgRequestHandler.sync_full(self, incoming_requests)
 
         if restart_router:
-            fwglobals.g.handle_request({'message': 'start-router'})
+            self.g.handle_request({'message': 'start-router'})
 
-        fwglobals.log.debug("_sync_device: router full sync succeeded")
+        self.log.debug("_sync_device: router full sync succeeded")

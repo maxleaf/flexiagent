@@ -52,11 +52,26 @@ class FwCfgRequestHandler:
         self.translators = translators
         self.cfg_db = cfg_db
         self.revert_failure_callback = revert_failure_callback
+        self.log                     = fwglobals.log
 
         self.cfg_db.set_translators(translators)
 
     def __enter__(self):
         return self
+
+    def set_logger(self, logger=None):
+        new_logger = logger if logger else fwglobals.log
+        self.cfg_db.set_logger(new_logger)
+        self.log = new_logger
+
+    def set_request_logger(self, request):
+        old_logger = self.log
+        new_logger = fwglobals.g.loggers.get(request['message'], fwglobals.log)
+        if old_logger != new_logger:
+            self.cfg_db.set_logger(new_logger)
+            self.log = new_logger
+            old_logger.debug("logging switched to %s ..." % str(new_logger))
+        return old_logger
 
     def call(self, request, dont_revert_on_failure=False):
         if request['message'] == 'aggregated':
@@ -70,7 +85,7 @@ class FwCfgRequestHandler:
             self.call(request, dont_revert_on_failure=True) # True: Prevent revert of rollback :)
         except Exception as e:
             err_str = "rollback: failed for '%s': %s" % (request['message'], str(e))
-            fwglobals.log.excep(err_str)
+            self.log.excep(err_str)
             if self.revert_failure_callback:
                 self.revert_failure_callback(err_str)
 
@@ -82,6 +97,7 @@ class FwCfgRequestHandler:
         :returns: dictionary with status code and optional error message.
         """
         whitelist = None
+        prev_logger = self.set_request_logger(request)   # Use request specific logger (this is to offload heavy 'add-application' logging)
         try:
             # Translate request to list of commands to be executed
             if re.match('modify-', request['message']):
@@ -107,12 +123,15 @@ class FwCfgRequestHandler:
                 self.cfg_db.update(request, cmd_list, execute, whitelist)
             except Exception as e:
                 self._revert(cmd_list)
+                self.set_logger(prev_logger)
                 raise e
         except Exception as e:
             err_str = "_call_simple: %s" % str(traceback.format_exc())
-            fwglobals.log.error(err_str)
+            self.log.error(err_str)
+            self.set_logger(prev_logger)
             raise e
 
+        self.set_logger(prev_logger)
         return {'ok':1}
 
     def _call_aggregated(self, requests, dont_revert_on_failure=False):
@@ -129,7 +148,7 @@ class FwCfgRequestHandler:
 
         :returns: dictionary with status code and optional error message.
         """
-        fwglobals.log.debug("=== start handling aggregated request ===")
+        self.log.debug("=== start handling aggregated request ===")
 
         for (idx, request) in enumerate(requests):
 
@@ -139,13 +158,13 @@ class FwCfgRequestHandler:
             str_request = (str_request[:1000] + '..') if len(str_request) > 1000 else str_request
 
             try:
-                fwglobals.log.debug("_call_aggregated: handle request %s" % str_request)
+                self.log.debug("_call_aggregated: handle request %s" % str_request)
                 self._call_simple(request)
             except Exception as e:
                 if dont_revert_on_failure:
                     raise e
                 # Revert previously succeeded simple requests
-                fwglobals.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
+                self.log.error("_call_aggregated: failed to handle %s. reverting previous requests..." % str_request)
                 for request in reversed(requests[0:idx]):
                     try:
                         op = request['message']
@@ -154,13 +173,13 @@ class FwCfgRequestHandler:
                     except Exception as e:
                         # on failure to revert move router into failed state
                         err_str = "_call_aggregated: failed to revert request %s while running rollback on aggregated request" % op
-                        fwglobals.log.excep("%s: %s" % (err_str, format(e)))
+                        self.log.excep("%s: %s" % (err_str, format(e)))
                         if self.revert_failure_callback:
                             self.revert_failure_callback(t)
                         pass
                 raise e
 
-        fwglobals.log.debug("=== end handling aggregated request ===")
+        self.log.debug("=== end handling aggregated request ===")
         return {'ok':1}
 
     def _translate(self, request):
@@ -207,7 +226,7 @@ class FwCfgRequestHandler:
 
         req = request['message']
 
-        fwglobals.log.debug("=== start execution of %s ===" % (req))
+        self.log.debug("=== start execution of %s ===" % (req))
 
         for idx, t in enumerate(cmd_list):      # 't' stands for command Tuple, though it is Python Dictionary :)
             cmd = t['cmd']
@@ -215,7 +234,7 @@ class FwCfgRequestHandler:
             # If filter was provided, execute only commands that have the provided filter
             if filter:
                 if not 'filter' in cmd or cmd['filter'] != filter:
-                    fwglobals.log.debug("_execute: filter out command by filter=%s (req=%s, cmd=%s, cmd['filter']=%s, params=%s)" %
+                    self.log.debug("_execute: filter out command by filter=%s (req=%s, cmd=%s, cmd['filter']=%s, params=%s)" %
                                         (filter, req, cmd['name'], str(cmd.get('filter')), str(cmd.get('params'))))
                     continue
 
@@ -230,25 +249,25 @@ class FwCfgRequestHandler:
                     params = format(cmd['params'])
                 else:
                     params = ''
-                fwglobals.log.debug("_execute: %s(%s)" % (cmd['name'], params))
+                self.log.debug("_execute: %s(%s)" % (cmd['name'], params))
 
                 # Now execute command
                 result = None if not 'cache_ret_val' in cmd else \
                     { 'result_attr' : cmd['cache_ret_val'][0] , 'cache' : cmd_cache , 'key' :  cmd['cache_ret_val'][1] }
                 reply = fwglobals.g.handle_request({ 'message': cmd['name'], 'params':  cmd.get('params')}, result)
                 if reply['ok'] == 0:        # On failure go back revert already executed commands
-                    fwglobals.log.debug("%s failed ('ok' is 0)" % cmd['name'])
+                    self.log.debug("%s failed ('ok' is 0)" % cmd['name'])
                     raise Exception("API failed: %s" % reply['message'])
 
             except Exception as e:
                 err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), str(traceback.format_exc()))
-                fwglobals.log.error(err_str)
-                fwglobals.log.debug("=== failed execution of %s ===" % (req))
+                self.log.error(err_str)
+                self.log.debug("=== failed execution of %s ===" % (req))
                 if fwglobals.g.router_api.state_is_starting_stopping():
                     fwutils.dump()
                 # On failure go back to the begining of list and revert executed commands.
                 self._revert(cmd_list, idx)
-                fwglobals.log.debug("=== finished revert of %s ===" % (req))
+                self.log.debug("=== finished revert of %s ===" % (req))
                 raise Exception('failed to %s. (error: %s)' % (cmd['descr'], str(e)))
 
             # At this point the execution succeeded.
@@ -257,13 +276,13 @@ class FwCfgRequestHandler:
                 try:
                     self.substitute(cmd_cache, t['revert'].get('params'))
                 except Exception as e:
-                    fwglobals.log.excep("_execute: failed to substitute revert command: %s\n%s, %s" % \
+                    self.log.excep("_execute: failed to substitute revert command: %s\n%s, %s" % \
                                 (str(t), str(e), str(traceback.format_exc())))
-                    fwglobals.log.debug("=== failed execution of %s ===" % (req))
+                    self.log.debug("=== failed execution of %s ===" % (req))
                     self._revert(cmd_list, idx)
                     raise e
 
-        fwglobals.log.debug("=== end execution of %s ===" % (req))
+        self.log.debug("=== end execution of %s ===" % (req))
 
     def _revert(self, cmd_list, idx_failed_cmd=-1):
         """Revert list commands that are previous to the failed command with
@@ -284,12 +303,12 @@ class FwCfgRequestHandler:
                         { 'message': rev_cmd['name'], 'params': rev_cmd.get('params')})
                     if reply['ok'] == 0:
                         err_str = "handle_request(%s) failed" % rev_cmd['name']
-                        fwglobals.log.error(err_str)
+                        self.log.error(err_str)
                         raise Exception(err_str)
                 except Exception as e:
                     err_str = "_revert: exception while '%s': %s(%s): %s" % \
                                 (t['cmd']['descr'], rev_cmd['name'], format(rev_cmd['params']), str(e))
-                    fwglobals.log.excep(err_str)
+                    self.log.excep(err_str)
 
                     if self.revert_failure_callback:
                         self.revert_failure_callback(err_str)
@@ -559,21 +578,21 @@ class FwCfgRequestHandler:
 
         if request['message'] != 'aggregated':
             if _should_be_stripped(request):
-                fwglobals.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
+                self.log.debug("_strip_noop_request: request has no impact: %s" % json.dumps(request))
                 return None
         else:  # aggregated request
             out_requests = []
             inp_requests = request['params']['requests']
             for _request in inp_requests:
                 if _should_be_stripped(_request, inp_requests):
-                    fwglobals.log.debug("_strip_noop_request: embedded request has no impact: %s" % json.dumps(request))
+                    self.log.debug("_strip_noop_request: embedded request has no impact: %s" % json.dumps(request))
                 else:
                     out_requests.append(_request)
             if not out_requests:
-                fwglobals.log.debug("_strip_noop_request: aggregated request has no impact")
+                self.log.debug("_strip_noop_request: aggregated request has no impact")
                 return None
             if len(out_requests) < len(inp_requests):
-                fwglobals.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
+                self.log.debug("_strip_noop_request: aggregation after strip: %s" % json.dumps(out_requests))
             request['params']['requests'] = out_requests
         return request
 
@@ -582,16 +601,16 @@ class FwCfgRequestHandler:
         Run all configuration translated commands.
         """
         try:
-            fwglobals.log.info("===restore configuration: started===")
+            self.log.info("===restore configuration: started===")
 
             requests = self.cfg_db.dump(keys=True, types=types)
             if requests:
                 for req in requests:
                     reply = fwglobals.g.handle_request(req)
         except Exception as e:
-            fwglobals.log.excep("restore_configuration failed: %s" % str(e))
+            self.log.excep("restore_configuration failed: %s" % str(e))
 
-        fwglobals.log.info("====restore configuration: finished===")
+        self.log.info("====restore configuration: finished===")
 
     def sync_full(self, incoming_requests):
         fwglobals.g.agent_api._reset_device_soft()
@@ -615,10 +634,10 @@ class FwCfgRequestHandler:
         sync_list = self.cfg_db.get_sync_list(incoming_requests)
 
         if len(sync_list) == 0 and not full_sync:
-            fwglobals.log.info("_sync_device: sync_list is empty, no need to sync")
+            self.log.info("_sync_device: sync_list is empty, no need to sync")
             return True
 
-        fwglobals.log.debug("_sync_device: start smart sync")
+        self.log.debug("_sync_device: start smart sync")
 
         sync_request = {
             'message':   'aggregated',
@@ -628,7 +647,7 @@ class FwCfgRequestHandler:
         reply = self.call(sync_request, dont_revert_on_failure=True)
 
         if reply['ok'] == 1 and not full_sync:
-            fwglobals.log.debug("_sync_device: smart sync succeeded")
+            self.log.debug("_sync_device: smart sync succeeded")
             return True
 
         # Full sync
