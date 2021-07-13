@@ -994,7 +994,7 @@ def vpp_if_name_to_tap(vpp_if_name):
      """
     # vpp_api.cli() throw exception in vpp 19.01 (and works in vpp 19.04)
     # taps = fwglobals.g.router_api.vpp_api.cli("show tap-inject")
-    taps = _vppctl_read("show tap-inject")
+    taps = _vppctl_read("show tap-inject").strip()
     if taps is None:
         raise Exception("vpp_if_name_to_tap: failed to fetch tap info from VPP")
 
