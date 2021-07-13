@@ -826,14 +826,16 @@ class Fwglobals:
         return rollbacks_aggregations
 
     def get_logger(self, request):
-        req_name = request['message']
-        if req_name != 'aggregated' and req_name != 'sync-device':
-            if req_name in self.loggers:
-                return self.loggers[req_name]
+        if type(request) == list:
+            requests = request   # Accommodate to call by update_device_config_signature()
+        elif re.match('aggregated|sync-device', request['message']):
+            requests = request['params']['requests']
         else:
-            for r in request['params']['requests']:
-                if re.match('(add|remove)-application',r['message']):
-                    return self.loggers[r['message']]
+            requests = [request]
+
+        for r in requests:
+            if r['message'] in self.loggers:
+                return self.loggers[r['message']]
         return None
 
 
