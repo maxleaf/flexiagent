@@ -34,6 +34,9 @@ import fwutils
 import fwsystem_api
 import fwrouter_api
 import re
+from pyroute2 import NDB
+
+ndb = NDB()
 
 fwagent_api = {
     'get-device-certificate':        '_get_device_certificate',
@@ -61,6 +64,31 @@ class LTE_ERROR_MESSAGES():
 
     PUK_IS_WRONG = 'PUK_IS_WRONG'
     PUK_IS_REQUIRED = 'PUK_IS_REQUIRED'
+
+routes_protocol_map = {
+    -1: '',
+    0: 'unspec',
+    1: 'redirect',
+    2: 'kernel',
+    3: 'boot',
+    4: 'static',
+    8: 'gated',
+    9: 'ra',
+    10: 'mrt',
+    11: 'zebra',
+    12: 'bird',
+    13: 'dnrouted',
+    14: 'xorp',
+    15: 'ntk',
+    16: 'dhcp',
+    18: 'keepalived',
+    42: 'babel',
+    186: 'bgp',
+    187: 'isis',
+    188: 'ospf',
+    189: 'rip',
+    192: 'eigrp',
+}
 
 class FWAGENT_API:
     """This class implements fwagent level APIs of flexiEdge device.
@@ -225,71 +253,52 @@ class FWAGENT_API:
 
         :returns: Dictionary with routes and status code.
         """
-        routing_table = fwutils.get_os_routing_table()
 
-        if routing_table == None:
+        # The data from summary() is not enoughs for us. we need to get some more data from the `dump()`.
+        # But in `dump()` there is no 'ifname' for multipath (it always shows 0). So we need to use both.
+        # Both requests return the same length of results in the same order (without filtering).
+        routes_sum = json.loads(str(ndb.routes.summary().select('dst', 'dst_len', 'ifname', 'gateway').format('json')))
+        routes_dump = json.loads(str(ndb.routes.dump().select('priority', 'proto', 'type').format('json')))
+
+        if routes_sum == None or routes_dump == None:
             raise Exception("_get_device_os_routes: failed to get device routes: %s" % format(sys.exc_info()[1]))
 
-        # Remove empty lines and the headers of the 'route' command
-        # routing_table = [ el for el in routing_table if (el is not "" and routing_table.index(el)) > 1 ]
         route_entries = []
 
-        def _get_nexthop_parent_data(route):
-            data = re.findall(r'((?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
-            return (data[0], data[1])
-
-        for idx, route in enumerate(routing_table):
-            if route == '':
-                continue
-
-            fields = route.split()
-
-            dest = ''
-            gateway = ''
-            interface = ''
-            protocol = ''
-            metric = ''
-
+        for idx, route in enumerate(routes_sum):
             try:
-                if 'default' in route:
-                    data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+|(?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
-                    dest = '0.0.0.0'
-                    gateway = data[0]
-                    interface = data[1]
+                dump_route = routes_dump[idx]
 
-                    if len(data) == 3:
-                        metric = data[2]
-                    else:
-                        protocol = data[2]
-                        metric = data[3]
-
-                elif route != routing_table[-1] and 'nexthop' in routing_table[idx + 1] and not 'nexthop' in route:
+                # We take only the unicast routes (As shown in the result of "ip route")
+                #
+                # 'RTN_UNSPEC': 0,
+                # 'RTN_UNICAST': 1,      # Gateway or direct route
+                # 'RTN_LOCAL': 2,        # Accept locally
+                # 'RTN_BROADCAST': 3,    # Accept locally as broadcast
+                # 'RTN_ANYCAST': 4,      # Accept locally as broadcast,
+                # 'RTN_MULTICAST': 5,    # Multicast route
+                # 'RTN_BLACKHOLE': 6,    # Drop
+                # 'RTN_UNREACHABLE': 7,  # Destination is unreachable
+                # 'RTN_PROHIBIT': 8,     # Administratively prohibited
+                # 'RTN_THROW': 9,        # Not in this table
+                # 'RTN_NAT': 10,         # Translate this address
+                # 'RTN_XRESOLVE': 11     # Use external resolver
+                if dump_route.get('type') != 1:
                     continue
 
-                elif 'nexthop' in route:
-                    search_idx = idx -1
-                    destinationData = routing_table[search_idx]
-                    while 'nexthop' in destinationData:
-                        search_idx -= 1
-                        destinationData = routing_table[search_idx]
+                dest = route.get('dst')
+                if not dest:
+                    dest = '0.0.0.0'
+                dest = '%s/%d' % (dest, route.get('dst_len'))
 
-                    protocol, metric = _get_nexthop_parent_data(destinationData)
-                    dest = destinationData.split()[0]
+                gateway = route.get('gateway', '')
+                interface = route.get('ifname', '')
 
-                    data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
-                    gateway = data[0]
-                    interface = data[1]
+                if interface == 'lo':
+                    continue
 
-                else:
-                    dest = fields[0]
-                    if 'proto' in route:
-                        data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
-                        interface = data[0]
-                        protocol = data[1]
-                    elif 'via' in route:
-                        data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
-                        gateway = data[0]
-                        interface = data[1]
+                protocol = routes_protocol_map[dump_route.get('proto', -1)]
+                metric = dump_route.get('priority')
 
                 route_entries.append({
                     'destination': dest,
@@ -299,8 +308,10 @@ class FWAGENT_API:
                     'protocol': protocol
                 })
             except Exception as e:
-                fwglobals.log.error("_get_device_os_routes: failed to get data for route %s." % (route. str(e)))
+                fwglobals.log.error("_get_device_os_routes: failed to parse data for route %s.\nsum=%s.\ndump=%s." % \
+                    (route, str(routes_sum), str(routes_dump)))
                 pass
+
 
         return {'message': route_entries, 'ok': 1}
 

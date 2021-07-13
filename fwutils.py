@@ -212,17 +212,6 @@ def af_to_name(af_type):
 	}
     return af_map.get(af_type, af_type)
 
-def get_os_routing_table():
-    """Get routing table.
-
-    :returns: List of routes.
-    """
-    try:
-        routing_table = subprocess.check_output(['ip', 'route']).decode().split('\n')
-        return routing_table
-    except:
-        return (None)
-
 def get_default_route(if_name=None):
     """Get default route.
 
@@ -1376,10 +1365,11 @@ def update_device_config_signature(request):
 
     log_line = "sha1: new=%s, current=%s, delta=%s" % (str(new), str(current), str(delta))
     fwglobals.log.debug(log_line)
-    for r in request:  # If 'add-application' is in delta, the line in main log will be truncated, so print it into application logger ass well
-        logger = fwglobals.g.get_logger(r)
-        if logger:
-            logger.debug(log_line)
+    if type(request) == 'list':
+        for r in request:  # If 'add-application' is in delta, the line in main log will be truncated, so print it into application logger ass well
+            logger = fwglobals.g.get_logger(r)
+            if logger:
+                logger.debug(log_line)
 
 def get_device_config_signature():
     if not 'signature' in fwglobals.g.db:
