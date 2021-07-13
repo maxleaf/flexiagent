@@ -21,7 +21,7 @@
 ################################################################################
 
 def add_ospf(params):
-    """Change /etc/dhcp/dhcpd.conf config file.
+    """OSPF configuration to frr.
 
     :param cmd_list:            List of commands.
 
@@ -60,11 +60,11 @@ def add_ospf(params):
     return cmd_list
 
 def get_request_key(params):
-    """Get add-dhcp-config command.
+    """Get add-ospf-config command.
 
     :param params:        Parameters from flexiManage.
 
-    :returns: add-dhcp-config command.
+    :returns: add-ospf-config command.
     """
     key = 'add-ospf-config'
     return key
