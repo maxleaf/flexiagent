@@ -34,6 +34,7 @@ import fwutils
 import fwsystem_api
 import fwrouter_api
 import re
+from pyroute2 import IPDB
 
 fwagent_api = {
     'get-device-certificate':        '_get_device_certificate',
@@ -61,6 +62,31 @@ class LTE_ERROR_MESSAGES():
 
     PUK_IS_WRONG = 'PUK_IS_WRONG'
     PUK_IS_REQUIRED = 'PUK_IS_REQUIRED'
+
+routes_protocol_map = {
+    -1: '',
+    0: 'unspec',
+    1: 'redirect',
+    2: 'kernel',
+    3: 'boot',
+    4: 'static',
+    8: 'gated',
+    9: 'ra',
+    10: 'mrt',
+    11: 'zebra',
+    12: 'bird',
+    13: 'dnrouted',
+    14: 'xorp',
+    15: 'ntk',
+    16: 'dhcp',
+    18: 'keepalived',
+    42: 'babel',
+    186: 'bgp',
+    187: 'isis',
+    188: 'ospf',
+    189: 'rip',
+    192: 'eigrp',
+}
 
 class FWAGENT_API:
     """This class implements fwagent level APIs of flexiEdge device.
@@ -225,81 +251,46 @@ class FWAGENT_API:
 
         :returns: Dictionary with routes and status code.
         """
-        routing_table = fwutils.get_os_routing_table()
 
-        if routing_table == None:
-            raise Exception("_get_device_os_routes: failed to get device routes: %s" % format(sys.exc_info()[1]))
+        ip = IPDB()
 
-        # Remove empty lines and the headers of the 'route' command
-        # routing_table = [ el for el in routing_table if (el is not "" and routing_table.index(el)) > 1 ]
         route_entries = []
 
-        def _get_nexthop_parent_data(route):
-            data = re.findall(r'((?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
-            return (data[0], data[1])
-
-        for idx, route in enumerate(routing_table):
-            if route == '':
-                continue
-
-            fields = route.split()
-
-            dest = ''
-            gateway = ''
-            interface = ''
-            protocol = ''
-            metric = ''
-
+        for route in ip.routes:
             try:
-                if 'default' in route:
-                    data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+|(?<=proto )[^\s]+|(?<=metric )[^\s]+)', route)
-                    dest = '0.0.0.0'
-                    gateway = data[0]
-                    interface = data[1]
+                dst = route.dst
+                if dst == 'default':
+                    dst = '0.0.0.0/0'
 
-                    if len(data) == 3:
-                        metric = data[2]
-                    else:
-                        protocol = data[2]
-                        metric = data[3]
+                metric = route.priority
+                protocol = routes_protocol_map[route.get('proto', -1)]
 
-                elif route != routing_table[-1] and 'nexthop' in routing_table[idx + 1] and not 'nexthop' in route:
-                    continue
+                if not route.multipath:
+                    gateway = route.gateway
+                    interface = ip.interfaces[route.oif].ifname
 
-                elif 'nexthop' in route:
-                    search_idx = idx -1
-                    destinationData = routing_table[search_idx]
-                    while 'nexthop' in destinationData:
-                        search_idx -= 1
-                        destinationData = routing_table[search_idx]
-
-                    protocol, metric = _get_nexthop_parent_data(destinationData)
-                    dest = destinationData.split()[0]
-
-                    data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
-                    gateway = data[0]
-                    interface = data[1]
-
+                    route_entries.append({
+                        'destination': dst,
+                        'gateway': gateway,
+                        'metric': metric,
+                        'interface': interface,
+                        'protocol': protocol
+                    })
                 else:
-                    dest = fields[0]
-                    if 'proto' in route:
-                        data = re.findall(r'((?<=dev )[^\s]+|(?<=proto )[^\s]+)', route)
-                        interface = data[0]
-                        protocol = data[1]
-                    elif 'via' in route:
-                        data = re.findall(r'((?<=via )[^\s]+|(?<=dev )[^\s]+)', route)
-                        gateway = data[0]
-                        interface = data[1]
+                    for path in route.multipath:
+                        gateway = path.gateway
+                        interface = ip.interfaces[path.oif].ifname
 
-                route_entries.append({
-                    'destination': dest,
-                    'gateway': gateway,
-                    'metric': metric,
-                    'interface': interface,
-                    'protocol': protocol
-                })
+                        route_entries.append({
+                            'destination': dst,
+                            'gateway': gateway,
+                            'metric': metric,
+                            'interface': interface,
+                            'protocol': protocol
+                        })
             except Exception as e:
-                fwglobals.log.error("_get_device_os_routes: failed to get data for route %s." % (route. str(e)))
+                fwglobals.log.error("_get_device_os_routes: failed to parse route %s.\nroutes=%s." % \
+                    (str(route), str(ip.routes)))
                 pass
 
         return {'message': route_entries, 'ok': 1}
