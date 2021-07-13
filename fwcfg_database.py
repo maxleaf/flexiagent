@@ -63,6 +63,7 @@ class FwCfgDatabase:
         """
         self.db_filename = db_file
         self.db = SqliteDict(db_file, autocommit=True, encode=encode, decode=decode)
+        self.log = fwglobals.log
 
     def __enter__(self):
         return self
@@ -98,6 +99,9 @@ class FwCfgDatabase:
 
     def set_translators(self, translators):
        self.translators = translators
+
+    def set_logger(self, logger):
+       self.log = logger if logger else fwglobals.log
 
     def is_same_cfg_item(self, request1, request2):
         """Checks if provided requests stand for the same configuration item.
@@ -164,7 +168,7 @@ class FwCfgDatabase:
         except KeyError:
             pass
         except Exception as e:
-            fwglobals.log.error("update(%s) failed: %s, %s" % \
+            self.log.error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 

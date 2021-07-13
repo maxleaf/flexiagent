@@ -190,6 +190,7 @@ class FWAGENT_API:
         """
         dl_map = {
     	    'fwagent': fwglobals.g.ROUTER_LOG_FILE,
+    	    'application_ids': fwglobals.g.APPLICATION_IDS_LOG_FILE,
     	    'syslog': fwglobals.g.SYSLOG_FILE,
             'dhcp': fwglobals.g.DHCP_LOG_FILE,
             'vpp': fwglobals.g.VPP_LOG_FILE,

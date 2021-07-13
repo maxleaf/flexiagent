@@ -108,21 +108,10 @@ g_dumpers = {
     'fwagent_conf':                 { 'shell_cmd': 'mkdir -p <temp_folder>/fwagent && ' +
                                                    'cp -r /etc/flexiwan/agent/* <temp_folder>/fwagent/ 2>/dev/null' },
     'fwagent_device_signature':     { 'shell_cmd': 'fwagent show --configuration signature > <dumper_out_file>' },
-    'fwagent_log':                  { 'shell_cmd': 'cp %s <temp_folder>/fwagent.log 2>/dev/null ;' % (g.ROUTER_LOG_FILE) +
+    'fwagent_logs': 				{ 'shell_cmd': 'mkdir -p <temp_folder>/flexiwan_logs && ' +
+                                                   'cp /var/log/flexiwan/*.log /var/log/flexiwan/*.log.1 <temp_folder>/flexiwan_logs/ 2>/dev/null ;' +
+                                                   'mv <temp_folder>/flexiwan_logs/agent.log <temp_folder>/fwagent.log 2>/dev/null ;' +  # Move main log into root folder for convenience
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwagent_log.1':                { 'shell_cmd': 'cp %s.1 <temp_folder>/fwagent_1.log 2>/dev/null ;' % (g.ROUTER_LOG_FILE) +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-
-    'fwagent_ui_log':               { 'shell_cmd': 'cp %s <temp_folder>/fwagent_ui.log 2>/dev/null ;' % (g.AGENT_UI_LOG_FILE) +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwagent_ui_log.1':             { 'shell_cmd': 'cp %s.1 <temp_folder>/fwagent_ui_1.log 2>/dev/null ;' % (g.AGENT_UI_LOG_FILE) +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-
-    'fwsystem_checker_log':         { 'shell_cmd': 'cp %s <temp_folder>/fwsystem_checker.log 2>/dev/null ;' % (g.SYSTEM_CHECKER_LOG_FILE) +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-    'fwsystem_checker_log.1':       { 'shell_cmd': 'cp %s.1 <temp_folder>/fwsystem_checker_1.log 2>/dev/null ;' % (g.SYSTEM_CHECKER_LOG_FILE) +
-                                                   'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
-
     'dpkg_log':                     { 'shell_cmd': 'cp /var/log/dpkg.log <temp_folder>/dpkg.log 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'dpkg_log.1':                   { 'shell_cmd': 'cp /var/log/dpkg.log.1 <temp_folder>/dpkg_1.log 2>/dev/null ;' +
