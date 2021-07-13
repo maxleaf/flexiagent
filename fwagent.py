@@ -653,9 +653,10 @@ class FwAgent:
             logger = fwglobals.g.get_logger(msg)
 
             if print_message:
-                fwglobals.log.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
+                log_line = "handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1)
+                fwglobals.log.debug(log_line)
                 if logger:
-                    logger.debug("handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1))
+                    logger.debug(log_line)
 
             reply = fwglobals.g.handle_request(msg, received_msg=received_msg)
             if not 'entity' in reply and 'entity' in msg:
@@ -664,9 +665,10 @@ class FwAgent:
                 reply.update({'message': 'success'})
 
             if print_message:
-                fwglobals.log.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
+                log_line = "handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1)
+                fwglobals.log.debug(log_line)
                 if logger:
-                    logger.debug("handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1))
+                    logger.debug(log_line)
 
             self.handling_request = False
 
