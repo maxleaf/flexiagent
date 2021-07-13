@@ -60,9 +60,11 @@ class FwCfgRequestHandler:
         return self
 
     def set_logger(self, logger=None):
-        new_logger = logger if logger else fwglobals.log
-        self.cfg_db.set_logger(new_logger)
-        self.log = new_logger
+        if self.log != logger:
+            new_logger = logger if logger else fwglobals.log
+            self.cfg_db.set_logger(new_logger)
+            self.log = new_logger
+            new_logger.debug("logging switched back from %s ..." % str(logger))
 
     def set_request_logger(self, request):
         old_logger = self.log
