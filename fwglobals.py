@@ -40,7 +40,10 @@ from fwrouter_api import FWROUTER_API
 from fwsystem_api import FWSYSTEM_API
 from fwagent_api import FWAGENT_API
 from os_api import OS_API
-from fwlog import Fwlog
+from fwlog import FwLogFile
+from fwlog import FwSyslog
+from fwlog import FWLOG_LEVEL_INFO
+from fwlog import FWLOG_LEVEL_DEBUG
 from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
@@ -226,7 +229,7 @@ class Fwglobals:
                 self.UUID           = DEFAULT_UUID
                 self.MONITOR_UNASSIGNED_INTERFACES = DEFAULT_MONITOR_UNASSIGNED_INTERFACES
             if self.DEBUG and log:
-                log.set_level(Fwlog.FWLOG_LEVEL_DEBUG)
+                log.set_level(FWLOG_LEVEL_DEBUG)
 
     class FwCache:
         """Storage for data that is valid during one FwAgent lifecycle only.
@@ -278,6 +281,7 @@ class Fwglobals:
         self.CONN_FAILURE_FILE   = self.DATA_PATH + '.upgrade_failed'
         self.IKEV2_FOLDER        = self.DATA_PATH + 'ikev2/'
         self.ROUTER_LOG_FILE     = '/var/log/flexiwan/agent.log'
+        self.APPLICATION_IDS_LOG_FILE = '/var/log/flexiwan/application_ids.log'
         self.AGENT_UI_LOG_FILE   = '/var/log/flexiwan/agentui.log'
         self.SYSTEM_CHECKER_LOG_FILE = '/var/log/flexiwan/system_checker.log'
         self.REPO_SOURCE_DIR     = '/etc/apt/sources.list.d/'
@@ -374,6 +378,15 @@ class Fwglobals:
             log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
+        # Create loggers
+        #
+        self.logger_add_application = FwLogFile(
+            filename=self.APPLICATION_IDS_LOG_FILE, level=log.level)
+        self.loggers = {
+            'add-application':      self.logger_add_application,
+            'remove-application':   self.logger_add_application,
+        }
+
         # Some lte modules have a problem with drivers binding.
         # As workaround, we reload the driver to fix it.
         # We run it only if vpp is not running to make sure that we reload the driver
@@ -412,7 +425,7 @@ class Fwglobals:
 
         self.stun_wrapper.initialize()   # IMPORTANT! The STUN should be initialized before restore_vpp_if_needed!
 
-        self.traffic_identifications = FwTrafficIdentifications(self.TRAFFIC_ID_DB_FILE)
+        self.traffic_identifications = FwTrafficIdentifications(self.TRAFFIC_ID_DB_FILE, logger=self.logger_add_application)
 
         self.router_api.restore_vpp_if_needed()
 
@@ -448,6 +461,7 @@ class Fwglobals:
         del self.os_api
         del self.router_api
         del self.agent_api
+        del self.logger_add_application
         del self.fwagent
         self.fwagent = None
         self.db.close()
@@ -815,8 +829,19 @@ class Fwglobals:
 
         return rollbacks_aggregations
 
+    def get_logger(self, request):
+        req_name = request['message']
+        if req_name != 'aggregated' and req_name != 'sync-device':
+            if req_name in self.loggers:
+                return self.loggers[req_name]
+        else:
+            for r in request['params']['requests']:
+                if re.match('(add|remove)-application',r['message']):
+                    return self.loggers[r['message']]
+        return None
 
-def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO, quiet=False):
+
+def initialize(log_level=FWLOG_LEVEL_INFO, quiet=False):
     """Initialize global instances of LOG, and GLOBALS.
 
     :param log_level:    LOG severity level.
@@ -826,7 +851,7 @@ def initialize(log_level=Fwlog.FWLOG_LEVEL_INFO, quiet=False):
     global g_initialized
     if not g_initialized:
         global log
-        log = Fwlog(log_level)
+        log = FwSyslog(log_level)
         if quiet:
             log.set_target(to_terminal=False)
         global g
