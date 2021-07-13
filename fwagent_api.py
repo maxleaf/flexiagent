@@ -34,9 +34,7 @@ import fwutils
 import fwsystem_api
 import fwrouter_api
 import re
-from pyroute2 import NDB
-
-ndb = NDB()
+from pyroute2 import IPDB
 
 fwagent_api = {
     'get-device-certificate':        '_get_device_certificate',
@@ -254,64 +252,46 @@ class FWAGENT_API:
         :returns: Dictionary with routes and status code.
         """
 
-        # The data from summary() is not enoughs for us. we need to get some more data from the `dump()`.
-        # But in `dump()` there is no 'ifname' for multipath (it always shows 0). So we need to use both.
-        # Both requests return the same length of results in the same order (without filtering).
-        routes_sum = json.loads(str(ndb.routes.summary().select('dst', 'dst_len', 'ifname', 'gateway').format('json')))
-        routes_dump = json.loads(str(ndb.routes.dump().select('priority', 'proto', 'type').format('json')))
-
-        if routes_sum == None or routes_dump == None:
-            raise Exception("_get_device_os_routes: failed to get device routes: %s" % format(sys.exc_info()[1]))
+        ip = IPDB()
 
         route_entries = []
 
-        for idx, route in enumerate(routes_sum):
+        for route in ip.routes:
             try:
-                dump_route = routes_dump[idx]
+                dst = route.dst
+                if dst == 'default':
+                    dst = '0.0.0.0/0'
 
-                # We take only the unicast routes (As shown in the result of "ip route")
-                #
-                # 'RTN_UNSPEC': 0,
-                # 'RTN_UNICAST': 1,      # Gateway or direct route
-                # 'RTN_LOCAL': 2,        # Accept locally
-                # 'RTN_BROADCAST': 3,    # Accept locally as broadcast
-                # 'RTN_ANYCAST': 4,      # Accept locally as broadcast,
-                # 'RTN_MULTICAST': 5,    # Multicast route
-                # 'RTN_BLACKHOLE': 6,    # Drop
-                # 'RTN_UNREACHABLE': 7,  # Destination is unreachable
-                # 'RTN_PROHIBIT': 8,     # Administratively prohibited
-                # 'RTN_THROW': 9,        # Not in this table
-                # 'RTN_NAT': 10,         # Translate this address
-                # 'RTN_XRESOLVE': 11     # Use external resolver
-                if dump_route.get('type') != 1:
-                    continue
+                metric = route.priority
+                protocol = routes_protocol_map[route.get('proto', -1)]
 
-                dest = route.get('dst')
-                if not dest:
-                    dest = '0.0.0.0'
-                dest = '%s/%d' % (dest, route.get('dst_len'))
+                if not route.multipath:
+                    gateway = route.gateway
+                    interface = ip.interfaces[route.oif].ifname
 
-                gateway = route.get('gateway', '')
-                interface = route.get('ifname', '')
+                    route_entries.append({
+                        'destination': dst,
+                        'gateway': gateway,
+                        'metric': metric,
+                        'interface': interface,
+                        'protocol': protocol
+                    })
+                else:
+                    for path in route.multipath:
+                        gateway = path.gateway
+                        interface = ip.interfaces[path.oif].ifname
 
-                if interface == 'lo':
-                    continue
-
-                protocol = routes_protocol_map[dump_route.get('proto', -1)]
-                metric = dump_route.get('priority')
-
-                route_entries.append({
-                    'destination': dest,
-                    'gateway': gateway,
-                    'metric': metric,
-                    'interface': interface,
-                    'protocol': protocol
-                })
+                        route_entries.append({
+                            'destination': dst,
+                            'gateway': gateway,
+                            'metric': metric,
+                            'interface': interface,
+                            'protocol': protocol
+                        })
             except Exception as e:
-                fwglobals.log.error("_get_device_os_routes: failed to parse data for route %s.\nsum=%s.\ndump=%s." % \
-                    (route, str(routes_sum), str(routes_dump)))
+                fwglobals.log.error("_get_device_os_routes: failed to parse route %s.\nroutes=%s." % \
+                    (str(route), str(ip.routes)))
                 pass
-
 
         return {'message': route_entries, 'ok': 1}
 
