@@ -1365,11 +1365,10 @@ def update_device_config_signature(request):
 
     log_line = "sha1: new=%s, current=%s, delta=%s" % (str(new), str(current), str(delta))
     fwglobals.log.debug(log_line)
-    if type(request) == 'list':
-        for r in request:  # If 'add-application' is in delta, the line in main log will be truncated, so print it into application logger ass well
-            logger = fwglobals.g.get_logger(r)
-            if logger:
-                logger.debug(log_line)
+    for r in request:  # If 'add-application' is in delta, the line in main log will be truncated, so print it into application logger ass well
+        logger = fwglobals.g.get_logger(r)
+        if logger:
+            logger.debug(log_line)
 
 def get_device_config_signature():
     if not 'signature' in fwglobals.g.db:
