@@ -3398,7 +3398,7 @@ def frr_setup_config():
     # Setup basics on frr.conf.
     subprocess.check_call('sudo /usr/bin/vtysh -c "configure" -c "password zebra" '\
         '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"; '\
-        'sudo /usr/bin/vtysh -c "write"', shell=True)
+        'sudo /usr/bin/vtysh -c "write" > /dev/null', shell=True)
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content
