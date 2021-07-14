@@ -40,8 +40,8 @@ def add_ospf(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags'              : '-c "configure" -c "router ospf" -c "ospf router-id %s"' % routerId,
-                    'restart_frr_service': True,
+                    'commands'   : ["router ospf", "ospf router-id %s" % routerId],
+                    'restart_frr': True,
                 }
         }
         cmd['revert'] = {}
@@ -50,8 +50,8 @@ def add_ospf(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags'              : '-c "configure" -c "router ospf" -c "no ospf router-id %s"' % routerId,
-                    'restart_frr_service': True,
+                    'commands'   : ["router ospf", "no ospf router-id %s" % routerId],
+                    'restart_frr': True,
                 }
         }
         cmd['revert']['descr']   =  "remove routerId %s from OSPF" % routerId

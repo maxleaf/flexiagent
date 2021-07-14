@@ -3373,19 +3373,21 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_vtysh_run(flags, restart_frr_service=False):
+def frr_vtysh_run(commands, restart_frr=False):
     '''Run vtysh command to configure router
 
-    :param flags:               flags of commands
-    :param restart_frr_service: some OSPF configurations require restarting the service in order to apply them
+    :param commands:    array of frr commands
+    :param restart_frr: some OSPF configurations require restarting the service in order to apply them
     '''
     try:
-        vtysh_cmd = 'sudo /usr/bin/vtysh %s; sudo /usr/bin/vtysh -c "write"' % flags
+        shell_commands = ' -c '.join(map(lambda x: '"%s"' % x, commands))
+        vtysh_cmd = 'sudo /usr/bin/vtysh -c "configure" -c %s; sudo /usr/bin/vtysh -c "write"' % shell_commands
         output = os.popen(vtysh_cmd).read().splitlines()
 
+        # in output, the first line might contains error. So we print only the first line
         fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, output=%s" % (vtysh_cmd, output[0] if output else ''))
 
-        if restart_frr_service:
+        if restart_frr:
             os.system('systemctl restart frr')
 
         return (True, None)
@@ -3404,8 +3406,12 @@ def frr_setup_config():
     subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
     # Setup basics on frr.conf.
-    frr_vtysh_run('-c "configure" -c "password zebra" '\
-        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"')
+    frr_vtysh_run([
+        "password zebra",
+        "log file /var/log/frr/frr.log informational",
+        "log stdout",
+        "log syslog informational",
+    ])
 
 def frr_create_redistribution_filter(router , acl, route_map, route_map_num, revert=False):
     # When we add a static route, OSPF sees it as a kernel route, not a static one.
@@ -3420,13 +3426,13 @@ def frr_create_redistribution_filter(router , acl, route_map, route_map_num, rev
     #   match ip address fw-redist-ospf-acl
     # !
     #
-    route_map_cmd = '-c "%sroute-map %s permit %s"' % ('no ' if revert else '', route_map, route_map_num)
+    route_map_commands = ["%sroute-map %s permit %s" % ('no ' if revert else '', route_map, route_map_num)]
     if not revert:
-        route_map_cmd += ' -c "match ip address %s"' % acl
-    frr_vtysh_run('-c "configure" %s' % route_map_cmd)
+        route_map_commands.append("match ip address %s" % acl)
+    frr_vtysh_run(route_map_commands)
 
     redistribute_cmd = '%sredistribute kernel route-map %s' % ('no ' if revert else '', route_map)
-    frr_vtysh_run('-c "configure" -c "%s" -c "%s"' % (router, redistribute_cmd))
+    frr_vtysh_run([router , redistribute_cmd])
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content

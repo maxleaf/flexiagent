@@ -395,7 +395,7 @@ def add_interface(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags': '-c "configure" -c "router ospf" -c "network %s area %s"' % (iface_addr, area)
+                    'commands': ["router ospf", "network %s area %s" % (iface_addr, area)]
                 }
         }
         cmd['revert'] = {}
@@ -404,37 +404,36 @@ def add_interface(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags': '-c "configure" -c "router ospf" -c "no network %s area %s"' % (iface_addr, area)
+                    'commands': ["router ospf", "no network %s area %s" % (iface_addr, area)]
                 }
         }
         cmd['revert']['descr']   =  "remove network %s from OSPF" % iface_addr
         cmd_list.append(cmd)
 
         # OSPF per interface configuration
-        vty_commands = []
+        frr_cmd = []
         restart_frr = False
         helloInterval = ospf.get('helloInterval')
         if helloInterval:
-            vty_commands.append('ip ospf hello-interval %s' % helloInterval)
+            frr_cmd.append('ip ospf hello-interval %s' % helloInterval)
 
         deadInterval = ospf.get('deadInterval')
         if deadInterval:
-            vty_commands.append('ip ospf dead-interval %s' % deadInterval)
+            frr_cmd.append('ip ospf dead-interval %s' % deadInterval)
 
         cost = ospf.get('cost')
         if cost:
-            vty_commands.append('ip ospf cost %s' % cost)
+            frr_cmd.append('ip ospf cost %s' % cost)
 
         keyId = ospf.get('keyId')
         key = ospf.get('key')
         if keyId and key:
             restart_frr = True
-            vty_commands.append('ip ospf message-digest-key %s md5 %s' % (keyId, key))
-            vty_commands.append('ip ospf authentication message-digest')
+            frr_cmd.append('ip ospf message-digest-key %s md5 %s' % (keyId, key))
+            frr_cmd.append('ip ospf authentication message-digest')
 
-        if vty_commands:
-            frr_cmd = ' -c '.join(map(lambda x: '"%s"' % x, vty_commands))
-            frr_cmd_revert = ' -c '.join(map(lambda x: '"no %s"' % x, vty_commands))
+        if frr_cmd:
+            frr_cmd_revert = list(map(lambda x: '"no %s"' % x, frr_cmd))
 
             cmd = {}
             cmd['cmd'] = {}
@@ -443,10 +442,10 @@ def add_interface(params):
                     'module': 'fwutils',
                     'func': 'frr_vtysh_run',
                     'args': {
-                        'flags'              : '-c "configure" -c "interface DEV-STUB" -c %s' % frr_cmd,
-                        'restart_frr_service': restart_frr
+                        'commands'   : ["interface DEV-STUB"] + frr_cmd,
+                        'restart_frr': restart_frr
                     },
-                    'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
             }
             cmd['cmd']['descr']   =  "add OSPF per link configuration of interface %s" % iface_addr
             cmd['revert'] = {}
@@ -455,10 +454,10 @@ def add_interface(params):
                     'module': 'fwutils',
                     'func': 'frr_vtysh_run',
                     'args': {
-                        'flags'              : '-c "configure" -c "interface DEV-STUB" -c %s' % frr_cmd_revert,
-                        'restart_frr_service': restart_frr
+                        'commands'   : ["interface DEV-STUB"] + frr_cmd_revert,
+                        'restart_frr': restart_frr
                     },
-                    'substs': [ {'replace':'DEV-STUB', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
             }
             cmd['revert']['descr']   =  "remove OSPF per link configuration of interface %s" % iface_addr
             cmd_list.append(cmd)

@@ -1162,9 +1162,9 @@ def add_tunnel(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags': '-c "configure" -c "interface DEV-STUB" -c "ip ospf network point-to-point"'
+                    'commands': ["interface DEV-STUB", "ip ospf network point-to-point"]
                 },
-                'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
+                'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
         }
         cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % addr
         cmd['revert'] = {}
@@ -1173,9 +1173,9 @@ def add_tunnel(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags': '-c "configure" -c "interface DEV-STUB" -c "no ip ospf network point-to-point"'
+                    'commands': ["interface DEV-STUB", "no ip ospf network point-to-point"]
                 },
-                'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
+                'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
         }
         cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % addr
         cmd_list.append(cmd)
@@ -1188,7 +1188,7 @@ def add_tunnel(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags': '-c "configure" -c "router ospf" -c "network %s area 0.0.0.0"' % addr
+                    'commands': ["router ospf", "network %s area 0.0.0.0" % addr]
                 }
         }
         cmd['cmd']['descr']   = "add loopback interface %s to ospf" % addr
@@ -1198,7 +1198,7 @@ def add_tunnel(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'flags': '-c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"' % addr
+                    'commands': ["router ospf", "no network %s area 0.0.0.0" % addr]
                 }
         }
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % addr
