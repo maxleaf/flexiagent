@@ -433,7 +433,7 @@ def add_interface(params):
             frr_cmd.append('ip ospf authentication message-digest')
 
         if frr_cmd:
-            frr_cmd_revert = list(map(lambda x: '"no %s"' % x, frr_cmd))
+            frr_cmd_revert = list(map(lambda x: 'no %s' % x, frr_cmd))
 
             cmd = {}
             cmd['cmd'] = {}
