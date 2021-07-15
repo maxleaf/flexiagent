@@ -3373,7 +3373,7 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_vtysh_run(commands, restart_frr=False):
+def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
     '''Run vtysh command to configure router
 
     :param commands:    array of frr commands
@@ -3381,7 +3381,8 @@ def frr_vtysh_run(commands, restart_frr=False):
     '''
     try:
         shell_commands = ' -c '.join(map(lambda x: '"%s"' % x, commands))
-        vtysh_cmd = 'sudo /usr/bin/vtysh -c "configure" -c %s; sudo /usr/bin/vtysh -c "write"' % shell_commands
+        write_cmd = '-c "write"%s' % '' if print_stdout else ' > /dev/null'
+        vtysh_cmd = 'sudo /usr/bin/vtysh -c "configure" -c %s; sudo /usr/bin/vtysh %s' % (shell_commands, write_cmd)
         output = os.popen(vtysh_cmd).read().splitlines()
 
         # in output, the first line might contains error. So we print only the first line
@@ -3406,12 +3407,13 @@ def frr_setup_config():
     subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
     # Setup basics on frr.conf.
-    frr_vtysh_run([
+    frr_commands = [
         "password zebra",
         "log file /var/log/frr/frr.log informational",
         "log stdout",
-        "log syslog informational",
-    ])
+        "log syslog informational"
+    ]
+    frr_vtysh_run(frr_commands, restart_frr=False, print_stdout=False)
 
 def frr_create_redistribution_filter(router , acl, route_map, route_map_num, revert=False):
     # When we add a static route, OSPF sees it as a kernel route, not a static one.
