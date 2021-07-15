@@ -3381,7 +3381,7 @@ def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
     '''
     try:
         shell_commands = ' -c '.join(map(lambda x: '"%s"' % x, commands))
-        write_cmd = '-c "write"%s' % '' if print_stdout else ' > /dev/null'
+        write_cmd = '-c "write"%s' % ('' if print_stdout else ' > /dev/null')
         vtysh_cmd = 'sudo /usr/bin/vtysh -c "configure" -c %s; sudo /usr/bin/vtysh %s' % (shell_commands, write_cmd)
         output = os.popen(vtysh_cmd).read().splitlines()
 
