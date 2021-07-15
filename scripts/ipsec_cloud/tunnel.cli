@@ -6,7 +6,6 @@
         "encryption-mode": "ikev2",
         "src": "192.168.0.106",
         "dst": "104.193.146.116",
-        "dstPort": "",
         "tunnel-id": 3,
         "peer": {
             "mtu": 1350,
@@ -16,7 +15,6 @@
                 ]
             }
         },
-        "loopback-iface": {},
         "dev_id": "pci:0000:00:03.00",
         "ikev2": {
             "role": "initiator",
@@ -36,8 +34,7 @@
                 "dh-group": "ecp-256",
                 "key-size": 256
             },
-            "psk": "abc243f5621c1a95997997c8cd597956",
-            "certificate": ""
+            "psk": "abc243f5621c1a95997997c8cd597956"
         }
     }
 }

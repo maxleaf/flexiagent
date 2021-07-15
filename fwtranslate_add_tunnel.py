@@ -1084,62 +1084,66 @@ def add_tunnel(params):
     :returns: List of commands.
     """
     cmd_list = []
+    loop0_ip = ''
 
     encryption_mode = params.get("encryption-mode", "psk")
 
-    loop0_ip  = IPNetwork(params['loopback-iface']['addr'])     # 10.100.0.4 / 10.100.0.5
-    loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
+    if 'loopback-iface' in params:
+        loop0_ip  = IPNetwork(params['loopback-iface']['addr'])     # 10.100.0.4 / 10.100.0.5
+        loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
 
-    remote_loop0_ip         = copy.deepcopy(loop0_ip)
-    remote_loop0_ip.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
-    remote_loop0_mac        = copy.deepcopy(loop0_mac)
-    remote_loop0_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fd:00:04 -> 02:00:27:fd:00:05 / 02:00:27:fd:00:05 -> 02:00:27:fd:00:04
+        remote_loop0_ip         = copy.deepcopy(loop0_ip)
+        remote_loop0_ip.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
+        remote_loop0_mac        = copy.deepcopy(loop0_mac)
+        remote_loop0_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fd:00:04 -> 02:00:27:fd:00:05 / 02:00:27:fd:00:05 -> 02:00:27:fd:00:04
 
-    loop1_ip         = copy.deepcopy(loop0_ip)
-    loop1_ip.value  += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
-    loop1_mac        = copy.deepcopy(loop0_mac)
-    loop1_mac.value += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
+        loop1_ip         = copy.deepcopy(loop0_ip)
+        loop1_ip.value  += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
+        loop1_mac        = copy.deepcopy(loop0_mac)
+        loop1_mac.value += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
 
-    remote_loop1_ip         = copy.deepcopy(loop1_ip)
-    remote_loop1_ip.value  ^= IPAddress('0.0.0.1').value        # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
-    remote_loop1_mac        = copy.deepcopy(loop1_mac)
-    remote_loop1_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fe:00:04 -> 02:00:27:fe:00:05 / 02:00:27:fe:00:05 -> 02:00:27:fe:00:04
+        remote_loop1_ip         = copy.deepcopy(loop1_ip)
+        remote_loop1_ip.value  ^= IPAddress('0.0.0.1').value        # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
+        remote_loop1_mac        = copy.deepcopy(loop1_mac)
+        remote_loop1_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fe:00:04 -> 02:00:27:fe:00:05 / 02:00:27:fe:00:05 -> 02:00:27:fe:00:04
 
-    # Add loop1-bridge-vxlan
-    vxlan_ips = {'src':params['src'], 'dst':params['dst']}
-    remote_loop0_cfg = {'addr':str(remote_loop0_ip), 'mac':str(remote_loop0_mac)}
-    remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
+        # Add loop1-bridge-vxlan
+        vxlan_ips = {'src':params['src'], 'dst':params['dst']}
+        remote_loop0_cfg = {'addr':str(remote_loop0_ip), 'mac':str(remote_loop0_mac)}
+        remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "validate tunnel id"
-    cmd['cmd']['params']    = {
-                                'module': 'fwtranslate_add_tunnel',
-                                'func':   'validate_tunnel_id',
-                                'args': {
-                                    'tunnel_id': params['tunnel-id']
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']      = "python"
+        cmd['cmd']['descr']     = "validate tunnel id"
+        cmd['cmd']['params']    = {
+                                    'module': 'fwtranslate_add_tunnel',
+                                    'func':   'validate_tunnel_id',
+                                    'args': {
+                                        'tunnel_id': params['tunnel-id']
+                                    }
                                 }
-                            }
-    # Don't delete /etc/frr/ospfd.conf on revert, as it might be used by other interfaces too
-    cmd_list.append(cmd)
+        cmd_list.append(cmd)
 
-    if encryption_mode == "none":
-        loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
-        bridge_id = params['tunnel-id']*2
-        _add_loop_bridge_vxlan(cmd_list, params, loop0_cfg, remote_loop0_cfg, vxlan_ips, bridge_id=bridge_id, internal=False, loop_cache_key='loop0_sw_if_index')
+    if 'peer' in params:
+        pass
     else:
-        loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
-        bridge_id = params['tunnel-id']*2+1
-        _add_loop_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=bridge_id, internal=True, loop_cache_key='loop1_sw_if_index')
+        if encryption_mode == "none":
+            loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
+            bridge_id = params['tunnel-id']*2
+            _add_loop_bridge_vxlan(cmd_list, params, loop0_cfg, remote_loop0_cfg, vxlan_ips, bridge_id=bridge_id, internal=False, loop_cache_key='loop0_sw_if_index')
+        else:
+            loop1_cfg = {'addr':str(loop1_ip), 'mac':str(loop1_mac), 'mtu': 9000}
+            bridge_id = params['tunnel-id']*2+1
+            _add_loop_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=bridge_id, internal=True, loop_cache_key='loop1_sw_if_index')
 
-        l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
-        if encryption_mode == "psk":
-            # Add loop0-bridge-l2gre-ipsec
-            _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
-        elif encryption_mode == "ikev2":
-            # Add loop0-bridge-l2gre-ikev2
-            _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop0_cfg, l2gre_ips, params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
+            l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
+            if encryption_mode == "psk":
+                # Add loop0-bridge-l2gre-ipsec
+                _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
+            elif encryption_mode == "ikev2":
+                # Add loop0-bridge-l2gre-ikev2
+                _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop0_cfg, l2gre_ips, params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
 
     # --------------------------------------------------------------------------
     # Add following section to frr ospfd.conf
@@ -1151,35 +1155,33 @@ def add_tunnel(params):
     #           network <loopback ip> area 0.0.0.0
     # Restart frr
     # --------------------------------------------------------------------------
-    if 'routing' in params['loopback-iface'] and params['loopback-iface']['routing'] == 'ospf':
+    if 'loopback-iface' in params and 'routing' in params['loopback-iface'] and params['loopback-iface']['routing'] == 'ospf':
 
         # Add point-to-point type of interface for the tunnel address
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % params['loopback-iface']['addr']
+        cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % loop0_ip
         cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
             'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
 
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % params['loopback-iface']['addr']
+        cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % loop0_ip
         cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
             'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
         cmd_list.append(cmd)
 
         # Add network for the tunnel interface.
-        addr = params['loopback-iface']['addr']
-
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "add loopback interface %s to ospf" % params['loopback-iface']['addr']
+        cmd['cmd']['descr']   = "add loopback interface %s to ospf" % loop0_ip
         cmd['cmd']['params']  = [ 
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   = "remove loopback interface %s from ospf" % params['loopback-iface']['addr']
+        cmd['revert']['descr']   = "remove loopback interface %s from ospf" % loop0_ip
         cmd['revert']['params']  = [
             'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
         cmd_list.append(cmd)
@@ -1191,7 +1193,7 @@ def add_tunnel(params):
     cmd['cmd']['params']  = {
                     'module': 'fwtunnel_stats',
                     'func'  : 'tunnel_stats_add',
-                    'args'  : { 'tunnel_id': params['tunnel-id'], 'loopback_addr': params['loopback-iface']['addr']},
+                    'args'  : { 'tunnel_id': params['tunnel-id'], 'loopback_addr': loop0_ip},
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
