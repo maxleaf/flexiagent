@@ -385,18 +385,82 @@ def add_interface(params):
 
     # Update ospfd configuration.
     if 'routing' in params and params['routing'].lower() == 'ospf':
+        ospf = params.get('ospf', {})
+        area = ospf.get('area', '0.0.0.0')
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   =  "add network %s to OSPF" % (iface_addr)
-        cmd['cmd']['params']  = [ 
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['descr']   =  "add network %s to OSPF" % iface_addr
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["router ospf", "network %s area %s" % (iface_addr, area)]
+                }
+        }
         cmd['revert'] = {}
-        cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   =  "remove network %s from OSPF" % (iface_addr)
-        cmd['revert']['params']  = [ 
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (iface_addr) ]
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["router ospf", "no network %s area %s" % (iface_addr, area)]
+                }
+        }
+        cmd['revert']['descr']   =  "remove network %s from OSPF" % iface_addr
         cmd_list.append(cmd)
+
+        # OSPF per interface configuration
+        frr_cmd = []
+        restart_frr = False
+        helloInterval = ospf.get('helloInterval')
+        if helloInterval:
+            frr_cmd.append('ip ospf hello-interval %s' % helloInterval)
+
+        deadInterval = ospf.get('deadInterval')
+        if deadInterval:
+            frr_cmd.append('ip ospf dead-interval %s' % deadInterval)
+
+        cost = ospf.get('cost')
+        if cost:
+            frr_cmd.append('ip ospf cost %s' % cost)
+
+        keyId = ospf.get('keyId')
+        key = ospf.get('key')
+        if keyId and key:
+            restart_frr = True
+            frr_cmd.append('ip ospf message-digest-key %s md5 %s' % (keyId, key))
+            frr_cmd.append('ip ospf authentication message-digest')
+
+        if frr_cmd:
+            frr_cmd_revert = list(map(lambda x: '"no %s"' % x, frr_cmd))
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']   = "python"
+            cmd['cmd']['params'] = {
+                    'module': 'fwutils',
+                    'func': 'frr_vtysh_run',
+                    'args': {
+                        'commands'   : ["interface DEV-STUB"] + frr_cmd,
+                        'restart_frr': restart_frr
+                    },
+                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+            }
+            cmd['cmd']['descr']   =  "add OSPF per link configuration of interface %s" % iface_addr
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "python"
+            cmd['revert']['params'] = {
+                    'module': 'fwutils',
+                    'func': 'frr_vtysh_run',
+                    'args': {
+                        'commands'   : ["interface DEV-STUB"] + frr_cmd_revert,
+                        'restart_frr': restart_frr
+                    },
+                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+            }
+            cmd['revert']['descr']   =  "remove OSPF per link configuration of interface %s" % iface_addr
+            cmd_list.append(cmd)
 
     if is_lte:
         cmd = {}

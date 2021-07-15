@@ -449,7 +449,22 @@ class FwCfgRequestHandler:
             elif 'replace' in s:
                 old = s['replace']
                 if type(params) is dict:
-                    raise Exception("fwutils.py:substitute: 'replace' is not supported for dictionary in '%s'" % format(params))
+                    if not 'args' in params:
+                        raise Exception("fwutils.py:substitute: 'replace' is not supported for the given dictionary in '%s'" % format(params))
+                    if not 'key' in s: # need to specify the key in params['args'] that it's value needs to be replaced
+                        raise Exception("fwutils.py:substitute: key to replace doesn't specified in substitute '%s'" % format(s))
+
+                    arg_key = s['key']
+                    if not params['args'][arg_key]: # make sure specified key is exists in args
+                        raise Exception("fwutils.py:substitute: '%s' key doesn't exist in params '%s'" % (arg_key, format(s)))
+
+                    val = params['args'][arg_key]
+                    if type(val) == list:  # if value is list, go over the list and check
+                        for (idx, p) in list(enumerate(val)):
+                            if type(p) == str and old in p:
+                                params['args'][arg_key][idx] = params['args'][arg_key][idx].replace(old, str(new))
+                    else:
+                        raise Exception("fwutils.py:substitute: 'replace' is not supported for the given dictionary in '%s'" % format(params))
                 else:  # list
                     for (idx, p) in list(enumerate(params)):
                         if type(p) == str:
