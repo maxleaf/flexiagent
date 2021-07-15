@@ -1,0 +1,45 @@
+[
+{
+    "entity": "agent",
+    "message": "add-tunnel",
+    "params": {
+        "encryption-mode": "ikev2",
+        "src": "192.168.0.106",
+        "dst": "104.193.146.116",
+        "dstPort": "",
+        "tunnel-id": 3,
+        "peer": {
+            "mtu": 1350,
+            "multilink": {
+                "labels": [
+                    "5e8d7cc005369313f5ceff16"
+                ]
+            }
+        },
+        "loopback-iface": {},
+        "dev_id": "pci:0000:00:03.00",
+        "ikev2": {
+            "role": "initiator",
+            "mode": "psk",
+            "local-device-id": "b0bbd024d5",
+            "remote-device-id": "104.193.146.116",
+            "lifetime": 3600,
+            "ike": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "modp-2048",
+                "key-size": 256
+            },
+            "esp": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "ecp-256",
+                "key-size": 256
+            },
+            "psk": "abc243f5621c1a95997997c8cd597956",
+            "certificate": ""
+        }
+    }
+}
+]
+
