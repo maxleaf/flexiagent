@@ -109,6 +109,8 @@ request_handlers = {
     'remove-application':           {'name': '_call_router_api', 'sign': True},
     'add-multilink-policy':         {'name': '_call_router_api', 'sign': True},
     'remove-multilink-policy':      {'name': '_call_router_api', 'sign': True},
+    'add-ospf':                     {'name': '_call_router_api', 'sign': True},
+    'remove-ospf':                  {'name': '_call_router_api', 'sign': True},
     'add-switch':                   {'name': '_call_router_api', 'sign': True},
     'remove-switch':                {'name': '_call_router_api', 'sign': True},
     'add-firewall-policy':          {'name': '_call_router_api', 'sign': True},
@@ -296,6 +298,8 @@ class Fwglobals:
         self.FRR_CONFIG_FILE     = '/etc/frr/frr.conf'
         self.FRR_OSPFD_FILE      = '/etc/frr/ospfd.conf'
         self.FRR_VTYSH_FILE      = '/etc/frr/vtysh.conf'
+        self.FRR_OSPF_ACL       = 'fw-redist-ospf-acl'
+        self.FRR_OSPF_ROUTE_MAP = 'fw-redist-ospf-rm'
         self.DHCPD_CONFIG_FILE   = '/etc/dhcp/dhcpd.conf'
         self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'

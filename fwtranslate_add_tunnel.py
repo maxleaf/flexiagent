@@ -1152,36 +1152,56 @@ def add_tunnel(params):
     # Restart frr
     # --------------------------------------------------------------------------
     if 'routing' in params['loopback-iface'] and params['loopback-iface']['routing'] == 'ospf':
+        addr = params['loopback-iface']['addr']
 
         # Add point-to-point type of interface for the tunnel address
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % params['loopback-iface']['addr']
-        cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
-            'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
-
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["interface DEV-STUB", "ip ospf network point-to-point"]
+                },
+                'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
+        }
+        cmd['cmd']['descr']   = "add loopback interface %s to ospf as point-to-point" % addr
         cmd['revert'] = {}
-        cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % params['loopback-iface']['addr']
-        cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]},
-            'sudo /usr/bin/vtysh -c "configure" -c "interface DEV-STUB" -c "no ip ospf network point-to-point"; sudo /usr/bin/vtysh -c "write"']
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["interface DEV-STUB", "no ip ospf network point-to-point"]
+                },
+                'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
+        }
+        cmd['revert']['descr']   = "remove loopback interface %s from ospf as point-to-point" % addr
         cmd_list.append(cmd)
 
         # Add network for the tunnel interface.
-        addr = params['loopback-iface']['addr']
-
         cmd = {}
         cmd['cmd'] = {}
-        cmd['cmd']['name']    = "exec"
-        cmd['cmd']['descr']   = "add loopback interface %s to ospf" % params['loopback-iface']['addr']
-        cmd['cmd']['params']  = [ 
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["router ospf", "network %s area 0.0.0.0" % addr]
+                }
+        }
+        cmd['cmd']['descr']   = "add loopback interface %s to ospf" % addr
         cmd['revert'] = {}
-        cmd['revert']['name']    = "exec"
-        cmd['revert']['descr']   = "remove loopback interface %s from ospf" % params['loopback-iface']['addr']
-        cmd['revert']['params']  = [
-            'sudo /usr/bin/vtysh -c "configure" -c "router ospf" -c "no network %s area 0.0.0.0"; sudo /usr/bin/vtysh -c "write"' % (addr) ]
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["router ospf", "no network %s area 0.0.0.0" % addr]
+                }
+        }
+        cmd['revert']['descr']   = "remove loopback interface %s from ospf" % addr
         cmd_list.append(cmd)
 
     cmd = {}

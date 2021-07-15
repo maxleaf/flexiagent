@@ -212,17 +212,6 @@ def af_to_name(af_type):
 	}
     return af_map.get(af_type, af_type)
 
-def get_os_routing_table():
-    """Get routing table.
-
-    :returns: List of routes.
-    """
-    try:
-        routing_table = subprocess.check_output(['route', '-n']).decode().split('\n')
-        return routing_table
-    except:
-        return (None)
-
 def get_default_route(if_name=None):
     """Get default route.
 
@@ -3384,6 +3373,28 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
+def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
+    '''Run vtysh command to configure router
+
+    :param commands:    array of frr commands
+    :param restart_frr: some OSPF configurations require restarting the service in order to apply them
+    '''
+    try:
+        shell_commands = ' -c '.join(map(lambda x: '"%s"' % x, commands))
+        write_cmd = '-c "write"%s' % ('' if print_stdout else ' > /dev/null')
+        vtysh_cmd = 'sudo /usr/bin/vtysh -c "configure" -c %s; sudo /usr/bin/vtysh %s' % (shell_commands, write_cmd)
+        output = os.popen(vtysh_cmd).read().splitlines()
+
+        # in output, the first line might contains error. So we print only the first line
+        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, output=%s" % (vtysh_cmd, output[0] if output else ''))
+
+        if restart_frr:
+            os.system('systemctl restart frr')
+
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))
+
 def frr_setup_config():
     '''Setup the /etc/frr/frr.conf file, initializes it and
     ensures that ospf is switched on in the frr configuration'''
@@ -3396,9 +3407,34 @@ def frr_setup_config():
     subprocess.check_call('sudo sed -i -E "s/^service integrated-vtysh-config/no service integrated-vtysh-config/" %s' % (fwglobals.g.FRR_VTYSH_FILE), shell=True)
 
     # Setup basics on frr.conf.
-    subprocess.check_call('sudo /usr/bin/vtysh -c "configure" -c "password zebra" '\
-        '-c "log file /var/log/frr/frr.log informational" -c "log stdout" -c "log syslog informational"; '\
-        'sudo /usr/bin/vtysh -c "write" > /dev/null', shell=True)
+    frr_commands = [
+        "password zebra",
+        "log file /var/log/frr/frr.log informational",
+        "log stdout",
+        "log syslog informational"
+    ]
+    frr_vtysh_run(frr_commands, restart_frr=False, print_stdout=False)
+
+def frr_create_redistribution_filter(router , acl, route_map, route_map_num, revert=False):
+    # When we add a static route, OSPF sees it as a kernel route, not a static one.
+    # That is why we are forced to set in OSPF/BGP - redistribution of *kernel* routes.
+    # But, of course, we don't want to redistribute them all, so we create a filter.
+    #
+    # This is content in OSPF file after the filter settings (bgp is similar):
+    # router ospf
+    #   redistribute kernel route-map fw-redist-ospf-rm
+    # !
+    # route-map fw-redist-ospf-rm permit 1
+    #   match ip address fw-redist-ospf-acl
+    # !
+    #
+    route_map_commands = ["%sroute-map %s permit %s" % ('no ' if revert else '', route_map, route_map_num)]
+    if not revert:
+        route_map_commands.append("match ip address %s" % acl)
+    frr_vtysh_run(route_map_commands)
+
+    redistribute_cmd = '%sredistribute kernel route-map %s' % ('no ' if revert else '', route_map)
+    frr_vtysh_run([router , redistribute_cmd])
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content

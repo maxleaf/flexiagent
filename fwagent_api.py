@@ -33,6 +33,8 @@ import fwstats
 import fwutils
 import fwsystem_api
 import fwrouter_api
+import re
+from pyroute2 import IPDB
 
 fwagent_api = {
     'get-device-certificate':        '_get_device_certificate',
@@ -60,6 +62,31 @@ class LTE_ERROR_MESSAGES():
 
     PUK_IS_WRONG = 'PUK_IS_WRONG'
     PUK_IS_REQUIRED = 'PUK_IS_REQUIRED'
+
+routes_protocol_map = {
+    -1: '',
+    0: 'unspec',
+    1: 'redirect',
+    2: 'kernel',
+    3: 'boot',
+    4: 'static',
+    8: 'gated',
+    9: 'ra',
+    10: 'mrt',
+    11: 'zebra',
+    12: 'bird',
+    13: 'dnrouted',
+    14: 'xorp',
+    15: 'ntk',
+    16: 'dhcp',
+    18: 'keepalived',
+    42: 'babel',
+    186: 'bgp',
+    187: 'isis',
+    188: 'ospf',
+    189: 'rip',
+    192: 'eigrp',
+}
 
 class FWAGENT_API:
     """This class implements fwagent level APIs of flexiEdge device.
@@ -224,28 +251,47 @@ class FWAGENT_API:
 
         :returns: Dictionary with routes and status code.
         """
-        routing_table = fwutils.get_os_routing_table()
 
-        if routing_table == None:
-            raise Exception("_get_device_os_routes: failed to get device routes: %s" % format(sys.exc_info()[1]))
+        ip = IPDB()
 
-        # Remove empty lines and the headers of the 'route' command
-        routing_table = [ el for el in routing_table if (el is not "" and routing_table.index(el)) > 1 ]
         route_entries = []
 
-        for route in routing_table:
-            fields = route.split()
-            if len(fields) < 8:
-                raise Exception("_get_device_os_routes: failed to get device routes: parsing failed")
+        for route in ip.routes:
+            try:
+                dst = route.dst
+                if dst == 'default':
+                    dst = '0.0.0.0/0'
 
-            route_entries.append({
-                'destination': fields[0],
-                'gateway': fields[1],
-                'mask': fields[2],
-                'flags': fields[3],
-                'metric': fields[4],
-                'interface': fields[7],
-            })
+                metric = route.priority
+                protocol = routes_protocol_map[route.get('proto', -1)]
+
+                if not route.multipath:
+                    gateway = route.gateway
+                    interface = ip.interfaces[route.oif].ifname
+
+                    route_entries.append({
+                        'destination': dst,
+                        'gateway': gateway,
+                        'metric': metric,
+                        'interface': interface,
+                        'protocol': protocol
+                    })
+                else:
+                    for path in route.multipath:
+                        gateway = path.gateway
+                        interface = ip.interfaces[path.oif].ifname
+
+                        route_entries.append({
+                            'destination': dst,
+                            'gateway': gateway,
+                            'metric': metric,
+                            'interface': interface,
+                            'protocol': protocol
+                        })
+            except Exception as e:
+                fwglobals.log.error("_get_device_os_routes: failed to parse route %s.\nroutes=%s." % \
+                    (str(route), str(ip.routes)))
+                pass
 
         return {'message': route_entries, 'ok': 1}
 
