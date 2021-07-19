@@ -56,6 +56,7 @@ from fwpolicies     import FwPolicies
 from fwwan_monitor  import get_wan_failover_metric
 from fwikev2        import FwIKEv2
 from fw_traffic_identification import FwTrafficIdentifications
+import fwtranslate_add_switch
 
 proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
 
@@ -900,6 +901,23 @@ def dev_id_to_vpp_sw_if_index(dev_id):
     fwglobals.log.debug("dev_id_to_vpp_sw_if_index(%s): vpp_if_name: %s" % (dev_id, yaml.dump(sw_ifs, canonical=True)))
 
     return None
+
+# 'dev_id_to_bvi_interface_tap' function get the addr of the interface in a bridge
+# and return the tap interface of the BVI interface
+def dev_id_to_bvi_interface_tap(bridge_addr):
+    # check if interface indeed in a bridge
+    bd_id = fwtranslate_add_switch.get_bridge_id(bridge_addr)
+    if not bd_id:
+        fwglobals.log.error('bridge_addr_to_bvi_interface_tap: failed to fetch bridge id for address: %s' % str(bridge_addr))
+        return None
+
+    vpp_bridges_det = fwglobals.g.router_api.vpp_api.vpp.api.bridge_domain_dump(bd_id=bd_id)
+    if not vpp_bridges_det:
+        fwglobals.log.error('bridge_addr_to_bvi_interface_tap: failed to fetch vpp bridges for bd_id %s' % str(bd_id))
+        return None
+
+    bvi_sw_if_index = vpp_bridges_det[0].bvi_sw_if_index
+    return vpp_sw_if_index_to_tap(bvi_sw_if_index)
 
 # 'dev_id_to_tap' function maps interface referenced by dev_id, e.g '0000:00:08.00'
 # into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp1.

@@ -35,6 +35,7 @@ import fwsystem_api
 import fwrouter_api
 import re
 from pyroute2 import IPDB
+ipdb = IPDB()
 
 fwagent_api = {
     'get-device-certificate':        '_get_device_certificate',
@@ -252,11 +253,9 @@ class FWAGENT_API:
         :returns: Dictionary with routes and status code.
         """
 
-        ip = IPDB()
-
         route_entries = []
 
-        for route in ip.routes:
+        for route in ipdb.routes:
             try:
                 dst = route.dst
                 if dst == 'default':
@@ -267,7 +266,7 @@ class FWAGENT_API:
 
                 if not route.multipath:
                     gateway = route.gateway
-                    interface = ip.interfaces[route.oif].ifname
+                    interface = ipdb.interfaces[route.oif].ifname
 
                     route_entries.append({
                         'destination': dst,
@@ -279,7 +278,7 @@ class FWAGENT_API:
                 else:
                     for path in route.multipath:
                         gateway = path.gateway
-                        interface = ip.interfaces[path.oif].ifname
+                        interface = ipdb.interfaces[path.oif].ifname
 
                         route_entries.append({
                             'destination': dst,
