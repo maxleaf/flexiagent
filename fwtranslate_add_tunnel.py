@@ -1158,6 +1158,35 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
 
     _add_static_neighbor(cmd_list, remote_loop_cfg, loop_cache_key)
 
+def _add_peer(cmd_list, params):
+    auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
+    tunnel_cache_key = 'ipip_tunnel_sw_if_index'
+    mtu              = params['peer']['mtu']
+    wan_dev_id       = params['dev_id']
+
+    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
+
+    # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "sw_interface_set_mtu"
+    cmd['cmd']['descr']   = "set mtu=%s to ipip interface" % mtu
+    cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                              'mtu': [ mtu , 0, 0, 0 ] }
+    cmd_list.append(cmd)
+
+    # interface.api.json: sw_interface_set_unnumbered (..., sw_if_index, ...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "sw_interface_set_unnumbered"
+    cmd['cmd']['descr']   = "set unnumbered to ipip interface"
+    cmd['cmd']['params']  = { 'is_add':1,
+                              'substs': [ { 'add_param':'unnumbered_sw_if_index', 'val_by_key':tunnel_cache_key},
+                                          { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':wan_dev_id} ]}
+    cmd_list.append(cmd)
+
+    _add_ikev2(cmd_list, params, params['dst'], tunnel_cache_key, auth_method, None)
+
 def add_tunnel(params):
     """Generate commands to add tunnel into VPP.
 
@@ -1211,10 +1240,7 @@ def add_tunnel(params):
         cmd_list.append(cmd)
 
     if 'peer' in params:
-        auth_method = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
-        tunnel_cache_key = 'ipip_tunnel_sw_if_index'
-        _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
-        _add_ikev2(cmd_list, params, params['dst'], tunnel_cache_key, auth_method, None)
+        _add_peer(cmd_list, params)
     else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}

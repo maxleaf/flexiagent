@@ -180,6 +180,7 @@ request_handlers = {
     'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
     'sw_interface_set_mac_address': {'name': '_call_vpp_api'},
     'sw_interface_set_mtu':         {'name': '_call_vpp_api'},
+    'sw_interface_set_unnumbered':  {'name': '_call_vpp_api'},
     'vmxnet3_create':               {'name': '_call_vpp_api'},
     'vmxnet3_delete':               {'name': '_call_vpp_api'},
     'vxlan_add_del_tunnel':         {'name': '_call_vpp_api'},
