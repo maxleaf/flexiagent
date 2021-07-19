@@ -100,7 +100,7 @@ def get_device_packet_traces(num_of_packets, timeout):
         else:
             cmd = 'sudo vppctl trace add vmxnet3-input %s && sudo vppctl trace add virtio-input %s' % (num_of_packets, num_of_packets)
         subprocess.check_call(cmd, shell=True)
-        time.sleep(timeout)
+        time.sleep(int(timeout))
         cmd = 'sudo vppctl show trace max {}'.format(num_of_packets)
         res = subprocess.check_output(cmd, shell=True).decode().splitlines()
         # skip first line (contains unnecessary information header)
