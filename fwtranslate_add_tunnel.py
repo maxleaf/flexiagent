@@ -446,6 +446,31 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa
                                 }
         cmd_list.append(cmd)
 
+def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
+    """Add IPIP tunnel command into the list.
+
+    :param cmd_list:             List of commands.
+    :param cache_key:            Cache key of the tunnel to be used by others.
+    :param src:                  Source ip address.
+    :param dst:                  Destination ip address.
+
+    :returns: None.
+    """
+    # ipip.api.json: ipip_add_tunnel (tunnel <type vl_api_ipip_tunnel_t>)
+    ret_attr = 'sw_if_index'
+    tunnel = {
+        'src': ipaddress.ip_address(src),
+        'dst': ipaddress.ip_address(dst)
+    }
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']          = "ipip_add_tunnel"
+    cmd['cmd']['params']        = {'tunnel': tunnel}
+    cmd['cmd']['cache_ret_val'] = (ret_attr , cache_key)
+    cmd['cmd']['descr']         = "create ipip tunnel %s -> %s" % (src, dst)
+    cmd_list.append(cmd)
+
 def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     """Add VxLAN tunnel command into the list.
 
@@ -582,12 +607,12 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
-def _add_ikev2_common_profile(cmd_list, name, remote_device_id, cache_key, auth_method, local_fqdn, remote_fqdn):
+def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, local_fqdn, remote_fqdn):
     """Add IKEv2 common profile commands into the list.
 
     :param cmd_list:            List of commands.
+    :param params:              Parameters from flexiManage.
     :param name:                Profile name.
-    :param remote_device_id:    Remote device id.
     :param cache_key:           Tunnel interface cache_key.
     :param auth_method:         Authenticate method.
     :param local_fqdn:          Local FQDN.
@@ -607,21 +632,26 @@ def _add_ikev2_common_profile(cmd_list, name, remote_device_id, cache_key, auth_
     cmd['revert']['descr']  = "delete IKEv2 profile %s" % name
     cmd_list.append(cmd)
 
-    if cache_key:
-        # ikev2.api.json: ikev2_set_tunnel_interface (...)
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']      = "ikev2_set_tunnel_interface"
-        cmd['cmd']['params']    = { 'name':name , 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ], }
-        cmd['cmd']['descr']     = "set GRE interface for IKEv2 profile %s" % name
-        cmd_list.append(cmd)
 
-    # ikev2.api.json: ikev2_profile_set_auth (..., auth_method: IKEV2_AUTH_METHOD_RSA_SIG)
-    data = fwglobals.g.ikev2.remote_certificate_filename_get(remote_device_id)
+    # ikev2.api.json: ikev2_set_tunnel_interface (...)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_set_tunnel_interface"
+    cmd['cmd']['params']    = { 'name':name , 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ], }
+    cmd['cmd']['descr']     = "set tunnel interface for IKEv2 profile %s" % name
+    cmd_list.append(cmd)
+
+    # ikev2.api.json: ikev2_profile_set_auth (..., auth_method)
+    auth_data = ''
+    if auth_method == 1:
+        auth_data = fwglobals.g.ikev2.remote_certificate_filename_get(params['ikev2']['remote-device-id']).encode()
+    if auth_method == 2:
+        auth_data = params['ikev2']['psk'].encode()
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "ikev2_profile_set_auth"
-    cmd['cmd']['params']    = { 'name':name, 'auth_method':auth_method, 'data':data.encode(), 'data_len':len(data) }
+    cmd['cmd']['params']    = { 'name':name, 'auth_method':auth_method, 'data':auth_data, 'data_len':len(auth_data) }
     cmd['cmd']['descr']     = "set IKEv2 auth method, profile %s" % name
     cmd_list.append(cmd)
 
@@ -704,14 +734,19 @@ def _add_ikev2_certificates(cmd_list, remote_device_id, certificate):
                                 }
     cmd_list.append(cmd)
 
-def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_address, ike, esp):
+def _add_ikev2_initiator_profile(cmd_list, name, lifetime,
+                                 responder_cache_key,
+                                 responder_address,
+                                 responder_dev_id,
+                                 ike, esp):
     """Add IKEv2 initiator profile commands into the list.
 
     :param cmd_list:            List of commands.
     :param name:                Profile name.
     :param lifetime:            Connection life time.
-    :param cache_key:           Interface with responder.
+    :param responder_cache_key: Interface with responder.
     :param responder_address:   Responder IP address.
+    :param responder_dev_id:    Responder device id.
     :param ike:                 IKEv2 crypto params.
     :param esp:                 ESP crypto params.
 
@@ -784,11 +819,18 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime, cache_key, responder_
     if not esp['dh-group'] in dh_type_algs:
         raise Exception("_add_ikev2_initiator_profile: esp dh-group %s is not supported" % esp['dh-group'])
 
-    # ikev2.api.json: ikev2_set_responder (...)
-    responder = {
-                 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
-                 'addr':ipaddress.ip_address(responder_address)
-    }
+    if responder_cache_key:
+        # ikev2.api.json: ikev2_set_responder (...)
+        responder = {
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':responder_cache_key} ],
+                    'addr':ipaddress.ip_address(responder_address)
+        }
+    else:
+        # ikev2.api.json: ikev2_set_responder (...)
+        responder = {
+                    'substs': [{'add_param': 'sw_if_index', 'val_by_func': 'dev_id_to_vpp_sw_if_index', 'arg': responder_dev_id}],
+                    'addr':ipaddress.ip_address(responder_address)
+        }
 
     cmd = {}
     cmd['cmd'] = {}
@@ -851,7 +893,7 @@ def _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop_cfg, l2gre_tunnel
     :param remote_loop_cfg:     Remote loopback config.
     :param l2gre_tunnel_ips:    GRE tunnel src and dst ip addresses.
     :param bridge_id:           Bridge identifier.
-    :params loop_cache_key:     Loopback cache key.
+    :param loop_cache_key:      Loopback cache key.
 
     :returns: None.
     """
@@ -890,13 +932,15 @@ def _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop_cfg, l2gre_tunnel
                 shg=1,
                 cache_key='gre_tunnel_sw_if_index')
 
-def _add_ikev2(cmd_list, params, responder_ip_address, tunnel_intf_cache_key):
+def _add_ikev2(cmd_list, params, responder_ip_address, tunnel_intf_cache_key, auth_method, responder_cache_key):
     """Add IKEv2 tunnel, loopback and bridge commands into the list.
 
     :param cmd_list:                List of commands.
     :param params:                  Parameters from flexiManage.
     :param responder_address:       Responder IP address.
-    :param tunnel_intf_cache_key:   Tunnel interface cache_key.
+    :param tunnel_intf_cache_key:   Tunnel interface cache key.
+    :param auth_method:             Authenticate method.
+    :param responder_cache_key:     Responder interface cache key.
 
     :returns: None.
     """
@@ -917,10 +961,10 @@ def _add_ikev2(cmd_list, params, responder_ip_address, tunnel_intf_cache_key):
     ikev2_profile_name = fwglobals.g.ikev2.profile_name_get(params['tunnel-id'])
     _add_ikev2_common_profile(
                       cmd_list,
+                      params,
                       ikev2_profile_name,
-                      params['ikev2']['remote-device-id'],
                       tunnel_intf_cache_key,
-                      1, # IKEV2_AUTH_METHOD_RSA_SIG
+                      auth_method,
                       local_fqdn,
                       remote_fqdn)
 
@@ -929,13 +973,14 @@ def _add_ikev2(cmd_list, params, responder_ip_address, tunnel_intf_cache_key):
                         cmd_list,
                         ikev2_profile_name,
                         params['ikev2']['lifetime'],
-                        'loop1_sw_if_index',
+                        responder_cache_key,
                         responder_ip_address,
+                        params['dev_id'],
                         params['ikev2']['ike'],
                         params['ikev2']['esp']
                         )
 
-def _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop_cfg, l2gre_tunnel_ips, bridge_id, loop_cache_key):
+def _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop_cfg, l2gre_tunnel_ips, bridge_id, loop0_cache_key, loop1_cache_key):
     """Add IKEv2 tunnel, loopback and bridge commands into the list.
 
     :param cmd_list:            List of commands.
@@ -943,16 +988,17 @@ def _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop_cfg, l2gre_tunnel
     :param remote_loop_cfg:     Remote loopback config.
     :param l2gre_tunnel_ips:    GRE tunnel src and dst ip addresses.
     :param bridge_id:           Bridge identifier.
-    :params loop_cache_key:     Loopback cache key.
+    :param loop0_cache_key:     Loop0 cache key.
+    :param loop1_cache_key:     Loop1 cache key.
 
     :returns: None.
     """
     _add_loopback(
                 cmd_list,
-                loop_cache_key,
+                loop0_cache_key,
                 params['loopback-iface'],
                 id=bridge_id)
-    _add_static_neighbor(cmd_list, remote_loop_cfg, loop_cache_key)
+    _add_static_neighbor(cmd_list, remote_loop_cfg, loop0_cache_key)
     _add_bridge(
                 cmd_list, bridge_id)
     _add_gre_tunnel(
@@ -967,7 +1013,7 @@ def _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop_cfg, l2gre_tunnel
                 bridge_id=bridge_id,
                 bvi=1,
                 shg=0,
-                cache_key=loop_cache_key)
+                cache_key=loop0_cache_key)
     gre_tunnel_sw_if_index = 'gre_tunnel_sw_if_index'
     _add_interface_to_bridge(
                 cmd_list,
@@ -978,7 +1024,8 @@ def _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop_cfg, l2gre_tunnel
                 cache_key=gre_tunnel_sw_if_index)
 
     responder_ip_address = str(IPNetwork(l2gre_tunnel_ips['dst']).ip)
-    _add_ikev2(cmd_list, params, responder_ip_address, gre_tunnel_sw_if_index)
+    auth_method = 1 # IKEV2_AUTH_METHOD_RSA_SIG
+    _add_ikev2(cmd_list, params, responder_ip_address, gre_tunnel_sw_if_index, auth_method, loop1_cache_key)
 
 def _add_loop0_bridge_l2gre(cmd_list, params, l2gre_tunnel_ips, bridge_id):
     """Add unprotected tunnel, loopback and bridge commands into the list.
@@ -1029,7 +1076,7 @@ def _add_static_neighbor(cmd_list, remote_loop_cfg, loop_cache_key):
 
     :param cmd_list:            List of commands.
     :param remote_loop_cfg:     Remote loopback config.
-    :params loop_cache_key:     Loopback cache key.
+    :param loop_cache_key:      Loopback cache key.
 
     :returns: None.
     """
@@ -1071,8 +1118,8 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
     :param remote_loop_cfg:     Remote loopback config.
     :param vxlan_ips:           VxLAN tunnel src and dst ip addresses.
     :param bridge_id:           Bridge identifier.
-    :params internal:           Hide loopback from Linux.
-    :params loop_cache_key:     Loopback cache key.
+    :param internal:            Hide loopback from Linux.
+    :param loop_cache_key:      Loopback cache key.
 
     :returns: None.
     """
@@ -1112,7 +1159,7 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
     _add_static_neighbor(cmd_list, remote_loop_cfg, loop_cache_key)
 
 def add_tunnel(params):
-    """Generate commands to add IPSEC-GRE and VxLAN tunnels into VPP.
+    """Generate commands to add tunnel into VPP.
 
     :param params:        Parameters from flexiManage.
 
@@ -1120,6 +1167,8 @@ def add_tunnel(params):
     """
     cmd_list = []
     loop0_ip = ''
+    loop0_ip_network = None
+    remote_loop0_ip = None
 
     encryption_mode = params.get("encryption-mode", "psk")
 
@@ -1162,7 +1211,10 @@ def add_tunnel(params):
         cmd_list.append(cmd)
 
     if 'peer' in params:
-        pass
+        auth_method = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
+        tunnel_cache_key = 'ipip_tunnel_sw_if_index'
+        _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
+        _add_ikev2(cmd_list, params, params['dst'], tunnel_cache_key, auth_method, None)
     else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
@@ -1179,7 +1231,7 @@ def add_tunnel(params):
                 _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
             elif encryption_mode == "ikev2":
                 # Add loop0-bridge-l2gre-ikev2
-                _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop0_cfg, l2gre_ips, params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
+                _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop0_cfg, l2gre_ips, params['tunnel-id']*2, loop0_cache_key='loop0_sw_if_index', loop1_cache_key='loop1_sw_if_index')
 
     # --------------------------------------------------------------------------
     # Add following section to frr ospfd.conf
@@ -1243,6 +1295,12 @@ def add_tunnel(params):
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % loop0_ip
         cmd_list.append(cmd)
 
+    if 'peer' in params:
+        loopback_local = str(params['src'])
+        loopback_remote = str(params['dst'])
+    else:
+        loopback_local = str(loop0_ip_network.ip)
+        loopback_remote = str(remote_loop0_ip.ip)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -1250,7 +1308,9 @@ def add_tunnel(params):
     cmd['cmd']['params']  = {
                     'module': 'fwtunnel_stats',
                     'func'  : 'tunnel_stats_add',
-                    'args'  : { 'tunnel_id': params['tunnel-id'], 'loopback_addr': loop0_ip},
+                    'args'  : { 'tunnel_id': params['tunnel-id'],
+                                'loopback_local': loopback_local,
+                                'loopback_remote': loopback_remote},
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -1261,7 +1321,7 @@ def add_tunnel(params):
                     'args'  : { 'tunnel_id': params['tunnel-id']},
     }
     cmd_list.append(cmd)
-
+    '''
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -1282,6 +1342,7 @@ def add_tunnel(params):
                     'substs': [ { 'add_param':'sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
     }
     cmd_list.append(cmd)
+    '''
 
     return cmd_list
 

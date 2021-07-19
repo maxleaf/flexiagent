@@ -37,6 +37,26 @@
             "psk": "abc243f5621c1a95997997c8cd597956"
         }
     }
+},
+{
+  "entity": "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+     {
+	"dev_id": "pci:0000:00:03.00",
+	"addr": "192.168.0.106/24",
+	"gateway": "192.168.0.1",
+	"type":"WAN"
+     },
+     {
+	"dev_id": "pci:0000:00:08.00",
+	"addr": "10.10.10.1/24",
+	"routing":"ospf",
+	"type":"LAN"
+     }
+   ]  
+  }
 }
 ]
 

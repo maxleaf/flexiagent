@@ -75,28 +75,24 @@ def tunnel_stats_clear():
     with tunnel_stats_global_lock:
         tunnel_stats_global.clear()
 
-def tunnel_stats_add(tunnel_id, loopback_addr):
+def tunnel_stats_add(tunnel_id, loopback_local, loopback_remote):
     """Add tunnel statistics entry into a dictionary.
 
     :param tunnel_id:         Tunnel identifier.
-    :param loopback_addr:     Loopback local end ip address.
+    :param loopback_local:    Loopback local end ip address.
+    :param loopback_remote:   Loopback local end ip address.
 
     :returns: None.
     """
-    ip_addr = IPNetwork(loopback_addr)
     stats_entry = dict()
-    stats_entry['loopback_network'] = str(ip_addr)
     stats_entry['sent'] = 0
     stats_entry['received'] = 0
     stats_entry['drop_rate'] = 0
     stats_entry['rtt'] = 0
     stats_entry['timestamp'] = 0
 
-    for ip in ip_addr:
-        if (ip.value != ip_addr.value):
-            stats_entry['loopback_remote'] = str(ip)
-        else:
-            stats_entry['loopback_local'] = str(ip)
+    stats_entry['loopback_remote'] = loopback_remote
+    stats_entry['loopback_local'] = loopback_local
 
     with tunnel_stats_global_lock:
         tunnel_stats_global[tunnel_id] = stats_entry

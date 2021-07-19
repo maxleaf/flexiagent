@@ -158,6 +158,8 @@ request_handlers = {
     'ikev2_set_responder':          {'name': '_call_vpp_api'},
     'ikev2_set_sa_lifetime':        {'name': '_call_vpp_api'},
     'ikev2_set_tunnel_interface':   {'name': '_call_vpp_api'},
+    'ipip_add_tunnel':              {'name': '_call_vpp_api'},
+    'ipip_del_tunnel':              {'name': '_call_vpp_api'},
     'ip_neighbor_add_del':          {'name': '_call_vpp_api'},
     'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},

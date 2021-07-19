@@ -430,8 +430,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         tunnels = self.cfg_db.get_tunnels()
         for params in tunnels:
             id   = params['tunnel-id']
-            addr = params['loopback-iface']['addr']
-            fwtunnel_stats.tunnel_stats_add(id, addr)
+            #addr = params['loopback-iface']['addr']
+            fwtunnel_stats.tunnel_stats_add(id, '', '')  ##################### TBD
 
     def _call_simple(self, request):
         """Execute single request.
