@@ -430,8 +430,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         tunnels = self.cfg_db.get_tunnels()
         for params in tunnels:
             id   = params['tunnel-id']
-            #addr = params['loopback-iface']['addr']
-            fwtunnel_stats.tunnel_stats_add(id, '', '')  ##################### TBD
+            if 'peer' in params:
+                remote_ip = str(params['dst'])
+            else:
+                remote_ip = fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])
+            fwtunnel_stats.tunnel_stats_add(id, remote_ip)
 
     def _call_simple(self, request):
         """Execute single request.

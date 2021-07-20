@@ -1196,35 +1196,31 @@ def add_tunnel(params):
     """
     cmd_list = []
     loop0_ip = ''
-    loop0_ip_network = None
     remote_loop0_ip = None
 
     encryption_mode = params.get("encryption-mode", "psk")
 
     if 'loopback-iface' in params:
-        loop0_ip = params['loopback-iface']['addr']
-        loop0_ip_network = IPNetwork(loop0_ip)     # 10.100.0.4 / 10.100.0.5
-        loop0_mac = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
+        loop0_ip                = params['loopback-iface']['addr']
+        remote_loop0_ip         = fwutils.build_remote_loop_ip_address(loop0_ip)       # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
 
-        remote_loop0_ip         = copy.deepcopy(loop0_ip_network)
-        remote_loop0_ip.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
+        loop0_mac               = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
         remote_loop0_mac        = copy.deepcopy(loop0_mac)
         remote_loop0_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fd:00:04 -> 02:00:27:fd:00:05 / 02:00:27:fd:00:05 -> 02:00:27:fd:00:04
 
-        loop1_ip         = copy.deepcopy(loop0_ip_network)
-        loop1_ip.value  += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
-        loop1_mac        = copy.deepcopy(loop0_mac)
-        loop1_mac.value += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
+        loop1_ip                = IPNetwork(loop0_ip)
+        loop1_ip.value         += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
+        remote_loop1_ip         = fwutils.build_remote_loop_ip_address(str(loop1_ip.ip))        # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
 
-        remote_loop1_ip         = copy.deepcopy(loop1_ip)
-        remote_loop1_ip.value  ^= IPAddress('0.0.0.1').value        # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
+        loop1_mac               = copy.deepcopy(loop0_mac)
+        loop1_mac.value        += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
         remote_loop1_mac        = copy.deepcopy(loop1_mac)
         remote_loop1_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fe:00:04 -> 02:00:27:fe:00:05 / 02:00:27:fe:00:05 -> 02:00:27:fe:00:04
 
         # Add loop1-bridge-vxlan
         vxlan_ips = {'src':params['src'], 'dst':params['dst']}
-        remote_loop0_cfg = {'addr':str(remote_loop0_ip), 'mac':str(remote_loop0_mac)}
-        remote_loop1_cfg = {'addr':str(remote_loop1_ip), 'mac':str(remote_loop1_mac)}
+        remote_loop0_cfg = {'addr':remote_loop0_ip, 'mac':str(remote_loop0_mac)}
+        remote_loop1_cfg = {'addr':remote_loop1_ip, 'mac':str(remote_loop1_mac)}
 
         cmd = {}
         cmd['cmd'] = {}
@@ -1251,7 +1247,7 @@ def add_tunnel(params):
             bridge_id = params['tunnel-id']*2+1
             _add_loop_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=bridge_id, internal=True, loop_cache_key='loop1_sw_if_index')
 
-            l2gre_ips = {'src':str(loop1_ip), 'dst':str(remote_loop1_ip)}
+            l2gre_ips = {'src':str(loop1_ip), 'dst':remote_loop1_ip}
             if encryption_mode == "psk":
                 # Add loop0-bridge-l2gre-ipsec
                 _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
@@ -1322,11 +1318,9 @@ def add_tunnel(params):
         cmd_list.append(cmd)
 
     if 'peer' in params:
-        loopback_local = str(params['src'])
-        loopback_remote = str(params['dst'])
+        remote_ip = params['dst']
     else:
-        loopback_local = str(loop0_ip_network.ip)
-        loopback_remote = str(remote_loop0_ip.ip)
+        remote_ip = remote_loop0_ip
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -1335,8 +1329,7 @@ def add_tunnel(params):
                     'module': 'fwtunnel_stats',
                     'func'  : 'tunnel_stats_add',
                     'args'  : { 'tunnel_id': params['tunnel-id'],
-                                'loopback_local': loopback_local,
-                                'loopback_remote': loopback_remote},
+                                'remote_ip': remote_ip},
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -1347,6 +1340,7 @@ def add_tunnel(params):
                     'args'  : { 'tunnel_id': params['tunnel-id']},
     }
     cmd_list.append(cmd)
+
     '''
     cmd = {}
     cmd['cmd'] = {}
@@ -1369,7 +1363,6 @@ def add_tunnel(params):
     }
     cmd_list.append(cmd)
     '''
-
     return cmd_list
 
 def modify_tunnel(new_params, old_params):
