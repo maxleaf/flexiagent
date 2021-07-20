@@ -1158,9 +1158,16 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
 
     _add_static_neighbor(cmd_list, remote_loop_cfg, loop_cache_key)
 
-def _add_peer(cmd_list, params):
+def _add_peer(cmd_list, params, tunnel_cache_key):
+    """Add tunnel for a peer.
+
+    :param cmd_list:            List of commands.
+    :param params:              Parameters from flexiManage.
+    :param tunnel_cache_key:    Tunnel cache key.
+
+    :returns: None.
+    """
     auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
-    tunnel_cache_key = 'ipip_tunnel_sw_if_index'
     mtu              = params['peer']['mtu']
     wan_dev_id       = params['dev_id']
 
@@ -1236,7 +1243,7 @@ def add_tunnel(params):
         cmd_list.append(cmd)
 
     if 'peer' in params:
-        _add_peer(cmd_list, params)
+        _add_peer(cmd_list, params, 'ipip_tunnel_sw_if_index')
     else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
@@ -1341,7 +1348,10 @@ def add_tunnel(params):
     }
     cmd_list.append(cmd)
 
-    '''
+    if 'peer' in params:
+        policy_interface_cache_key = 'ipip_tunnel_sw_if_index'
+    else:
+        policy_interface_cache_key = 'loop0_sw_if_index'
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -1350,7 +1360,7 @@ def add_tunnel(params):
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_add_tunnel_after',
                     'args'  : {},
-                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':policy_interface_cache_key} ]
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -1359,10 +1369,10 @@ def add_tunnel(params):
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_remove_tunnel_before',
                     'args'  : {},
-                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':policy_interface_cache_key} ]
     }
     cmd_list.append(cmd)
-    '''
+
     return cmd_list
 
 def modify_tunnel(new_params, old_params):
