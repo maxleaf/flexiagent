@@ -57,6 +57,14 @@
      }
    ]  
   }
+},
+{
+  "entity":  "agent",
+  "message": "remove-tunnel",
+  "params":
+    {
+      "tunnel-id": 3
+    }
 }
 ]
 

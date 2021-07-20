@@ -457,7 +457,6 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
     :returns: None.
     """
     # ipip.api.json: ipip_add_tunnel (tunnel <type vl_api_ipip_tunnel_t>)
-    ret_attr = 'sw_if_index'
     tunnel = {
         'src': ipaddress.ip_address(src),
         'dst': ipaddress.ip_address(dst)
@@ -467,8 +466,12 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "ipip_add_tunnel"
     cmd['cmd']['params']        = {'tunnel': tunnel}
-    cmd['cmd']['cache_ret_val'] = (ret_attr , cache_key)
+    cmd['cmd']['cache_ret_val'] = ('sw_if_index', cache_key)
     cmd['cmd']['descr']         = "create ipip tunnel %s -> %s" % (src, dst)
+    cmd['revert'] = {}
+    cmd['revert']['name']       = 'ipip_del_tunnel'
+    cmd['revert']['params']     = {'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ]}
+    cmd['revert']['descr']      = "delete ipip tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
 def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
