@@ -902,9 +902,9 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 
     return None
 
-# 'dev_id_to_bvi_interface_tap' function get the addr of the interface in a bridge
+# 'bridge_addr_to_bvi_interface_tap' function get the addr of the interface in a bridge
 # and return the tap interface of the BVI interface
-def dev_id_to_bvi_interface_tap(bridge_addr):
+def bridge_addr_to_bvi_interface_tap(bridge_addr):
     # check if interface indeed in a bridge
     bd_id = fwtranslate_add_switch.get_bridge_id(bridge_addr)
     if not bd_id:
