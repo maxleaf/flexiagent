@@ -91,7 +91,7 @@ def flow_01():
 ######################################################################
 # This flow ensures that when all LAN interfaces are removed,
 # the ospfd.conf is deleted.
-# - start-stop-router
+# - start-router
 # - save ospfd.conf
 # - start-router
 # - add-config
@@ -106,8 +106,6 @@ def flow_02():
     with fwtests.TestFwagent() as agent:
 
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
-        assert ok
-        (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
         assert ok
 
         ospfd_content_old = read_ospfd_conf()
@@ -135,7 +133,7 @@ def flow_02():
 # Note we make one add-config & start-router & stop-router & remove-config cycle
 # to create empty ospfd.conf, as it might not exist at the moment
 # of test invocation.
-# - start-stop-router
+# - start-router
 # - save ospfd.conf
 # - start-router
 # - add-config
@@ -152,8 +150,6 @@ def flow_03():
     with fwtests.TestFwagent() as agent:
 
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
-        assert ok
-        (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
         assert ok
 
         ospfd_content_old = read_ospfd_conf()
@@ -183,7 +179,7 @@ def flow_03():
 # Note we make one add-config & start-router & stop-router & remove-config cycle
 # to create empty ospfd.conf, as it might not exist at the moment
 # of test invocation.
-# - start-stop-router
+# - start-router
 # - save ospfd.conf
 # - add-config
 # - start-router
@@ -200,8 +196,6 @@ def flow_04():
     with fwtests.TestFwagent() as agent:
 
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
-        assert ok
-        (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
         assert ok
 
         ospfd_content_old = read_ospfd_conf()
