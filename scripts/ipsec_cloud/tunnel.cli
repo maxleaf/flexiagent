@@ -6,7 +6,7 @@
         "encryption-mode": "ikev2",
         "src": "192.168.0.106",
         "dst": "104.193.146.116",
-        "tunnel-id": 3,
+        "tunnel-id": 1,
         "peer": {
             "mtu": 1350,
             "multilink": {
@@ -39,6 +39,45 @@
     }
 },
 {
+    "entity": "agent",
+    "message": "add-tunnel",
+    "params": {
+        "encryption-mode": "ikev2",
+        "src": "192.168.0.106",
+        "dst": "149.19.194.10",
+        "tunnel-id": 2,
+        "peer": {
+            "mtu": 1350,
+            "multilink": {
+                "labels": [
+                    "5e8d7cc005369313f5ceff16"
+                ]
+            }
+        },
+        "dev_id": "pci:0000:00:03.00",
+        "ikev2": {
+            "role": "initiator",
+            "mode": "psk",
+            "local-device-id": "bb74899bef",
+            "remote-device-id": "149.19.194.10",
+            "lifetime": 3600,
+            "ike": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "modp-2048",
+                "key-size": 256
+            },
+            "esp": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "ecp-256",
+                "key-size": 256
+            },
+            "psk": "97370213b00141b8176dc1ae87bad302"
+        }
+    }
+},
+{
   "entity": "agent",
   "message": "start-router",
   "params": {
@@ -63,7 +102,7 @@
   "message": "remove-tunnel",
   "params":
     {
-      "tunnel-id": 3
+      "tunnel-id": 2
     }
 }
 ]

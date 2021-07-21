@@ -459,7 +459,8 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
     # ipip.api.json: ipip_add_tunnel (tunnel <type vl_api_ipip_tunnel_t>)
     tunnel = {
         'src': ipaddress.ip_address(src),
-        'dst': ipaddress.ip_address(dst)
+        'dst': ipaddress.ip_address(dst),
+        'instance': 0xffffffff
     }
 
     cmd = {}
