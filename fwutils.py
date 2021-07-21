@@ -4142,8 +4142,8 @@ def reload_lte_drivers():
         'option',
         'cdc_wdm',
         'cdc_ncm',
-        'usbnet',
         'qcserial',
+        'usbnet',
         'usb_wwan',
         'mii',
         'usbserial'
@@ -4152,8 +4152,24 @@ def reload_lte_drivers():
     for module in modules:
         os.system('rmmod %s 2>/dev/null' % module)
 
-    for module in modules:
-        os.system('modprobe %s' % module)
+    # Due to the strange behavior of the kernel, the loading of the drivers is not always done properly.
+    # And the following error is printed to the console:
+    #   modprobe: ERROR: could not insert 'cdc_mbim': Key was rejected by service.
+    # The reason is not clear, but a workaround is to run the same command multiple times and surprisingly it works out.
+    tries = 0
+    while tries < 10:
+        tries += 1
+        succeded = True
+
+        # loop over the modules and run modprobe for each one
+        for module in modules:
+            ret = os.system('modprobe %s > /dev/null 2>&1' % module)
+            # In case of error mark the flase as false and loop again
+            if ret != 0:
+                succeded = False
+
+        if succeded:
+            break
 
     time.sleep(2)
 
