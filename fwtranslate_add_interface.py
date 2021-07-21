@@ -433,7 +433,14 @@ def add_interface(params):
             frr_cmd.append('ip ospf authentication message-digest')
 
         if frr_cmd:
-            frr_cmd_revert = list(map(lambda x: '"no %s"' % x, frr_cmd))
+            frr_cmd_revert = list(map(lambda x: 'no %s' % x, frr_cmd))
+
+            # if interface is inside a bridge, we need to put the ospf on the bvi loop interface
+            func = 'dev_id_to_tap'
+            arg = dev_id
+            if bridge_addr:
+                func = 'bridge_addr_to_bvi_interface_tap'
+                arg = bridge_addr
 
             cmd = {}
             cmd['cmd'] = {}
@@ -445,7 +452,7 @@ def add_interface(params):
                         'commands'   : ["interface DEV-STUB"] + frr_cmd,
                         'restart_frr': restart_frr
                     },
-                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func': func, 'arg': arg} ]
             }
             cmd['cmd']['descr']   =  "add OSPF per link configuration of interface %s" % iface_addr
             cmd['revert'] = {}
@@ -457,7 +464,7 @@ def add_interface(params):
                         'commands'   : ["interface DEV-STUB"] + frr_cmd_revert,
                         'restart_frr': restart_frr
                     },
-                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'dev_id_to_tap', 'arg': dev_id} ]
+                    'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func': func, 'arg': arg} ]
             }
             cmd['revert']['descr']   =  "remove OSPF per link configuration of interface %s" % iface_addr
             cmd_list.append(cmd)

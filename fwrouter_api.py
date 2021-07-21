@@ -1105,7 +1105,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             'add-tunnel',
             'add-application',
             'add-multilink-policy',
-            'add-firewall-policy'
+            'add-firewall-policy',
             'add-route',            # Routes should come after tunnels as they might use them!
             'add-dhcp-config'
         ]
