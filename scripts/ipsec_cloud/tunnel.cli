@@ -9,11 +9,9 @@
         "tunnel-id": 1,
         "peer": {
             "mtu": 1350,
-            "multilink": {
-                "labels": [
-                    "5e8d7cc005369313f5ceff16"
-                ]
-            }
+	    "multilink": {
+              "labels": [ "green" ]
+	    }
         },
         "dev_id": "pci:0000:00:03.00",
         "ikev2": {
@@ -48,11 +46,9 @@
         "tunnel-id": 2,
         "peer": {
             "mtu": 1350,
-            "multilink": {
-                "labels": [
-                    "5e8d7cc005369313f5ceff16"
-                ]
-            }
+	    "multilink": {
+              "labels": [ "red" ]
+	    }
         },
         "dev_id": "pci:0000:00:03.00",
         "ikev2": {
@@ -86,7 +82,13 @@
 	"dev_id": "pci:0000:00:03.00",
 	"addr": "192.168.0.106/24",
 	"gateway": "192.168.0.1",
-	"type":"WAN"
+	"type":"WAN",
+        "multilink": {
+            "labels": [
+                "green",
+                "blue",
+                "red"]
+        }
      },
      {
 	"dev_id": "pci:0000:00:08.00",

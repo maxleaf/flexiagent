@@ -1174,6 +1174,7 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
     auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
     mtu              = params['peer']['mtu']
     wan_dev_id       = params['dev_id']
+    iface_params     = params['peer']
 
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
 
@@ -1195,6 +1196,33 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
                               'substs': [ { 'add_param':'unnumbered_sw_if_index', 'val_by_key':tunnel_cache_key},
                                           { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':wan_dev_id} ]}
     cmd_list.append(cmd)
+
+    # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)
+    if 'multilink' in iface_params and 'labels' in iface_params['multilink']:
+        labels = iface_params['multilink']['labels']
+        if len(labels) > 0:
+            # next_hop is a remote gateway
+            next_hop = params['dst']
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "python"
+            cmd['cmd']['descr']   = "add multilink labels into tunnel interface %s: %s" % (params['src'], labels)
+            cmd['cmd']['params']  = {
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels': labels, 'next_hop': next_hop, 'remove': False }
+            }
+            cmd['revert'] = {}
+            cmd['revert']['name']   = "python"
+            cmd['revert']['descr']  = "remove multilink labels from tunnel interface %s: %s" % (params['src'], labels)
+            cmd['revert']['params'] = {
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                            'module': 'fwutils',
+                            'func'  : 'vpp_multilink_update_labels',
+                            'args'  : { 'labels': labels, 'next_hop': next_hop, 'remove': True }
+            }
+            cmd_list.append(cmd)
 
     _add_ikev2(cmd_list, params, params['dst'], tunnel_cache_key, auth_method, None)
 
