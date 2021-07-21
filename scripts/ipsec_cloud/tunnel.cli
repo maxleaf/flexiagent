@@ -75,6 +75,36 @@
 },
 {
   "entity": "agent",
+  "message": "add-multilink-policy",
+  "params": {
+    "id": "5ed4127aa81d8258b96b4853",
+    "rules": [
+      {
+        "id": "1",
+        "priority": 0,
+        "classification": {
+          "prefix": {
+            "ip": "8.8.8.8/32",
+            "ports": "",
+            "protocol": ""
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "green" ],
+              "order": "load-balance"
+            }
+          ],
+          "order": "load-balance",
+          "fallback": "by-destination"
+        }
+      }
+    ]
+  }
+},
+{
+  "entity": "agent",
   "message": "start-router",
   "params": {
     "interfaces": [
