@@ -42,7 +42,7 @@
     "params": {
         "encryption-mode": "ikev2",
         "src": "192.168.0.106",
-        "dst": "149.19.194.10",
+        "dst": "149.19.194.14",
         "tunnel-id": 2,
         "peer": {
             "mtu": 1350,
@@ -54,8 +54,8 @@
         "ikev2": {
             "role": "initiator",
             "mode": "psk",
-            "local-device-id": "bb74899bef",
-            "remote-device-id": "149.19.194.10",
+            "local-device-id": "bb6afde66b",
+            "remote-device-id": "149.19.194.14",
             "lifetime": 3600,
             "ike": {
                 "crypto-alg": "aes-cbc",
@@ -69,7 +69,7 @@
                 "dh-group": "ecp-256",
                 "key-size": 256
             },
-            "psk": "97370213b00141b8176dc1ae87bad302"
+            "psk": "1d53d5ec8e4587fd6ad379c3e17573a0"
         }
     }
 },
@@ -128,14 +128,6 @@
      }
    ]  
   }
-},
-{
-  "entity":  "agent",
-  "message": "remove-tunnel",
-  "params":
-    {
-      "tunnel-id": 2
-    }
 }
 ]
 
