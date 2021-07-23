@@ -44,14 +44,9 @@ cli_add_config_start_stop_remove_config_file = os.path.join(cli_path, 'add-confi
 ospfd_conf_filename = '/etc/frr/ospfd.conf'
 
 def read_ospfd_conf():
-    try:
-        f = open(ospfd_conf_filename, 'r')
-    except:
-        return ''
-
-    content = ''.join(list(filter(lambda line: not line.startswith('!'), f)))
-    f.close()
-
+    content = ''
+    with open(ospfd_conf_filename, 'r') as f:
+        content = ''.join(list(filter(lambda line: not line.startswith('!'), f)))
     return content
 
 ######################################################################
