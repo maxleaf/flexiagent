@@ -28,7 +28,7 @@
         "peer": {
             "mtu": 1350,
             "multilink": {
-               labels": [ "green" ]
+               "labels": [ "green" ]
             }
         },
         "ikev2": {
