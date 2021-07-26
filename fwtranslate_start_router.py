@@ -239,7 +239,7 @@ def start_router(params=None):
     cmd['cmd']['params']  = { 'enable':1, 'flags': 1,  # nat.h: _(0x01, IS_ENDPOINT_DEPENDENT)
                               'sessions':  100000 }    # Defaults: users=1024, sessions=10x1024, in multicore these parameters are per worker thread
     cmd_list.append(cmd)
-    
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
@@ -263,6 +263,24 @@ def start_router(params=None):
         'func'  : 'restore_linux_netplan_files'
     }
     cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "backup DHCP server files"
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'backup_dhcpd_files'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "restore DHCP server files"
+    cmd['revert']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'restore_dhcpd_files'
+    }
+    cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "exec"
