@@ -9,3 +9,4 @@ sqlitedict
 pyserial
 vpp-papi
 websocket-client
+pyroute2
