@@ -256,6 +256,24 @@ def start_router(params=None):
         'func'  : 'restore_linux_netplan_files'
     }
     cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "backup DHCP server files"
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'backup_dhcpd_files'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "restore DHCP server files"
+    cmd['revert']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'restore_dhcpd_files'
+    }
+    cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "exec"
