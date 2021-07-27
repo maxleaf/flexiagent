@@ -1232,7 +1232,7 @@ def reset_device_config():
     if 'lte' in fwglobals.g.db:
         fwglobals.g.db['lte'] = {}
 
-    reset_dhcpd()
+    restore_dhcpd_files()
 
 def print_system_config(full=False):
     """Print router configuration.
@@ -1680,16 +1680,39 @@ def remove_linux_bridges():
     except:
         return True
 
-def reset_dhcpd():
-    if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
-
+def backup_dhcpd_files():
     try:
-        subprocess.check_call('sudo systemctl stop isc-dhcp-server', shell=True)
-    except:
-        return False
+        cmd = 'systemctl stop isc-dhcp-server'
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
 
-    return True
+        if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+            open(fwglobals.g.DHCPD_CONFIG_FILE, 'w').close()
+
+        if not os.path.exists(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.ISC_DHCP_CONFIG_FILE, fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP)
+            open(fwglobals.g.ISC_DHCP_CONFIG_FILE, 'w').close()
+
+    except Exception as e:
+        fwglobals.log.error("backup_dhcpd_files: %s" % str(e))
+
+def restore_dhcpd_files():
+    try:
+        if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
+            os.remove(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+
+        if os.path.exists(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP, fwglobals.g.ISC_DHCP_CONFIG_FILE)
+            os.remove(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP)
+
+        cmd = 'systemctl restart isc-dhcp-server'
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
+
+    except Exception as e:
+        fwglobals.log.error("restore_dhcpd_files: %s" % str(e))
 
 def modify_dhcpd(is_add, params):
     """Modify /etc/dhcp/dhcpd configuration file.
@@ -1698,7 +1721,7 @@ def modify_dhcpd(is_add, params):
 
     :returns: String with sed commands.
     """
-    dev_id         = params['interface']
+    dev_id      = params['interface']
     range_start = params.get('range_start', '')
     range_end   = params.get('range_end', '')
     dns         = params.get('dns', {})
@@ -1712,9 +1735,6 @@ def modify_dhcpd(is_add, params):
     router = str(address.ip)
     subnet = str(address.network)
     netmask = str(address.netmask)
-
-    if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
 
     config_file = fwglobals.g.DHCPD_CONFIG_FILE
 
