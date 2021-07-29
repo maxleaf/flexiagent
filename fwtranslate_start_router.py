@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -25,7 +25,9 @@ import re
 
 import fwnetplan
 import fwglobals
+import fwikev2
 import fwutils
+import fw_nat_command_helpers
 
 # start_router
 # --------------------------------------
@@ -35,7 +37,7 @@ import fwutils
 #      "entity": "agent",
 #      "message": "start-router",
 #      "params": {
-#        "pci": [
+#        "dev_id": [
 #           "0000:00:08.00",
 #           "0000:00:09.00"
 #        ]
@@ -82,51 +84,74 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "fwtranslate_add_tunnel.init_tunnels()"
+    cmd['cmd']['descr']   = "fwrouter_api._on_start_router_before()"
     cmd['cmd']['params']  = {
-                    'module': 'fwtranslate_add_tunnel',
-                    'func'  : 'init_tunnels'
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_start_router_before'
     }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "fwrouter_api._on_stop_router_after()"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_stop_router_after'
+    }
+    cmd_list.append(cmd)
+
+    dev_id_list         = []
+    pci_list_vmxnet3 = []
 
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
     #   sudo ip addr flush dev enp0s8
     # The interfaces to be removed are stored within 'add-interface' requests
     # in the configuration database.
-    pci_list         = []
-    pci_list_vmxnet3 = []
     interfaces = fwglobals.g.router_cfg.get_interfaces()
     for params in interfaces:
-        iface_pci  = fwutils.pci_to_linux_iface(params['pci'])
-        if iface_pci:
-            # Firstly mark 'vmxnet3' interfaces as they need special care:
+        linux_if  = fwutils.dev_id_to_linux_if(params['dev_id'])
+        if linux_if:
+
+            cmd = {}
+            cmd['cmd'] = {}
+            cmd['cmd']['name']    = "exec"
+            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (linux_if ,linux_if ) ]
+            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % linux_if
+            cmd_list.append(cmd)
+
+            # Non-dpdk interface should not appear in /etc/vpp/startup.conf because they don't have a pci address.
+            # Additional spacial logic for these interfaces is at add_interface translator
+            if fwutils.is_non_dpdk_interface(params['dev_id']):
+                continue
+
+            # Mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
             #      If they appear in /etc/vpp/startup.conf, vpp will capture
             #      them with vfio-pci driver, and 'create interface vmxnet3'
             #      command will fail with 'device in use'.
             #   2. They require additional VPP call vmxnet3_create on start
             #      and complement vmxnet3_delete on stop
-            if fwutils.pci_is_vmxnet3(params['pci']):
-                pci_list_vmxnet3.append(params['pci'])
+            if fwutils.dev_id_is_vmxnet3(params['dev_id']):
+                pci_list_vmxnet3.append(params['dev_id'])
             else:
-                pci_list.append(params['pci'])
-
-            cmd = {}
-            cmd['cmd'] = {}
-            cmd['cmd']['name']    = "exec"
-            cmd['cmd']['params']  = [ "sudo ip link set dev %s down && sudo ip addr flush dev %s" % (iface_pci ,iface_pci ) ]
-            cmd['cmd']['descr']   = "shutdown dev %s in Linux" % iface_pci
-            cmd_list.append(cmd)
+                dev_id_list.append(params['dev_id'])
 
     vpp_filename = fwglobals.g.VPP_CONFIG_FILE
 
-    netplan_files = fwnetplan.get_netplan_filenames()
-    fwnetplan._set_netplan_filename(netplan_files)
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "enable coredump to %s" % vpp_filename
+    cmd['cmd']['params']  = {
+        'module': 'fw_vpp_coredump_utils',
+        'func'  : 'vpp_coredump_setup_startup_conf',
+        'args'  : { 'vpp_config_filename' : vpp_filename, 'enable': 1 }
+    }
+    cmd_list.append(cmd)
 
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
     # Other interfaces will be not captured by vpp even if they are DOWN.
-    if len(pci_list) > 0:
+    if len(dev_id_list) > 0:
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']    = "python"
@@ -134,7 +159,7 @@ def start_router(params=None):
         cmd['cmd']['params']  = {
             'module': 'fwutils',
             'func'  : 'vpp_startup_conf_add_devices',
-            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': pci_list }
+            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd['revert'] = {}
         cmd['revert']['name']   = "python"
@@ -142,29 +167,34 @@ def start_router(params=None):
         cmd['revert']['params'] = {
             'module': 'fwutils',
             'func'  : 'vpp_startup_conf_remove_devices',
-            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': pci_list }
+            'args'  : { 'vpp_config_filename' : vpp_filename, 'devices': dev_id_list }
         }
         cmd_list.append(cmd)
-
-    # Enable NAT in vpp configuration file
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "add NAT to %s" % vpp_filename
-    cmd['cmd']['params']  = {
-        'module': 'fwutils',
-        'func'  : 'vpp_startup_conf_add_nat',
-        'args'  : { 'vpp_config_filename' : vpp_filename }
-    }
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "remove NAT from %s" % vpp_filename
-    cmd['revert']['params'] = {
-        'module': 'fwutils',
-        'func'  : 'vpp_startup_conf_remove_nat',
-        'args'  : { 'vpp_config_filename' : vpp_filename }
-    }
-    cmd_list.append(cmd)
+    elif len(pci_list_vmxnet3) == 0:
+        # When the list of devices in the startup.conf file is empty, the vpp attempts
+        # to manage all the down linux interfaces.
+        # Since we allow non-dpdk interfaces (LTE, WiFi), this list could be empty.
+        # In order to prevent vpp from doing so, we need to add the "no-pci" flag.
+        # Note, on VMWare don't use no-pci, so vpp will capture interfaces and
+        # vmxnet3_create() called after vpp start will succeed.
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "add no-pci flag to %s" % vpp_filename
+        cmd['cmd']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_add_nopci',
+            'args'  : { 'vpp_config_filename' : vpp_filename }
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "remove no-pci flag to %s" % vpp_filename
+        cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func'  : 'vpp_startup_conf_remove_nopci',
+            'args'  : { 'vpp_config_filename' : vpp_filename }
+        }
+        cmd_list.append(cmd)
 
     #  Create commands that start vpp and configure it with addresses
     #  sudo systemtctl start vpp
@@ -188,30 +218,35 @@ def start_router(params=None):
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "connect_to_router"
-    cmd['cmd']['descr']   = "connect to vpp papi"
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "connect to vpp papi"
+    cmd['cmd']['params']    = { 'object': 'fwglobals.g.router_api.vpp_api', 'func': 'connect_to_vpp' }
     cmd['revert'] = {}
-    cmd['revert']['name']   = "disconnect_from_router"
+    cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "disconnect from vpp papi"
+    cmd['revert']['params'] = { 'object': 'fwglobals.g.router_api.vpp_api', 'func': 'disconnect_from_vpp' }
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "exec"
-    cmd['cmd']['params']  = [ "sudo vppctl enable tap-inject" ]
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'vpp_enable_tap_inject'}
     cmd['cmd']['descr']   = "enable tap-inject"
     cmd_list.append(cmd)
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "nat44_forwarding_enable_disable"
-    cmd['cmd']['descr']   = "enable NAT forwarding"
-    cmd['cmd']['params']  = { 'enable':1 }
+    cmd['cmd']['name']    = "nat44_plugin_enable_disable"
+    cmd['cmd']['descr']   = "enable NAT pluging and configure it"
+    cmd['cmd']['params']  = { 'enable':1, 'flags': 1,  # nat.h: _(0x01, IS_ENDPOINT_DEPENDENT)
+                              'sessions':  100000 }    # Defaults: users=1024, sessions=10x1024, in multicore these parameters are per worker thread
     cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
     cmd['cmd']['descr'] = "punt ip broadcast"
     cmd_list.append(cmd)
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
@@ -229,13 +264,86 @@ def start_router(params=None):
     }
     cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "backup DHCP server files"
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'backup_dhcpd_files'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "restore DHCP server files"
+    cmd['revert']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'restore_dhcpd_files'
+    }
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "exec"
+    cmd['cmd']['params']  = [ 'sudo systemctl start frr; if [ -z "$(pgrep frr)" ]; then exit 1; fi' ]
+    cmd['cmd']['descr']   = "start frr"
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "stop frr"
+    cmd['revert']['params'] = [ 'sudo systemctl stop frr' ]
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "Setup FRR configuration"
+    cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'frr_setup_config'}
+    cmd_list.append(cmd)
+
+    # We set up the redistribution filter now. We don't want to set it on every add_route translation.
+    # At this time, the filter list will be empty, so no kernel route will be redistributed.
+    # When we need to redistribute a static route, we'll add it to the filter list.
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+            'module': 'fwutils',
+            'func':   'frr_create_redistribution_filter',
+            'args': {
+                'router': 'router ospf',
+                'acl': fwglobals.g.FRR_OSPF_ACL,
+                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
+                'route_map_num': '1', # 1 is for OSPF
+            }
+    }
+    cmd['cmd']['descr']   =  "add ospf redistribution filter"
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+            'module': 'fwutils',
+            'func':   'frr_create_redistribution_filter',
+            'args': {
+                'router': 'router ospf',
+                'acl': fwglobals.g.FRR_OSPF_ACL,
+                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
+                'route_map_num': '1', # 1 is for OSPF
+                'revert': True
+            }
+    }
+    cmd['revert']['descr']   =  "remove ospf redistribution filter"
+    cmd_list.append(cmd)
+
+    # Setup Global VPP NAT parameters
+    # Post VPP NAT/Firewall changes - The param need to be false
+    cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(False))
+
     # vmxnet3 interfaces are not created by VPP on bootup, so create it explicitly
     # vmxnet3.api.json: vmxnet3_create (..., pci_addr, enable_elog, rxq_size, txq_size, ...)
     # Note we do it here and not on 'add-interface' as 'modify-interface' is translated
     # into 'remove-interface' and 'add-interface', so we want to avoid deletion
     # and creation interface on every 'modify-interface'. There is no sense to do
     # that and it causes problems in FIB, when default route interface is deleted.
-    for pci in pci_list_vmxnet3:
+    for dev_id in pci_list_vmxnet3:
+        _, pci = fwutils.dev_id_parse(dev_id)
         pci_bytes = fwutils.pci_str_to_bytes(pci)
         cmd = {}
         cmd['cmd'] = {}
@@ -245,7 +353,7 @@ def start_router(params=None):
         cmd['revert'] = {}
         cmd['revert']['name']   = "vmxnet3_delete"
         cmd['revert']['descr']  = "delete vmxnet3 interface for %s" % pci
-        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'pci_to_vpp_sw_if_index', 'arg':pci } ] }
+        cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ] }
         cmd_list.append(cmd)
 
     # Once VPP started, apply configuration to it.
@@ -263,17 +371,17 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = "fwrouter_api._on_start_router()"
+    cmd['cmd']['descr']   = "fwrouter_api._on_start_router_after()"
     cmd['cmd']['params']  = {
                     'object': 'fwglobals.g.router_api',
-                    'func'  : '_on_start_router'
+                    'func'  : '_on_start_router_after'
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "fwrouter_api._on_stop_router()"
+    cmd['revert']['descr']  = "fwrouter_api._on_stop_router_before()"
     cmd['revert']['params'] = {
                     'object': 'fwglobals.g.router_api',
-                    'func'  : '_on_stop_router'
+                    'func'  : '_on_stop_router_before'
     }
     cmd_list.append(cmd)
 

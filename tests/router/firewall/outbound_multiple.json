@@ -1,0 +1,43 @@
+[
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "outbound": {
+                "rules": [
+                    {
+                        "id": "1",
+                        "classification": {
+                            "destination": {
+                                "trafficTags": {
+                                    "category": "auth-service",
+                                    "importance": "low"
+                                }
+                            },
+                            "source": {
+                                "trafficId": "3"
+                            }
+                        },
+                        "action": {
+                            "permit": true
+                        }
+                    },
+                    {
+                        "id": "2",
+                        "classification": {
+                            "destination": {
+                                "trafficId": "1"
+                            },
+                            "source": {
+                                "trafficId": "2"
+                            }
+                        },
+                        "action": {
+                            "permit": false
+                        }
+                    }
+                ]
+            }
+        }
+    }
+]

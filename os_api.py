@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -27,7 +27,7 @@ import fwnetplan
 import fwutils
 import fwstats
 import os
-
+import fwglobals
 
 # TBD: define all APIs in a file
 os_modules = {
@@ -39,58 +39,14 @@ os_modules = {
 
 # TBD: define all APIs in a file
 os_api_defs = {
-    'interfaces':{'module':'psutil', 'api':'net_if_addrs', 'decode':'interfaces'},
     'cpuutil':{'module':'psutil', 'api':'cpu_percent', 'decode':None},
     'exec':{'module':'os', 'api':'popen', 'decode':'execd'},
-    'savefile':{'module':'fwutils', 'api':'save_file', 'decode':'default'},
-    'pcisub':{'module':'fwutils', 'api':'pci_sub_file', 'decode':'default'},
-    'tapsub':{'module':'fwutils', 'api':'tap_sub_file', 'decode':'default'},
-    'gresub':{'module':'fwutils', 'api':'gre_sub_file', 'decode':'default'},
-    'ifcount':{'module':'fwutils', 'api':'get_vpp_if_count', 'decode':'default'},
-    'connect_to_router':{'module':'fwutils', 'api':'connect_to_router', 'decode':None},
-    'disconnect_from_router':{'module':'fwutils', 'api':'disconnect_from_router', 'decode':None}
+    'exec_timeout':{'module':'fwutils', 'api':'exec_with_timeout', 'decode':'exec_timeout_decode'}
 }
 
 class OS_DECODERS:
     """OS DECODERS class representation.
     """
-    def interfaces(self, inp):
-        """Get PCI address from Linux interface name for a list of interfaces.
-
-        :param inp:         Interfaces.
-
-        :returns: Array of interface descriptions.
-        """
-        out = []
-
-        for nicname, addrs in inp.items():
-            pciaddr = fwutils.linux_to_pci_addr(nicname)
-            if pciaddr[0] == "":
-                continue
-            daddr = {
-                        'name':nicname,
-                        'pciaddr':pciaddr[0],
-                        'driver':pciaddr[1],
-                        'MAC':'',
-                        'IPv4':'',
-                        'IPv4Mask':'',
-                        'IPv6':'',
-                        'IPv6Mask':'',
-                        'dhcp':'',
-                        'gateway':'',
-                        'metric': '',
-                    }
-            daddr['dhcp'] = fwnetplan.get_dhcp_netplan_interface(nicname)
-            daddr['gateway'], daddr['metric'] = fwutils.get_linux_interface_gateway(nicname)
-            for addr in addrs:
-                addr_af_name = fwutils.af_to_name(addr.family)
-                daddr[addr_af_name] = addr.address.split('%')[0]
-                if addr.netmask != None:
-                    daddr[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
-
-            out.append(daddr)
-        return (out,1)
-
     def execd(self, handle):
         """Read from a descriptor.
 
@@ -103,6 +59,17 @@ class OS_DECODERS:
         if retcode == None or retcode == 0: ok=1
         else: ok=0
         return (data, ok)
+
+    def exec_timeout_decode(self, handle):
+        """Read from a descriptor.
+
+        :param handle:         Dict with command execution result.
+
+        :returns: Return value.
+        """
+        ok = 1
+        return (handle, ok)
+
     def default(self, inp):
         """Return default message.
         """

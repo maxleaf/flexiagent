@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -21,13 +21,16 @@
 ################################################################################
 
 # Handle device statistics
+import fwikev2
 import fwutils
+import math
 import time
 import loadsimulator
 import psutil
 
 from fwtunnel_stats import tunnel_stats_get
 import fwglobals
+import fwtunnel_stats
 
 # Globals
 # Keep updates up to 1 hour ago
@@ -57,51 +60,53 @@ def update_stats():
         reset_stats()
         vpp_pid = current_vpp_pid
 
-    new_stats = fwutils.get_vpp_if_count()
-    if new_stats['ok'] == 1:
-        prev_stats = dict(stats)  # copy of prev stats
-        stats['time'] = time.time()
-        stats['last'] = new_stats['message']
-        stats['ok'] = 1
-        # Update info if previous stats valid
-        if prev_stats['ok'] == 1:
-            if_bytes = {}
-            tunnel_bytes = {}
-            tunnel_stats = tunnel_stats_get()
-            for intf, counts in stats['last'].items():
-                if (intf.startswith('ipsec-gre') or
-                    intf.startswith('loop')): continue
-                prev_stats_if = prev_stats['last'].get(intf, None)
-                if prev_stats_if != None:
-                    rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])
-                    rx_pkts  = 1.0 * (counts['rx_pkts'] - prev_stats_if['rx_pkts'])
-                    tx_bytes = 1.0 * (counts['tx_bytes'] - prev_stats_if['tx_bytes'])
-                    tx_pkts  = 1.0 * (counts['tx_pkts'] - prev_stats_if['tx_pkts'])
-                    calc_stats = {
-                            'rx_bytes': rx_bytes,
-                            'rx_pkts': rx_pkts,
-                            'tx_bytes': tx_bytes,
-                            'tx_pkts': tx_pkts
-                        }
-                    if (intf.startswith('vxlan_tunnel')):
-                        vxlan_id = int(intf[12:])
-                        tunnel_id = vxlan_id/2
-                        t_stats = tunnel_stats.get(tunnel_id)
-                        if t_stats:
-                            t_stats.update(calc_stats)
-                    else:
-                        # For other interfaces try to get pci index
-                        pci = fwutils.vpp_if_name_to_pci(intf)
-                        if pci:
-                            if_bytes[pci] = calc_stats
-
-
-            stats['bytes'] = if_bytes
-            stats['tunnel_stats'] = tunnel_stats
-            stats['period'] = stats['time'] - prev_stats['time']
-            stats['running'] = True if fwutils.vpp_does_run() else False
-    else:
+    if not vpp_pid or not fwglobals.g.router_api.state_is_started():
         stats['ok'] = 0
+    else:
+        new_stats = fwutils.get_vpp_if_count()
+        if not new_stats:
+            stats['ok'] = 0
+        else:
+            prev_stats = dict(stats)  # copy of prev stats
+            stats['time'] = time.time()
+            stats['last'] = new_stats
+            stats['ok'] = 1
+            # Update info if previous stats valid
+            if prev_stats['ok'] == 1:
+                if_bytes = {}
+                tunnel_stats = tunnel_stats_get()
+                fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
+                for intf, counts in list(stats['last'].items()):
+                    if (intf.startswith('gre') or
+                        intf.startswith('loop')): continue
+                    prev_stats_if = prev_stats['last'].get(intf, None)
+                    if prev_stats_if != None:
+                        rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])
+                        rx_pkts  = 1.0 * (counts['rx_pkts'] - prev_stats_if['rx_pkts'])
+                        tx_bytes = 1.0 * (counts['tx_bytes'] - prev_stats_if['tx_bytes'])
+                        tx_pkts  = 1.0 * (counts['tx_pkts'] - prev_stats_if['tx_pkts'])
+                        calc_stats = {
+                                'rx_bytes': rx_bytes,
+                                'rx_pkts': rx_pkts,
+                                'tx_bytes': tx_bytes,
+                                'tx_pkts': tx_pkts
+                            }
+                        if (intf.startswith('vxlan_tunnel')):
+                            vxlan_id = int(intf[12:])
+                            tunnel_id = math.floor(vxlan_id/2)
+                            t_stats = tunnel_stats.get(tunnel_id)
+                            if t_stats:
+                                t_stats.update(calc_stats)
+                        else:
+                            # For other interfaces try to get interface id
+                            dev_id = fwutils.vpp_if_name_to_dev_id(intf)
+                            if dev_id:
+                                if_bytes[dev_id] = calc_stats
+
+                stats['bytes'] = if_bytes
+                stats['tunnel_stats'] = tunnel_stats
+                stats['period'] = stats['time'] - prev_stats['time']
+                stats['running'] = True if fwutils.vpp_does_run() else False
 
     # Add the update to the list of updates. If the list is full,
     # remove the oldest update before pushing the new one
@@ -141,10 +146,12 @@ def get_system_health():
     try:
         temp_stats = {'value':0.0, 'high':100.0, 'critical':100.0}
         all_temp = psutil.sensors_temperatures()
-        for ttype, templist in all_temp.items():
-            for temp in templist:
-                if temp.current > temp_stats['value']:
-                    temp_stats = {'value':temp.current, 'high':temp.high, 'critical':temp.critical}
+        for ttype, templist in list(all_temp.items()):
+            if ttype == 'coretemp':
+                temp = templist[0]
+                if temp.current: temp_stats['value'] = temp.current
+                if temp.high: temp_stats['high'] = temp.high
+                if temp.critical: temp_stats['critical'] = temp.critical
     except Exception as e:
         fwglobals.log.excep("Error getting temperature stats: %s" % str(e))
 
@@ -159,6 +166,7 @@ def get_stats():
     del updates_list[:]
 
     reconfig = fwutils.get_reconfig_hash()
+    ikev2_certificate_expiration = fwglobals.g.ikev2.get_certificate_expiration()
 
     # If the list of updates is empty, append a dummy update to
     # set the most up-to-date status of the router. If not, update
@@ -167,11 +175,12 @@ def get_stats():
         status = True
         state = 'running'
         reason = ''
+        reconfig = ''
     else:
         status = True if fwutils.vpp_does_run() else False
         (state, reason) = fwutils.get_router_state()
     if not res_update_list:
-        res_update_list.append({
+        info = {
             'ok': stats['ok'],
             'running': status,
             'state': state,
@@ -182,13 +191,18 @@ def get_stats():
             'period': 0,
             'utc': time.time(),
             'reconfig': reconfig
-        })
+        }
+        if fwglobals.g.ikev2.is_private_key_created():
+            info['ikev2'] = ikev2_certificate_expiration
+        res_update_list.append(info)
     else:
         res_update_list[-1]['running'] = status
         res_update_list[-1]['state'] = state
         res_update_list[-1]['stateReason'] = reason
         res_update_list[-1]['reconfig'] = reconfig
         res_update_list[-1]['health'] = get_system_health()
+        if fwglobals.g.ikev2.is_private_key_created():
+            res_update_list[-1]['ikev2'] = ikev2_certificate_expiration
 
     return {'message': res_update_list, 'ok': 1}
 
@@ -207,4 +221,4 @@ def reset_stats():
     :returns: None.
     """
     global stats
-    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False}
+    stats = {'running': False, 'ok':0, 'last':{}, 'bytes':{}, 'tunnel_stats':{}, 'health':{}, 'period':0, 'reconfig':False, 'ikev2':''}

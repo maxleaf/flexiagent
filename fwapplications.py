@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -70,6 +70,24 @@ class FwApps:
         self.categories.clear()
         self.subcategories.clear()
         self.importances.clear()
+
+    def dumps(self):
+        """Prints content of database into string
+        """
+
+        app_2_acl = sorted(self.app_2_acl.keys())
+        categories = sorted(self.categories.keys())
+        subcategories = sorted(self.subcategories.keys())
+        importances = sorted(self.importances.keys())
+
+        db = {
+            'app_2_acl': [ { key: self.app_2_acl[key] } for key in app_2_acl ],
+            'categories': [ { key: self.categories[key] } for key in categories ],
+            'subcategories': [ { key: self.subcategories[key] } for key in subcategories ],
+            'importances': [ { key: self.importances[key] } for key in importances ],
+        }
+
+        return json.dumps(db, indent=2, sort_keys=True)
 
     def _add_acl_id(self, dict, key, acl_id):
         if key not in dict:

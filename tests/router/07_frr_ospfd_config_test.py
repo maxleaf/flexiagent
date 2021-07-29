@@ -43,6 +43,12 @@ cli_add_config_start_stop_remove_config_file = os.path.join(cli_path, 'add-confi
 
 ospfd_conf_filename = '/etc/frr/ospfd.conf'
 
+def read_ospfd_conf():
+    content = ''
+    with open(ospfd_conf_filename, 'r') as f:
+        content = ''.join(list(filter(lambda line: not line.startswith('!'), f)))
+    return content
+
 ######################################################################
 # This flow checks if every subsequent 'start-router' doesn't blow
 # the ospfd.conf with same interfaces:
@@ -62,9 +68,7 @@ def flow_01():
         (ok, _) = agent.cli('-f %s' % cli_start_router_file)
         assert ok
 
-        f = open(ospfd_conf_filename, 'r')
-        ospfd_content_old = f.read()
-        f.close()
+        ospfd_content_old = read_ospfd_conf()
 
         (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
         assert ok
@@ -73,9 +77,8 @@ def flow_01():
         (ok, _) = agent.cli('-f %s' % cli_stop_router_file)
         assert ok
 
-        f = open(ospfd_conf_filename, 'r')
-        ospfd_content_new = f.read()
-        f.close()
+        ospfd_content_new = read_ospfd_conf()
+
         assert ospfd_content_old == ospfd_content_new, \
               "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
               (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
@@ -84,29 +87,39 @@ def flow_01():
 # This flow ensures that when all LAN interfaces are removed,
 # the ospfd.conf is deleted.
 # - start-router
+# - save ospfd.conf
+# - start-router
 # - add-config
 # - remove-config
 # - stop-router
-# - ensure that ospfd.conf does not exist
+# - ensure that current ospfd.conf is equal to the saved previously one
 # - add-config
 # - remove-config
-# - ensure that ospfd.conf does not exist
+# - ensure that current ospfd.conf is equal to the saved previously one
 ######################################################################
 def flow_02():
     with fwtests.TestFwagent() as agent:
 
+        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
+        assert ok
+
+        ospfd_content_old = read_ospfd_conf()
+
         (ok, _) = agent.cli('-f %s' % cli_start_add_config_remove_config_stop_file)
         assert ok
 
-        exist = fwtests.file_exists(ospfd_conf_filename)
-        assert exist==False, "%s was not deleted on configuration removal" % ospfd_conf_filename
+        ospfd_content_new = read_ospfd_conf()
+
+        assert ospfd_content_old == ospfd_content_new, \
+              "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
+              (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
 
         (ok, _) = agent.cli('-f %s' % cli_add_config_remove_config_file)
         assert ok
 
-        exists = fwtests.file_exists(ospfd_conf_filename)
-        assert exists==False, "%s was not deleted on configuration add and remove" % ospfd_conf_filename
-
+        assert ospfd_content_old == ospfd_content_new, \
+              "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
+              (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
 
 ######################################################################
 # This flow checks if 'remove-cfg' performed after router was stopped
@@ -116,30 +129,43 @@ def flow_02():
 # to create empty ospfd.conf, as it might not exist at the moment
 # of test invocation.
 # - start-router
-# - add-config
-# - remove-config
-# - stop-router
-# - ensure that ospfd.conf does not exist
+# - save ospfd.conf
 # - start-router
 # - add-config
 # - remove-config
 # - stop-router
-# - ensure that ospfd.conf does not exist
+# - ensure that current ospfd.conf is equal to the saved previously one
+# - start-router
+# - add-config
+# - remove-config
+# - stop-router
+# - ensure that current ospfd.conf is equal to the saved previously one
 ######################################################################
 def flow_03():
     with fwtests.TestFwagent() as agent:
 
+        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
+        assert ok
+
+        ospfd_content_old = read_ospfd_conf()
+
         (ok, _) = agent.cli('-f %s' % cli_start_add_config_remove_config_stop_file)
         assert ok
 
-        exist = fwtests.file_exists(ospfd_conf_filename)
-        assert exist==False, "%s was not deleted on configuration removal" % ospfd_conf_filename
+        ospfd_content_new = read_ospfd_conf()
+
+        assert ospfd_content_old == ospfd_content_new, \
+              "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
+              (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
 
         (ok, _) = agent.cli('-f %s' % cli_start_add_config_remove_config_stop_file)
         assert ok
 
-        exists = fwtests.file_exists(ospfd_conf_filename)
-        assert exists==False, "%s was not deleted on configuration add and remove" % ospfd_conf_filename
+        ospfd_content_new = read_ospfd_conf()
+
+        assert ospfd_content_old == ospfd_content_new, \
+              "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
+              (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
 
 ######################################################################
 # This flow checks if 'remove-cfg' performed before router was stopped
@@ -148,31 +174,44 @@ def flow_03():
 # Note we make one add-config & start-router & stop-router & remove-config cycle
 # to create empty ospfd.conf, as it might not exist at the moment
 # of test invocation.
+# - start-router
+# - save ospfd.conf
 # - add-config
 # - start-router
 # - stop-router
 # - remove-config
-# - ensure that ospfd.conf does not exist
+# - ensure that current ospfd.conf is equal to the saved previously one
 # - add-config
 # - start-router
-# - stop-router
 # - remove-config
-# - ensure that ospfd.conf does not exist
+# - stop-router
+# - ensure that current ospfd.conf is equal to the saved previously one
 ######################################################################
 def flow_04():
     with fwtests.TestFwagent() as agent:
 
+        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
+        assert ok
+
+        ospfd_content_old = read_ospfd_conf()
+
         (ok, _) = agent.cli('-f %s' % cli_add_config_start_stop_remove_config_file)
         assert ok
 
-        exist = fwtests.file_exists(ospfd_conf_filename)
-        assert exist==False, "%s was not deleted on configuration removal" % ospfd_conf_filename
+        ospfd_content_new = read_ospfd_conf()
+
+        assert ospfd_content_old == ospfd_content_new, \
+              "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
+              (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
 
         (ok, _) = agent.cli('-f %s' % cli_add_config_start_stop_remove_config_file)
         assert ok
 
-        exists = fwtests.file_exists(ospfd_conf_filename)
-        assert exists==False, "%s was not deleted on configuration add and remove" % ospfd_conf_filename
+        ospfd_content_new = read_ospfd_conf()
+
+        assert ospfd_content_old == ospfd_content_new, \
+              "%s BEFORE test:%s\n\n%s AFTER test:%s\n" % \
+              (ospfd_conf_filename, ospfd_content_old, ospfd_conf_filename, ospfd_content_new)
 
 
 def test():

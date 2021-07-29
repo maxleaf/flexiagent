@@ -4,15 +4,10 @@
   "message": "start-router",
   "params": {
     "interfaces": [
+      "__INTERFACE_1__",
       {
-        "pci":"0000:00:08.00",
-        "addr":"10.0.0.4/24",
-        "gateway": "10.0.0.10",
-        "type":"wan"
-      },
-      {
-        "pci":"0000:00:09.00",
-        "addr":"192.168.56.101/24",
+        "dev_id":"__INTERFACE_2__dev_id",
+        "addr":"__INTERFACE_2__addr",
         "gateway": "192.168.56.1",
         "type":"wan",
         "routing":"ospf"
@@ -27,12 +22,12 @@
   "params": [
     {
       "addr": "6.6.6.0/24",
-      "via": "10.0.0.10"
+      "via": "__INTERFACE_1__gateway"
     },
     {
       "addr": "9.9.9.9",
       "via": "192.168.56.1",
-      "pci":"0000:00:09.00"
+      "dev_id":"__INTERFACE_2__dev_id"
     }
   ]
 }
@@ -43,12 +38,12 @@
   "params": [
     {
       "addr": "6.6.6.0/24",
-      "via": "10.0.0.10"
+      "via": "__INTERFACE_1__gateway"
     },
     {
       "addr": "9.9.9.9",
 	  "via": "192.168.56.1",
-      "pci":"0000:00:09.00"
+      "dev_id":"__INTERFACE_2__dev_id"
     }
   ]
 }

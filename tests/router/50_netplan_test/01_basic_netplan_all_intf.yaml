@@ -1,0 +1,13 @@
+network:
+    version: 2
+    ethernets:
+        __INTERFACE_3__name:
+            dhcp4: true
+        __INTERFACE_1__name:
+            dhcp4: true
+            dhcp4-overrides:
+                route-metric: 200
+        __INTERFACE_2__name:
+            dhcp4: true
+            dhcp4-overrides:
+                route-metric: 300

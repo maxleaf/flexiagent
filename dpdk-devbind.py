@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python3
 #
 #   BSD LICENSE
 #
@@ -131,7 +131,7 @@ To bind 0000:02:00.0 and 0000:02:00.1 to the ixgbe kernel driver
 def check_output(args, stderr=None):
     '''Run a command and capture its output'''
     return subprocess.Popen(args, stdout=subprocess.PIPE,
-                            stderr=stderr).communicate()[0]
+                            stderr=stderr).communicate()[0].decode()
 
 
 def find_module(mod):
@@ -181,17 +181,13 @@ def check_modules():
         sysfs_path = '/sys/module/'
 
         # Get the list of directories in sysfs_path
-        sysfs_mods = [os.path.join(sysfs_path, o) for o
+        sysfs_mods = [o for o
                       in os.listdir(sysfs_path)
                       if os.path.isdir(os.path.join(sysfs_path, o))]
 
-        # Extract the last element of '/sys/module/abc' in the array
-        sysfs_mods = [a.split('/')[-1] for a in sysfs_mods]
-
         # special case for vfio_pci (module is named vfio-pci,
         # but its .ko is named vfio_pci)
-        sysfs_mods = map(lambda a:
-                         a if a != 'vfio_pci' else 'vfio-pci', sysfs_mods)
+        sysfs_mods = ['vfio-pci' if o == 'vfio_pci' else o for o in sysfs_mods ]
 
         for mod in mods:
             if mod["Name"] in sysfs_mods:
@@ -226,7 +222,7 @@ def get_pci_device_details(dev_id):
     for line in extra_info:
         if len(line) == 0:
             continue
-        name, value = line.decode().split("\t", 1)
+        name, value = line.split("\t", 1)
         name = name.strip(":") + "_str"
         device[name] = value
     # check for a unix interface name
@@ -280,7 +276,7 @@ def get_nic_details():
                 # use dict to make copy of dev
                 devices[dev["Slot"]] = dict(dev)
         else:
-            name, value = dev_line.decode().split("\t", 1)
+            name, value = dev_line.split("\t", 1)
             dev[name.rstrip(":")] = value
 
     # check what is the interface if any for an ssh connection if
@@ -288,18 +284,17 @@ def get_nic_details():
     ssh_if = []
     route = check_output(["ip", "-o", "route"])
     # filter out all lines for 169.254 routes
-    route = "\n".join(filter(lambda ln: not ln.startswith("169.254"),
-                             route.decode().splitlines()))
+    route = "\n".join([ln for ln in route.splitlines() if not ln.startswith("169.254")])
     rt_info = route.split()
     for i in range(len(rt_info) - 1):
         if rt_info[i] == "dev":
             ssh_if.append(rt_info[i+1])
 
     # based on the basic info, get extended text details
-    for d in devices.keys():
+    for d in list(devices.keys()):
         # get additional info and add it to existing data
         devices[d] = devices[d].copy()
-        devices[d].update(get_pci_device_details(d).items())
+        devices[d].update(get_pci_device_details(d))
 
         for _if in ssh_if:
             if _if in devices[d]["Interface"].split(","):
@@ -346,14 +341,14 @@ def get_crypto_details():
                 # use dict to make copy of dev
                 devices[dev["Slot"]] = dict(dev)
         else:
-            name, value = dev_line.decode().split("\t", 1)
+            name, value = dev_line.split("\t", 1)
             dev[name.rstrip(":")] = value
 
     # based on the basic info, get extended text details
-    for d in devices.keys():
+    for d in list(devices.keys()):
         # get additional info and add it to existing data
         devices[d] = devices[d].copy()
-        devices[d].update(get_pci_device_details(d).items())
+        devices[d].update(get_pci_device_details(d))
 
         # add igb_uio to list of supporting modules if needed
         if "Module_str" in devices[d]:
@@ -385,7 +380,7 @@ def dev_id_from_dev_name(dev_name):
         return "0000:" + dev_name
     else:
         # check if it's an interface name, e.g. eth1
-        for d in devices.keys():
+        for d in list(devices.keys()):
             if dev_name in devices[d]["Interface"].split(","):
                 return devices[d]["Slot"]
     # if nothing else matches - error
@@ -489,7 +484,7 @@ def bind_one(dev_id, driver, force):
 
 def unbind_all(dev_list, force=False):
     """Unbind method, takes a list of device locations"""
-    dev_list = map(dev_id_from_dev_name, dev_list)
+    dev_list = list(map(dev_id_from_dev_name, dev_list))
     for d in dev_list:
         unbind_one(d, force)
 
@@ -498,7 +493,7 @@ def bind_all(dev_list, driver, force=False):
     """Bind method, takes a list of device locations"""
     global devices
 
-    dev_list = map(dev_id_from_dev_name, dev_list)
+    dev_list = list(map(dev_id_from_dev_name, dev_list))
 
     for d in dev_list:
         bind_one(d, driver, force)
@@ -508,14 +503,13 @@ def bind_all(dev_list, driver, force=False):
     # be bound even if no one has asked them to. hence, we check the list of
     # drivers again, and see if some of the previously-unbound devices were
     # erroneously bound.
-    for d in devices.keys():
+    for d in list(devices.keys()):
         # skip devices that were already bound or that we know should be bound
         if "Driver_str" in devices[d] or d in dev_list:
             continue
 
         # update information about this device
-        devices[d] = dict(devices[d].items() +
-                          get_pci_device_details(d).items())
+        devices[d] = {**devices[d], **get_pci_device_details(d)}  # Merge dictionaries
 
         # check if updated information indicates that the device was bound
         if "Driver_str" in devices[d]:
@@ -554,7 +548,7 @@ def show_status():
     no_drv = []
 
     # split our list of network devices into the three categories above
-    for d in devices.keys():
+    for d in list(devices.keys()):
         if (NETWORK_BASE_CLASS in devices[d]["Class"]):
             if not has_driver(d):
                 no_drv.append(devices[d])
@@ -577,7 +571,7 @@ def show_status():
     dpdk_drv = []
     no_drv = []
 
-    for d in devices.keys():
+    for d in list(devices.keys()):
         if (CRYPTO_BASE_CLASS in devices[d]["Class"]):
             if not has_driver(d):
                 no_drv.append(devices[d])

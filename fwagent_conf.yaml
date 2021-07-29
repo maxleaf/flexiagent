@@ -2,5 +2,8 @@ agent:
   server: https://manage.flexiwan.com:443  # default: https://app.flexiwan.com:443
   token: /etc/flexiwan/agent/token.txt  # default: /etc/flexiwan/agent/token.txt
   bypass_certificate: false             # default: false
+  monitor_unassigned_interfaces: true   # default: true
   debug: true                           # default: true
 
+edgeui:
+  enabled: true                         # default or omit: true

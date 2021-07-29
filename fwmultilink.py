@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -27,10 +27,23 @@ from sqlitedict import SqliteDict
 class FwMultilink:
     """This is object that encapsulates data used by multi-link feature.
     """
-    def __init__(self, db_file):
+    def __init__(self, db_file, fill_if_empty=True):
         self.db_filename = db_file
-        # Map of label strings (aka names) into integers (aka id-s) used by VPP.
-        self.labels = SqliteDict(db_file, autocommit=True)
+        # The DB contains:
+        # db['labels']     - map of label strings (aka names) into integers (aka id-s) used by VPP.
+        # db['vacant_ids'] - pool of available id-s.
+
+        self.db = SqliteDict(db_file, autocommit=True)
+      
+        if not fill_if_empty:
+            return
+            
+        if not 'labels' in self.db:
+            self.db['labels'] = {}
+        if not 'vacant_ids' in self.db:
+            self.db['vacant_ids'] = list(range(256))  # VPP uses u8 to keep ID, hence limitation of 0-255
+        else:
+            self.db['vacant_ids'] = sorted(self.db['vacant_ids'])  # Reduce chaos a bit :)
 
     def __enter__(self):
         return self
@@ -41,31 +54,20 @@ class FwMultilink:
     def finalize(self):
         """Destructor method
         """
-        self.labels.close()
+        self.db.close()
 
     def clean(self):
         """Clean DB
-
-        :returns: None.
         """
-        self.labels.clear()
+        self.db['labels'] = {}
+        self.db['vacant_ids'] = list(range(256))
 
-    def _add_dict_entry(self, dict_key, key, value):
-        if dict_key not in self.labels:
-            self.labels[dict_key] = '{}'
-
-        json_dict = json.loads(self.labels[dict_key])
-        json_dict[key] = value
-        self.labels[dict_key] = json.dumps(json_dict)
-
-    def _remove_dict_entry(self, dict_key, key):
-        json_dict = json.loads(self.labels[dict_key])
-        del json_dict[key]
-        self.labels[dict_key] = json.dumps(json_dict)
-
-    def _get_dict_entry(self, dict_key, key):
-        json_dict = json.loads(self.labels[dict_key])
-        return json_dict[key]
+    def dumps(self):
+        """Prints content of database into string
+        """
+        db_keys = sorted(self.db.keys())                    # The key order might be affected by dictionary content, so sort it
+        dump = [ { key: self.db[key] } for key in db_keys ] # We can't json.dumps(self.db) directly as it is SqlDict and not dict
+        return json.dumps(dump, indent=2, sort_keys=True)
 
     def get_label_ids_by_names(self, names, remove=False):
         """Maps label names into label id-s.
@@ -78,40 +80,51 @@ class FwMultilink:
 
         :returns: list of id-s.
         """
-        gc_before = len(self.labels)
+        # Note we can't modify self.db subelements, as SqlDict can't detect
+        # modifications in the object memory, so we have to replace whole
+        # root element. That is why we use temporary copies of root elements.
+        #
+        labels     = self.db['labels']
+        vacant_ids = self.db['vacant_ids']
+
+        gc_before = len(labels)
 
         ids = []
         for name in names:
-            if name in self.labels:
-                old_value = self._get_dict_entry(name, 'refCounter')
+            if name in labels:
                 if remove:
-                    self._add_dict_entry(name, 'refCounter', old_value - 1)
+                    labels[name]['refCounter'] -= 1
                 else:
-                    self._add_dict_entry(name, 'refCounter', old_value + 1)
+                    labels[name]['refCounter'] += 1
+                ids.append(labels[name]['id'])
             else:
-                new_id = len(self.labels)
-                if new_id > 254:
-                    raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label")
+                if remove:
+                    raise Exception("FwMultilink: remove not existing label '%s'" % name)
 
-                self._add_dict_entry(name, 'id', new_id)
-                self._add_dict_entry(name, 'refCounter', 1)
-                new_id += 1
+                if len(vacant_ids) == 0:
+                    self.db['labels']     = labels
+                    self.db['vacant_ids'] = vacant_ids
+                    raise Exception("FwMultilink: 1-byte limit for label ID is reached, can't store label '%s'" % name)
 
-            id = self._get_dict_entry(name, 'id')
-            ids.append(id)
+                new_id = vacant_ids.pop(0)
+                labels[name] = {}
+                labels[name]['id'] = new_id
+                labels[name]['refCounter'] = 1
+                ids.append(new_id)
 
         # Clean id-s with no refCounter
         if remove:
             for name in names:
-                if name in self.labels:
-                    ref_counter = self._get_dict_entry(name, 'refCounter')
-                    if ref_counter == 0:
-                        del self.labels[name]
+                if name in labels:
+                    if labels[name]['refCounter'] == 0:
+                        vacant_ids.insert(0, labels[name]['id'])
+                        del labels[name]
 
-        gc_after = len(self.labels)
+        self.db['labels']     = labels
+        self.db['vacant_ids'] = vacant_ids
 
-        fwglobals.log.debug("get_label_ids_by_names: gc=%d, input:  %s, remove=%s" % \
-                            (gc_before ,names, str(remove)))
-        fwglobals.log.debug("get_label_ids_by_names: gc=%d, output: %s" % \
-                            (gc_after, ','.join(map(str, ids))))
+        gc_after = len(labels)
+
+        fwglobals.log.debug("get_label_ids_by_names: input=%s, remove=%s, output=%s, gc: %d -> %d" % \
+            (names, str(remove), ','.join(map(str, ids)), gc_before, gc_after))
         return ids

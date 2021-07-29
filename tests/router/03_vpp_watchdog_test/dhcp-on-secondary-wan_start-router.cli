@@ -1,0 +1,22 @@
+[
+{
+  "entity":  "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+      {
+        "dev_id":"__INTERFACE_1__dev_id",
+        "dhcp":"yes",
+        "type":"wan"
+      },
+      "__INTERFACE_2__"
+    ],
+    "routes": [
+      {
+        "addr": "default",
+        "via": "__INTERFACE_1__gateway"
+      }
+	]
+  }
+}
+]

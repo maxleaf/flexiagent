@@ -4,32 +4,22 @@
   "message": "start-router",
   "params": {
     "interfaces": [
-      {
-        "pci":"0000:00:08.00",
-        "addr":"10.0.0.4/24",
-        "gateway": "10.0.0.10",
-        "type":"wan"
-      },
-      {
-        "pci":"0000:00:09.00",
-        "addr":"192.168.56.101/24",
-        "routing":"ospf",
-        "type":"lan"
-      }
+      "__INTERFACE_1__",
+      "__INTERFACE_2__"
     ],
     "routes": [
       {
-        "pci":"0000:00:08.00",
-        "addr":"10.0.0.4/24"
+        "dev_id":"__INTERFACE_1__dev_id",
+        "addr":"__INTERFACE_1__addr"
       },
       {
-        "pci":"0000:00:09.00",
-        "addr":"192.168.56.101/24",
+        "dev_id":"__INTERFACE_2__dev_id",
+        "addr":"__INTERFACE_2__addr",
         "routing":"ospf"
       },
       {
-        "pci":"0000:00:88.00",
-        "addr":"10.0.0.4/24"
+        "dev_id":"0000:00:88.00",
+        "addr":"__INTERFACE_1__addr"
       }
     ]
   }
@@ -40,12 +30,12 @@
   "message": "remove-route",
   "params": [
     {
-      "pci":"0000:00:08.00",
-      "addr":"10.0.0.4/24"
+      "dev_id":"__INTERFACE_1__dev_id",
+      "addr":"__INTERFACE_1__addr"
     },
     {
-      "pci":"0000:00:09.00",
-      "addr":"192.168.56.101/24",
+      "dev_id":"__INTERFACE_2__dev_id",
+      "addr":"__INTERFACE_2__addr",
       "routing":"ospf"
     }
   ]
@@ -56,12 +46,12 @@
   "message": "remove-interface",
   "params": [
     {
-      "pci":"0000:00:08.00",
-      "addr":"10.0.0.4/24"
+      "dev_id":"__INTERFACE_1__dev_id",
+      "addr":"__INTERFACE_1__addr"
     },
     {
-      "pci":"0000:00:09.00",
-      "addr":"192.168.56.101/24",
+      "dev_id":"__INTERFACE_2__dev_id",
+      "addr":"__INTERFACE_2__addr",
       "routing":"ospf"
     }
   ]

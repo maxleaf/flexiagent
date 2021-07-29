@@ -1,0 +1,100 @@
+[
+{
+  "entity":  "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+      {
+        "dev_id":"__INTERFACE_1__dev_id",
+        "addr":"__INTERFACE_1__addr",
+        "gateway": "__INTERFACE_1__gateway",
+        "type":"wan",
+        "multilink": {
+            "labels": [
+                "green",
+                "blue",
+                "red"]
+        }
+      },
+      {
+        "dev_id":"__INTERFACE_2__dev_id",
+        "addr":"192.168.56.101/24",
+        "routing":"ospf",
+        "type":"lan"
+      }
+    ]
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "__INTERFACE_1__addr_no_mask",
+    "dev_id":"__INTERFACE_1__dev_id",
+    "dst": "20.0.0.4",
+    "tunnel-id": 1,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1020,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.1/31",
+      "mac":"08:00:27:fd:00:02",
+      "mtu":1420,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "brown", "gray" ]
+      }
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "__INTERFACE_1__addr_no_mask",
+    "dev_id":"__INTERFACE_1__dev_id",
+    "dst": "30.0.0.4",
+    "tunnel-id": 2,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1030,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1030aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1030ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 3010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "3010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "3010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.3/31",
+      "mac":"08:00:27:fd:00:03",
+      "mtu":1420,
+      "routing":"ospf",
+      "multilink": {
+        "labels": [ "gray", "black" ]
+      }
+    }
+  }
+}
+]

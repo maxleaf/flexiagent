@@ -1,538 +1,539 @@
 {
   "======= START COMMAND =======": [
     {
-      "Key": "start-router", 
-      "Params": null
+      "Key": "start-router",
+      "Params": {}
     }
-  ], 
+  ],
   "======== INTERFACES ========": [
     {
-      "Key": "add-interface:0000:00:08.00", 
+      "Key": "add-interface:__INTERFACE_1__dev_id",
       "Params": {
-        "addr": "10.0.0.4/24", 
-        "gateway": "10.0.0.10", 
+        "addr": "__INTERFACE_1__addr",
+        "dev_id": "__INTERFACE_1__dev_id",
+        "gateway": "__INTERFACE_1__gateway",
         "multilink": {
           "labels": [
             "green"
           ]
-        }, 
-        "pci": "0000:00:08.00", 
+        },
         "type": "wan"
       }
-    }, 
+    },
     {
-      "Key": "add-interface:0000:00:09.00", 
+      "Key": "add-interface:__INTERFACE_2__dev_id",
       "Params": {
-        "addr": "192.168.56.102/24", 
-        "pci": "0000:00:09.00", 
-        "routing": "ospf", 
+        "addr": "__INTERFACE_2__addr",
+        "dev_id": "__INTERFACE_2__dev_id",
+        "routing": "ospf",
         "type": "lan"
       }
     }
-  ], 
+  ],
   "========== TUNNELS ==========": [
     {
-      "Key": "add-tunnel:1", 
+      "Key": "add-tunnel:1",
       "Params": {
-        "dst": "20.0.0.4", 
+        "dev_id": "__INTERFACE_1__dev_id",
+        "dst": "20.0.0.4",
         "ipsec": {
           "local-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "1020aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "1020aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58",
             "spi": 1020
-          }, 
+          },
           "remote-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "2010aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "2010ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "2010aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "2010ff4b55523947594d6d3547666b45764e6a58",
             "spi": 2010
           }
-        }, 
+        },
         "loopback-iface": {
-          "addr": "10.100.0.1/31", 
-          "mac": "08:00:27:fd:00:02", 
-          "mtu": 1420, 
+          "addr": "10.100.0.1/31",
+          "mac": "08:00:27:fd:00:02",
+          "mtu": 1420,
           "multilink": {
             "labels": [
-              "brown", 
+              "brown",
               "gray"
             ]
-          }, 
+          },
           "routing": "ospf"
-        }, 
-        "src": "10.0.0.4", 
+        },
+        "src": "__INTERFACE_1__addr_no_mask",
         "tunnel-id": 1
       }
-    }, 
+    },
     {
-      "Key": "add-tunnel:2", 
+      "Key": "add-tunnel:2",
       "Params": {
-        "dst": "30.0.0.4", 
+        "dev_id": "__INTERFACE_1__dev_id",
+        "dst": "30.0.0.4",
         "ipsec": {
           "local-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "1030aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "1030ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "1030aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "1030ff4b55523947594d6d3547666b45764e6a58",
             "spi": 1030
-          }, 
+          },
           "remote-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "3010aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "3010ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "3010aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "3010ff4b55523947594d6d3547666b45764e6a58",
             "spi": 3010
           }
-        }, 
+        },
         "loopback-iface": {
-          "addr": "10.100.0.3/31", 
-          "mac": "08:00:27:fd:00:03", 
-          "mtu": 1420, 
+          "addr": "10.100.0.3/31",
+          "mac": "08:00:27:fd:00:03",
+          "mtu": 1420,
           "multilink": {
             "labels": [
-              "gray", 
+              "gray",
               "black"
             ]
-          }, 
+          },
           "routing": "ospf"
-        }, 
-        "src": "10.0.0.4", 
+        },
+        "src": "__INTERFACE_1__addr_no_mask",
         "tunnel-id": 2
       }
-    }, 
+    },
     {
-      "Key": "add-tunnel:7", 
+      "Key": "add-tunnel:7",
       "Params": {
-        "dst": "70.0.0.7", 
+        "dev_id": "__INTERFACE_1__dev_id",
+        "dst": "70.0.0.7",
         "ipsec": {
           "local-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "7030aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "7030ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "7030aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "7030ff4b55523947594d6d3547666b45764e6a58",
             "spi": 1070
-          }, 
+          },
           "remote-sa": {
-            "crypto-alg": "aes-cbc-128", 
-            "crypto-key": "7010aa794f574265564551694d653768", 
-            "integr-alg": "sha1-96", 
-            "integr-key": "7010ff4b55523947594d6d3547666b45764e6a58", 
+            "crypto-alg": "aes-cbc-128",
+            "crypto-key": "7010aa794f574265564551694d653768",
+            "integr-alg": "sha1-96",
+            "integr-key": "7010ff4b55523947594d6d3547666b45764e6a58",
             "spi": 7010
           }
-        }, 
+        },
         "loopback-iface": {
-          "addr": "10.100.0.7/31", 
-          "mac": "08:00:27:fd:00:07", 
-          "mtu": 1420, 
+          "addr": "10.100.0.7/31",
+          "mac": "08:00:27:fd:00:07",
+          "mtu": 1420,
           "multilink": {
             "labels": [
               "orange"
             ]
-          }, 
+          },
           "routing": "ospf"
-        }, 
-        "src": "10.0.0.4", 
+        },
+        "src": "__INTERFACE_1__addr_no_mask",
         "tunnel-id": 7
       }
     }
-  ], 
+  ],
   "=========== DHCP CONFIG ===========": [
     {
-      "Key": "add-dhcp-config 0000:00:09.00", 
+      "Key": "add-dhcp-config __INTERFACE_2__dev_id",
       "Params": {
         "dns": [
           "8.8.8.8"
-        ], 
-        "interface": "0000:00:09.00", 
-        "range_end": "20.20.20.150", 
+        ],
+        "interface": "__INTERFACE_2__dev_id",
+        "range_end": "20.20.20.150",
         "range_start": "20.20.20.100"
       }
     }
-  ]
-}
-{
+  ],
   "============ APPLICATIONS ============": [
     {
-      "Key": "add-application", 
+      "Key": "add-application",
       "Params": {
         "applications": [
           {
-            "category": "management", 
-            "description": "Echo Protocol", 
-            "id": "1", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "echo", 
+            "category": "management",
+            "description": "Echo Protocol",
+            "id": "1",
+            "importance": "medium",
+            "modified": false,
+            "name": "echo",
             "rules": [
               {
-                "ports": "7", 
+                "ports": "7",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "7", 
+                "ports": "7",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "oam"
-          }, 
+          },
           {
-            "category": "management", 
-            "description": "Daytime Protocol", 
-            "id": "3", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "daytime", 
+            "category": "management",
+            "description": "Daytime Protocol",
+            "id": "3",
+            "importance": "medium",
+            "modified": false,
+            "name": "daytime",
             "rules": [
               {
-                "ports": "13", 
+                "ports": "13",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "13", 
+                "ports": "13",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "remote_access", 
-            "description": "Secure Shell (SSH)", 
-            "id": "5", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "ssh", 
+            "category": "remote_access",
+            "description": "Secure Shell (SSH)",
+            "id": "5",
+            "importance": "high",
+            "modified": false,
+            "name": "ssh",
             "rules": [
               {
-                "ports": "22", 
+                "ports": "22",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "remote_access", 
-            "description": "Telnet protocol", 
-            "id": "6", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "telnet", 
+            "category": "remote_access",
+            "description": "Telnet protocol",
+            "id": "6",
+            "importance": "medium",
+            "modified": false,
+            "name": "telnet",
             "rules": [
               {
-                "ports": "22", 
+                "ports": "22",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Simple Mail Transfer Protocol (SMTP)", 
-            "id": "7", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "smtp", 
+            "category": "email",
+            "description": "Simple Mail Transfer Protocol (SMTP)",
+            "id": "7",
+            "importance": "high",
+            "modified": false,
+            "name": "smtp",
             "rules": [
               {
-                "ports": "25", 
+                "ports": "25",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "management", 
-            "description": "Time Protocol", 
-            "id": "8", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "time", 
+            "category": "management",
+            "description": "Time Protocol",
+            "id": "8",
+            "importance": "medium",
+            "modified": false,
+            "name": "time",
             "rules": [
               {
-                "ports": "37", 
+                "ports": "37",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "37", 
+                "ports": "37",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "network", 
-            "description": "WHOIS protocol", 
-            "id": "9", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "whois", 
+            "category": "network",
+            "description": "WHOIS protocol",
+            "id": "9",
+            "importance": "medium",
+            "modified": false,
+            "name": "whois",
             "rules": [
               {
-                "ports": "43", 
+                "ports": "43",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "file-sharing", 
-            "description": "Gopher protocol", 
-            "id": "12", 
-            "importance": "low", 
-            "modified": false, 
-            "name": "gopher", 
+            "category": "file-sharing",
+            "description": "Gopher protocol",
+            "id": "12",
+            "importance": "low",
+            "modified": false,
+            "name": "gopher",
             "rules": [
               {
-                "ports": "70", 
+                "ports": "70",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "management", 
-            "description": "Finger protocol", 
-            "id": "13", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "finger", 
+            "category": "management",
+            "description": "Finger protocol",
+            "id": "13",
+            "importance": "medium",
+            "modified": false,
+            "name": "finger",
             "rules": [
               {
-                "ports": "79", 
+                "ports": "79",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Post Office Protocol, version 3 (POP3)", 
-            "id": "15", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "pop3", 
+            "category": "email",
+            "description": "Post Office Protocol, version 3 (POP3)",
+            "id": "15",
+            "importance": "high",
+            "modified": false,
+            "name": "pop3",
             "rules": [
               {
-                "ports": "110", 
+                "ports": "110",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "management", 
-            "description": "Network News Transfer Protocol (NNTP)", 
-            "id": "16", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "nntp", 
+            "category": "management",
+            "description": "Network News Transfer Protocol (NNTP)",
+            "id": "16",
+            "importance": "medium",
+            "modified": false,
+            "name": "nntp",
             "rules": [
               {
-                "ports": "119", 
+                "ports": "119",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Internet Message Access Protocol (IMAP)", 
-            "id": "17", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "imap2", 
+            "category": "email",
+            "description": "Internet Message Access Protocol (IMAP)",
+            "id": "17",
+            "importance": "high",
+            "modified": false,
+            "name": "imap2",
             "rules": [
               {
-                "ports": "143", 
+                "ports": "143",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "remote_access", 
-            "description": "X Display Manager Control Protocol (XDMCP)", 
-            "id": "18", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "xdmcp", 
+            "category": "remote_access",
+            "description": "X Display Manager Control Protocol (XDMCP)",
+            "id": "18",
+            "importance": "medium",
+            "modified": false,
+            "name": "xdmcp",
             "rules": [
               {
-                "ports": "177", 
+                "ports": "177",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "177", 
+                "ports": "177",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "internet", 
-            "description": "Hypertext Transfer Protocol over TLS/SSL (HTTPS)", 
-            "id": "20", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "https", 
+            "category": "internet",
+            "description": "Hypertext Transfer Protocol over TLS/SSL (HTTPS)",
+            "id": "20",
+            "importance": "medium",
+            "modified": false,
+            "name": "https",
             "rules": [
               {
-                "ports": "443", 
+                "ports": "443",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "internet", 
-            "description": "Simple Network Paging Protocol (SNPP), RFC 1568", 
-            "id": "21", 
-            "importance": "low", 
-            "modified": false, 
-            "name": "snpp", 
+            "category": "internet",
+            "description": "Simple Network Paging Protocol (SNPP), RFC 1568",
+            "id": "21",
+            "importance": "low",
+            "modified": false,
+            "name": "snpp",
             "rules": [
               {
-                "ports": "444", 
+                "ports": "444",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "auth-service", 
-            "description": "Microsoft-DS (Directory Services) Active Directory, Windows shares", 
-            "id": "22", 
-            "importance": "high", 
-            "modified": false, 
-            "name": "active-directory", 
+            "category": "auth-service",
+            "description": "Microsoft-DS (Directory Services) Active Directory, Windows shares",
+            "id": "22",
+            "importance": "high",
+            "modified": false,
+            "name": "active-directory",
             "rules": [
               {
-                "ports": "445", 
+                "ports": "445",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "445", 
+                "ports": "445",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "network-control"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Internet Message Access Protocol over TLS/SSL (IMAPS)", 
-            "id": "31", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "imaps", 
+            "category": "email",
+            "description": "Internet Message Access Protocol over TLS/SSL (IMAPS)",
+            "id": "31",
+            "importance": "medium",
+            "modified": false,
+            "name": "imaps",
             "rules": [
               {
-                "ports": "993", 
+                "ports": "993",
                 "protocol": "tcp"
               }
-            ], 
+            ],
             "serviceClass": "default"
-          }, 
+          },
           {
-            "category": "email", 
-            "description": "Post Office Protocol 3 over TLS/SSL (POP3S)", 
-            "id": "32", 
-            "importance": "medium", 
-            "modified": false, 
-            "name": "pop3s", 
+            "category": "email",
+            "description": "Post Office Protocol 3 over TLS/SSL (POP3S)",
+            "id": "32",
+            "importance": "medium",
+            "modified": false,
+            "name": "pop3s",
             "rules": [
               {
-                "ports": "995", 
+                "ports": "995",
                 "protocol": "tcp"
-              }, 
+              },
               {
-                "ports": "995", 
+                "ports": "995",
                 "protocol": "udp"
               }
-            ], 
+            ],
             "serviceClass": "default"
           }
         ]
       }
     }
-  ], 
+  ],
   "============= POLICIES =============": [
     {
-      "Key": "add-multilink-policy", 
+      "Key": "add-multilink-policy",
       "Params": {
-        "id": "5ed4127aa81d8258b96b4853", 
+        "id": "5ed4127aa81d8258b96b4853",
         "rules": [
           {
             "action": {
-              "fallback": "by-destination", 
+              "fallback": "by-destination",
               "links": [
                 {
-                  "order": "load-balance", 
+                  "order": "load-balance",
                   "pathlabels": [
-                    "green", 
+                    "green",
                     "blue"
                   ]
-                }, 
+                },
                 {
-                  "order": "priority", 
+                  "order": "priority",
                   "pathlabels": [
                     "blue"
                   ]
                 }
-              ], 
+              ],
               "order": "load-balance"
-            }, 
+            },
             "classification": {
               "prefix": {
-                "ip": "8.8.8.8/32", 
-                "ports": "", 
+                "ip": "8.8.8.8/32",
+                "ports": "",
                 "protocol": ""
               }
-            }, 
-            "id": "1", 
+            },
+            "id": "1",
             "priority": 0
-          }, 
+          },
           {
             "action": {
-              "fallback": "by-destination", 
+              "fallback": "by-destination",
               "links": [
                 {
-                  "order": "priority", 
+                  "order": "priority",
                   "pathlabels": [
                     "black"
                   ]
                 }
-              ], 
+              ],
               "order": "priority"
-            }, 
+            },
             "classification": {
               "application": {
                 "importance": "low"
               }
-            }, 
-            "id": "2", 
+            },
+            "id": "2",
             "priority": 1
-          }, 
+          },
           {
             "action": {
-              "fallback": "drop", 
+              "fallback": "drop",
               "links": [
                 {
-                  "order": "load-balance", 
+                  "order": "load-balance",
                   "pathlabels": [
                     "orange"
                   ]
                 }
-              ], 
+              ],
               "order": "priority"
-            }, 
+            },
             "classification": {
               "application": {
                 "importance": "low"
               }
-            }, 
-            "id": "3", 
+            },
+            "id": "3",
             "priority": 1
           }
         ]

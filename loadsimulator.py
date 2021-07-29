@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -23,14 +23,12 @@
 import threading
 import uuid
 import fwglobals
-import fwagent
 import random
 import time
 import json
 import websocket
 import fwutils
 import ssl
-import fwagent
 import traceback
 import signal
 import sys
@@ -54,8 +52,8 @@ class LoadSimulator:
         self.machine_ids = []
         self.simulate_stats = {'tx_pkts': 0, 'tx_bytes': 0, 'rx_bytes': 0, 'rx_pkts': 0}
         self.simulate_tunnel_stats = {"1": {"status": "up", "rtt": 10, "drop_rate": 0}}
-        self.interface_wan = 'GigabitEthernet0/8/0'
-        self.interface_lan = 'GigabitEthernet0/3/0'
+        self.interface_wan = '0000:00:03.00'
+        self.interface_lan = '0000:00:08.00'
         self.data = ''
         self.versions = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.thread_statistics = None
@@ -64,7 +62,7 @@ class LoadSimulator:
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("LoadSimulator: got %s" % fwglobals.g.signal_names[signum])
+        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
         self.stop()
         exit(1)
 
@@ -74,7 +72,7 @@ class LoadSimulator:
         :returns: None.
         """
         self.started = False
-        for ws in self.simulate_websockets.values():
+        for ws in list(self.simulate_websockets.values()):
             ws.keep_running = False
 
     def enable(self, count):
@@ -123,12 +121,12 @@ class LoadSimulator:
         self.data = json.loads(self.simulate_device_tokens[self.simulate_id])
 
         machine_id = self.get_generated_machine_id(self.simulate_id)
-        fwglobals.log.info("connecting to flexiWAN orchestrator with uuid %s" % machine_id)
+        fwglobals.log.info("connecting to flexiManage with uuid %s" % machine_id)
 
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
         header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
 
-        self.simulate_threads[self.simulate_id] = threading.Thread(target=fwagent.Fwagent().websocket_thread,
+        self.simulate_threads[self.simulate_id] = threading.Thread(target=self.agent.websocket_thread,
                                              name='Websocket Thread ' + str(self.simulate_id),
                                              args=(url, header_UserAgent, self.simulate_id))
         self.simulate_threads[self.simulate_id].start()
@@ -147,35 +145,36 @@ class LoadSimulator:
         """
         fwglobals.log.info("started in simulate mode")
 
-        with fwagent.FwAgent(handle_signals=False) as agent:
+        self.agent = fwglobals.g.initialize_agent()
+        self.enable(int(count))
 
-            self.enable(int(count))
+        # Generate temporary machine IDs
+        # -------------------------------------
+        for self.simulate_id in range(self.count()):
+            self.generate_machine_id()
+            if not self.started:
+                break
 
-            # Generate temporary machine IDs
+            # Register with Manager
             # -------------------------------------
-            for self.simulate_id in range(self.count()):
-                self.generate_machine_id()
-                if not self.started:
-                    break
+            while not self.agent.register() and self.started:
+                retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
+                fwglobals.log.info("retry registration in %d seconds" % retry_sec)
+                time.sleep(retry_sec)
 
-                # Register with Manager
-                # -------------------------------------
-                while not agent.register() and self.started:
-                    retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-                    fwglobals.log.info("retry registration in %d seconds" % retry_sec)
-                    time.sleep(retry_sec)
+        self.simulate_id = 0
+        for self.simulate_id in range(self.count()):
+            # Establish main connection to Manager
+            # and start infinite receive-send loop.
+            # -------------------------------------
+            if not self.started:
+                break
+            self.connect()
 
-            self.simulate_id = 0
-            for self.simulate_id in range(self.count()):
-                # Establish main connection to Manager
-                # and start infinite receive-send loop.
-                # -------------------------------------
-                if not self.started:
-                    break
-                self.connect()
+        while self.started is True:
+            time.sleep(1)
 
-            while self.started is True:
-                time.sleep(1)
+        self.agent = fwglobals.g.finalize_agent()
 
     def update_stats(self):
         """Update fake statistics.
@@ -199,7 +198,7 @@ class LoadSimulator:
             # Update info if previous stats valid
             if prev_stats['ok'] == 1:
                 if_bytes = {}
-                for intf, counts in fwstats.stats['last'].items():
+                for intf, counts in list(fwstats.stats['last'].items()):
                     prev_stats_if = prev_stats['last'].get(intf, None)
                     if prev_stats_if != None:
                         rx_bytes = 1.0 * (counts['rx_bytes'] - prev_stats_if['rx_bytes'])

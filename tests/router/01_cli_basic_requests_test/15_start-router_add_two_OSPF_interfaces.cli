@@ -5,18 +5,13 @@
   "params": {
     "interfaces": [
       {
-        "pci":"0000:00:08.00",
-        "addr":"10.0.0.4/24",
-        "gateway": "10.0.0.10",
+        "dev_id":"__INTERFACE_1__dev_id",
+        "addr":"__INTERFACE_1__addr",
+        "gateway": "__INTERFACE_1__gateway",
         "routing":"ospf",
         "type":"wan"
       },
-      {
-        "pci":"0000:00:09.00",
-        "addr":"192.168.56.101/24",
-        "routing":"ospf",
-        "type":"lan"
-      }
+      "__INTERFACE_2__"
     ]
   }
 }

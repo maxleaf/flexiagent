@@ -3,9 +3,9 @@
   "entity":  "agent",
   "message": "start-router",
   "params": {
-    "pci": [
-      "0000:00:08.00",
-      "0000:00:09.00"
+    "dev_id": [
+      "__INTERFACE_1__dev_id",
+      "__INTERFACE_2__dev_id"
     ]
   }
 }

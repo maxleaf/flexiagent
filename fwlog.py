@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -20,54 +20,49 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import inspect
 import os
 import syslog
-import sys
+
+from datetime import datetime
+
+FWLOG_LEVEL_INFO  = 0x01
+FWLOG_LEVEL_DEBUG = 0x0F
+FWLOG_LEVEL_TRACE = 0xFF
 
 class Fwlog:
     """This is logging class representation.
 
     :param level: Start logging from this severity level.
     """
-    FWLOG_LEVEL_INFO  = 0x1
-    FWLOG_LEVEL_DEBUG = 0xFF
-
-    def __init__(self, level=FWLOG_LEVEL_INFO):
+    def __init__(self, level, name):
         """Constructor method
         """
         self.level = level
         self.to_syslog_enabled   = True
         self.to_terminal_enabled = True
-        syslog.openlog(ident="fwagent")
+        self.name                = name
+    
+    def __str__(self):
+        return self.name
 
-    def _log(self, log_message, to_terminal=True, to_syslog=True):
-        """Print log message.
+    def _build_log_line_prefix(self, add_date=False):
+        # We prefix every log line with name of class that invoked the log print.
+        #
+        date = ''
+        cls_name = ''
 
-        :param log_message:       Message contents.
-        :param to_terminal:       Print to terminal.
-        :param to_syslog:         Print to syslog.
+        if add_date:
+            # "Jul  6 04:14:30" - like in syslog except zero padding of day
+            date = datetime.today().strftime('%b %d %H:%M:%S') + ': '
 
-        :returns: None.
-        """
-        if to_terminal and self.to_terminal_enabled:
-            print(log_message)
+        stack = inspect.stack()
+        frame = stack[3]        # obj.f() -> fwlog.debug() -> _log() -> _build_log_line_prefix()
+        obj = frame[0].f_locals.get('self')
+        if obj:
+            cls_name = obj.__class__.__name__ + ': '
 
-        if to_syslog and self.to_syslog_enabled:
-
-            # syslog discards lines beyond 8K by default, so we fold them.
-            # We use 8000 and not 8192 to leave space for syslog additions,
-            # like pid, date, etc.
-            #
-            chunk_len = 8000
-            msgs = [log_message[i:i+chunk_len] for i in range(0, len(log_message), chunk_len)]
-
-            if len(msgs) == 1:
-                syslog.syslog(log_message)
-            else:
-                syslog.syslog("--multiline-start--")
-                for msg in msgs:
-                    syslog.syslog(msg)
-                syslog.syslog("--multiline-end--")
+        return date + cls_name
 
     def excep(self, log_message, to_terminal=True, to_syslog=True):
         """Print exception message.
@@ -111,7 +106,8 @@ class Fwlog:
 
         :returns: None.
         """
-        self._log(log_message, to_terminal, to_syslog)
+        if self.level >= FWLOG_LEVEL_INFO:
+            self._log(log_message, to_terminal, to_syslog)
 
     def debug(self, log_message, to_terminal=True, to_syslog=True):
         """Print debug message.
@@ -122,7 +118,19 @@ class Fwlog:
 
         :returns: None.
         """
-        if self.level == self.FWLOG_LEVEL_DEBUG:
+        if self.level >= FWLOG_LEVEL_DEBUG:
+            self._log(log_message, to_terminal, to_syslog)
+
+    def trace(self, log_message, to_terminal=True, to_syslog=True):
+        """Print debug message.
+
+        :param log_message:       Message contents.
+        :param to_terminal:       Print to terminal.
+        :param to_syslog:         Print to syslog.
+
+        :returns: None.
+        """
+        if self.level >= FWLOG_LEVEL_TRACE:
             self._log(log_message, to_terminal, to_syslog)
 
     def set_level(self, level):
@@ -145,3 +153,90 @@ class Fwlog:
         self.to_syslog_enabled   = to_syslog
         self.to_terminal_enabled = to_terminal
 
+
+class FwSyslog(Fwlog):
+    def __init__(self, level=FWLOG_LEVEL_INFO, identification="fwagent"):
+        """Constructor method
+        """
+        Fwlog.__init__(self, level=level, name="syslog(ident=fwagent)")
+        syslog.openlog(ident=identification)
+
+    def _log(self, log_message, to_terminal=True, to_syslog=True):
+        """Print log message.
+
+        :param log_message:       Message contents.
+        :param to_terminal:       Print to terminal.
+        :param to_syslog:         Print to syslog.
+
+        :returns: None.
+        """
+
+        # Prepend prefix (name of class that produced log line) and truncate the log line to 4K.
+        # Note syslog discards lines beyond 8K by default, so take a caution if you modify this code!
+        #
+        log_message = self._build_log_line_prefix() + log_message
+        if len(log_message) > 4096:
+            log_message = log_message[0:4096] + ' <truncated>'
+
+        if to_terminal and self.to_terminal_enabled:
+            print(log_message)
+
+        if to_syslog and self.to_syslog_enabled:
+            syslog.syslog(log_message)
+
+
+class FwLogFile(Fwlog):
+    def __init__(self, filename, max_size=10000000, level=FWLOG_LEVEL_INFO):
+        """Constructor method
+        """
+        Fwlog.__init__(self, level=level, name=filename)
+        self.filepath, self.filename = os.path.split(filename)
+        self.max_size = max_size  # 10 MB by default
+        self.cur_size = 0
+
+        if os.path.exists(filename):
+            self.cur_size = os.path.getsize(filename)
+        self.f = open(filename, 'a')
+
+    def _rotate(self):
+        self.f.close()
+        main_filename = os.path.join(self.filepath, self.filename)
+        backup_filename = os.path.join(self.filepath, self.filename + '.1')
+        os.rename(main_filename, backup_filename)
+        self.f = open(main_filename, 'w')
+        self.cur_size = 0
+
+    def _log(self, log_message, to_terminal=True, to_syslog=True):
+        """Print log message.
+
+        :param log_message:       Message contents.
+        :param to_terminal:       Print to terminal - NOT IN USE for FwLogFile
+        :param to_syslog:         Print to syslog
+
+        :returns: None.
+        """
+
+        log_prefix  = self._build_log_line_prefix(add_date=True)
+        log_message = log_message.replace('\r\n', '#012').replace('\n', '#012')  # Mimic syslog format
+        log_message = log_prefix + log_message
+
+        if to_syslog and self.to_syslog_enabled:
+
+            # Split long line into chunks of 8K to make it compatible with various editors.
+            #
+            chunk_len = 8000
+            total_len = len(log_message)
+
+            if total_len <= chunk_len:
+                self.f.write(log_message + '\n')
+            else:
+                msgs = [log_message[i:i+chunk_len] for i in range(0, total_len, chunk_len)]
+                self.f.write(log_prefix + "--multiline-start--\n")
+                for msg in msgs:
+                    self.f.write(msg + '\n')
+                self.f.write(log_prefix + "--multiline-end--\n")
+            self.f.flush()
+
+            self.cur_size += total_len
+            if self.cur_size > self.max_size:
+                self._rotate()

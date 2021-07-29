@@ -73,14 +73,13 @@ def test():
         assert ok, "'remove-interface' request was rejected, when router is in failure state"
 
         # Start router and ensure that configuration was applied successfully
-        (ok, _) = agent.cli('-f %s' % cli_start_router_file)
-        assert ok, "'start-router' request failed"
-
         # The applyied configuration should include two interfaces:
         # - 0000:00:09.0 loaded from fail_router.cli
         # - 0000:00:08.0 loaded from add-interface.cli
-        configured = fwtests.wait_vpp_to_be_configured([('interfaces', 2),('tunnels', 0)], timeout=30)
-        assert configured, "failed to configure interfaces in vpp"
+        #
+        (ok, err_str) = agent.cli('-f %s' % cli_start_router_file,
+                                  expected_vpp_cfg=[('interfaces', 2),('tunnels', 0)])
+        assert ok, err_str
 
         # Ensure that failure state was removed due to successfull start
         exists = fwtests.file_exists(state_file)

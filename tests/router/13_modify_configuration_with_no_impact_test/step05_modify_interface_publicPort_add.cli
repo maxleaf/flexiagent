@@ -1,0 +1,26 @@
+{
+  "entity": "agent",
+  "message": "aggregated",
+  "params": {
+    "requests": [
+        {
+          "entity":  "agent",
+          "message": "modify-interface",
+          "params":
+          {
+            "dev_id":"__INTERFACE_1__dev_id",
+            "addr":"__INTERFACE_1__addr",
+            "gateway": "__INTERFACE_1__gateway",
+            "PublicPort": 19001,
+            "type":"wan",
+            "multilink": {
+                "labels": [
+                    "green",
+                    "blue",
+                    "red"]
+            }
+          }
+        }
+    ]
+  }
+}

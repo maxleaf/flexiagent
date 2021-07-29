@@ -28,7 +28,7 @@ test_root = code_root + '/tests/'
 sys.path.append(test_root)
 import fwtests
 
-def test():
+def test(): 
     tests_path = __file__.replace('.py', '')
     test_cases = sorted(glob.glob('%s/*.cli' % tests_path))
     for (idx,t) in enumerate(test_cases):

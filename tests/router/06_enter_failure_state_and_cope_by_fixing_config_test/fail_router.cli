@@ -3,16 +3,11 @@
   "entity": "agent",
   "message": "add-interface",
   "params": [
+    "__INTERFACE_2__",
     {
-      "pci":"0000:00:09.00",
-      "addr":"192.168.56.101/24",
-      "routing":"ospf",
-      "type":"lan"
-    },
-    {
-      "pci":"0000:00:01.00",
+      "dev_id":"0000:00:01.00",
       "addr":"10.0.0.9/24",
-      "gateway": "10.0.0.10",
+      "gateway": "__INTERFACE_1__gateway",
       "type":"wan"
     }
   ]
@@ -22,9 +17,9 @@
   "entity": "agent",
   "message": "start-router",
   "params": {
-    "pci": [
-      "0000:00:08.00",
-      "0000:00:09.00"
+    "dev_id": [
+      "__INTERFACE_1__dev_id",
+      "__INTERFACE_2__dev_id"
     ]
   }
 }

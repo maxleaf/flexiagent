@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -34,7 +34,7 @@ import fwutils
 #       "params": {
 #           "addr":"10.0.0.4/24" (OR "10.0.0.4" OR "default")
 #           "via":"192.168.1.1",
-#           "pci":"0000:00:08.00"   (device, optional)
+#           "dev_id":"0000:00:08.00"   (device, optional)
 #       }
 #    }
 #
@@ -59,33 +59,59 @@ def add_route(params):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']      = "python"
-    cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('pci')))
+    cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
                                 'func':   'add_static_route',
                                 'args':   {
-                                    'addr':   params['addr'],
-                                    'via':    params['via'],
+                                    'addr'  : params['addr'],
+                                    'via'   : params['via'],
                                     'metric': params.get('metric'),
                                     'remove': False,
-                                    'pci':    params.get('pci')
+                                    'dev_id': params.get('dev_id')
                                 }
                               }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
-    cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('pci')))
+    cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['revert']['params'] = {
                                 'module': 'fwutils',
                                 'func':   'add_static_route',
                                 'args':   {
-                                    'addr':   params['addr'],
-                                    'via':    params['via'],
+                                    'addr'  : params['addr'],
+                                    'via'   : params['via'],
                                     'metric': params.get('metric'),
                                     'remove': True,
-                                    'pci':    params.get('pci')
+                                    'dev_id': params.get('dev_id')
                                 }
                               }
     cmd_list.append(cmd)
+
+    # Add this static route to the ACL permit filter
+    if params.get('redistributeViaOSPF', False) == True:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']   = "python"
+        cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["router ospf", "access-list %s permit %s" % (fwglobals.g.FRR_OSPF_ACL, params['addr'])]
+                },
+        }
+        cmd['cmd']['descr']   =  "add %s to the allowed redistribution filter list" % params['addr']
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'frr_vtysh_run',
+                'args': {
+                    'commands': ["router ospf", "no access-list %s permit %s" % (fwglobals.g.FRR_OSPF_ACL, params['addr'])]
+                },
+        }
+        cmd['revert']['descr']   =  "remove %s from the allowed redistribution filter list" % params['addr']
+        cmd_list.append(cmd)
+
     return cmd_list
 
 def get_request_key(params):
@@ -95,12 +121,14 @@ def get_request_key(params):
 
      :returns: A key.
      """
-    if 'pci' in params:
+    if 'dev_id' in params:
+        key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['dev_id'])
+    elif 'pci' in params: # Used for pci_to_dev_id migration only to compute the right key
         key = 'add-route:%s:%s:%s' % (params['addr'], params['via'], params['pci'])
     else:
         key = 'add-route:%s:%s' % (params['addr'], params['via'])
 
-    if 'metric' in params.keys():
-        key += ':' + params['metric']
+    if params.get('metric'):
+        key += ':' + str(params['metric'])
 
     return key

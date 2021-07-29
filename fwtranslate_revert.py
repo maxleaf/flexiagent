@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 
 ################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
@@ -20,9 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import fwglobals
-
-def revert(request):
+def revert(request, db):
     """Generate list of commands for the 'remove-X' type of requests.
     To do that it fetches the list of commands for the corresponding 'add-X'
     request, goes over this list from the end to the beginning and for every
@@ -35,7 +33,7 @@ def revert(request):
     """
 
     # Fetch list of commands for the correspondent 'add-X' request
-    (cmd_list_src, executed) = fwglobals.g.router_cfg.get_request_cmd_list(request)
+    (cmd_list_src, executed) = db.get_request_cmd_list(request)
 
     # If there is no 'add-XXX' commands to revert,
     # or if the 'add-XXX' commands were never executed,

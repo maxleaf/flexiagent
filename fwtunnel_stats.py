@@ -1,6 +1,4 @@
-#! /usr/bin/python
-
-################################################################################
+#################################################################################
 # flexiWAN SD-WAN software - flexiEdge, flexiManage.
 # For more information go to https://flexiwan.com
 #
@@ -20,16 +18,19 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
+import copy
 import os
 import re
 import time
 from netaddr import *
 import shlex
 from subprocess import Popen, PIPE, STDOUT
-
+import threading
 import fwglobals
+import fwutils
 
 tunnel_stats_global = {}
+tunnel_stats_global_lock = threading.RLock()
 
 TIMEOUT = 15
 WINDOW_SIZE = 30
@@ -44,29 +45,35 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     :returns: Command execution result.
     """
     args = shlex.split(cmd)
-    return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0]
- 
-def tunnel_stats_get_ping_time(host):
+    return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
+
+def tunnel_stats_get_ping_time(hosts):
     """Use fping to get RTT.
 
-    :param host:         IP address to ping.
+    :param hosts:         IP addresses to ping.
 
-    :returns: RTT value on success and 0 otherwise.
+    :returns: RTT values on success and 0 otherwise.
     """
-    host = host.split(':')[0]
-    cmd = "fping {host} -C 1 -q".format(host=host)
-    res = [float(x) for x in tunnel_stats_get_simple_cmd_output(cmd).strip().split(':')[-1].split() if x != '-']
-    if len(res) > 0:
-        return sum(res) / len(res)
-    else:
-        return 0
+    ret = {}
+
+    cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
+
+    # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
+    # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
+    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines():
+        host_rtt = [x.strip() for x in row.strip().split(':')]
+        rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
+        ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+
+    return ret
 
 def tunnel_stats_clear():
     """Clear previously collected statistics.
 
     :returns: None.
     """
-    tunnel_stats_global.clear()
+    with tunnel_stats_global_lock:
+        tunnel_stats_global.clear()
 
 def tunnel_stats_add(tunnel_id, loopback_addr):
     """Add tunnel statistics entry into a dictionary.
@@ -77,57 +84,98 @@ def tunnel_stats_add(tunnel_id, loopback_addr):
     :returns: None.
     """
     ip_addr = IPNetwork(loopback_addr)
-    tunnel_stats_global[tunnel_id] = dict()
-    tunnel_stats_global[tunnel_id]['loopback_network'] = str(ip_addr)
-    tunnel_stats_global[tunnel_id]['sent'] = 0
-    tunnel_stats_global[tunnel_id]['received'] = 0
-    tunnel_stats_global[tunnel_id]['drop_rate'] = 0
-    tunnel_stats_global[tunnel_id]['rtt'] = 0
-    tunnel_stats_global[tunnel_id]['timestamp'] = 0
+    stats_entry = dict()
+    stats_entry['loopback_network'] = str(ip_addr)
+    stats_entry['sent'] = 0
+    stats_entry['received'] = 0
+    stats_entry['drop_rate'] = 0
+    stats_entry['rtt'] = 0
+    stats_entry['timestamp'] = 0
 
     for ip in ip_addr:
         if (ip.value != ip_addr.value):
-            tunnel_stats_global[tunnel_id]['loopback_remote'] = str(ip)
+            stats_entry['loopback_remote'] = str(ip)
         else:
-            tunnel_stats_global[tunnel_id]['loopback_local'] = str(ip)
+            stats_entry['loopback_local'] = str(ip)
+
+    with tunnel_stats_global_lock:
+        tunnel_stats_global[tunnel_id] = stats_entry
+
+def tunnel_stats_remove(tunnel_id):
+    with tunnel_stats_global_lock:
+        del tunnel_stats_global[tunnel_id]
 
 def tunnel_stats_test():
     """Update RTT, drop rate and other fields for all tunnels.
 
     :returns: None.
     """
-    for value in tunnel_stats_global.values():
-        value['sent'] += 1
+    if not tunnel_stats_global:
+        return
 
-        rtt = tunnel_stats_get_ping_time(value['loopback_remote'])
+    tunnel_stats_global_copy = {}
+    with tunnel_stats_global_lock:
+        tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
+
+    hosts = [x.get('loopback_remote', '').split(':')[0] for x in tunnel_stats_global_copy.values()]
+    tunnel_rtt = tunnel_stats_get_ping_time(hosts)
+
+    for tunnel_id, stats in tunnel_stats_global_copy.items():
+        stats['sent'] += 1
+
+        rtt = tunnel_rtt.get(stats['loopback_remote'], 0)
         if rtt > 0:
-            value['received'] += 1
-            value['timestamp'] = time.time()
+            stats['received'] += 1
+            stats['timestamp'] = time.time()
 
-        value['rtt'] = value['rtt'] + (rtt - value['rtt']) / APPROX_FACTOR
-        value['drop_rate'] = 100 - value['received'] * 100 / value['sent']
+        stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
+        stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
 
-        if (value['sent'] == WINDOW_SIZE):
-            value['sent'] = 0
-            value['received'] = 0
+        if (stats['sent'] == WINDOW_SIZE):
+            stats['sent'] = 0
+            stats['received'] = 0
+
+    with tunnel_stats_global_lock:
+        for tunnel_id in list(tunnel_stats_global.keys()):
+            if tunnel_id in tunnel_stats_global_copy:
+                tunnel_stats_global[tunnel_id] = tunnel_stats_global_copy[tunnel_id]
 
 def tunnel_stats_get():
     """Return a new tunnel status dictionary.
     Update tunnel status based on timeout.
 
-    :returns: None.
+    :returns: dictionary of tunnel statistics.
     """
     tunnel_stats = {}
     cur_time = time.time()
+    tunnel_stats_global_copy = {}
 
-    for key, value in tunnel_stats_global.items():
-        tunnel_stats[key] = dict()
-        tunnel_stats[key]['rtt'] = value['rtt']
-        tunnel_stats[key]['drop_rate'] = value['drop_rate']
+    with tunnel_stats_global_lock:
+        tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-        if ((value['timestamp'] == 0) or (cur_time - value['timestamp'] > TIMEOUT)):
-            tunnel_stats[key]['status'] = 'down'
+    for tunnel_id, stats in tunnel_stats_global_copy.items():
+        tunnel_stats[tunnel_id] = {}
+        tunnel_stats[tunnel_id]['rtt'] = stats['rtt']
+        tunnel_stats[tunnel_id]['drop_rate'] = stats['drop_rate']
+
+        if ((stats['timestamp'] == 0) or (cur_time - stats['timestamp'] > TIMEOUT)):
+            tunnel_stats[tunnel_id]['status'] = 'down'
         else:
-            tunnel_stats[key]['status'] = 'up'
+            tunnel_stats[tunnel_id]['status'] = 'up'
 
     return tunnel_stats
+
+def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):
+    """ get set of addresses that are part of any connected tunnels
+    : param tunnel_stat : statistics of tunnels.
+    : param tunnels     : list of tunnels and their properties
+    : return : set of IP addresses part of connected tunnels
+    """
+    ip_up_set = set()
+    if tunnels and tunnel_stats:
+        for tunnel in tunnels:
+            tunnel_id = tunnel.get('tunnel-id')
+            if tunnel_id and tunnel_stats.get(tunnel_id):
+                if tunnel_stats[tunnel_id].get('status') == 'up':
+                    ip_up_set.add(tunnel['src'])
+    return ip_up_set

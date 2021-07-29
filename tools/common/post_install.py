@@ -43,6 +43,7 @@
 import os
 import sys
 import glob
+import pathlib
 import re
 
 FW_EXIT_CODE_OK      = 0
@@ -51,7 +52,7 @@ FW_EXIT_CODE_ERROR   = 0x1
 def run_migrations(prev_version, new_version, upgrade):
     print("Migrations from %s to %s on %s" % (prev_version, new_version, upgrade))
     # Get files path for migration
-    migration_path = os.path.abspath(os.path.dirname(__file__) + './../migrations')
+    migration_path = str(pathlib.Path(__file__).parent.absolute()) + '/../migrations'
     # Add path to system to allow imports
     sys.path.append(migration_path)
     # Get all python files in the migration path
@@ -66,6 +67,9 @@ def run_migrations(prev_version, new_version, upgrade):
         print("Migrating file %s" % (imported_file))
         imported = __import__(imported_file)
         imported.migrate(prev_version, new_version, upgrade)
+
+def cmp(a, b):
+    return (a > b) - (a < b)
 
 # Function to test if v1 > v2 or vice versa
 # v1>v2, return 1
@@ -85,7 +89,7 @@ if __name__ == '__main__':
     try:
         if len(sys.argv) < 4:
             print("Usage: %s <prev_version> <new_version> <install|remove>" % sys.argv[0])
-            exit(FW_EXIT_CODE_ERROR)
+            sys.exit(FW_EXIT_CODE_ERROR)
 
         prev_version = sys.argv[1]
         new_version = sys.argv[2]
@@ -102,4 +106,4 @@ if __name__ == '__main__':
 
     except Exception as e:
         print("Post install error: %s" % (str(e)))
-    exit(FW_EXIT_CODE_OK)
+    sys.exit(FW_EXIT_CODE_OK)

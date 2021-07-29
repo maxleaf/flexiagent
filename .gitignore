@@ -1,7 +1,8 @@
+.vscode
+
 # Byte-compiled
 __pycache__/
 *.py[cod]
-.vscode/
 pytestdebug.log
 .cache
 *.DS_Store
@@ -20,6 +21,5 @@ pytestdebug.log
 *.tar
 *.zip
 
-# Text files
-*.txt
-
+#Swap files
+*.sw[g-p]

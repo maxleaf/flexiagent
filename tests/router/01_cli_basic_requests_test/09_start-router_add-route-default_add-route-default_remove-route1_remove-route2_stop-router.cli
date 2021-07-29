@@ -4,18 +4,8 @@
   "message": "start-router",
   "params": {
     "interfaces": [
-      {
-        "pci":"0000:00:08.00",
-        "addr":"10.0.0.4/24",
-        "gateway": "10.0.0.10",
-        "type":"wan"
-      },
-      {
-        "pci":"0000:00:09.00",
-        "addr":"192.168.56.101/24",
-        "routing":"ospf",
-        "type":"lan"
-      }
+      "__INTERFACE_1__",
+      "__INTERFACE_2__"
     ]
   }
 }
@@ -25,7 +15,7 @@
   "message": "add-route",
   "params": {
     "addr": "default",
-	"via": "10.0.0.10"
+	"via": "__INTERFACE_1__gateway"
   }
 }
 ,
@@ -35,7 +25,7 @@
   "params": {
     "addr": "111.111.111.111",
 	"via": "192.168.56.154",
-    "pci":"0000:00:09.00"
+    "dev_id":"__INTERFACE_2__dev_id"
   }
 }
 ,
@@ -45,7 +35,7 @@
   "params": {
     "addr": "111.111.111.111",
 	"via": "192.168.56.154",
-    "pci":"0000:00:09.00"
+    "dev_id":"__INTERFACE_2__dev_id"
   }
 }
 ,
@@ -54,7 +44,7 @@
   "message": "remove-route",
   "params": {
     "addr": "default",
-	"via": "10.0.0.10"
+	"via": "__INTERFACE_1__gateway"
   }
 }
 ,

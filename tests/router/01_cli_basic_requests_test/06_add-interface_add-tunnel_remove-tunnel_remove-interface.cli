@@ -3,8 +3,8 @@
   "entity": "agent",
   "message": "add-interface",
   "params": {
-      "pci":"0000:00:08.00",
-      "addr":"10.0.0.4/24",
+      "dev_id":"__INTERFACE_1__dev_id",
+      "addr":"__INTERFACE_1__addr",
       "routing":"ospf",
       "type":"lan"
   }
@@ -14,8 +14,10 @@
   "entity":  "agent",
   "message": "add-tunnel",
   "params": {
-    "src": "10.0.0.4",
+    "src": "__INTERFACE_1__gateway",
+    "dev_id":"__INTERFACE_1__dev_id",
     "dst": "20.0.0.4",
+    "dstPort": "1068",
     "tunnel-id": 1,
     "ipsec": {
       "local-sa": {
@@ -52,7 +54,7 @@
   "entity": "agent",
   "message": "remove-interface",
   "params": {
-      "pci":"0000:00:08.00"
+      "dev_id":"__INTERFACE_1__dev_id"
   }
 }
 ]

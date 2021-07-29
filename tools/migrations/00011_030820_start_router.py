@@ -33,30 +33,24 @@ globals = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , '..'
 sys.path.append(globals)
 
 import fwglobals
-import fwdb_requests
 import fwutils
 
-from fwdb_requests import FwDbRequests
-
-SQLITE_DB_FILE = '/etc/flexiwan/agent/.requests.sqlite'
-
-
-def _is_start_router_in_db():
-    with FwDbRequests(SQLITE_DB_FILE) as db_requests:
-        for key, request in db_requests.db.items():
-            if re.match('start-router', key):
-                return True
-    return False
-
+from fwrouter_cfg import FwRouterCfg
+from fwrouter_api import fwrouter_translators
 
 def migrate(prev_version, new_version, upgrade):
     if upgrade != 'upgrade' or prev_version.split('-')[0] != '1.3.9':
         return
     try:
         print("* Migrating start-router...")
-        if not _is_start_router_in_db():
-            with FwDbRequests(SQLITE_DB_FILE) as db_requests:
-                db_requests.update('start-router', {}, {}, [], False)
+        request = {
+            'message':   'start-router',
+            'params':    {},
+        }
+        with FwRouterCfg("/etc/flexiwan/agent/.requests.sqlite") as router_cfg:
+            router_cfg.set_translators(fwrouter_translators)
+            if not router_cfg.exists(request):
+                router_cfg.update(request, [], False)
 
     except Exception as e:
         print("Migration error: %s : %s" % (__file__, str(e)))
