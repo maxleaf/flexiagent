@@ -33,7 +33,7 @@ fwservices_handlers = {
     'upgrade-service':   {'handler': 'upgrade'}
 }
 
-class FwServices:
+class FWSERVICES_API:
     """Services class representation.
     """
 
