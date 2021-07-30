@@ -130,12 +130,12 @@ class FWROUTER_API(FwCfgRequestHandler):
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
 
+                    fwglobals.log.debug("watchdog: restore finished")
                     # Process if any VPP coredump
                     pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
                 elif pending_coredump_processing:
                     pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
 
-                    fwglobals.log.debug("watchdog: restore finished")
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
