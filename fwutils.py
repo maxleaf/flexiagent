@@ -1014,11 +1014,13 @@ def vpp_get_tap_info():
         return ({}, {})
 
     taps = taps.splitlines()
+    separator = ' -> '
 
     for line in taps:
-        tap_info = line.split(' -> ')
-        tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
-        vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
+        if separator in line:
+            tap_info = line.split(separator)
+            tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
+            vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
 
     return (tap_to_vpp_if_name, vpp_if_name_to_tap)
 
