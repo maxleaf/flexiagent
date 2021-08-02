@@ -1118,11 +1118,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         if self.state_is_started():
             self.log.debug("_sync_device: restart_router=True")
             restart_router = True
-            self.g.handle_request({'message':'stop-router'})
+            fwglobals.g.handle_request({'message':'stop-router'})
 
         FwCfgRequestHandler.sync_full(self, incoming_requests)
 
         if restart_router:
-            self.g.handle_request({'message': 'start-router'})
+            fwglobals.g.handle_request({'message': 'start-router'})
 
         self.log.debug("_sync_device: router full sync succeeded")
