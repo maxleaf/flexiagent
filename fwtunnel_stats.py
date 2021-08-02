@@ -75,7 +75,7 @@ def tunnel_stats_clear():
     with tunnel_stats_global_lock:
         tunnel_stats_global.clear()
 
-def tunnel_stats_add(tunnel_id, remote_ip):
+def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index):
     """Add tunnel statistics entry into a dictionary.
 
     :param tunnel_id:         Tunnel identifier.
@@ -91,6 +91,8 @@ def tunnel_stats_add(tunnel_id, remote_ip):
     stats_entry['timestamp'] = 0
 
     stats_entry['loopback_remote'] = remote_ip
+    if local_sw_if_index:
+        stats_entry['local_sw_if_index'] = local_sw_if_index
 
     with tunnel_stats_global_lock:
         tunnel_stats_global[tunnel_id] = stats_entry
@@ -115,6 +117,9 @@ def tunnel_stats_test():
     tunnel_rtt = tunnel_stats_get_ping_time(hosts)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
+        if 'local_sw_if_index' in stats:
+            stats['state'] = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=stats['local_sw_if_index'])[0].flags
+
         stats['sent'] += 1
 
         rtt = tunnel_rtt.get(stats['loopback_remote'], 0)
@@ -156,6 +161,9 @@ def tunnel_stats_get():
             tunnel_stats[tunnel_id]['status'] = 'down'
         else:
             tunnel_stats[tunnel_id]['status'] = 'up'
+
+        if 'state' in stats and stats['state'] == 0:
+            tunnel_stats[tunnel_id]['status'] = 'down'
 
     return tunnel_stats
 

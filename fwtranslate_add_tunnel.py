@@ -1275,7 +1275,8 @@ def add_tunnel(params):
         cmd_list.append(cmd)
 
     if 'peer' in params:
-        _add_peer(cmd_list, params, 'ipip_tunnel_sw_if_index')
+        tunnel_cache_key = 'ipip_tunnel_sw_if_index'
+        _add_peer(cmd_list, params, tunnel_cache_key)
     else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
@@ -1356,10 +1357,13 @@ def add_tunnel(params):
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % loop0_ip
         cmd_list.append(cmd)
 
+    tunnel_stats_args = { 'tunnel_id': params['tunnel-id'] }
     if 'peer' in params:
-        remote_ip = params['dst']
+        tunnel_stats_args['remote_ip'] = params['dst']
+        tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':tunnel_cache_key} ]
     else:
-        remote_ip = remote_loop0_ip
+        tunnel_stats_args['remote_ip'] = remote_loop0_ip
+        tunnel_stats_args['local_sw_if_index'] = None
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -1367,8 +1371,7 @@ def add_tunnel(params):
     cmd['cmd']['params']  = {
                     'module': 'fwtunnel_stats',
                     'func'  : 'tunnel_stats_add',
-                    'args'  : { 'tunnel_id': params['tunnel-id'],
-                                'remote_ip': remote_ip},
+                    'args'  : tunnel_stats_args
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"

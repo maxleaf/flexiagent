@@ -429,12 +429,19 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwtunnel_stats.tunnel_stats_clear()
         tunnels = self.cfg_db.get_tunnels()
         for params in tunnels:
+            local_sw_if_index = None
             id   = params['tunnel-id']
             if 'peer' in params:
+                profile_name = "pr%u" % id
                 remote_ip = str(params['dst'])
+                profiles = fwglobals.g.router_api.vpp_api.vpp.api.ikev2_profile_dump()
+                for item in profiles:
+                    profile = item.profile
+                    if profile.name == profile_name:
+                        local_sw_if_index = profile.tun_itf
             else:
                 remote_ip = fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])
-            fwtunnel_stats.tunnel_stats_add(id, remote_ip)
+            fwtunnel_stats.tunnel_stats_add(id, remote_ip, local_sw_if_index)
 
     def _call_simple(self, request):
         """Execute single request.
