@@ -259,7 +259,7 @@ class FwCfgRequestHandler:
                 reply = fwglobals.g.handle_request({ 'message': cmd['name'], 'params':  cmd.get('params')}, result)
                 if reply['ok'] == 0:        # On failure go back revert already executed commands
                     self.log.debug("%s failed ('ok' is 0)" % cmd['name'])
-                    raise Exception("API failed: %s" % reply['message'])
+                    raise Exception("API failed: %s" % cmd['name'])
 
             except Exception as e:
                 err_str = "_execute: %s(%s) failed: %s, %s" % (cmd['name'], format(cmd.get('params')), str(e), str(traceback.format_exc()))

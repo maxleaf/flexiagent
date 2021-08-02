@@ -1,0 +1,108 @@
+[
+    {
+        "entity": "agent",
+        "message": "start-router",
+        "params": {
+            "default-route": "192.168.0.1",
+            "interfaces": [
+                {
+                    "dev_id": "__INTERFACE_1__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_2__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_3__dev_id",
+                    "dhcp": "yes",
+                    "type": "lan"
+                }
+            ]
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-application",
+        "params": {
+            "applications": [
+                {
+                    "rules": [
+                        {
+                            "ports": "10001"
+                        }
+                    ],
+                    "name": "custom:Test2",
+                    "description": "Test2",
+                    "category": "management",
+                    "serviceClass": "network-control",
+                    "importance": "medium",
+                    "id": "1"
+                },
+                {
+                    "name": "echo",
+                    "id": "2",
+                    "category": "management",
+                    "serviceClass": "oam",
+                    "importance": "medium",
+                    "description": "Echo Protocol",
+                    "rules": [
+                        {
+                            "protocol": "tcp",
+                            "ports": "7"
+                        },
+                        {
+                            "protocol": "udp",
+                            "ports": "7"
+                        }
+                    ],
+                    "modified": false
+                }
+            ]
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "outbound": {
+                "rules": [
+                    {
+                        "id": "1",
+                        "classification": {
+                            "destination": {
+                                "trafficTags": {
+                                    "category": "management",
+                                    "serviceClass": "high-throughput",
+                                    "importance": "high"
+                                }
+                            },
+                            "source": {
+                                "trafficId": "1"
+                            }
+                        },
+                        "action": {
+                            "permit": true
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "remove-firewall-policy",
+        "params": {}
+    },
+    {
+        "entity": "agent",
+        "message": "remove-application",
+        "params": {}
+    },
+    {
+        "entity": "agent",
+        "message": "stop-router"
+    }
+ ]
