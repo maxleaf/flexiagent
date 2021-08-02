@@ -78,6 +78,7 @@ def update_stats():
                 fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
                 for intf, counts in list(stats['last'].items()):
                     if (intf.startswith('gre') or
+                        intf.startswith('ipip') or
                         intf.startswith('loop')): continue
                     prev_stats_if = prev_stats['last'].get(intf, None)
                     if prev_stats_if != None:
