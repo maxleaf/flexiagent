@@ -1015,6 +1015,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
         fwutils.clear_linux_interfaces_cache()
+        fwglobals.g.router_api.vpp_api.register_interface_handler()
         self.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):

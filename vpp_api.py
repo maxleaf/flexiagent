@@ -25,6 +25,8 @@ import fnmatch
 import fwglobals
 import fwutils
 import time
+import subprocess
+import fwutils
 
 try:
     from vpp_papi import VPPApiClient
@@ -49,6 +51,17 @@ class VPP_API:
         """
         if self.connected_to_vpp:
             self.disconnect_from_vpp()
+
+    def papi_event_handler(self, msgname, result):
+        linux_if = fwutils.vpp_sw_if_index_to_tap(result.sw_if_index)
+        if result.flags == 3:
+            cmd = 'ip link set dev %s up' % linux_if
+            fwglobals.log.debug(cmd)
+            subprocess.check_call(cmd, shell=True)
+
+    def register_interface_handler(self):
+        self.vpp.api.want_interface_events(enable_disable=1,pid=os.getpid())
+        self.vpp.register_event_callback(self.papi_event_handler)
 
     def connect_to_vpp(self, vpp_json_dir='/usr/share/vpp/api/'):
         """Connect to VPP.
