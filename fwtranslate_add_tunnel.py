@@ -1173,10 +1173,33 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
     """
     auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
     mtu              = params['peer']['mtu']
-    wan_dev_id       = params['dev_id']
+    addr             = params['peer']['addr']
     iface_params     = params['peer']
 
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
+
+    # sudo ip addr add <tunnel ip> dev <tap of loopback iface>
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "set %s to tunnel interface in Linux" % addr
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
+                                "sudo ip addr add %s dev DEV-STUB" % (addr) ]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "unset %s from tunnel interface in Linux" % addr
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
+                                "sudo ip addr del %s dev DEV-STUB" % (addr) ]
+    cmd_list.append(cmd)
+
+    # sudo ip link set dev <tap of tunnel iface> mtu <mtu of tunnel iface>
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "exec"
+    cmd['cmd']['descr']   = "set mtu=%s into loopback interface %s in Linux" % (mtu, addr)
+    cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
+                            "sudo ip link set dev DEV-STUB mtu %s" % mtu ]
+    cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
     cmd = {}
@@ -1185,16 +1208,6 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
     cmd['cmd']['descr']   = "set mtu=%s to ipip interface" % mtu
     cmd['cmd']['params']  = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key} ],
                               'mtu': [ mtu , 0, 0, 0 ] }
-    cmd_list.append(cmd)
-
-    # interface.api.json: sw_interface_set_unnumbered (..., sw_if_index, ...)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "sw_interface_set_unnumbered"
-    cmd['cmd']['descr']   = "set unnumbered to ipip interface"
-    cmd['cmd']['params']  = { 'is_add':1,
-                              'substs': [ { 'add_param':'unnumbered_sw_if_index', 'val_by_key':tunnel_cache_key},
-                                          { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':wan_dev_id} ]}
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_flexiwan_label_add_del (..., sw_if_index, n_labels, labels, ...)

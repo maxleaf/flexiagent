@@ -8,6 +8,7 @@
         "dst": "104.193.146.116",
         "tunnel-id": 1,
         "peer": {
+            "addr": "20.20.20.1/32",
             "mtu": 1350,
 	    "multilink": {
               "labels": [ "green" ]
@@ -45,6 +46,7 @@
         "dst": "149.19.194.14",
         "tunnel-id": 2,
         "peer": {
+            "addr": "20.20.20.2/32",
             "mtu": 1350,
 	    "multilink": {
               "labels": [ "red" ]
@@ -122,7 +124,7 @@
      },
      {
 	"dev_id": "pci:0000:00:08.00",
-	"addr": "20.20.20.1/24",
+	"addr": "10.10.10.1/24",
 	"routing":"ospf",
 	"type":"LAN"
      }
