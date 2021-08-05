@@ -1237,7 +1237,7 @@ def cli(clean_request_db=True, api=None, script_fname=None, template_fname=None,
             else:
                 ret_val = json.dumps({'ok': 0, 'error': ret['error']})
             fwglobals.log.info('return-value-start ' + ret_val + ' return-value-end')
-            time.sleep(30)
+            time.sleep(300)
         else:
             cli.run_loop()
     if clean_request_db:

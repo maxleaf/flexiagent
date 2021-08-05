@@ -1008,6 +1008,15 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         fwnetplan.load_netplan_filenames()
 
+    def _interface_events_handler(self, sw_if_index, flags):
+        linux_if = fwutils.vpp_sw_if_index_to_tap(sw_if_index)
+        if flags == 0:
+            cmd = 'ip link set dev %s down' % linux_if
+        else:
+            cmd = 'ip link set dev %s up' % linux_if
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
+
     def _on_start_router_after(self):
         """Handles post start VPP activities.
         :returns: None.
@@ -1015,7 +1024,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         self.state_change(FwRouterState.STARTED)
         self._start_threads()
         fwutils.clear_linux_interfaces_cache()
-        fwglobals.g.router_api.vpp_api.register_interface_handler()
+        fwglobals.g.router_api.vpp_api.register_interface_events_handler(self._interface_events_handler)
         self.log.info("router was started: vpp_pid=%s" % str(fwutils.vpp_pid()))
 
     def _on_stop_router_before(self):

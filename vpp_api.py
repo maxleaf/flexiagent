@@ -43,6 +43,7 @@ class VPP_API:
         """Constructor method
         """
         self.connected_to_vpp = False
+        self.interface_event_handler = None
         if fwutils.vpp_does_run():
             self.connect_to_vpp()
 
@@ -53,15 +54,12 @@ class VPP_API:
             self.disconnect_from_vpp()
 
     def papi_event_handler(self, msgname, result):
-        linux_if = fwutils.vpp_sw_if_index_to_tap(result.sw_if_index)
-        if result.flags == 3:
-            cmd = 'ip link set dev %s up' % linux_if
-            fwglobals.log.debug(cmd)
-            subprocess.check_call(cmd, shell=True)
+        if msgname == 'sw_interface_event' and self.interface_event_handler:
+            self.interface_event_handler(result.sw_if_index, result.flags)
 
-    def register_interface_handler(self):
+    def register_interface_events_handler(self, interface_event_handler):
         self.vpp.api.want_interface_events(enable_disable=1,pid=os.getpid())
-        self.vpp.register_event_callback(self.papi_event_handler)
+        self.interface_event_handler = interface_event_handler
 
     def connect_to_vpp(self, vpp_json_dir='/usr/share/vpp/api/'):
         """Connect to VPP.
@@ -94,6 +92,7 @@ class VPP_API:
                 else:
                     time.sleep(20)
         self.connected_to_vpp = True
+        self.vpp.register_event_callback(self.papi_event_handler)
         fwglobals.log.debug("connect_to_vpp: connected")
 
 #        vpp_methods = []
