@@ -475,6 +475,19 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
     cmd['revert']['descr']      = "delete ipip tunnel %s -> %s" % (src, dst)
     cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "python"
+    cmd['cmd']['descr']     = "register interface events handler"
+    cmd['cmd']['params']    = { 'object': 'fwglobals.g.router_api.vpp_api',
+                                'func': 'register_interface_events_handler',
+                                'args': {
+                                         'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                         'interface_event_handler':fwutils.interface_events_handler
+                                }
+                              }
+    cmd_list.append(cmd)
+
 def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     """Add VxLAN tunnel command into the list.
 

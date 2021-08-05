@@ -4225,3 +4225,11 @@ def build_remote_loop_ip_address(addr):
     network.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
     return str(network.ip)
 
+def interface_events_handler(sw_if_index, flags):
+    linux_if = vpp_sw_if_index_to_tap(sw_if_index)
+    if flags == 0:
+        cmd = 'ip link set dev %s down' % linux_if
+    else:
+        cmd = 'ip link set dev %s up' % linux_if
+    fwglobals.log.debug(cmd)
+    subprocess.check_call(cmd, shell=True)

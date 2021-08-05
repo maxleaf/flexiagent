@@ -43,7 +43,7 @@ class VPP_API:
         """Constructor method
         """
         self.connected_to_vpp = False
-        self.interface_event_handler = None
+        self.interface_event_handlers = {}
         if fwutils.vpp_does_run():
             self.connect_to_vpp()
 
@@ -54,12 +54,12 @@ class VPP_API:
             self.disconnect_from_vpp()
 
     def papi_event_handler(self, msgname, result):
-        if msgname == 'sw_interface_event' and self.interface_event_handler:
-            self.interface_event_handler(result.sw_if_index, result.flags)
+        if msgname == 'sw_interface_event' and result.sw_if_index in self.interface_event_handlers:
+            self.interface_event_handlers[result.sw_if_index](result.sw_if_index, result.flags)
 
-    def register_interface_events_handler(self, interface_event_handler):
+    def register_interface_events_handler(self, sw_if_index, interface_event_handler):
         self.vpp.api.want_interface_events(enable_disable=1,pid=os.getpid())
-        self.interface_event_handler = interface_event_handler
+        self.interface_event_handlers[sw_if_index] = interface_event_handler
 
     def connect_to_vpp(self, vpp_json_dir='/usr/share/vpp/api/'):
         """Connect to VPP.
