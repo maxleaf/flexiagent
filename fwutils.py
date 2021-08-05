@@ -1001,17 +1001,17 @@ def vpp_get_tap_info():
     vpp_if_name_to_tap = {}
     if not vpp_does_run():
         fwglobals.log.debug("tap_info_get: VPP is not running")
-        return ({}, {})
+        return ({}, {}, 'None')
 
     taps = _vppctl_read("show tap-inject").strip()
     if not taps:
         fwglobals.log.debug("tap_info_get: no TAPs configured")
-        return ({}, {})
+        return ({}, {}, taps)
 
     # check if tap-inject is configured and enabled
     if 'not enabled' in taps:
         fwglobals.log.debug("tap_info_get: %s" % taps)
-        return ({}, {})
+        return ({}, {}, taps)
 
     taps = taps.splitlines()
     separator = ' -> '
@@ -1022,7 +1022,7 @@ def vpp_get_tap_info():
             tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
             vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
 
-    return (tap_to_vpp_if_name, vpp_if_name_to_tap)
+    return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
@@ -1033,11 +1033,12 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    tap_to_vpp_if_name, _ = vpp_get_tap_info()
-    if tap in tap_to_vpp_if_name:
-        return tap_to_vpp_if_name[tap]
+    tap_to_vpp_if_name, _, tap_info = vpp_get_tap_info()
+    if not tap in tap_to_vpp_if_name:
+        fwglobals.log.debug(f"tap_to_vpp_if_name({tap}): not found: {tap_info}")
+        return None
+    return tap_to_vpp_if_name[tap]
 
-    return None
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
@@ -1048,11 +1049,11 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
-    _, vpp_if_name_to_tap = vpp_get_tap_info()
-    if vpp_if_name in vpp_if_name_to_tap:
-        return vpp_if_name_to_tap[vpp_if_name]
-
-    return None
+    _, vpp_if_name_to_tap, tap_info = vpp_get_tap_info()
+    if not vpp_if_name in vpp_if_name_to_tap:
+        fwglobals.log.debug(f"vpp_if_name_to_tap({vpp_if_name}): not found: {tap_info}")
+        return None
+    return vpp_if_name_to_tap[vpp_if_name]
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
     """
@@ -1113,6 +1114,8 @@ def vpp_sw_if_index_to_name(sw_if_index):
      :returns: VPP interface name.
      """
     sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
+    if not sw_interfaces:
+        fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
