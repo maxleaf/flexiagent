@@ -621,6 +621,10 @@ def get_interface_dev_id(if_name):
             interface.update({'dev_id': ''})
             return ''
 
+        if re.match(r'^ipip', vpp_if_name): # ipip tunnel interfaces have no dev id (bus id)
+            interface.update({'dev_id': ''})
+            return ''
+
         dev_id = vpp_if_name_to_dev_id(vpp_if_name)
         if dev_id:
             interface.update({'dev_id': dev_id})
