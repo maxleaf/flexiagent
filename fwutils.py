@@ -1005,26 +1005,28 @@ def vpp_get_tap_info():
     vpp_if_name_to_tap = {}
     if not vpp_does_run():
         fwglobals.log.debug("tap_info_get: VPP is not running")
-        return ({}, {})
+        return ({}, {}, 'None')
 
     taps = _vppctl_read("show tap-inject").strip()
     if not taps:
         fwglobals.log.debug("tap_info_get: no TAPs configured")
-        return ({}, {})
+        return ({}, {}, taps)
 
     # check if tap-inject is configured and enabled
     if 'not enabled' in taps:
         fwglobals.log.debug("tap_info_get: %s" % taps)
-        return ({}, {})
+        return ({}, {}, taps)
 
     taps = taps.splitlines()
+    separator = ' -> '
 
     for line in taps:
-        tap_info = line.split(' -> ')
-        tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
-        vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
+        if separator in line:
+            tap_info = line.split(separator)
+            tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
+            vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
 
-    return (tap_to_vpp_if_name, vpp_if_name_to_tap)
+    return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
@@ -1035,11 +1037,12 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    tap_to_vpp_if_name, _ = vpp_get_tap_info()
-    if tap in tap_to_vpp_if_name:
-        return tap_to_vpp_if_name[tap]
+    tap_to_vpp_if_name, _, tap_info = vpp_get_tap_info()
+    if not tap in tap_to_vpp_if_name:
+        fwglobals.log.debug(f"tap_to_vpp_if_name({tap}): not found: {tap_info}")
+        return None
+    return tap_to_vpp_if_name[tap]
 
-    return None
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
@@ -1050,11 +1053,11 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
-    _, vpp_if_name_to_tap = vpp_get_tap_info()
-    if vpp_if_name in vpp_if_name_to_tap:
-        return vpp_if_name_to_tap[vpp_if_name]
-
-    return None
+    _, vpp_if_name_to_tap, tap_info = vpp_get_tap_info()
+    if not vpp_if_name in vpp_if_name_to_tap:
+        fwglobals.log.debug(f"vpp_if_name_to_tap({vpp_if_name}): not found: {tap_info}")
+        return None
+    return vpp_if_name_to_tap[vpp_if_name]
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
     """
@@ -1115,6 +1118,8 @@ def vpp_sw_if_index_to_name(sw_if_index):
      :returns: VPP interface name.
      """
     sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
+    if not sw_interfaces:
+        fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
@@ -1282,7 +1287,7 @@ def reset_device_config():
 
     reset_router_api_db_sa_id() # sa_id-s are used in translations of router configuration, so clean them too.
 
-    reset_dhcpd()
+    restore_dhcpd_files()
 
 def reset_router_api_db_sa_id():
     router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
@@ -1784,16 +1789,39 @@ def remove_linux_bridges():
     except:
         return True
 
-def reset_dhcpd():
-    if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
-
+def backup_dhcpd_files():
     try:
-        subprocess.check_call('sudo systemctl stop isc-dhcp-server', shell=True)
-    except:
-        return False
+        cmd = 'systemctl stop isc-dhcp-server'
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
 
-    return True
+        if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+            open(fwglobals.g.DHCPD_CONFIG_FILE, 'w').close()
+
+        if not os.path.exists(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.ISC_DHCP_CONFIG_FILE, fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP)
+            open(fwglobals.g.ISC_DHCP_CONFIG_FILE, 'w').close()
+
+    except Exception as e:
+        fwglobals.log.error("backup_dhcpd_files: %s" % str(e))
+
+def restore_dhcpd_files():
+    try:
+        if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
+            os.remove(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+
+        if os.path.exists(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP, fwglobals.g.ISC_DHCP_CONFIG_FILE)
+            os.remove(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP)
+
+        cmd = 'systemctl restart isc-dhcp-server'
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
+
+    except Exception as e:
+        fwglobals.log.error("restore_dhcpd_files: %s" % str(e))
 
 def modify_dhcpd(is_add, params):
     """Modify /etc/dhcp/dhcpd configuration file.
@@ -1802,7 +1830,7 @@ def modify_dhcpd(is_add, params):
 
     :returns: String with sed commands.
     """
-    dev_id         = params['interface']
+    dev_id      = params['interface']
     range_start = params.get('range_start', '')
     range_end   = params.get('range_end', '')
     dns         = params.get('dns', {})
@@ -1816,9 +1844,6 @@ def modify_dhcpd(is_add, params):
     router = str(address.ip)
     subnet = str(address.network)
     netmask = str(address.netmask)
-
-    if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
 
     config_file = fwglobals.g.DHCPD_CONFIG_FILE
 

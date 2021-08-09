@@ -593,7 +593,7 @@ class FwStunWrap:
         if not self.sym_nat_tunnels_cache:
             return
 
-        for tunnel_id, tunnel in self.sym_nat_tunnels_cache.items():
+        for tunnel_id, tunnel in list(self.sym_nat_tunnels_cache.items()):
             src_ip = tunnel['src']
             src_port = 4789
             dst_ip = tunnel['dst']

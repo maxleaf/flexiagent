@@ -1,0 +1,64 @@
+[
+    {
+        "entity": "agent",
+        "message": "start-router",
+        "params": {
+            "default-route": "192.168.0.1",
+            "interfaces": [
+                {
+                    "dev_id": "__INTERFACE_1__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_2__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_3__dev_id",
+                    "dhcp": "yes",
+                    "type": "lan"
+                }
+            ]
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "inbound": {
+                "edgeAccess": {
+                    "rules": [
+                        {
+                            "id": "1",
+                            "classification": {
+                                "destination": {
+                                    "protocols": [
+                                        "tcp",
+                                        "udp"
+                                    ],
+                                    "ports": "1024"
+                                },
+                                "source": {
+                                    "ipPort": {
+                                        "ip": "12.12.12.1/32"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "remove-firewall-policy",
+        "params": {}
+    },
+    {
+        "entity": "agent",
+        "message": "stop-router"
+    }
+]
