@@ -1134,15 +1134,15 @@ class Checker:
         for nicname, addrs in list(psutil.net_if_addrs().items()):
             if not fwutils.is_wifi_interface(nicname):
                 continue
-                
+
             driver = fwutils.get_interface_driver(nicname, cache=False)
             if not driver in ['ath10k_pci', 'ath9k_pci']:
                 other_wifi_drivers = True
                 continue
-            
+
             # Check if driver is a kernel driver or a dkms driver
-            driver_info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()               
-            
+            driver_info = subprocess.check_output('modinfo %s | grep filename' % driver, shell=True).decode().strip()
+
             # If driver is already dkms, we can return True
             if 'dkms' in driver_info:
                 return True
@@ -1150,11 +1150,11 @@ class Checker:
             # Make sure that driver is a kernel driver
             if not 'kernel' in driver_info:
                 continue
-            
+
             # At this point, we sure that we need to replace the existing driver with our one
             if not fix:
                 return False
-            
+
             if silently:
                 print(TXT_COLOR.BG_WARNING + "Installing new driver... that might takes a few minutes" + TXT_COLOR.END)
                 choice = "Y"
@@ -1163,7 +1163,7 @@ class Checker:
 
             if choice != 'y' and choice != 'Y':
                 return False
-            
+
             modules = [
                 'ath10k_pci',
                 'ath10k_core',
@@ -1175,7 +1175,10 @@ class Checker:
 
             try:
                 os.system('apt update >> %s 2>&1' % fwglobals.g.SYSTEM_CHECKER_LOG_FILE)
-                os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHECKER_LOG_FILE))
+                rc = os.system('apt install -y flexiwan-%s-dkms >> %s 2>&1' % (driver.split('_')[0], fwglobals.g.SYSTEM_CHECKER_LOG_FILE))
+
+                if rc:
+                    raise Exception("An error occurred while installing the driver")
 
                 for module in modules:
                     os.system('rmmod %s 2>/dev/null' % module)
@@ -1187,9 +1190,9 @@ class Checker:
                 for module in modules:
                     os.system('modprobe %s 2>/dev/null' % module)
                 return False
-                
-            # At this point, the driver installed and compailed successfully. 
-            # We can return True even we are inside the loop, 
+
+            # At this point, the driver installed and compailed successfully.
+            # We can return True even we are inside the loop,
             # since wo don't need to run it for each WiFi interface.
             return True
 

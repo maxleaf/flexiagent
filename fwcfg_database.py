@@ -33,6 +33,8 @@ from sqlitedict import SqliteDict
 import fwglobals
 import fwutils
 
+from fwlog import FwSyslog
+
 def decode(obj):
     """Deserialize objects retrieved from SQLite."""
     return pickle.loads(bytes(obj), encoding="latin1")
@@ -63,7 +65,7 @@ class FwCfgDatabase:
         """
         self.db_filename = db_file
         self.db = SqliteDict(db_file, autocommit=True, encode=encode, decode=decode)
-        self.log = fwglobals.log
+        self.log = fwglobals.log if fwglobals.g_initialized else FwSyslog()
 
     def __enter__(self):
         return self
