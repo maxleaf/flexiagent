@@ -4244,3 +4244,26 @@ def is_ip(str_to_check):
         return True
     except:
         return False
+
+def set_ip_on_bridge_bvi_interface(bridge_addr, is_add):
+    """Configure IP address on the BVI tap inerface if needed
+
+    :param bridge_addr: bridge address
+    :param is_add:      indiciate if need to add or remote the IP
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    try:
+        tap = bridge_addr_to_bvi_interface_tap(bridge_addr)
+        if not tap:
+            return (False, 'tap is not found for bvi interface')
+
+        ip_addr = get_interface_address(tap)
+        if not ip_addr:
+            op = 'add' if is_add else 'del'
+            state = 'up' if is_add else 'down'
+            subprocess.check_call(f'sudo ip addr {op} {bridge_addr} dev {tap}', shell=True)
+            subprocess.check_call(f'sudo ip link set dev {tap} {state}', shell=True)
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))

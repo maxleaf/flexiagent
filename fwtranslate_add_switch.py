@@ -158,45 +158,6 @@ def add_switch(params):
                             }
     cmd_list.append(cmd)
 
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "set %s to loopback interface in Linux" % addr
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':loopback_cache_key} ]},
-                                "sudo ip addr add %s dev DEV-STUB" % addr ]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "unset %s from loopback interface in Linux" % addr
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':loopback_cache_key} ]},
-                                "sudo ip addr del %s dev DEV-STUB" % addr ]
-    cmd_list.append(cmd)
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "UP loopback interface %s in Linux" % addr
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':loopback_cache_key} ]},
-                                "sudo ip link set dev DEV-STUB up" ]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "DOWN loopback interface %s in Linux" % addr
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':loopback_cache_key} ]},
-                                "sudo ip link set dev DEV-STUB down" ]
-    cmd_list.append(cmd)
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']    = "exec"
-    cmd['cmd']['descr']   = "set %s to loopback interface in VPP" % addr
-    cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':loopback_cache_key} ]},
-                                "sudo vppctl set interface ip address DEV-STUB %s" % addr ]
-    cmd['revert'] = {}
-    cmd['revert']['name']    = "exec"
-    cmd['revert']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':loopback_cache_key} ]},
-                                "sudo vppctl set interface ip address del DEV-STUB %s" % addr ]
-    cmd['revert']['descr']   = "unset %s to loopback interface in VPP" % addr
-    cmd_list.append(cmd)
-
     return cmd_list
 
 def get_request_key(params):
