@@ -62,6 +62,8 @@ proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
 
+#os.environ["COLUMNS"] = "300"
+
 def get_device_logs(file, num_of_lines):
     """Get device logs.
 
