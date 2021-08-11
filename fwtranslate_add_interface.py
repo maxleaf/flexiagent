@@ -329,6 +329,36 @@ def add_interface(params):
         }
         cmd_list.append(cmd)
 
+        # set the bridge IP address here.
+        # If the bridged interface exists in original netplan with set-name it might cause issues,
+        # So we configure the IP address for the BVI interface here
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "set %s to BVI loopback interface in Linux" % bridge_addr
+        cmd['cmd']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'set_ip_on_bridge_bvi_interface',
+            'args'  : {
+                'bridge_addr': bridge_addr,
+                'dev_id':      dev_id,
+                'is_add':      True,
+            }
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "unset %s to BVI loopback interface in Linux" % bridge_addr
+        cmd['revert']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'set_ip_on_bridge_bvi_interface',
+            'args'  : {
+                'bridge_addr': bridge_addr,
+                'dev_id':      dev_id,
+                'is_add':      False,
+            }
+        }
+        cmd_list.append(cmd)
+
     if mtu:
         # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
         cmd = {}
