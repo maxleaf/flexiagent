@@ -340,8 +340,9 @@ def add_interface(params):
             'module': 'fwutils',
             'func'  : 'set_ip_on_bridge_bvi_interface',
             'args'  : {
-                'is_add':      True,
                 'bridge_addr': bridge_addr,
+                'dev_id':      dev_id,
+                'is_add':      True,
             }
         }
         cmd['revert'] = {}
@@ -351,8 +352,9 @@ def add_interface(params):
             'module': 'fwutils',
             'func'  : 'set_ip_on_bridge_bvi_interface',
             'args'  : {
-                'is_add':      False,
                 'bridge_addr': bridge_addr,
+                'dev_id':      dev_id,
+                'is_add':      False,
             }
         }
         cmd_list.append(cmd)
