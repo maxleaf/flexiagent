@@ -4266,14 +4266,14 @@ def set_ip_on_bridge_bvi_interface(bridge_addr, dev_id, is_add):
                 subprocess.check_call(f'sudo ip link set dev {tap} up', shell=True)
         else:
             # check if there are other interefaces in the bridge.
-            # if so, don't remove the bridge id
+            # if so, don't remove the bridge ip
             bridged_interfaces = fwglobals.g.router_cfg.get_interfaces(ip=bridge_addr)
 
             # if bridged_interfaces containes only one interface at this remove process
             # it means that this interface is the last in the bridge and we need to remove the ip
             if len(bridged_interfaces) == 1:
-                subprocess.check_call(f'sudo ip addr del {bridge_addr} dev {tap}', shell=True)
                 subprocess.check_call(f'sudo ip link set dev {tap} down', shell=True)
+                subprocess.check_call(f'sudo ip addr del {bridge_addr} dev {tap}', shell=True)
         return (True, None)
     except Exception as e:
         return (False, str(e))
