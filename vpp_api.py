@@ -58,8 +58,10 @@ class VPP_API:
             self.interface_event_handlers[result.sw_if_index](result.sw_if_index, result.flags)
 
     def register_interface_events_handler(self, sw_if_index, interface_event_handler):
-        self.vpp.api.want_interface_events(enable_disable=1,pid=os.getpid())
         self.interface_event_handlers[sw_if_index] = interface_event_handler
+
+    def unregister_interface_events_handler(self, sw_if_index):
+        del self.interface_event_handlers[sw_if_index]
 
     def connect_to_vpp(self, vpp_json_dir='/usr/share/vpp/api/'):
         """Connect to VPP.
@@ -92,6 +94,7 @@ class VPP_API:
                 else:
                     time.sleep(20)
         self.connected_to_vpp = True
+        self.vpp.api.want_interface_events(enable_disable=1,pid=os.getpid())
         self.vpp.register_event_callback(self.papi_event_handler)
         fwglobals.log.debug("connect_to_vpp: connected")
 
