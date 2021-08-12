@@ -4255,7 +4255,7 @@ def build_remote_loop_ip_address(addr):
     network.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
     return str(network.ip)
 
-def interface_events_handler(sw_if_index, flags):
+def linux_interface_set_state(sw_if_index, flags):
     linux_if = vpp_sw_if_index_to_tap(sw_if_index)
     if flags == 0:
         cmd = 'ip link set dev %s down' % linux_if
@@ -4263,3 +4263,12 @@ def interface_events_handler(sw_if_index, flags):
         cmd = 'ip link set dev %s up' % linux_if
     fwglobals.log.debug(cmd)
     subprocess.check_call(cmd, shell=True)
+
+def linux_is_interface_up(sw_if_index):
+    linux_if = vpp_sw_if_index_to_tap(sw_if_index)
+    net_if_stats = psutil.net_if_stats()
+    for if_name, data in net_if_stats.items():
+        if if_name == linux_if:
+            return data.isup
+
+    return False
