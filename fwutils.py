@@ -296,6 +296,9 @@ def get_tunnel_gateway(dst, dev_id):
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
     return ipaddress.ip_address(gw_ip) if gw_ip else ipaddress.ip_address('0.0.0.0')
 
+def get_tunnel_gateway_str(dst, dev_id):
+    return str(get_tunnel_gateway(dst, dev_id))
+
 def is_interface_assigned_to_vpp(dev_id):
     """ Check if dev_id is assigned to vpp.
     This function could be called even deamon doesn't run.
@@ -1937,6 +1940,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev_id=None, sw_i
     op = 'del' if remove else 'add'
 
     vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
+    fwglobals.log.debug(vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:

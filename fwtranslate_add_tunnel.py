@@ -1222,8 +1222,8 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
             cmd['cmd']['name']    = "python"
             cmd['cmd']['descr']   = "add multilink labels into tunnel interface %s: %s" % (params['src'], labels)
             cmd['cmd']['params']  = {
-                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key},
-                                        { 'add_param': 'next_hop', 'val_by_func': 'get_tunnel_gateway', 'arg': [dst, dev_id]}],
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id},
+                                        { 'add_param':'next_hop', 'val_by_func':'get_tunnel_gateway_str', 'arg':[dst, dev_id]}],
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels': labels, 'remove': False }
@@ -1232,8 +1232,8 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
             cmd['revert']['name']   = "python"
             cmd['revert']['descr']  = "remove multilink labels from tunnel interface %s: %s" % (params['src'], labels)
             cmd['revert']['params'] = {
-                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key},
-                                        { 'add_param': 'next_hop', 'val_by_func': 'get_tunnel_gateway', 'arg': [dst, dev_id]}],
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id},
+                                        { 'add_param':'next_hop', 'val_by_func':'get_tunnel_gateway_str', 'arg':[dst, dev_id]}],
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
                             'args'  : { 'labels': labels, 'remove': True }
