@@ -185,7 +185,7 @@ class OpenVPN:
                 'echo "proto udp" >> %s' % destFile,
 
                 # "dev tun" will create a routed IP tunnel
-                'echo "dev tun" >> %s' % destFile,
+                'echo "dev tap0" >> %s' % destFile,
 
                 # SSL/TLS root certificate
                 'echo "ca /etc/openvpn/server/ca.crt" >> %s' % destFile,
@@ -239,7 +239,7 @@ class OpenVPN:
                 'echo "tmp-dir /dev/shm" >> %s' % destFile,
                 'echo "script-security 2" >> %s' % destFile,
 
-                'echo "client-cert-not-required" >> %s' % destFile,
+                'echo "verify-client-cert none" >> %s' % destFile,
                 'echo "client-config-dir /etc/openvpn/client" >> %s' % destFile,
                 'echo "username-as-common-name" >> %s' % destFile,
                 'echo "reneg-sec 43200" >> %s' % destFile,
@@ -322,4 +322,4 @@ class OpenVPN:
             return (True, None)
         except Exception as e:
             return (False, str(e))
-        
+

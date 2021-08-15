@@ -52,24 +52,24 @@ class FWSERVICES_API:
         message = request['message']
         params = request['params']
         service_type = params['type']
-        
+
         service = fwservices.get(service_type)
         assert service, '%s: "%s" service is not supported' % (message, service_type)
 
         handler = fwservices_handlers.get(message)
-        assert handler, '%s: "%s" handler is not supported' % (message, message)        
-        
+        assert handler, '%s: "%s" handler is not supported' % (message, message)
+
         handler_func = getattr(service, handler['handler'])
-        assert handler_func, '%s: "%s" function is not implemented fro this service' % (message, handler_func)        
-     
+        assert handler_func, '%s: "%s" function is not implemented fro this service' % (message, handler_func)
+
         try:
             (success, error) = handler_func(params['config'])
-            
+
             if success == False:
                 raise Exception(error)
 
             reply = {'entity':'servicesReply', 'message': 'success', 'ok': 1}
         except Exception as e:
             reply = {'entity':'servicesReply', 'message': str(e), 'ok': 0}
-        
+
         return reply
