@@ -47,23 +47,24 @@ def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
     args = shlex.split(cmd)
     return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
 
-def tunnel_stats_get_ping_time(hosts):
+def tunnel_stats_get_ping_time(tunnels):
     """Use fping to get RTT.
 
-    :param hosts:         IP addresses to ping.
+    :param tunnels:         IP addresses to ping.
 
     :returns: RTT values on success and 0 otherwise.
     """
     ret = {}
 
-    cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
-
     # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
     # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
-    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines():
-        host_rtt = [x.strip() for x in row.strip().split(':')]
-        rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
-        ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+    for hosts in tunnels:
+        for host in hosts:
+            cmd = "fping %s -C 1 -q" % host
+            row = tunnel_stats_get_simple_cmd_output(cmd).strip()
+            host_rtt = [x.strip() for x in row.strip().split(':')]
+            rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
+            ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
 
     return ret
 
@@ -113,8 +114,16 @@ def tunnel_stats_test():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    hosts = [x.get('loopback_remote', '').split(':')[0] for x in tunnel_stats_global_copy.values()]
-    tunnel_rtt = tunnel_stats_get_ping_time(hosts)
+    tunnels = []
+    for x in tunnel_stats_global_copy.values():
+        hosts = []
+        host = x.get('loopback_remote', '').split(':')[0]
+        interface = x.get('local_sw_if_index', None)
+        if interface:
+            host += " -I %s" % fwutils.vpp_sw_if_index_to_tap(interface)
+        hosts.append(host)
+        tunnels.append(hosts)
+    tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
         if 'local_sw_if_index' in stats:
