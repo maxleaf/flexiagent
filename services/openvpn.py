@@ -38,13 +38,9 @@ class OpenVPN:
 
         :returns: (True, None) tuple on success, (False, <error string>) on failure.
         """
-    
+
         try:
-            if params['version']:
-                # version = params['version']
-                version = 'stable'
-            else:
-                version = 'stable'
+            version = params.get('version', 'stable')
 
             os.system('mkdir -p /etc/openvpn/server')
             os.system('mkdir -p /etc/openvpn/client')
@@ -52,7 +48,7 @@ class OpenVPN:
             shutil.copyfile('{}/openvpn_scripts/auth.sh'.format(dir), '/etc/openvpn/server/auth-script.sh')
             shutil.copyfile('{}/openvpn_scripts/up.sh'.format(dir), '/etc/openvpn/server/up-script.sh')
             shutil.copyfile('{}/openvpn_scripts/down.sh'.format(dir), '/etc/openvpn/server/down-script.sh')
-        
+
             commands = [
                 'wget -O - https://swupdate.openvpn.net/repos/repo-public.gpg|apt-key add -',
                 'echo "deb http://build.openvpn.net/debian/openvpn/%s bionic main" > /etc/apt/sources.list.d/openvpn-aptrepo.list' % version,
@@ -65,7 +61,7 @@ class OpenVPN:
                 "sed -i 's/\r$//' /etc/openvpn/server/auth-script.sh",
                 "sed -i 's/\r$//' /etc/openvpn/server/up-script.sh",
                 "sed -i 's/\r$//' /etc/openvpn/server/down-script.sh",
-            
+
                 'echo "%s" > /etc/openvpn/server/ca.key' % params['caKey'],
                 'echo "%s" > /etc/openvpn/server/ca.crt' % params['caCrt'],
                 'echo "%s" > /etc/openvpn/server/server.key' % params['serverKey'],
@@ -75,14 +71,14 @@ class OpenVPN:
 
                 'rm -rf ./pki'
             ]
-            
+
             for command in commands:
                 ret = os.system(command)
                 if ret:
                     return (False, ret)
-            
+
             self.modify(params)
-            
+
             fwglobals.log.debug("Openvpn installed successfully")
             return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
         except Exception as e:
@@ -124,7 +120,7 @@ class OpenVPN:
             if vpnIsRun:
                 os.system('sudo killall openvpn')
                 time.sleep(5)  # 5 sec
-            
+
             output = os.system('sudo openvpn --config /etc/openvpn/server/server.conf --daemon')
             fwglobals.log.debug("openvpn server is running!")
             return (True, None)
@@ -218,7 +214,7 @@ class OpenVPN:
 
                 # Select a cryptographic cipher.
                 'echo "cipher AES-256-CBC" >> %s' % destFile,
-            
+
                 #'echo "user nobody" >> %s' % destFile,
                 #'echo "group nogroup" >> %s' % destFile,
 
@@ -226,7 +222,7 @@ class OpenVPN:
                 # that may no longer be accessible because of the privilege downgrade.
                 'echo "persist-key" >> %s' % destFile,
                 'echo "persist-tun" >> %s' % destFile,
-        
+
                 # Output a short status file showing current connections, truncated
                 # and rewritten every minute.
                 'echo "status /etc/openvpn/server/openvpn-status.log" >> %s' % destFile,
@@ -254,7 +250,7 @@ class OpenVPN:
             if params['routeAllOverVpn'] is True:
                 # this directive will configure all clients to redirect their default
                 # network gateway through the VPN
-                commands.append('echo "push \\"redirect-gateway def1 bypass-dhcp\\"" >> %s' % destFile)        
+                commands.append('echo "push \\"redirect-gateway def1 bypass-dhcp\\"" >> %s' % destFile)
             else:
                 commands.append('echo "push \\"route 172.16.0.0 255.255.255.0\\"" >> %s' % (destFile))
 
@@ -280,9 +276,9 @@ class OpenVPN:
             fwglobals.log.debug("Openvpn server conf configured successfully")
             return (True, None)
         except Exception as e:
-            return (False, str(e))  
+            return (False, str(e))
 
-    def _configure_client_file(self, params): 
+    def _configure_client_file(self, params):
         try:
             destFile = '/etc/openvpn/client/client.conf'
 
