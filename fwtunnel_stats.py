@@ -58,9 +58,10 @@ def tunnel_stats_get_ping_time(tunnels):
 
     # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
     # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
-    for hosts in tunnels:
-        for host in hosts:
-            cmd = "fping %s -C 1 -q" % host
+    for tunnel in tunnels:
+        interface = tunnel['interface']
+        for host in tunnel['hosts']:
+            cmd = "fping %s -C 1 -q -I %s" % (host, interface)
             row = tunnel_stats_get_simple_cmd_output(cmd).strip()
             host_rtt = [x.strip() for x in row.strip().split(':')]
             rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
@@ -118,11 +119,9 @@ def tunnel_stats_test():
     for x in tunnel_stats_global_copy.values():
         hosts = []
         host = x.get('loopback_remote', '').split(':')[0]
-        interface = x.get('local_sw_if_index', None)
-        if interface:
-            host += " -I %s" % fwutils.vpp_sw_if_index_to_tap(interface)
+        interface = fwutils.vpp_sw_if_index_to_tap(x.get('local_sw_if_index', None))
         hosts.append(host)
-        tunnels.append(hosts)
+        tunnels.append({'interface':interface, 'hosts':hosts})
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
