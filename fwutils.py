@@ -588,7 +588,7 @@ def get_interface_dev_id(if_name):
 
     :returns: dev_id.
     """
-    if not if_name:
+    if is_interface_without_dev_id(if_name):
         return ''
 
     with fwglobals.g.cache.lock:
@@ -1714,6 +1714,29 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
 
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
+
+def is_interface_without_dev_id(if_name):
+    """Check if the given interface is expected to have no dev_id
+
+    :param if_name:  Interface name tpo check.
+
+    :returns: Boolean indicates if expected to have no dev_id
+    """
+    if not if_name:
+        return True
+
+    if if_name == 'lo':
+        return True
+
+    # tap interface that created for LTE interface has no dev_id
+    if if_name.startswith('tap_'):
+        return True
+
+    # bridge interface that created for WiFi has no dev_id
+    if if_name.startswith('br_'):
+        return True
+
+    return False
 
 def get_lte_interfaces_names():
     names = []
