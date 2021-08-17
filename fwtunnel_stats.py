@@ -61,12 +61,17 @@ def tunnel_stats_get_ping_time(tunnels):
     for tunnel in tunnels:
         interface = tunnel['interface']
         tunnel_id = tunnel['tunnel_id']
-        for host in tunnel['hosts']:
-            cmd = "fping %s -C 1 -q -I %s" % (host, interface)
-            row = tunnel_stats_get_simple_cmd_output(cmd).strip()
+        hosts =  tunnel['hosts']
+
+        cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
+        cmd += " -I %s" % interface
+        rows = tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines()
+        rtts = []
+        for row in rows:
             host_rtt = [x.strip() for x in row.strip().split(':')]
-            rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
-            ret[tunnel_id] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+            rtt = host_rtt[1] if host_rtt[1] != '-' else '0'
+            rtts.append(float(rtt))
+        ret[tunnel_id] = sum(rtts) / len(rtts) if len(rtts) > 0 else 0
 
     return ret
 
