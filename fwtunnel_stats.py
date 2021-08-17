@@ -93,8 +93,7 @@ def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index):
     stats_entry['timestamp'] = 0
 
     stats_entry['loopback_remote'] = remote_ip
-    if local_sw_if_index:
-        stats_entry['local_sw_if_index'] = local_sw_if_index
+    stats_entry['local_sw_if_index'] = local_sw_if_index
 
     with tunnel_stats_global_lock:
         tunnel_stats_global[tunnel_id] = stats_entry
@@ -125,13 +124,12 @@ def tunnel_stats_test():
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
-        if 'local_sw_if_index' in stats:
-            sw_if_index = stats['local_sw_if_index']
-            flags = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)[0].flags
-            stats['state'] = flags
-            is_up = fwutils.linux_is_interface_up(sw_if_index)
-            if is_up and flags == 0 or not is_up and flags != 0:
-                fwutils.linux_interface_set_state(sw_if_index, flags)
+        sw_if_index = stats['local_sw_if_index']
+        flags = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)[0].flags
+        stats['state'] = flags
+        is_up = fwutils.linux_is_interface_up(sw_if_index)
+        if is_up and flags == 0 or not is_up and flags != 0:
+            fwutils.linux_interface_set_state(sw_if_index, flags)
 
         stats['sent'] += 1
 
