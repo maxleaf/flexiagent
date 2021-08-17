@@ -431,12 +431,14 @@ class FWROUTER_API(FwCfgRequestHandler):
         for params in tunnels:
             id   = params['tunnel-id']
             if 'peer' in params:
-                remote_ip = params['dst']
+                remote_ips = [params['dst']]
+                remote_ips += params['peer']['ips']
+                remote_ips += params['peer']['urls']
                 local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
             else:
-                remote_ip = fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])
+                remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
                 local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-            fwtunnel_stats.tunnel_stats_add(id, remote_ip, local_sw_if_index)
+            fwtunnel_stats.tunnel_stats_add(id, remote_ips, local_sw_if_index)
 
     def _call_simple(self, request):
         """Execute single request.

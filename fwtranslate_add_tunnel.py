@@ -1375,10 +1375,12 @@ def add_tunnel(params):
 
     tunnel_stats_args = { 'tunnel_id': params['tunnel-id'] }
     if 'peer' in params:
-        tunnel_stats_args['remote_ip'] = params['dst']
+        tunnel_stats_args['remote_ip'] = [params['dst']]
+        tunnel_stats_args['remote_ip'] += params['peer']['ips']
+        tunnel_stats_args['remote_ip'] += params['peer']['urls']
         tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':tunnel_cache_key} ]
     else:
-        tunnel_stats_args['remote_ip'] = remote_loop0_ip
+        tunnel_stats_args['remote_ip'] = [remote_loop0_ip]
         tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
     cmd = {}
     cmd['cmd'] = {}

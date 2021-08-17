@@ -60,12 +60,13 @@ def tunnel_stats_get_ping_time(tunnels):
     # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
     for tunnel in tunnels:
         interface = tunnel['interface']
+        tunnel_id = tunnel['tunnel_id']
         for host in tunnel['hosts']:
             cmd = "fping %s -C 1 -q -I %s" % (host, interface)
             row = tunnel_stats_get_simple_cmd_output(cmd).strip()
             host_rtt = [x.strip() for x in row.strip().split(':')]
             rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
-            ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+            ret[tunnel_id] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
 
     return ret
 
@@ -115,12 +116,10 @@ def tunnel_stats_test():
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
     tunnels = []
-    for x in tunnel_stats_global_copy.values():
-        hosts = []
-        host = x.get('loopback_remote', '').split(':')[0]
-        interface = fwutils.vpp_sw_if_index_to_tap(x.get('local_sw_if_index', None))
-        hosts.append(host)
-        tunnels.append({'interface':interface, 'hosts':hosts})
+    for tunnel_id, tunnel_stats_entry in tunnel_stats_global_copy.items():
+        hosts = tunnel_stats_entry.get('loopback_remote', [])
+        interface = fwutils.vpp_sw_if_index_to_tap(tunnel_stats_entry.get('local_sw_if_index', None))
+        tunnels.append({'tunnel_id':tunnel_id, 'interface':interface, 'hosts':hosts})
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
@@ -133,7 +132,7 @@ def tunnel_stats_test():
 
         stats['sent'] += 1
 
-        rtt = tunnel_rtt.get(stats['loopback_remote'], 0)
+        rtt = tunnel_rtt.get(tunnel_id, 0)
         if rtt > 0:
             stats['received'] += 1
             stats['timestamp'] = time.time()
