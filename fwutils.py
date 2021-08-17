@@ -21,6 +21,7 @@
 import copy
 import binascii
 import datetime
+import enum
 import glob
 import hashlib
 import inspect
@@ -38,6 +39,7 @@ import fwglobals
 import fwikev2
 import fwnetplan
 import fwstats
+import fwtunnel_stats
 import shutil
 import sys
 import traceback
@@ -46,6 +48,7 @@ from netaddr import IPNetwork, IPAddress
 import threading
 import serial
 import ipaddress
+import pyroute2
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
@@ -2049,8 +2052,8 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
-def add_static_route(addr, via, metric, remove, dev_id=None):
-    """Add static route.
+def add_remove_static_route(addr, via, metric, remove, dev_id=None):
+    """Add/Remove static route.
 
     :param addr:            Destination network.
     :param via:             Gateway address.
@@ -3948,59 +3951,35 @@ def dump(filename=None, path=None, clean_log=False):
     except Exception as e:
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 
-def linux_routes_dictionary_get():
+class IpRouteProto(enum.Enum):
+   BOOT = 3
+
+def linux_get_routes(proto=IpRouteProto.BOOT.value):
     routes_dict = {}
 
-    # get only our static routes from Linux
-    try :
-        output = subprocess.check_output('ip route show | grep -v proto', shell=True).decode().strip()
-    except:
-        return routes_dict
+    with pyroute2.IPRoute() as ipr:
+        routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
+        for route in routes:
+            nexthops = set()
+            for attr in route['attrs']:
+                metric = 0
+                if attr[0] == 'RTA_PRIORITY':
+                    metric = attr[1]
+                if attr[0] == 'RTA_DST':
+                    dst = attr[1]
+                if attr[0] == 'RTA_GATEWAY':
+                    nexthops.add(attr[1])
+                if attr[0] == 'RTA_MULTIPATH':
+                    for elem in attr[1]:
+                        for attr2 in elem['attrs']:
+                            if attr2[0] == 'RTA_GATEWAY':
+                                nexthops.add(attr2[1])
+            addr = "%s/%u" % (dst, route['dst_len'])
 
-    addr = ''
-    metric = 0
-    nexthops = set()
-    routes = output.splitlines()
-
-    for route in routes:
-        part = route.split(' ')[0]
-        if re.search('nexthop', part):
-            parts = route.split('via ')
-            via = parts[1].split(' ')[0]
-            nexthops.add(via)
-            continue
-        else:
-            # save multipath route if needed
-            if nexthops:
-                if metric not in routes_dict:
-                    routes_dict[metric] = {addr: copy.copy(nexthops)}
-                else:
-                    routes_dict[metric][addr] = copy.copy(nexthops)
-
-            # continue with current route
-            nexthops.clear()
-            metric = 0
-            addr = part
-
-        if 'metric' in route:
-            parts = route.split('metric ')
-            metric = int(parts[1])
-
-        parts = route.split('via ')
-        if isinstance(parts, list) and len(parts) > 1:
-            via = parts[1].split(' ')[0]
-            nexthops.add(via)
-
-        if not nexthops:
-            continue
-
-        if metric not in routes_dict:
-            routes_dict[metric] = {addr: copy.copy(nexthops)}
-        else:
-            routes_dict[metric][addr] = copy.copy(nexthops)
-
-        nexthops.clear()
-        metric = 0
+            if metric not in routes_dict:
+                routes_dict[metric] = {addr: copy.copy(nexthops)}
+            else:
+                routes_dict[metric][addr] = copy.copy(nexthops)
 
     return routes_dict
 
@@ -4026,18 +4005,23 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
 
 def check_reinstall_static_routes():
     routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_routes_dictionary_get()
+    routes_linux = linux_get_routes()
+    tunnel_addresses = fwtunnel_stats.get_tunnel_info()
 
     for route in routes_db:
         addr = route['addr']
         via = route['via']
         metric = str(route.get('metric', '0'))
         dev = route.get('dev_id', None)
+        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
 
-        if linux_routes_dictionary_exist(routes_linux, addr, metric, via):
+        if tunnel_addresses.get(via) == 'down':
+            if exist_in_linux:
+                add_remove_static_route(addr, via, metric, True, dev)
             continue
 
-        add_static_route(addr, via, metric, False, dev)
+        if not exist_in_linux:
+            add_remove_static_route(addr, via, metric, False, dev)
 
 def exec_with_timeout(cmd, timeout=60):
     """Run bash command with timeout option
