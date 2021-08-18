@@ -31,21 +31,21 @@ import fwutils
 
 tunnel_stats_global = {}
 tunnel_stats_global_lock = threading.RLock()
+fping_processes = {}
 
 TIMEOUT = 15
 WINDOW_SIZE = 30
 APPROX_FACTOR = 16
 
-def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
+def start_fping_process(cmd):
     """Execute a simple external command and get its output.
 
     :param cmd:         Bash command
-    :param stderr:      Where to print errors.
 
     :returns: Command execution result.
     """
-    args = shlex.split(cmd)
-    return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
+    process = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True, universal_newlines=True)
+    return process
 
 def tunnel_stats_get_ping_time(tunnels):
     """Use fping to get RTT.
@@ -62,16 +62,27 @@ def tunnel_stats_get_ping_time(tunnels):
         interface = tunnel['interface']
         tunnel_id = tunnel['tunnel_id']
         hosts =  tunnel['hosts']
+        rows = None
 
         cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
         cmd += " -I %s" % interface
-        rows = tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines()
-        rtts = []
-        for row in rows:
-            host_rtt = [x.strip() for x in row.strip().split(':')]
-            rtt = host_rtt[1] if host_rtt[1] != '-' else '0'
-            rtts.append(float(rtt))
-        ret[tunnel_id] = sum(rtts) / len(rtts) if len(rtts) > 0 else 0
+        if tunnel_id in fping_processes:
+            if fping_processes[tunnel_id].poll() is not None:
+                (output, errors) = fping_processes[tunnel_id].communicate()
+                rows = errors.strip().splitlines()
+                fping_processes[tunnel_id] = start_fping_process(cmd)
+        else:
+            fping_processes[tunnel_id] = start_fping_process(cmd)
+
+        if rows:
+            rtts = []
+            for row in rows:
+                host_rtt = [x.strip() for x in row.strip().split(':')]
+                rtt = host_rtt[1] if host_rtt[1] != '-' else '0'
+                rtts.append(float(rtt))
+            ret[tunnel_id] = sum(rtts) / len(rtts) if len(rtts) > 0 else 0
+        else:
+            ret[tunnel_id] = None
 
     return ret
 
@@ -131,6 +142,9 @@ def tunnel_stats_test():
         stats['sent'] += 1
 
         rtt = tunnel_rtt.get(tunnel_id, 0)
+        if rtt is None:
+            continue
+
         if rtt > 0:
             stats['received'] += 1
             stats['timestamp'] = time.time()
