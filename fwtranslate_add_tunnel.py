@@ -1159,7 +1159,8 @@ def add_tunnel(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'commands': ["interface DEV-STUB", "no ip ospf network point-to-point"]
+                    'commands': ["interface DEV-STUB", "no ip ospf network point-to-point"],
+                    'restart_frr': True
                 },
                 'substs': [ {'replace':'DEV-STUB', 'key': 'commands', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':'loop0_sw_if_index'} ]
         }
