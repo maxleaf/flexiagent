@@ -1184,7 +1184,12 @@ def add_tunnel(params):
                 'module': 'fwutils',
                 'func': 'frr_vtysh_run',
                 'args': {
-                    'commands': ["router ospf", "no network %s area 0.0.0.0" % addr]
+                    'commands': ["router ospf", "no network %s area 0.0.0.0" % addr],
+
+                    # Use 'wait_after' to ensure that redistributed routes that might be received over tunnel
+                    # are removed from kernel and from vpp FIB
+                    #
+                    'wait_after': 2
                 }
         }
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % addr
