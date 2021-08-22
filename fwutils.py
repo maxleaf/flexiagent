@@ -3286,7 +3286,7 @@ def lte_get_radio_signals_state(dev_id):
                     result['text'] = 'Good'
                 elif -60 >= dbm_num:
                     result['text'] = 'Very Good'
-                elif -50 >= dbm_num:
+                else:
                     result['text'] = 'Excellent'
                 continue
             if 'SINR' in line:
