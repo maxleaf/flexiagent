@@ -3457,11 +3457,13 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
+def frr_vtysh_run(commands, restart_frr=False, print_stdout=True, wait_after=None):
     '''Run vtysh command to configure router
 
     :param commands:    array of frr commands
     :param restart_frr: some OSPF configurations require restarting the service in order to apply them
+    :param wait_after:  seconds to wait after successfull command execution.
+                        It might be needed to give a systemt/vpp time to get updates as a result of frr update.
     '''
     try:
         shell_commands = ' -c '.join(map(lambda x: '"%s"' % x, commands))
@@ -3470,10 +3472,14 @@ def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
         output = os.popen(vtysh_cmd).read().splitlines()
 
         # in output, the first line might contains error. So we print only the first line
-        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, output=%s" % (vtysh_cmd, output[0] if output else ''))
+        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, wait_after=%s, output=%s" %
+                            (vtysh_cmd, str(wait_after), output[0] if output else ''))
 
         if restart_frr:
             os.system('systemctl restart frr')
+
+        if wait_after:
+            time.sleep(wait_after)
 
         return (True, None)
     except Exception as e:
