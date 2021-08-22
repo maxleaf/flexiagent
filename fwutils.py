@@ -1017,7 +1017,7 @@ def vpp_get_tap_info():
         return ({}, {}, taps)
 
     taps = taps.splitlines()
-    # the output of "show tap-inject might be messy, and the array can look like this:
+    # the output of "show tap-inject" might be messy, and the array can look like this:
     # [
     # '_______    _        _   _____  ___ ',
     # ' __/ __/ _ \\  (_)__    | | / / _ \\/ _ \\',
