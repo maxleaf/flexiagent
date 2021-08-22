@@ -1017,7 +1017,8 @@ def vpp_get_tap_info():
         return ({}, {}, taps)
 
     taps = taps.splitlines()
-    # the output of "show tap-inject" might be messy, and the array can look like this:
+    # the output of "show tap-inject" might be messy,
+    # Here are some examples we dealt with during the time:
     # [
     # '_______    _        _   _____  ___ ',
     # ' __/ __/ _ \\  (_)__    | | / / _ \\/ _ \\',
@@ -1026,15 +1027,15 @@ def vpp_get_tap_info():
     # '',
     # 'vpp# loop16300 -> vpp3',
     # 'vmxnet3-0/3/0/0 -> vpp0',
-    # 'vmxnet3-0/13/0/0 -> vpp1',
-    # 'vmxnet3-0/4/0/0 -> vpp2'
+    # 'GigabitEthernet4/0/1 -> vpp0',
+    # 'tapcli-0 -> vpp5'
     # ]
     # we use a regex check to get the closest words before and after the arrow
     for line in taps:
-        tap_info = re.search("(\w+) -> (\w+)", line)
+        tap_info = re.search("([/\w-]+) -> (\w+)", line)
         if tap_info:
-            tap = tap_info.group(1)
-            vpp_if_name = tap_info.group(2)
+            vpp_if_name = tap_info.group(1)
+            tap = tap_info.group(2)
             tap_to_vpp_if_name[tap] = vpp_if_name
             vpp_if_name_to_tap[vpp_if_name] = tap
 
