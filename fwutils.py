@@ -1028,7 +1028,8 @@ def vpp_get_tap_info():
     # 'vpp# loop16300 -> vpp3',
     # 'vmxnet3-0/3/0/0 -> vpp0',
     # 'GigabitEthernet4/0/1 -> vpp0',
-    # 'tapcli-0 -> vpp5'
+    # 'tapcli-0 -> vpp5',
+    # 'tap0 -> vpp3'
     # ]
     # we use a regex check to get the closest words before and after the arrow
     for line in taps:
