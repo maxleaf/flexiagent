@@ -1033,7 +1033,7 @@ def vpp_get_tap_info():
     # ]
     # we use a regex check to get the closest words before and after the arrow
     for line in taps:
-        tap_info = re.search("([/\w-]+) -> ([^\s/]+)", line)
+        tap_info = re.search("([/\w-]+) -> ([\S]+)", line)
         if tap_info:
             vpp_if_name = tap_info.group(1)
             tap = tap_info.group(2)
