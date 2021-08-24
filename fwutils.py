@@ -4220,7 +4220,7 @@ def reload_lte_drivers():
         # loop over the modules and run modprobe for each one
         for module in modules:
             ret = os.system('modprobe %s > /dev/null 2>&1' % module)
-            # In case of error mark the flase as false and loop again
+            # In case of error mark the flag as false and loop again
             if ret != 0:
                 succeded = False
 
