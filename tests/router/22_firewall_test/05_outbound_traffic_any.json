@@ -1,0 +1,51 @@
+[
+    {
+        "entity": "agent",
+        "message": "start-router",
+        "params": {
+            "default-route": "192.168.0.1",
+            "interfaces": [
+                {
+                    "dev_id": "__INTERFACE_1__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_2__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_3__dev_id",
+                    "dhcp": "yes",
+                    "type": "lan"
+                }
+            ]
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "outbound": {
+                "rules": [
+                    {
+                        "id": "1",
+                        "action": {
+                            "permit": true
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "remove-firewall-policy",
+        "params": {}
+    },
+    {
+        "entity": "agent",
+        "message": "stop-router"
+    }
+]

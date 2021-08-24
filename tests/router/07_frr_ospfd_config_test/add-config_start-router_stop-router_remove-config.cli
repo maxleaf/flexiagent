@@ -47,11 +47,6 @@
 }
 ,
 {
-  "entity": "agent",
-  "message": "stop-router"
-}
-,
-{
   "entity":  "agent",
   "message": "remove-tunnel",
   "params": { "tunnel-id": 1 }
@@ -71,5 +66,10 @@
       "routing":"ospf"
     }
   ]
+}
+,
+{
+  "entity": "agent",
+  "message": "stop-router"
 }
 ]

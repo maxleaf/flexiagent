@@ -1,0 +1,227 @@
+[
+    {
+        "entity": "agent",
+        "message": "start-router",
+        "params": {
+            "default-route": "192.168.0.1",
+            "interfaces": [
+                {
+                    "dev_id": "__INTERFACE_1__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_2__dev_id",
+                    "dhcp": "yes",
+                    "type": "wan"
+                },
+                {
+                    "dev_id": "__INTERFACE_3__dev_id",
+                    "dhcp": "yes",
+                    "type": "lan"
+                }
+            ]
+        }
+    },    
+    {
+        "entity": "agent",
+        "message": "add-application",
+        "params": {
+            "applications": [
+                {
+                    "rules": [
+                        {
+                            "_id": "610a63d8c654eb5b31bcbf4f",
+                            "ip": "104.154.0.0/15"
+                        }
+                    ],
+                    "name": "custom:company_ranges",
+                    "description": "All company ranges allowed",
+                    "category": "network",
+                    "serviceClass": "default",
+                    "importance": "high",
+                    "id": "610a63d8c654eb5b31bcbf4d"
+                },
+                {
+                    "rules": [
+                        {
+                            "_id": "610a7a3ac654eb5b31bcdbc4",
+                            "ip": "108.175.32.0/20"
+                        }
+                    ],
+                    "name": "custom:range2",
+                    "description": "second company range",
+                    "category": "remote_access",
+                    "serviceClass": "default",
+                    "importance": "high",
+                    "id": "610a7a3ac654eb5b31bcdbc2"
+                },
+                {
+                    "name": "custom:range3",
+                    "description": "third range",
+                    "category": "network",
+                    "serviceClass": "default",
+                    "importance": "high",
+                    "rules": [
+                        {
+                            "_id": "610a86fbc654eb5b31bceecf",
+                            "ip": "178.236.80.0/20"
+                        }
+                    ],
+                    "id": "610a86fbc654eb5b31bceecd"
+                }
+            ]
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "add-firewall-policy",
+        "params": {
+            "id": "610a5b4cc654eb5b31bcb374",
+            "outbound": {
+                "rules": [
+                    {
+                        "id": "610a5b4cc654eb5b31bcb377",
+                        "priority": 10000,
+                        "classification": {
+                            "source": {},
+                            "destination": {
+                                "ipProtoPort": {
+                                    "ip": "9.9.9.9/32",
+                                    "protocols": [
+                                        "icmp",
+                                        "tcp",
+                                        "udp"
+                                    ]
+                                }
+                            }
+                        },
+                        "action": {
+                            "interfaces": [],
+                            "permit": false
+                        }
+                    }
+                ]
+            },
+            "inbound": {
+                "portForward": {
+                    "rules": [
+                        {
+                            "id": "610a66aec654eb5b31bcc31e",
+                            "priority": 0,
+                            "classification": {
+                                "source": {
+                                    "trafficId": "610a86fbc654eb5b31bceecd"
+                                },
+                                "destination": {
+                                    "interface": "__INTERFACE_1__dev_id",
+                                    "ports": "2222",
+                                    "protocols": [
+                                        "tcp",
+                                        "udp"
+                                    ]
+                                }
+                            },
+                            "action": {
+                                "internalIP": "172.4.0.110",
+                                "internalPortStart": 2323
+                            }
+                        },
+                        {
+                            "id": "610a66aec654eb5b31bcc31e",
+                            "priority": 1,
+                            "classification": {
+                                "source": {
+                                    "trafficId": "610a63d8c654eb5b31bcbf4d"
+                                },
+                                "destination": {
+                                    "interface": "__INTERFACE_1__dev_id",
+                                    "ports": "8888",
+                                    "protocols": [
+                                        "tcp",
+                                        "udp"
+                                    ]
+                                }
+                            },
+                            "action": {
+                                "internalIP": "172.4.0.200",
+                                "internalPortStart": 8889
+                            }
+                        },
+                        {
+                            "id": "610a66aec654eb5b31bcc31e",
+                            "priority": 2,
+                            "classification": {
+                                "source": {
+                                    "trafficId": "610a7a3ac654eb5b31bcdbc2"
+                                },
+                                "destination": {
+                                    "interface": "__INTERFACE_1__dev_id",
+                                    "ports": "999",
+                                    "protocols": [
+                                        "tcp",
+                                        "udp"
+                                    ]
+                                }
+                            },
+                            "action": {
+                                "internalIP": "172.4.0.202",
+                                "internalPortStart": 9898
+                            }
+                        }
+                    ]
+                },
+                "edgeAccess": {
+                    "rules": [
+                        {
+                            "id": "610a5b4cc654eb5b31bcb37f",
+                            "priority": 10000,
+                            "classification": {
+                                "source": {},
+                                "destination": {
+                                    "ports": "8080",
+                                    "protocols": [
+                                        "tcp"
+                                    ]
+                                }
+                            },
+                            "action": {
+                                "permit": true
+                            }
+                        },
+                        {
+                            "id": "610a5b4cc654eb5b31bcb37b",
+                            "priority": 10001,
+                            "classification": {
+                                "source": {},
+                                "destination": {
+                                    "ports": "22",
+                                    "protocols": [
+                                        "tcp"
+                                    ]
+                                }
+                            },
+                            "action": {
+                                "permit": true
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "entity": "agent",
+        "message": "remove-firewall-policy",
+        "params": {}
+    },
+    {
+        "entity": "agent",
+        "message": "remove-application",
+        "params": {}
+    },
+    {
+        "entity": "agent",
+        "message": "stop-router"
+    }    
+]

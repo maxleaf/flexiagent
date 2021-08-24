@@ -21,6 +21,7 @@
 import copy
 import binascii
 import datetime
+import enum
 import glob
 import hashlib
 import inspect
@@ -38,6 +39,7 @@ import fwglobals
 import fwikev2
 import fwnetplan
 import fwstats
+import fwtunnel_stats
 import shutil
 import sys
 import traceback
@@ -46,6 +48,7 @@ from netaddr import IPNetwork, IPAddress
 import threading
 import serial
 import ipaddress
+import pyroute2
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
@@ -588,7 +591,7 @@ def get_interface_dev_id(if_name):
 
     :returns: dev_id.
     """
-    if not if_name:
+    if is_interface_without_dev_id(if_name):
         return ''
 
     with fwglobals.g.cache.lock:
@@ -1001,26 +1004,43 @@ def vpp_get_tap_info():
     vpp_if_name_to_tap = {}
     if not vpp_does_run():
         fwglobals.log.debug("tap_info_get: VPP is not running")
-        return ({}, {})
+        return ({}, {}, 'None')
 
     taps = _vppctl_read("show tap-inject").strip()
     if not taps:
         fwglobals.log.debug("tap_info_get: no TAPs configured")
-        return ({}, {})
+        return ({}, {}, taps)
 
     # check if tap-inject is configured and enabled
     if 'not enabled' in taps:
         fwglobals.log.debug("tap_info_get: %s" % taps)
-        return ({}, {})
+        return ({}, {}, taps)
 
     taps = taps.splitlines()
-
+    # the output of "show tap-inject" might be messy,
+    # Here are some examples we dealt with during the time:
+    # [
+    # '_______    _        _   _____  ___ ',
+    # ' __/ __/ _ \\  (_)__    | | / / _ \\/ _ \\',
+    # ' _/ _// // / / / _ \\   | |/ / ___/ ___/',
+    # ' /_/ /____(_)_/\\___/   |___/_/  /_/    ',
+    # '',
+    # 'vpp# loop16300 -> vpp3',
+    # 'vmxnet3-0/3/0/0 -> vpp0',
+    # 'GigabitEthernet4/0/1 -> vpp0',
+    # 'tapcli-0 -> vpp5',
+    # 'tap0 -> vpp3'
+    # ]
+    # we use a regex check to get the closest words before and after the arrow
     for line in taps:
-        tap_info = line.split(' -> ')
-        tap_to_vpp_if_name[tap_info[1]] = tap_info[0]
-        vpp_if_name_to_tap[tap_info[0]] = tap_info[1]
+        tap_info = re.search("([/\w-]+) -> ([\S]+)", line)
+        if tap_info:
+            vpp_if_name = tap_info.group(1)
+            tap = tap_info.group(2)
+            tap_to_vpp_if_name[tap] = vpp_if_name
+            vpp_if_name_to_tap[vpp_if_name] = tap
 
-    return (tap_to_vpp_if_name, vpp_if_name_to_tap)
+    return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
@@ -1031,11 +1051,12 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    tap_to_vpp_if_name, _ = vpp_get_tap_info()
-    if tap in tap_to_vpp_if_name:
-        return tap_to_vpp_if_name[tap]
+    tap_to_vpp_if_name, _, tap_info = vpp_get_tap_info()
+    if not tap in tap_to_vpp_if_name:
+        fwglobals.log.debug(f"tap_to_vpp_if_name({tap}): not found: {tap_info}")
+        return None
+    return tap_to_vpp_if_name[tap]
 
-    return None
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
@@ -1046,11 +1067,11 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
-    _, vpp_if_name_to_tap = vpp_get_tap_info()
-    if vpp_if_name in vpp_if_name_to_tap:
-        return vpp_if_name_to_tap[vpp_if_name]
-
-    return None
+    _, vpp_if_name_to_tap, tap_info = vpp_get_tap_info()
+    if not vpp_if_name in vpp_if_name_to_tap:
+        fwglobals.log.debug(f"vpp_if_name_to_tap({vpp_if_name}): not found: {tap_info}")
+        return None
+    return vpp_if_name_to_tap[vpp_if_name]
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
     """
@@ -1111,6 +1132,8 @@ def vpp_sw_if_index_to_name(sw_if_index):
      :returns: VPP interface name.
      """
     sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
+    if not sw_interfaces:
+        fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
@@ -1278,7 +1301,7 @@ def reset_device_config():
 
     reset_router_api_db_sa_id() # sa_id-s are used in translations of router configuration, so clean them too.
 
-    reset_dhcpd()
+    restore_dhcpd_files()
 
 def reset_router_api_db_sa_id():
     router_api_db = fwglobals.g.db['router_api'] # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
@@ -1710,6 +1733,29 @@ def vpp_startup_conf_remove_devices(vpp_config_filename, devices):
     p.dump(config, vpp_config_filename)
     return (True, None)   # 'True' stands for success, 'None' - for the returned object or error string.
 
+def is_interface_without_dev_id(if_name):
+    """Check if the given interface is expected to have no dev_id
+
+    :param if_name:  Interface name tpo check.
+
+    :returns: Boolean indicates if expected to have no dev_id
+    """
+    if not if_name:
+        return True
+
+    if if_name == 'lo':
+        return True
+
+    # tap interface that created for LTE interface has no dev_id
+    if if_name.startswith('tap_'):
+        return True
+
+    # bridge interface that created for WiFi has no dev_id
+    if if_name.startswith('br_'):
+        return True
+
+    return False
+
 def get_lte_interfaces_names():
     names = []
     interfaces = psutil.net_if_addrs()
@@ -1780,16 +1826,39 @@ def remove_linux_bridges():
     except:
         return True
 
-def reset_dhcpd():
-    if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
-
+def backup_dhcpd_files():
     try:
-        subprocess.check_call('sudo systemctl stop isc-dhcp-server', shell=True)
-    except:
-        return False
+        cmd = 'systemctl stop isc-dhcp-server'
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
 
-    return True
+        if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+            open(fwglobals.g.DHCPD_CONFIG_FILE, 'w').close()
+
+        if not os.path.exists(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.ISC_DHCP_CONFIG_FILE, fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP)
+            open(fwglobals.g.ISC_DHCP_CONFIG_FILE, 'w').close()
+
+    except Exception as e:
+        fwglobals.log.error("backup_dhcpd_files: %s" % str(e))
+
+def restore_dhcpd_files():
+    try:
+        if os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP, fwglobals.g.DHCPD_CONFIG_FILE)
+            os.remove(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
+
+        if os.path.exists(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP):
+            shutil.copyfile(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP, fwglobals.g.ISC_DHCP_CONFIG_FILE)
+            os.remove(fwglobals.g.ISC_DHCP_CONFIG_FILE_BACKUP)
+
+        cmd = 'systemctl restart isc-dhcp-server'
+        fwglobals.log.debug(cmd)
+        subprocess.check_call(cmd, shell=True)
+
+    except Exception as e:
+        fwglobals.log.error("restore_dhcpd_files: %s" % str(e))
 
 def modify_dhcpd(is_add, params):
     """Modify /etc/dhcp/dhcpd configuration file.
@@ -1798,7 +1867,7 @@ def modify_dhcpd(is_add, params):
 
     :returns: String with sed commands.
     """
-    dev_id         = params['interface']
+    dev_id      = params['interface']
     range_start = params.get('range_start', '')
     range_end   = params.get('range_end', '')
     dns         = params.get('dns', {})
@@ -1812,9 +1881,6 @@ def modify_dhcpd(is_add, params):
     router = str(address.ip)
     subnet = str(address.network)
     netmask = str(address.netmask)
-
-    if not os.path.exists(fwglobals.g.DHCPD_CONFIG_FILE_BACKUP):
-        shutil.copyfile(fwglobals.g.DHCPD_CONFIG_FILE, fwglobals.g.DHCPD_CONFIG_FILE_BACKUP)
 
     config_file = fwglobals.g.DHCPD_CONFIG_FILE
 
@@ -2001,8 +2067,8 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
-def add_static_route(addr, via, metric, remove, dev_id=None):
-    """Add static route.
+def add_remove_static_route(addr, via, metric, remove, dev_id=None):
+    """Add/Remove static route.
 
     :param addr:            Destination network.
     :param via:             Gateway address.
@@ -3235,7 +3301,7 @@ def lte_get_radio_signals_state(dev_id):
                     result['text'] = 'Good'
                 elif -60 >= dbm_num:
                     result['text'] = 'Very Good'
-                elif -50 >= dbm_num:
+                else:
                     result['text'] = 'Excellent'
                 continue
             if 'SINR' in line:
@@ -3391,11 +3457,13 @@ def is_non_dpdk_interface(dev_id):
 
     return False
 
-def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
+def frr_vtysh_run(commands, restart_frr=False, print_stdout=True, wait_after=None):
     '''Run vtysh command to configure router
 
     :param commands:    array of frr commands
     :param restart_frr: some OSPF configurations require restarting the service in order to apply them
+    :param wait_after:  seconds to wait after successfull command execution.
+                        It might be needed to give a systemt/vpp time to get updates as a result of frr update.
     '''
     try:
         shell_commands = ' -c '.join(map(lambda x: '"%s"' % x, commands))
@@ -3404,10 +3472,14 @@ def frr_vtysh_run(commands, restart_frr=False, print_stdout=True):
         output = os.popen(vtysh_cmd).read().splitlines()
 
         # in output, the first line might contains error. So we print only the first line
-        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, output=%s" % (vtysh_cmd, output[0] if output else ''))
+        fwglobals.log.debug("frr_vtysh_run: vtysh_cmd=%s, wait_after=%s, output=%s" %
+                            (vtysh_cmd, str(wait_after), output[0] if output else ''))
 
         if restart_frr:
             os.system('systemctl restart frr')
+
+        if wait_after:
+            time.sleep(wait_after)
 
         return (True, None)
     except Exception as e:
@@ -3900,59 +3972,38 @@ def dump(filename=None, path=None, clean_log=False):
     except Exception as e:
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 
-def linux_routes_dictionary_get():
+class IpRouteProto(enum.Enum):
+   BOOT = 3
+
+def linux_get_routes(proto=IpRouteProto.BOOT.value):
     routes_dict = {}
 
-    # get only our static routes from Linux
-    try :
-        output = subprocess.check_output('ip route show | grep -v proto', shell=True).decode().strip()
-    except:
-        return routes_dict
+    with pyroute2.IPRoute() as ipr:
+        routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
+        for route in routes:
+            nexthops = set()
+            dst = None # Some routes have no 'dst' (for example: LTE). Initialize the variable here
+            for attr in route['attrs']:
+                metric = 0
+                if attr[0] == 'RTA_PRIORITY':
+                    metric = attr[1]
+                if attr[0] == 'RTA_DST':
+                    dst = attr[1]
+                if attr[0] == 'RTA_GATEWAY':
+                    nexthops.add(attr[1])
+                if attr[0] == 'RTA_MULTIPATH':
+                    for elem in attr[1]:
+                        for attr2 in elem['attrs']:
+                            if attr2[0] == 'RTA_GATEWAY':
+                                nexthops.add(attr2[1])
+            if not dst:
+                continue
+            addr = "%s/%u" % (dst, route['dst_len'])
 
-    addr = ''
-    metric = 0
-    nexthops = set()
-    routes = output.splitlines()
-
-    for route in routes:
-        part = route.split(' ')[0]
-        if re.search('nexthop', part):
-            parts = route.split('via ')
-            via = parts[1].split(' ')[0]
-            nexthops.add(via)
-            continue
-        else:
-            # save multipath route if needed
-            if nexthops:
-                if metric not in routes_dict:
-                    routes_dict[metric] = {addr: copy.copy(nexthops)}
-                else:
-                    routes_dict[metric][addr] = copy.copy(nexthops)
-
-            # continue with current route
-            nexthops.clear()
-            metric = 0
-            addr = part
-
-        if 'metric' in route:
-            parts = route.split('metric ')
-            metric = int(parts[1])
-
-        parts = route.split('via ')
-        if isinstance(parts, list) and len(parts) > 1:
-            via = parts[1].split(' ')[0]
-            nexthops.add(via)
-
-        if not nexthops:
-            continue
-
-        if metric not in routes_dict:
-            routes_dict[metric] = {addr: copy.copy(nexthops)}
-        else:
-            routes_dict[metric][addr] = copy.copy(nexthops)
-
-        nexthops.clear()
-        metric = 0
+            if metric not in routes_dict:
+                routes_dict[metric] = {addr: copy.copy(nexthops)}
+            else:
+                routes_dict[metric][addr] = copy.copy(nexthops)
 
     return routes_dict
 
@@ -3978,18 +4029,23 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
 
 def check_reinstall_static_routes():
     routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_routes_dictionary_get()
+    routes_linux = linux_get_routes()
+    tunnel_addresses = fwtunnel_stats.get_tunnel_info()
 
     for route in routes_db:
         addr = route['addr']
         via = route['via']
         metric = str(route.get('metric', '0'))
         dev = route.get('dev_id', None)
+        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
 
-        if linux_routes_dictionary_exist(routes_linux, addr, metric, via):
+        if tunnel_addresses.get(via) == 'down':
+            if exist_in_linux:
+                add_remove_static_route(addr, via, metric, True, dev)
             continue
 
-        add_static_route(addr, via, metric, False, dev)
+        if not exist_in_linux:
+            add_remove_static_route(addr, via, metric, False, dev)
 
 def exec_with_timeout(cmd, timeout=60):
     """Run bash command with timeout option
@@ -4235,3 +4291,36 @@ def is_ip(str_to_check):
         return True
     except:
         return False
+
+def set_ip_on_bridge_bvi_interface(bridge_addr, dev_id, is_add):
+    """Configure IP address on the BVI tap inerface if needed
+
+    :param bridge_addr: bridge address
+    :param is_add:      indiciate if need to add or remote the IP
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    try:
+        tap = bridge_addr_to_bvi_interface_tap(bridge_addr)
+        if not tap:
+            return (False, 'tap is not found for bvi interface')
+
+        if is_add:
+            # check if IP already configured for this tap
+            ip_addr = get_interface_address(tap)
+            if not ip_addr:
+                subprocess.check_call(f'sudo ip addr add {bridge_addr} dev {tap}', shell=True)
+                subprocess.check_call(f'sudo ip link set dev {tap} up', shell=True)
+        else:
+            # check if there are other interefaces in the bridge.
+            # if so, don't remove the bridge ip
+            bridged_interfaces = fwglobals.g.router_cfg.get_interfaces(ip=bridge_addr)
+
+            # if bridged_interfaces containes only one interface at this remove process
+            # it means that this interface is the last in the bridge and we need to remove the ip
+            if len(bridged_interfaces) == 1:
+                subprocess.check_call(f'sudo ip link set dev {tap} down', shell=True)
+                subprocess.check_call(f'sudo ip addr del {bridge_addr} dev {tap}', shell=True)
+        return (True, None)
+    except Exception as e:
+        return (False, str(e))

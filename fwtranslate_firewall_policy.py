@@ -85,7 +85,7 @@ def add_firewall_policy(params):
             else:
                 raise Exception("Invalid Inbound NAT type %d" % rule_name)
 
-            for rule in rules['rules']:
+            for rule_index, rule in enumerate(rules['rules']):
 
                 ingress_id = None
                 classification = rule.get('classification')
@@ -93,8 +93,8 @@ def add_firewall_policy(params):
                 destination = classification.get('destination')
                 source = classification.get('source')
                 if source:
-                    ingress_id = 'fw_wan_ingress__type_%s_rule_%s' % (
-                        rule_type, rule['id'])
+                    ingress_id = 'fw_wan_ingress__type_%s_rule_%d' % (
+                        rule_type, rule_index)
                     dest_rule_params = convert_dest_to_acl_rule_params(destination)
                     cmd_list.append(fw_acl_command_helpers.add_acl_rule(
                         ingress_id, source, dest_rule_params, True, True, True))
@@ -150,7 +150,7 @@ def add_firewall_policy(params):
 
         intf_attachments = {}
         cmd_list = []
-        for rule in outbound_rules['rules']:
+        for rule_index, rule in enumerate(outbound_rules['rules']):
 
             classification = rule.get('classification')
             if classification:
@@ -161,10 +161,10 @@ def add_firewall_policy(params):
                 source = None
             action = rule['action']
             permit = action['permit']
-            ingress_id = 'fw_lan_ingress_rule_%s' % rule['id']
+            ingress_id = 'fw_lan_ingress_rule_%d' % rule_index
             cmd_list.append(fw_acl_command_helpers.add_acl_rule(
                 ingress_id, source, destination, permit, True, False))
-            egress_id = 'fw_lan_egress_rule_%s' % rule['id']
+            egress_id = 'fw_lan_egress_rule_%d' % rule_index
             cmd_list.append(fw_acl_command_helpers.add_acl_rule(
                 egress_id, source, destination, permit, False, False))
 
