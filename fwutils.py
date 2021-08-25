@@ -2862,6 +2862,8 @@ def get_at_port(dev_id):
         return at_ports
     except:
         return at_ports
+    finally:
+        at_ports.sort()
 
 def lte_set_modem_to_mbim(dev_id):
     try:
@@ -2877,22 +2879,51 @@ def lte_set_modem_to_mbim(dev_id):
         vendor = hardware_info['Vendor']
         model =  hardware_info['Model']
 
-        at_commands = []
-        if 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE): # Special fix for Quectel ec25 mini pci card
-            print('Please wait...')
-            at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
+        is_quectel = 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE)
+        is_telit = 'Telit' in vendor and 'LE910C4-LA' in model
+
+        # for quectel and telit we use at commands to switch the modem
+        if is_quectel or is_telit:
+            print('Please wait. This may take some time')
             at_serial_port = get_at_port(dev_id)
-            if at_serial_port and len(at_serial_port) > 0:
-                ser = serial.Serial(at_serial_port[0])
-                for at in at_commands:
-                    at_cmd = bytes(at + '\r', 'utf-8')
-                    ser.write(at_cmd)
-                    time.sleep(0.5)
-                ser.close()
-                time.sleep(10) # reset modem might take few seconds
-                os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
-                return (True, None)
-            return (False, 'AT port not found. dev_id: %s' % dev_id)
+            if not at_serial_port:
+                return (False, 'AT port not found. dev_id: %s' % dev_id)
+
+            if is_quectel:
+                at_commands = ['AT+QCFG="usbnet",2', 'AT+QPOWD=0']
+            elif is_telit:
+                at_commands = ['AT#USBCFG=2']
+
+            ser = serial.Serial(at_serial_port[0])
+            for at in at_commands:
+                at_cmd = bytes(at + '\r', 'utf-8')
+                ser.write(at_cmd)
+                time.sleep(0.5)
+            ser.close()
+
+            time.sleep(10) # reset modem might take few seconds
+
+            os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
+
+            # special steps needed for telit card
+            if is_telit:
+                try:
+                    time.sleep(5) # telit reset modem might take more few seconds
+
+                    usb_device_addr = dev_id.split('/')[-1]
+                    product_info = subprocess.check_output(f'cat /sys/bus/usb/devices/{usb_device_addr}/uevent | grep PRODUCT', shell=True).decode().strip()
+                    (vendorId, productId, _) = product_info.split('=')[-1].split('/') # product_info = PRODUCT=1bc7/1204/318
+
+                    # enable the at serial interface after the switching. Without ant
+                    # for i in range(1):
+                    subprocess.check_call('modprobe option', shell=True)
+                    time.sleep(2)
+                    cmd = 'echo %s %s > /sys/bus/usb-serial/drivers/option1/new_id' % (vendorId, productId)
+                    subprocess.check_call(cmd, shell=True)
+                except Exception as e:
+                    fwglobals.log.error(f'lte_set_modem_to_mbim: failed to enable serial interface. {str(e)}')
+                    print("The modem has been switched to MBIM but the serial interface has not been activated.\nIf you want to use this interface, you can try running it manually.")
+            return (True, None)
         elif 'Sierra Wireless' in vendor:
             print('Please wait...')
             _run_qmicli_command(dev_id, 'dms-swi-set-usb-composition=8')
@@ -2902,11 +2933,13 @@ def lte_set_modem_to_mbim(dev_id):
             os.system('modprobe cdc_mbim') # sometimes driver doesn't regirsted to the device after reset
             return (True, None)
         else:
-            print("Your card is not officially supported. It might work, But you have to switch manually to the MBIM modem")
-            return (False, 'vendor or model are not supported. (vendor: %s, model: %s)' % (vendor, model))
+            fwglobals.log.error(f'lte_set_modem_to_mbim: Manufacturer and model not found. {str(hardware_info)}')
+            print("The manufacturer and model were not found. Please check if they are supported. If so, please restart the router and try again.")
+            return (False, '')
     except Exception as e:
         # Modem cards sometimes get stuck and recover only after disconnecting the router from the power supply
-        print("Failed to switch modem to MBIM. You can unplug the router, wait a few seconds and try again. (%s)" % str(e))
+        fwglobals.log.error(f'lte_set_modem_to_mbim: Failed to switch modem to MBIM. {str(e)}')
+        print("Failed to switch modem to MBIM. Please try to unplug the router, wait a few seconds and try again.")
         return (False, str(e))
 
 
