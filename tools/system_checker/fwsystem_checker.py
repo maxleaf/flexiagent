@@ -82,6 +82,7 @@ soft_checkers = [
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_lte_modem_configured_in_mbim_mode': { 'severity': 'critical' }},
     { 'soft_check_wifi_driver': { 'severity': 'critical' }},
+    { 'soft_check_coredump_settings': { 'severity': 'critical' }},
 ]
 
 class TXT_COLOR:
