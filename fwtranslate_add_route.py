@@ -62,7 +62,7 @@ def add_route(params):
     cmd['cmd']['descr']     = "ip route add %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['cmd']['params']    = {
                                 'module': 'fwutils',
-                                'func':   'add_static_route',
+                                'func':   'add_remove_static_route',
                                 'args':   {
                                     'addr'  : params['addr'],
                                     'via'   : params['via'],
@@ -76,7 +76,7 @@ def add_route(params):
     cmd['revert']['descr']  = "ip route del %s via %s dev %s" % (params['addr'], params['via'], str(params.get('dev_id')))
     cmd['revert']['params'] = {
                                 'module': 'fwutils',
-                                'func':   'add_static_route',
+                                'func':   'add_remove_static_route',
                                 'args':   {
                                     'addr'  : params['addr'],
                                     'via'   : params['via'],

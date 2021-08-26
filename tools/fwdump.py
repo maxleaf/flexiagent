@@ -72,8 +72,8 @@ g_dumpers = {
                                                    'cp /run/netplan/*yaml* <temp_folder>/linux_netplan/run 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; ' +
-                                                   'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
-                                                   'ps -elf | grep vpp >> <dumper_out_file>' },
+                                                   'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; '},
+    'linux_ps':                     { 'shell_cmd': 'ps -ww -elf > <dumper_out_file>' },
     'linux_ram':                    { 'shell_cmd': 'free > <dumper_out_file>' },
     'linux_resolvconf':             { 'shell_cmd': 'mkdir -p <temp_folder>/linux_resolvconf/ && ' +
                                                    'cp /etc/resolv.conf <temp_folder>/linux_resolvconf 2>/dev/null ; ' +

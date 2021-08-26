@@ -210,3 +210,23 @@ def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):
                 if tunnel_stats[tunnel_id].get('status') == 'up':
                     ip_up_set.add(tunnel['src'])
     return ip_up_set
+
+def get_tunnel_info():
+    """ get set of remote loopback addresses
+    : return : set of remote loopback IP addresses
+    """
+    tunnel_stats     = tunnel_stats_get()
+    tunnels          = fwglobals.g.router_cfg.get_tunnels()
+    remote_loopbacks = dict()
+
+    if tunnels and tunnel_stats:
+        for tunnel in tunnels:
+            tunnel_id = tunnel.get('tunnel-id')
+            if 'peer' in tunnel:
+                continue
+            if tunnel_id and tunnel_stats.get(tunnel_id):
+                remote_loop = IPNetwork(tunnel['loopback-iface']['addr'])
+                remote_loop.value ^= IPAddress('0.0.0.1').value
+                status = tunnel_stats[tunnel_id].get('status')
+                remote_loopbacks[str(remote_loop.ip)] = status
+    return remote_loopbacks
