@@ -1177,6 +1177,7 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
     iface_params     = params['peer']
     dev_id           = params['dev_id']
     dst              = params['dst']
+    next_hop         = str(IPNetwork(addr).ip ^ IPAddress("0.0.0.1"))
 
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
 
@@ -1222,21 +1223,19 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
             cmd['cmd']['name']    = "python"
             cmd['cmd']['descr']   = "add multilink labels into tunnel interface %s: %s" % (params['src'], labels)
             cmd['cmd']['params']  = {
-                            'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id},
-                                        { 'add_param':'next_hop', 'val_by_func':'get_tunnel_gateway_str', 'arg':[dst, dev_id]}],
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key} ],
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels': labels, 'remove': False }
+                            'args'  : { 'labels': labels, 'next_hop': next_hop, 'remove': False }
             }
             cmd['revert'] = {}
             cmd['revert']['name']   = "python"
             cmd['revert']['descr']  = "remove multilink labels from tunnel interface %s: %s" % (params['src'], labels)
             cmd['revert']['params'] = {
-                            'substs': [ { 'add_param':'sw_if_index', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id},
-                                        { 'add_param':'next_hop', 'val_by_func':'get_tunnel_gateway_str', 'arg':[dst, dev_id]}],
+                            'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_cache_key} ],
                             'module': 'fwutils',
                             'func'  : 'vpp_multilink_update_labels',
-                            'args'  : { 'labels': labels, 'remove': True }
+                            'args'  : { 'labels': labels, 'next_hop': next_hop, 'remove': True }
             }
             cmd_list.append(cmd)
 
