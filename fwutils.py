@@ -2083,6 +2083,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
     ip_version = 'ip6' if is_ipv6 else 'ip4'
 
     vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
+    fwglobals.log.debug(vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None or re.search('unknown|failed|ret=-', out):
