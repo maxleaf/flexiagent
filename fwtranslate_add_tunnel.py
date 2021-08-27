@@ -1188,9 +1188,22 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "exec"
-    cmd['cmd']['descr']   = "set mtu=%s into loopback interface %s in Linux" % (mtu, addr)
+    cmd['cmd']['descr']   = "set mtu=%s into tunnel interface %s in Linux" % (mtu, addr)
     cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
                             "sudo ip link set dev DEV-STUB mtu %s" % mtu ]
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "exec"
+    cmd['cmd']['descr']     = "UP tunnel interface %s in Linux" % addr
+    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
+                                "sudo ip link set dev DEV-STUB up" ]
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "exec"
+    cmd['revert']['descr']  = "DOWN tunnel interface %s in Linux" % addr
+    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
+                                "sudo ip link set dev DEV-STUB down" ]
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
