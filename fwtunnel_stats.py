@@ -142,6 +142,9 @@ def tunnel_stats_test():
         sw_if_index = stats['local_sw_if_index']
         flags = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)[0].flags
         stats['state'] = flags
+        is_up = fwutils.linux_is_interface_up(sw_if_index)
+        if is_up and flags == 0 or not is_up and flags != 0:
+            fwutils.linux_interface_set_state(sw_if_index, flags)
 
         stats['sent'] += 1
 
