@@ -193,6 +193,10 @@ def tunnel_stats_get():
         if 'state' in stats and stats['state'] == 0:
             tunnel_stats[tunnel_id]['status'] = 'down'
 
+        interface = fwutils.vpp_sw_if_index_to_name(stats.get('local_sw_if_index', None))
+        loss = 100 if tunnel_stats[tunnel_id]['status'] == 'down' else 0
+        fwutils.vpp_multilink_update_interface_quality(interface, loss)
+
     return tunnel_stats
 
 def get_if_addr_in_connected_tunnels(tunnel_stats, tunnels):

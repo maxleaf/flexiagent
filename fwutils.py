@@ -2091,6 +2091,24 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
+def vpp_multilink_update_interface_quality(int_name, loss):
+    """Update interface quality in VPP FWABF plugin.
+
+    :param int_name:  The name of the interface in VPP
+    :param loss:      Loss in percents
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+
+    vppctl_cmd = 'fwabf quality %s loss %u' % (int_name, loss)
+    fwglobals.log.debug(vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None or re.search('unknown|failed|ret=-', out):
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)
+
 def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     """Add/Remove static route.
 
