@@ -413,7 +413,7 @@ class Fwglobals:
         self.system_api.restore_configuration() # IMPORTANT! The System configurations should be restored before restore_vpp_if_needed!
 
         fwutils.set_default_linux_reverse_path_filter(2)  # RPF set to Loose mode
-        fwutils.disable_ipv6()
+        #fwutils.disable_ipv6()
         # Increase allowed multicast group membership from default 20 to 4096
         # OSPF need that to be able to discover more neighbors on adjacent links
         fwutils.set_linux_igmp_max_memberships(4096)

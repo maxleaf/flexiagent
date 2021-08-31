@@ -459,10 +459,18 @@ def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
 
     :returns: None.
     """
+    fwglobals.log.debug("VxLAN Src: %s Dst: %s" % (src, dst))
     # vxlan.api.json: vxlan_add_del_tunnel (..., is_add, tunnel <type vl_api_vxlan_add_del_tunnel_t>, ...)
     ret_attr = 'sw_if_index'
-    src_addr = ipaddress.ip_address(src)
-    dst_addr = ipaddress.ip_address(dst)
+    if src == '12.12.12.100':
+        src_addr = ipaddress.ip_address('abcd:abcd:abcd:1212::100')
+        dst_addr = ipaddress.ip_address('abcd:abcd:abcd:2222::100')
+    elif src == '22.22.22.100':
+        src_addr = ipaddress.ip_address('abcd:abcd:abcd:2222::100')
+        dst_addr = ipaddress.ip_address('abcd:abcd:abcd:1212::100')
+    else:
+        src_addr = ipaddress.ip_address(src)
+        dst_addr = ipaddress.ip_address(dst)
 
     # for lte interface, we need to get the current source IP, and not the one stored in DB. The IP may have changed due last 'add-interface' job.
     if fwutils.is_lte_interface_by_dev_id(dev_id):

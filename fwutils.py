@@ -297,6 +297,11 @@ def get_tunnel_gateway(dst, dev_id):
 
     # If src, dst are not on same subnet or any error, use the gateway defined on the device
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
+    if dst == '22.22.22.100':
+        return ipaddress.ip_address('abcd:abcd:abcd:1212::1')
+    elif dst == '12.12.12.100':
+        return ipaddress.ip_address('abcd:abcd:abcd:2222::1')
+
     return ipaddress.ip_address(gw_ip) if gw_ip else ipaddress.ip_address('0.0.0.0')
 
 def is_interface_assigned_to_vpp(dev_id):
@@ -3565,7 +3570,7 @@ def netplan_apply(caller_name=None):
         clear_linux_interfaces_cache()
 
         # IPv6 might be renable if interface name is changed using set-name
-        disable_ipv6()
+        #disable_ipv6()
 
         # Find out if the default route was changed. If it was - reconnect agent.
         #

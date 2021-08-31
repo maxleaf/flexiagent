@@ -179,8 +179,10 @@ def _dump_netplan_file(fname):
             fwglobals.log.error(err_str)
 
 def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsServers, dnsDomains):
+    '''
     if 'dhcp6' in config_section:
         del config_section['dhcp6']
+    '''
 
     nameservers = config_section.get('nameservers', {})
     if dnsServers:
@@ -224,11 +226,21 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
 
     # Static IP
     config_section['dhcp4'] = False
+    config_section['dhcp6'] = False
     if 'dhcp4-overrides' in config_section:
         del config_section['dhcp4-overrides']
+    if 'dhcp6-overrides' in config_section:
+        del config_section['dhcp6-overrides']
 
     if ip:
-        config_section['addresses'] = [ip]
+        addresses = [ip]
+        if gw == '12.12.12.1':
+            addresses = [ip, 'abcd:abcd:abcd:1212::100/64']
+        elif gw == '22.22.22.1':
+            addresses = [ip, 'abcd:abcd:abcd:2222::100/64']
+        else:
+            addresses = [ip]
+        config_section['addresses'] = addresses
     elif 'addresses' in config_section:
         del config_section['addresses']
 
@@ -247,6 +259,12 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
             break
     if not default_route_found:
         routes.append({'to': '0.0.0.0/0', 'via': gw, 'metric': metric})
+
+        if gw == '12.12.12.1':
+            routes.append({'to': 'abcd:abcd:abcd:2222::/64', 'via': 'abcd:abcd:abcd:1212::1', 'metric': metric})
+        elif gw == '22.22.22.1':
+            routes.append({'to': 'abcd:abcd:abcd:1212::/64', 'via': 'abcd:abcd:abcd:2222::1', 'metric': metric})
+
         config_section['routes'] = routes   # Handle case where there is no 'routes' section
     if 'gateway4' in config_section:
         del config_section['gateway4']
