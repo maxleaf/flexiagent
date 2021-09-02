@@ -94,7 +94,7 @@ def tunnel_stats_clear():
     with tunnel_stats_global_lock:
         tunnel_stats_global.clear()
 
-def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index):
+def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index, local_tap = None):
     """Add tunnel statistics entry into a dictionary.
 
     :param tunnel_id:         Tunnel identifier.
@@ -111,6 +111,7 @@ def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index):
 
     stats_entry['loopback_remote'] = remote_ip
     stats_entry['local_sw_if_index'] = local_sw_if_index
+    stats_entry['local_tap'] = local_tap
 
     with tunnel_stats_global_lock:
         tunnel_stats_global[tunnel_id] = stats_entry
@@ -139,12 +140,6 @@ def tunnel_stats_test():
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
-        sw_if_index = stats['local_sw_if_index']
-        stats['state'] = fwutils.vpp_get_interface_state(sw_if_index)
-        is_up = fwutils.linux_is_interface_up(sw_if_index)
-        if is_up and stats['state'] == 0 or not is_up and stats['state'] != 0:
-            fwutils.linux_interface_set_state(sw_if_index, stats['state'])
-
         stats['sent'] += 1
 
         rtt = tunnel_rtt.get(tunnel_id, 0)
@@ -190,10 +185,7 @@ def tunnel_stats_get():
         else:
             tunnel_stats[tunnel_id]['status'] = 'up'
 
-        if 'state' in stats and stats['state'] == 0:
-            tunnel_stats[tunnel_id]['status'] = 'down'
-
-        interface = fwutils.vpp_sw_if_index_to_name(stats.get('local_sw_if_index', None))
+        interface = stats.get('local_tap', None)
         loss = 100 if tunnel_stats[tunnel_id]['status'] == 'down' else 0
         fwutils.vpp_multilink_update_interface_quality(interface, loss)
 
