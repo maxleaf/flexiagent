@@ -186,8 +186,9 @@ def tunnel_stats_get():
             tunnel_stats[tunnel_id]['status'] = 'up'
 
         interface = stats.get('local_tap', None)
-        loss = 100 if tunnel_stats[tunnel_id]['status'] == 'down' else 0
-        fwutils.vpp_multilink_update_interface_quality(interface, loss)
+        if interface:
+            loss = 100 if tunnel_stats[tunnel_id]['status'] == 'down' else 0
+            fwutils.vpp_multilink_update_interface_quality(interface, loss)
 
     return tunnel_stats
 

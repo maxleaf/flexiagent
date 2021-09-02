@@ -435,11 +435,13 @@ class FWROUTER_API(FwCfgRequestHandler):
                 remote_ips += params['peer']['ips']
                 remote_ips += params['peer']['urls']
                 local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
+                local_tap = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
+                local_tap = local_tap.replace('loop', 'ipip')
             else:
                 remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
                 local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+                local_tap = None
 
-            local_tap = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
             fwtunnel_stats.tunnel_stats_add(id, remote_ips, local_sw_if_index, local_tap)
 
     def _call_simple(self, request):
