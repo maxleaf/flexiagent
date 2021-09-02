@@ -448,7 +448,7 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa
                                 }
         cmd_list.append(cmd)
 
-def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr):
+def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr, instance):
     """Add IPIP tunnel command into the list.
 
     :param cmd_list:             List of commands.
@@ -456,6 +456,7 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr):
     :param src:                  Source ip address.
     :param dst:                  Destination ip address.
     :param addr:                 Interface ip address.
+    :param instance:             Tunnel instance number.
 
     :returns: None.
     """
@@ -463,7 +464,7 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr):
     tunnel = {
         'src': ipaddress.ip_address(src),
         'dst': ipaddress.ip_address(dst),
-        'instance': 0xffffffff
+        'instance': instance
     }
 
     cmd = {}
@@ -1182,11 +1183,12 @@ def _add_peer(cmd_list, params, tunnel_cache_key, peer_loopback_cache_key):
     tunnel_addr      = fwutils.build_second_loop_ip_address(addr)
     iface_params     = params['peer']
     next_hop         = str(IPNetwork(addr).ip ^ IPAddress("0.0.0.1"))
+    id               = params['tunnel-id']*2
 
-    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr)
+    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr, id)
 
     loopback_params = {'addr':addr, 'mtu': mtu}
-    _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, id=params['tunnel-id']*2)
+    _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, id=id)
 
     cmd = {}
     cmd['cmd'] = {}
