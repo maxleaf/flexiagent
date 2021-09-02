@@ -1320,7 +1320,7 @@ def add_tunnel(params):
                 _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
             elif encryption_mode == "ikev2":
                 # Add loop0-bridge-l2gre-ikev2
-                _add_loop_bridge_l2gre_ikev2(cmd_list, params, remote_loop0_cfg, l2gre_ips, params['tunnel-id']*2, loop0_cache_key='loop0_sw_if_index', loop1_cache_key='loop1_sw_if_index')
+                _add_loop_bridge_l2gre_ikev2(cmd_list, params, l2gre_ips, params['tunnel-id']*2, loop0_cache_key='loop0_sw_if_index', loop1_cache_key='loop1_sw_if_index')
 
     # --------------------------------------------------------------------------
     # Add following section to frr ospfd.conf
