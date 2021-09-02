@@ -153,6 +153,10 @@ def tunnel_stats_test():
         stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
         stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
 
+        interface = stats.get('local_tap', None)
+        if interface:
+            fwutils.vpp_multilink_update_interface_quality(interface, stats['drop_rate'])
+
         if (stats['sent'] == WINDOW_SIZE):
             stats['sent'] = 0
             stats['received'] = 0
@@ -184,11 +188,6 @@ def tunnel_stats_get():
             tunnel_stats[tunnel_id]['status'] = 'down'
         else:
             tunnel_stats[tunnel_id]['status'] = 'up'
-
-        interface = stats.get('local_tap', None)
-        if interface:
-            loss = 100 if tunnel_stats[tunnel_id]['status'] == 'down' else 0
-            fwutils.vpp_multilink_update_interface_quality(interface, loss)
 
     return tunnel_stats
 

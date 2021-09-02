@@ -2101,7 +2101,6 @@ def vpp_multilink_update_interface_quality(int_name, loss):
     """
 
     vppctl_cmd = 'fwabf quality %s loss %u' % (int_name, loss)
-    fwglobals.log.debug(vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None or re.search('unknown|failed|ret=-', out):
