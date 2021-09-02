@@ -110,7 +110,7 @@ def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index, local_tap = None):
     stats_entry['timestamp'] = 0
 
     stats_entry['loopback_remote'] = remote_ip
-    stats_entry['local_sw_if_index'] = local_sw_if_index
+    stats_entry['tap'] = fwutils.vpp_sw_if_index_to_tap(local_sw_if_index)
     stats_entry['local_tap'] = local_tap
 
     with tunnel_stats_global_lock:
@@ -135,7 +135,7 @@ def tunnel_stats_test():
     tunnels = []
     for tunnel_id, tunnel_stats_entry in tunnel_stats_global_copy.items():
         hosts = tunnel_stats_entry.get('loopback_remote', [])
-        interface = fwutils.vpp_sw_if_index_to_tap(tunnel_stats_entry.get('local_sw_if_index', None))
+        interface = tunnel_stats_entry.get('tap', None)
         tunnels.append({'tunnel_id':tunnel_id, 'interface':interface, 'hosts':hosts})
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
