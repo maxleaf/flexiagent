@@ -195,7 +195,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     # --------------------------------------------------------------------------
 
     addr = iface_params['addr']
-    mac  = iface_params['mac']
+    mac  = iface_params.get('mac', None)
     mtu  = iface_params['mtu']
 
     # ret_attr  - attribute of the object returned by command,
@@ -204,7 +204,9 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     # cache_key - key in cache, where the value
     #             of the 'ret_attr' attribute is stored.
     ret_attr = 'sw_if_index'
-    mac_bytes = fwutils.mac_str_to_bytes(mac)
+    mac_bytes = 0
+    if mac:
+        mac_bytes = fwutils.mac_str_to_bytes(mac)
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "create_loopback_instance"
@@ -446,13 +448,14 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa
                                 }
         cmd_list.append(cmd)
 
-def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
+def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr):
     """Add IPIP tunnel command into the list.
 
     :param cmd_list:             List of commands.
     :param cache_key:            Cache key of the tunnel to be used by others.
     :param src:                  Source ip address.
     :param dst:                  Destination ip address.
+    :param addr:                 Interface ip address.
 
     :returns: None.
     """
@@ -473,6 +476,19 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst):
     cmd['revert']['name']       = 'ipip_del_tunnel'
     cmd['revert']['params']     = {'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ]}
     cmd['revert']['descr']      = "delete ipip tunnel %s -> %s" % (src, dst)
+    cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "sw_interface_add_del_address"
+    cmd['cmd']['descr']     = "set %s to tunnel interface" % addr
+    cmd['cmd']['params']    = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                'is_add':1, 'prefix':addr }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "sw_interface_add_del_address"
+    cmd['revert']['descr']  = "unset %s from tunnel interface" % addr
+    cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
+                                'is_add':0, 'prefix':addr }
     cmd_list.append(cmd)
 
 def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
@@ -1151,7 +1167,7 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
 
 
 
-def _add_peer(cmd_list, params, tunnel_cache_key):
+def _add_peer(cmd_list, params, tunnel_cache_key, peer_loopback_cache_key):
     """Add tunnel for a peer.
 
     :param cmd_list:            List of commands.
@@ -1163,34 +1179,39 @@ def _add_peer(cmd_list, params, tunnel_cache_key):
     auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
     mtu              = params['peer']['mtu']
     addr             = params['peer']['addr']
+    tunnel_addr      = fwutils.build_second_loop_ip_address(addr)
     iface_params     = params['peer']
-    dev_id           = params['dev_id']
-    dst              = params['dst']
     next_hop         = str(IPNetwork(addr).ip ^ IPAddress("0.0.0.1"))
 
-    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'])
+    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr)
 
-    # sudo ip addr add <tunnel ip> dev <tap of loopback iface>
+    loopback_params = {'addr':addr, 'mtu': mtu}
+    _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, id=params['tunnel-id']*2)
+
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']      = "exec"
-    cmd['cmd']['descr']     = "set %s to tunnel interface in Linux" % addr
-    cmd['cmd']['params']    = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
-                                "sudo ip addr add %s dev DEV-STUB" % (addr) ]
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "exec"
-    cmd['revert']['descr']  = "unset %s from tunnel interface in Linux" % addr
-    cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
-                                "sudo ip addr del %s dev DEV-STUB" % (addr) ]
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = ""
+    cmd['cmd']['params']  = {
+                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
+                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'module': 'fwutils',
+                    'func'  : 'vpp_tap_inject_map_interface',
+                    'args'  : {}
+    }
     cmd_list.append(cmd)
 
-    # sudo ip link set dev <tap of tunnel iface> mtu <mtu of tunnel iface>
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name']    = "exec"
-    cmd['cmd']['descr']   = "set mtu=%s into loopback interface %s in Linux" % (mtu, addr)
-    cmd['cmd']['params']  = [ {'substs': [ {'replace':'DEV-STUB', 'val_by_func':'vpp_sw_if_index_to_tap', 'arg_by_key':tunnel_cache_key} ]},
-                            "sudo ip link set dev DEV-STUB mtu %s" % mtu ]
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = ""
+    cmd['cmd']['params']  = {
+                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
+                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'module': 'fwutils',
+                    'func'  : 'vpp_l3xc_connect',
+                    'args'  : {}
+    }
     cmd_list.append(cmd)
 
     # interface.api.json: sw_interface_set_mtu (..., sw_if_index, mtu, ...)
@@ -1251,9 +1272,8 @@ def add_tunnel(params):
         remote_loop0_mac        = copy.deepcopy(loop0_mac)
         remote_loop0_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fd:00:04 -> 02:00:27:fd:00:05 / 02:00:27:fd:00:05 -> 02:00:27:fd:00:04
 
-        loop1_ip                = IPNetwork(loop0_ip)
-        loop1_ip.value         += IPAddress('0.1.0.0').value               # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
-        remote_loop1_ip         = fwutils.build_remote_loop_ip_address(str(loop1_ip.ip))        # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
+        loop1_ip                = fwutils.build_second_loop_ip_address(loop0_ip)    # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
+        remote_loop1_ip         = fwutils.build_remote_loop_ip_address(loop1_ip)    # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
 
         loop1_mac               = copy.deepcopy(loop0_mac)
         loop1_mac.value        += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
@@ -1280,7 +1300,8 @@ def add_tunnel(params):
 
     if 'peer' in params:
         tunnel_cache_key = 'ipip_tunnel_sw_if_index'
-        _add_peer(cmd_list, params, tunnel_cache_key)
+        peer_loopback_cache_key = 'peer_loopback_sw_if_index'
+        _add_peer(cmd_list, params, tunnel_cache_key, peer_loopback_cache_key)
     else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
@@ -1291,7 +1312,7 @@ def add_tunnel(params):
             bridge_id = params['tunnel-id']*2+1
             _add_loop_bridge_vxlan(cmd_list, params, loop1_cfg, remote_loop1_cfg, vxlan_ips, bridge_id=bridge_id, internal=True, loop_cache_key='loop1_sw_if_index')
 
-            l2gre_ips = {'src':str(loop1_ip), 'dst':remote_loop1_ip}
+            l2gre_ips = {'src':loop1_ip, 'dst':remote_loop1_ip}
             if encryption_mode == "psk":
                 # Add loop0-bridge-l2gre-ipsec
                 _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
@@ -1366,15 +1387,21 @@ def add_tunnel(params):
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % loop0_ip
         cmd_list.append(cmd)
 
+    if 'peer' in params:
+        policy_interface_cache_key = 'ipip_tunnel_sw_if_index'
+    else:
+        policy_interface_cache_key = 'loop0_sw_if_index'
+
     tunnel_stats_args = { 'tunnel_id': params['tunnel-id'] }
     if 'peer' in params:
         tunnel_stats_args['remote_ip'] = [params['dst']]
         tunnel_stats_args['remote_ip'] += params['peer']['ips']
         tunnel_stats_args['remote_ip'] += params['peer']['urls']
-        tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':tunnel_cache_key} ]
+        tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':peer_loopback_cache_key} ]
     else:
         tunnel_stats_args['remote_ip'] = [remote_loop0_ip]
         tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
+    tunnel_stats_args['local_tap'] = ["DEV-STUB"]
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
@@ -1382,6 +1409,7 @@ def add_tunnel(params):
     cmd['cmd']['params']  = {
                     'module': 'fwtunnel_stats',
                     'func'  : 'tunnel_stats_add',
+                    'substs': [ { 'replace':'DEV-STUB', 'key': 'local_tap', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':policy_interface_cache_key} ],
                     'args'  : tunnel_stats_args
     }
     cmd['revert'] = {}
@@ -1394,10 +1422,6 @@ def add_tunnel(params):
     }
     cmd_list.append(cmd)
 
-    if 'peer' in params:
-        policy_interface_cache_key = 'ipip_tunnel_sw_if_index'
-    else:
-        policy_interface_cache_key = 'loop0_sw_if_index'
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"

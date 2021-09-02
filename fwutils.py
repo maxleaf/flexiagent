@@ -2109,6 +2109,46 @@ def vpp_multilink_update_interface_quality(int_name, loss):
 
     return (True, None)
 
+def vpp_tap_inject_map_interface(src_sw_if_index, dst_sw_if_index):
+    """Map interfaces inside tap-inject plugin.
+
+    :param src_sw_if_index:  The name of the interface in VPP
+    :param dst_sw_if_index:  The name of the interface in VPP
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    src_int_name = vpp_sw_if_index_to_name(src_sw_if_index)
+    dst_int_name = vpp_sw_if_index_to_name(dst_sw_if_index)
+
+    vppctl_cmd = 'tap-inject map interface %s %s' % (src_int_name, dst_int_name)
+    fwglobals.log.debug(vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None or re.search('unknown|failed|ret=-', out):
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)
+
+def vpp_l3xc_connect(src_sw_if_index, dst_sw_if_index):
+    """Connect interfaces using l3xc.
+
+    :param src_sw_if_index:  The name of the interface in VPP
+    :param dst_sw_if_index:  The name of the interface in VPP
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    """
+    src_int_name = vpp_sw_if_index_to_name(src_sw_if_index)
+    dst_int_name = vpp_sw_if_index_to_name(dst_sw_if_index)
+
+    vppctl_cmd = 'l3xc add %s via %s' % (src_int_name, dst_int_name)
+    fwglobals.log.debug(vppctl_cmd)
+
+    out = _vppctl_read(vppctl_cmd, wait=False)
+    if out is None or re.search('unknown|failed|ret=-', out):
+        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+
+    return (True, None)
+
 def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     """Add/Remove static route.
 
@@ -4323,6 +4363,11 @@ def build_remote_loop_ip_address(addr):
     network = IPNetwork(addr)     # 10.100.0.4 / 10.100.0.5
     network.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
     return str(network.ip)
+
+def build_second_loop_ip_address(addr):
+    network = IPNetwork(addr)     # 10.100.0.4/31
+    network.value  += IPAddress('0.1.0.0').value        # 10.100.0.4/31 -> 10.101.0.4/31
+    return str(network)
 
 def linux_interface_set_state(sw_if_index, flags):
     linux_if = vpp_sw_if_index_to_tap(sw_if_index)

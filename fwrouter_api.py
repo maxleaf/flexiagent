@@ -438,7 +438,9 @@ class FWROUTER_API(FwCfgRequestHandler):
             else:
                 remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
                 local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-            fwtunnel_stats.tunnel_stats_add(id, remote_ips, local_sw_if_index)
+
+            local_tap = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
+            fwtunnel_stats.tunnel_stats_add(id, remote_ips, local_sw_if_index, local_tap)
 
     def _call_simple(self, request):
         """Execute single request.
