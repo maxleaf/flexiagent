@@ -44,7 +44,6 @@ from fwlog import FwLogFile
 from fwlog import FwSyslog
 from fwlog import FWLOG_LEVEL_INFO
 from fwlog import FWLOG_LEVEL_DEBUG
-from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwsystem_cfg import FwSystemCfg
@@ -53,12 +52,11 @@ from fwwan_monitor import FwWanMonitor
 from fwikev2 import FwIKEv2
 from fw_traffic_identification import FwTrafficIdentifications
 
-# sync flag indicated if module implement sync logic. 
+# sync flag indicated if module implement sync logic.
 # IMPORTANT! Please keep the list order. It indicates the sync priorities
 modules = {
     'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' }, # fwglobals.g.system_api
     'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },  # fwglobals.g.agent_api
-    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' }, # fwglobals.g.apps
     'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' }, # fwglobals.g.router_api
     'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' }, # fwglobals.g.os_api
 }
@@ -304,7 +302,6 @@ class Fwglobals:
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.fworig'
         self.ISC_DHCP_CONFIG_FILE = '/etc/default/isc-dhcp-server'
         self.ISC_DHCP_CONFIG_FILE_BACKUP = '/etc/default/isc-dhcp-server.fworig'
-        self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
@@ -404,7 +401,6 @@ class Fwglobals:
         self.system_api   = FWSYSTEM_API(self.system_cfg)
         self.router_api   = FWROUTER_API(self.router_cfg, self.MULTILINK_DB_FILE)
         self.os_api       = OS_API()
-        self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
@@ -457,7 +453,6 @@ class Fwglobals:
 
         del self.wan_monitor
         del self.stun_wrapper
-        del self.apps
         del self.policies
         del self.traffic_identifications
         del self.os_api
@@ -561,8 +556,6 @@ class Fwglobals:
                 func = getattr(self.router_api, params['func'])
             elif params['object'] == 'fwglobals.g.router_api.vpp_api':
                 func = getattr(self.router_api.vpp_api, params['func'])
-            elif params['object'] == 'fwglobals.g.apps':
-                func = getattr(self.apps, params['func'])
             elif params['object'] == 'fwglobals.g.ikev2':
                 func = getattr(self.ikev2, params['func'])
             elif params['object'] == 'fwglobals.g.traffic_identifications':

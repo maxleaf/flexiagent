@@ -33,7 +33,6 @@ import fwglobals
 import fwutils
 import fwnetplan
 
-from fwapplications import FwApps
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
@@ -58,11 +57,11 @@ fwrouter_translators = {
     'remove-dhcp-config':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-application':          {'module': __import__('fwtranslate_add_app'),         'api':'add_app'},
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
-    'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
+    'add-multilink-policy':     {'module': __import__('fwtranslate_add_multilink_policy'), 'api':'add_multilink_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert'),          'api':'revert'},
     'add-switch':               {'module': __import__('fwtranslate_add_switch'),      'api':'add_switch'},
     'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
-    'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
+    'add-firewall-policy':      {'module': __import__('fwtranslate_add_firewall_policy'), 'api':'add_firewall_policy'},
     'remove-firewall-policy':   {'module': __import__('fwtranslate_revert'),          'api':'revert'},
     'add-ospf':                 {'module': __import__('fwtranslate_add_ospf'),        'api':'add_ospf'},
     'remove-ospf':              {'module': __import__('fwtranslate_revert'),          'api':'revert'},
@@ -248,8 +247,6 @@ class FWROUTER_API(FwCfgRequestHandler):
     def _restore_vpp(self):
         fwglobals.log.info("===restore vpp: started===")
         try:
-            with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
-                db_app_rec.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:

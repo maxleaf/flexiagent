@@ -365,11 +365,11 @@ def wait_vpp_to_start(timeout=1000000):
         return False
 
     # Wait for vpp to be ready to process cli requests
-    res = subprocess.call("sudo vppctl sh version", shell=True)
+    res = subprocess.call("sudo vppctl sh version > /dev/null", shell=True)
     while res != 0 and timeout > 0:
         time.sleep(3)
         timeout -= 1
-        res = subprocess.call("sudo vppctl sh version", shell=True)
+        res = subprocess.call("sudo vppctl sh version > /dev/null", shell=True)
     if timeout == 0:
         return False
     return True

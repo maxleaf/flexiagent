@@ -51,7 +51,6 @@ import ipaddress
 import pyroute2
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
-from fwapplications import FwApps
 from fwrouter_cfg   import FwRouterCfg
 from fwsystem_cfg   import FwSystemCfg
 from fwmultilink    import FwMultilink
@@ -61,7 +60,7 @@ from fwikev2        import FwIKEv2
 from fw_traffic_identification import FwTrafficIdentifications
 import fwtranslate_add_switch
 
-proto_map = {'icmp': 1, 'tcp': 6, 'udp': 17}
+proto_map = {'any': 0, 'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
 
@@ -1283,8 +1282,6 @@ def reset_device_config():
         shutil.copyfile(fwglobals.g.VPP_CONFIG_FILE_RESTORE, fwglobals.g.VPP_CONFIG_FILE)
     if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
-    with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
-        db_app_rec.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
