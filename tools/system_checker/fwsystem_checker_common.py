@@ -31,6 +31,7 @@ import sys
 import uuid
 import yaml
 import shutil
+import stat
 
 common_tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , '..' , 'common')
 sys.path.append(common_tools)
@@ -41,6 +42,7 @@ sys.path.append(globals)
 import fwglobals
 import fwutils
 import fwnetplan
+from fw_vpp_coredump_utils import FW_VPP_COREDUMP_FOLDER, FW_VPP_COREDUMP_PERMISSIONS
 from fwsystem_checker import TXT_COLOR
 
 from yaml.constructor import ConstructorError
@@ -1200,3 +1202,48 @@ class Checker:
             return True
 
         raise Exception("No WiFi device was detected")
+
+    def soft_check_coredump_settings(self, fix=False, silently=False, prompt=''):
+        """Create coredump settings to collect VPP crash dumps
+
+        :param fix:             Fix problem.
+        :param silently:        Do not prompt user.
+        :param prompt:          User prompt prefix.
+
+        :returns: 'True' if check is successful and 'False' otherwise.
+        """
+        result = False
+        is_file = False
+        dir_exists = False
+
+        try:
+            file_status = os.stat(FW_VPP_COREDUMP_FOLDER)
+            if stat.S_ISDIR(file_status.st_mode):
+                if (file_status.st_mode & 0o777) == FW_VPP_COREDUMP_PERMISSIONS:
+                    result = True
+                else:
+                    dir_exists = True
+            else:
+                # File with same name seen
+                is_file = True
+        except:
+            pass
+
+        if not fix:
+            return result
+
+        if not result:
+            if is_file:
+                os.remove(FW_VPP_COREDUMP_FOLDER)
+
+            if dir_exists:
+                # set permissions
+                # FW_VPP_COREDUMP_FOLDER folder user is root
+                os.chmod(FW_VPP_COREDUMP_FOLDER, FW_VPP_COREDUMP_PERMISSIONS)
+            else:
+                # create folder with write permissions for user (root here) and group
+                # os.makedirs(..mode=) is not taking effect - Looks like, parent folder mode is used
+                os.makedirs(FW_VPP_COREDUMP_FOLDER)
+                os.chmod(FW_VPP_COREDUMP_FOLDER, FW_VPP_COREDUMP_PERMISSIONS)
+
+        return True
