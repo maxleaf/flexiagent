@@ -627,10 +627,6 @@ def get_interface_dev_id(if_name):
             interface.update({'dev_id': ''})
             return ''
 
-        if re.match(r'^ipip', vpp_if_name): # ipip tunnel interfaces have no dev id (bus id)
-            interface.update({'dev_id': ''})
-            return ''
-
         dev_id = vpp_if_name_to_dev_id(vpp_if_name)
         if dev_id:
             interface.update({'dev_id': dev_id})
@@ -1048,6 +1044,32 @@ def vpp_get_tap_info():
             vpp_if_name_to_tap[vpp_if_name] = tap
 
     return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
+
+def vpp_get_tap_mapping():
+    """Get tap mapping
+
+     :returns: tap info in list
+     """
+    vpp_if_name_to_vpp_if_name = {}
+    if not vpp_does_run():
+        fwglobals.log.debug("vpp_get_tap_mapping: VPP is not running")
+        return {}
+
+    taps = _vppctl_read("show tap-inject mapping").strip()
+    if not taps:
+        fwglobals.log.debug("vpp_get_tap_mapping: no TAPs configured")
+        return {}
+
+    taps = taps.splitlines()
+
+    for line in taps:
+        tap_info = re.search("([/\w-]+) -> ([\S]+)", line)
+        if tap_info:
+            vpp_if_name_dst = tap_info.group(1)
+            vpp_if_name_src = tap_info.group(2)
+            vpp_if_name_to_vpp_if_name[vpp_if_name_dst] = vpp_if_name_src
+
+    return vpp_if_name_to_vpp_if_name
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
