@@ -2131,18 +2131,20 @@ def vpp_multilink_update_interface_quality(int_name, loss):
 
     return (True, None)
 
-def vpp_tap_inject_map_interface(src_sw_if_index, dst_sw_if_index):
+def vpp_tap_inject_map_interface(src_sw_if_index, dst_sw_if_index, is_add):
     """Map interfaces inside tap-inject plugin.
 
     :param src_sw_if_index:  The name of the interface in VPP
     :param dst_sw_if_index:  The name of the interface in VPP
+    :param is_add:           Add/remove  mapping
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     src_int_name = vpp_sw_if_index_to_name(src_sw_if_index)
     dst_int_name = vpp_sw_if_index_to_name(dst_sw_if_index)
+    delete = '' if is_add else 'del'
 
-    vppctl_cmd = 'tap-inject map interface %s %s' % (src_int_name, dst_int_name)
+    vppctl_cmd = 'tap-inject map interface %s %s %s' % (src_int_name, dst_int_name, delete)
     fwglobals.log.debug(vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
