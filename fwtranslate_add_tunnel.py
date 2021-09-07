@@ -906,12 +906,11 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime,
     cmd['cmd']['descr']     = "initialize IKEv2 connection, profile %s" % name
     cmd_list.append(cmd)
 
-def _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop_cfg, l2gre_tunnel_ips, bridge_id, loop_cache_key):
+def _add_loop_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id, loop_cache_key):
     """Add GRE tunnel, loopback and bridge commands into the list.
 
     :param cmd_list:            List of commands.
     :param params:              Parameters from flexiManage.
-    :param remote_loop_cfg:     Remote loopback config.
     :param l2gre_tunnel_ips:    GRE tunnel src and dst ip addresses.
     :param bridge_id:           Bridge identifier.
     :param loop_cache_key:      Loopback cache key.
@@ -1317,7 +1316,7 @@ def add_tunnel(params):
             l2gre_ips = {'src':loop1_ip, 'dst':remote_loop1_ip}
             if encryption_mode == "psk":
                 # Add loop0-bridge-l2gre-ipsec
-                _add_loop_bridge_l2gre_ipsec(cmd_list, params, remote_loop0_cfg, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
+                _add_loop_bridge_l2gre_ipsec(cmd_list, params, l2gre_ips, bridge_id=params['tunnel-id']*2, loop_cache_key='loop0_sw_if_index')
             elif encryption_mode == "ikev2":
                 # Add loop0-bridge-l2gre-ikev2
                 _add_loop_bridge_l2gre_ikev2(cmd_list, params, l2gre_ips, params['tunnel-id']*2, loop0_cache_key='loop0_sw_if_index', loop1_cache_key='loop1_sw_if_index')
