@@ -1215,6 +1215,7 @@ def vpp_ip_to_sw_if_index(ip):
             int_address = IPNetwork(int_address_str)
             if network == int_address:
                 return sw_if.sw_if_index
+    return None
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
