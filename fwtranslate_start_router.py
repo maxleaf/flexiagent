@@ -100,6 +100,7 @@ def start_router(params=None):
 
     dev_id_list         = []
     pci_list_vmxnet3 = []
+    assigned_linux_interfaces = []
 
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
@@ -122,6 +123,7 @@ def start_router(params=None):
             # Additional spacial logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
                 continue
+            assigned_linux_interfaces.append(linux_if)
 
             # Mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
@@ -193,6 +195,18 @@ def start_router(params=None):
             'module': 'fwutils',
             'func'  : 'vpp_startup_conf_remove_nopci',
             'args'  : { 'vpp_config_filename' : vpp_filename }
+        }
+        cmd_list.append(cmd)
+
+    if assigned_linux_interfaces:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "Unload to-be-VPP interfaces from linux networkd"
+        cmd['cmd']['params']  = {
+            'module': 'fwnetplan',
+            'func'  : 'netplan_unload_vpp_assigned_ports',
+            'args'  : { 'assigned_linux_interfaces' : assigned_linux_interfaces }
         }
         cmd_list.append(cmd)
 
