@@ -146,7 +146,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         Its function is to monitor tunnel state and RTT.
         It is implemented by pinging the other end of the tunnel.
         """
-        self._fill_tunnel_stats_dict()
+        fwtunnel_stats.fill_tunnel_stats_dict()
         while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
@@ -420,30 +420,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.set_logger(prev_logger)  # Restore logger if was changed
         return reply
-
-
-    def _fill_tunnel_stats_dict(self):
-        """Get tunnels their corresponding loopbacks ip addresses
-        to be used by tunnel statistics thread.
-        """
-        fwtunnel_stats.tunnel_stats_clear()
-        tunnels = self.cfg_db.get_tunnels()
-        tap_map = fwutils.vpp_get_tap_mapping()
-        for params in tunnels:
-            id   = params['tunnel-id']
-            if 'peer' in params:
-                remote_ips = [params['dst']]
-                remote_ips += params['peer']['ips']
-                remote_ips += params['peer']['urls']
-                local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
-                loop_name = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
-                local_tap = tap_map[loop_name]
-            else:
-                remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
-                local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-                local_tap = None
-
-            fwtunnel_stats.tunnel_stats_add(id, remote_ips, local_sw_if_index, local_tap)
 
     def _call_simple(self, request):
         """Execute single request.

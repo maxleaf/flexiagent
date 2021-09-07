@@ -1388,40 +1388,27 @@ def add_tunnel(params):
         cmd['revert']['descr']   = "remove loopback interface %s from ospf" % loop0_ip
         cmd_list.append(cmd)
 
-    if 'peer' in params:
-        policy_interface_cache_key = 'ipip_tunnel_sw_if_index'
-    else:
-        policy_interface_cache_key = 'loop0_sw_if_index'
-
-    tunnel_stats_args = { 'tunnel_id': params['tunnel-id'] }
-    if 'peer' in params:
-        tunnel_stats_args['remote_ip'] = [params['dst']]
-        tunnel_stats_args['remote_ip'] += params['peer']['ips']
-        tunnel_stats_args['remote_ip'] += params['peer']['urls']
-        tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':peer_loopback_cache_key} ]
-    else:
-        tunnel_stats_args['remote_ip'] = [remote_loop0_ip]
-        tunnel_stats_args['substs'] = [ { 'add_param':'local_sw_if_index', 'val_by_key':'loop0_sw_if_index'} ]
-    tunnel_stats_args['local_tap'] = ["DEV-STUB"]
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
     cmd['cmd']['descr']   = "tunnel stats add"
     cmd['cmd']['params']  = {
                     'module': 'fwtunnel_stats',
-                    'func'  : 'tunnel_stats_add',
-                    'substs': [ { 'replace':'DEV-STUB', 'key': 'local_tap', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':policy_interface_cache_key} ],
-                    'args'  : tunnel_stats_args
+                    'func'  : 'fill_tunnel_stats_dict'
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "tunnel stats remove"
     cmd['revert']['params'] = {
                     'module': 'fwtunnel_stats',
-                    'func'  : 'tunnel_stats_remove',
-                    'args'  : { 'tunnel_id': params['tunnel-id']},
+                    'func'  : 'fill_tunnel_stats_dict'
     }
     cmd_list.append(cmd)
+
+    if 'peer' in params:
+        policy_interface_cache_key = 'ipip_tunnel_sw_if_index'
+    else:
+        policy_interface_cache_key = 'loop0_sw_if_index'
 
     cmd = {}
     cmd['cmd'] = {}
