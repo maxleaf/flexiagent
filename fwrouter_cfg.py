@@ -73,6 +73,7 @@ class FwRouterCfg(FwCfgDatabase):
                 'add-dhcp-config',
                 'add-application',
                 'add-multilink-policy',
+                'add-firewall-policy',
                 'add-ospf',
             ]
 
@@ -96,6 +97,7 @@ class FwRouterCfg(FwCfgDatabase):
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",
             'add-application':      "============ APPLICATIONS ============",
             'add-multilink-policy': "============= POLICIES =============",
+            'add-firewall-policy':  "============= FIREWALL POLICY =============",
             'add-ospf':             "============= OSPF =============",
         }
 
