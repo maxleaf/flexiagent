@@ -78,8 +78,11 @@ def tunnel_stats_get_ping_time(tunnels):
             rtts = []
             for row in rows:
                 host_rtt = [x.strip() for x in row.strip().split(':')]
-                rtt = host_rtt[1] if host_rtt[1] != '-' else '0'
-                rtts.append(float(rtt))
+                try:
+                    float_rtt = float(host_rtt[1])
+                except ValueError:
+                    float_rtt = 0.0
+                rtts.append(float_rtt)
             ret[tunnel_id] = sum(rtts) / len(rtts) if len(rtts) > 0 else 0
         else:
             ret[tunnel_id] = None
