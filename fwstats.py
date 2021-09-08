@@ -78,7 +78,6 @@ def update_stats():
                 fwglobals.g.stun_wrapper.handle_down_tunnels(tunnel_stats)
                 for intf, counts in list(stats['last'].items()):
                     if (intf.startswith('gre') or
-                        intf.startswith('ipip') or
                         intf.startswith('loop')): continue
                     prev_stats_if = prev_stats['last'].get(intf, None)
                     if prev_stats_if != None:
@@ -95,6 +94,12 @@ def update_stats():
                         if (intf.startswith('vxlan_tunnel')):
                             vxlan_id = int(intf[12:])
                             tunnel_id = math.floor(vxlan_id/2)
+                            t_stats = tunnel_stats.get(tunnel_id)
+                            if t_stats:
+                                t_stats.update(calc_stats)
+                        elif (intf.startswith('ipip')):
+                            ipip_id = int(intf[4:])
+                            tunnel_id = math.floor(ipip_id/2)
                             t_stats = tunnel_stats.get(tunnel_id)
                             if t_stats:
                                 t_stats.update(calc_stats)
