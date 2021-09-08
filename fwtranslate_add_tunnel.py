@@ -1215,13 +1215,23 @@ def _add_peer(cmd_list, params, tunnel_cache_key, peer_loopback_cache_key):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
-    cmd['cmd']['descr']   = ""
+    cmd['cmd']['descr']   = "add l3xc connection"
     cmd['cmd']['params']  = {
                     'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
                                 { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
                     'module': 'fwutils',
                     'func'  : 'vpp_l3xc_connect',
-                    'args'  : {}
+                    'args'  : {'is_add':1}
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']    = "python"
+    cmd['revert']['descr']   = "remove l3xc connection"
+    cmd['revert']['params']  = {
+                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
+                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'module': 'fwutils',
+                    'func'  : 'vpp_l3xc_connect',
+                    'args'  : {'is_add':0}
     }
     cmd_list.append(cmd)
 

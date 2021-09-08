@@ -2153,18 +2153,20 @@ def vpp_tap_inject_map_interface(src_sw_if_index, dst_sw_if_index, is_add):
 
     return (True, None)
 
-def vpp_l3xc_connect(src_sw_if_index, dst_sw_if_index):
+def vpp_l3xc_connect(src_sw_if_index, dst_sw_if_index, is_add):
     """Connect interfaces using l3xc.
 
     :param src_sw_if_index:  The name of the interface in VPP
     :param dst_sw_if_index:  The name of the interface in VPP
+    :param is_add:           Add/remove l3xc connection
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     src_int_name = vpp_sw_if_index_to_name(src_sw_if_index)
     dst_int_name = vpp_sw_if_index_to_name(dst_sw_if_index)
+    op = 'add' if is_add else 'del'
 
-    vppctl_cmd = 'l3xc add %s via %s' % (src_int_name, dst_int_name)
+    vppctl_cmd = 'l3xc %s %s via %s' % (op, src_int_name, dst_int_name)
     fwglobals.log.debug(vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
