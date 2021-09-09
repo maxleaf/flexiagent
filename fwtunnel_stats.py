@@ -228,8 +228,8 @@ def get_tunnel_info():
         else:
             ip = fwutils.build_remote_loop_ip_address(tunnel['loopback-iface']['addr'])
 
-        if tunnel_stats.get(tunnel_id):
-            status = tunnel_stats[tunnel_id].get('status')
+        if tunnel_id in tunnel_stats:
+            status = tunnel_stats[tunnel_id]['status']
         else:
             status = 'down'
         remote_loopbacks[ip] = status
