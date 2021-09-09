@@ -217,16 +217,21 @@ def get_tunnel_info():
     tunnels          = fwglobals.g.router_cfg.get_tunnels()
     remote_loopbacks = dict()
 
-    if tunnels and tunnel_stats:
-        for tunnel in tunnels:
-            tunnel_id = tunnel.get('tunnel-id')
-            if tunnel_id and tunnel_stats.get(tunnel_id):
-                if 'peer' in tunnel:
-                    ip = str(IPNetwork(tunnel['peer']['addr']).ip)
-                else:
-                    ip = fwutils.build_remote_loop_ip_address(tunnel['loopback-iface']['addr'])
-                status = tunnel_stats[tunnel_id].get('status')
-                remote_loopbacks[ip] = status
+    if not tunnels:
+        return {}
+
+    for tunnel in tunnels:
+        tunnel_id = tunnel.get('tunnel-id')
+        if 'peer' in tunnel:
+            ip = str(IPNetwork(tunnel['peer']['addr']).ip)
+        else:
+            ip = fwutils.build_remote_loop_ip_address(tunnel['loopback-iface']['addr'])
+
+        if tunnel_stats.get(tunnel_id):
+            status = tunnel_stats[tunnel_id].get('status')
+        else:
+            status = 'down'
+        remote_loopbacks[ip] = status
     return remote_loopbacks
 
 def fill_tunnel_stats_dict():
