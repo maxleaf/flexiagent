@@ -1414,14 +1414,16 @@ def add_tunnel(params):
     cmd['cmd']['descr']   = "tunnel stats add"
     cmd['cmd']['params']  = {
                     'module': 'fwtunnel_stats',
-                    'func'  : 'fill_tunnel_stats_dict'
+                    'func'  : 'tunnel_stats_add',
+                    'args'  : {'params': params}
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
     cmd['revert']['descr']  = "tunnel stats remove"
     cmd['revert']['params'] = {
                     'module': 'fwtunnel_stats',
-                    'func'  : 'fill_tunnel_stats_dict'
+                    'func'  : 'tunnel_stats_remove',
+                    'args'  : { 'tunnel_id': params['tunnel-id']}
     }
     cmd_list.append(cmd)
 

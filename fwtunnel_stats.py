@@ -97,7 +97,7 @@ def tunnel_stats_clear():
     with tunnel_stats_global_lock:
         tunnel_stats_global.clear()
 
-def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index, local_tap = None):
+def tunnel_stats_add_internal(tunnel_id, remote_ip, local_sw_if_index, local_tap = None):
     """Add tunnel statistics entry into a dictionary.
 
     :param tunnel_id:         Tunnel identifier.
@@ -121,7 +121,8 @@ def tunnel_stats_add(tunnel_id, remote_ip, local_sw_if_index, local_tap = None):
 
 def tunnel_stats_remove(tunnel_id):
     with tunnel_stats_global_lock:
-        del tunnel_stats_global[tunnel_id]
+        if tunnel_id in tunnel_stats_global:
+            del tunnel_stats_global[tunnel_id]
 
 def tunnel_stats_test():
     """Update RTT, drop rate and other fields for all tunnels.
@@ -234,26 +235,37 @@ def get_tunnel_info():
         remote_loopbacks[ip] = status
     return remote_loopbacks
 
+def tunnel_stats_add(params):
+    """Add tunnel statistics entry into a dictionary.
+
+    :param params:         Tunnel parameters from Fleximanage.
+
+    :returns: None.
+    """
+    tap_map = fwutils.vpp_get_tap_mapping()
+    id   = params['tunnel-id']
+
+    if 'peer' in params:
+        remote_ips = [params['dst']]
+        remote_ips += params['peer']['ips']
+        remote_ips += params['peer']['urls']
+        local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
+        if local_sw_if_index:
+            loop_name = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
+            local_tap = tap_map[loop_name]
+    else:
+        remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
+        local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+        local_tap = None
+
+    tunnel_stats_add_internal(id, remote_ips, local_sw_if_index, local_tap)
+
 def fill_tunnel_stats_dict():
     """Get tunnels their corresponding loopbacks ip addresses
     to be used by tunnel statistics thread.
     """
     tunnel_stats_clear()
-    tunnels = fwglobals.g.router_cfg.get_tunnels()
-    tap_map = fwutils.vpp_get_tap_mapping()
-    for params in tunnels:
-        id   = params['tunnel-id']
-        if 'peer' in params:
-            remote_ips = [params['dst']]
-            remote_ips += params['peer']['ips']
-            remote_ips += params['peer']['urls']
-            local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
-            if local_sw_if_index:
-                loop_name = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
-                local_tap = tap_map[loop_name]
-        else:
-            remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
-            local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-            local_tap = None
 
-        tunnel_stats_add(id, remote_ips, local_sw_if_index, local_tap)
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for params in tunnels:
+        tunnel_stats_add(params)
