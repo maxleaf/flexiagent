@@ -1033,7 +1033,7 @@ def vpp_get_tap_info():
     # ]
     # we use a regex check to get the closest words before and after the arrow
     for line in taps:
-        tap_info = re.search("([/\w-]+) -> ([\S]+)", line)
+        tap_info = re.search(r'([/\w-]+) -> ([\S]+)', line)
         if tap_info:
             vpp_if_name = tap_info.group(1)
             tap = tap_info.group(2)
@@ -3503,13 +3503,13 @@ def frr_setup_config():
         "log stdout",
         "log syslog informational"
     ]
-    frr_vtysh_run(frr_commands, restart_frr=False, print_stdout=False)
 
-def frr_create_redistribution_filter(router , acl, route_map, route_map_num, revert=False):
+    # Setup route redistribution, so the static routes configured by 'add-route'
+    # requests will be propagated over tunnels to other flexiEdges.
+    #
     # When we add a static route, OSPF sees it as a kernel route, not a static one.
     # That is why we are forced to set in OSPF/BGP - redistribution of *kernel* routes.
     # But, of course, we don't want to redistribute them all, so we create a filter.
-    #
     # This is content in OSPF file after the filter settings (bgp is similar):
     # router ospf
     #   redistribute kernel route-map fw-redist-ospf-rm
@@ -3518,13 +3518,12 @@ def frr_create_redistribution_filter(router , acl, route_map, route_map_num, rev
     #   match ip address fw-redist-ospf-acl
     # !
     #
-    route_map_commands = ["%sroute-map %s permit %s" % ('no ' if revert else '', route_map, route_map_num)]
-    if not revert:
-        route_map_commands.append("match ip address %s" % acl)
-    frr_vtysh_run(route_map_commands)
-
-    redistribute_cmd = '%sredistribute kernel route-map %s' % ('no ' if revert else '', route_map)
-    frr_vtysh_run([router , redistribute_cmd])
+    frr_commands.extend([
+        f"route-map {fwglobals.g.FRR_OSPF_ROUTE_MAP} permit 1",
+        f"match ip address {fwglobals.g.FRR_OSPF_ACL}",
+        "router ospf", f"redistribute kernel route-map {fwglobals.g.FRR_OSPF_ROUTE_MAP}"
+    ])
+    frr_vtysh_run(frr_commands, restart_frr=False, print_stdout=False)
 
 def file_write_and_flush(f, data):
     '''Wrapper over the f.write() method that flushes wrote content
