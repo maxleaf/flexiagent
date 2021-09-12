@@ -2879,7 +2879,7 @@ def lte_set_modem_to_mbim(dev_id):
         vendor = hardware_info['Vendor']
         model =  hardware_info['Model']
 
-        is_quectel = 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE)
+        is_quectel = 'Quectel' in vendor or re.match('Quectel', model, re.IGNORECASE) # Special fix for Quectel ec25 mini pci card
         is_telit = 'Telit' in vendor and 'LE910C4-LA' in model
 
         # for quectel and telit we use at commands to switch the modem
@@ -2907,22 +2907,7 @@ def lte_set_modem_to_mbim(dev_id):
 
             # special steps needed for telit card
             if is_telit:
-                try:
-                    time.sleep(5) # telit reset modem might take more few seconds
-
-                    usb_device_addr = dev_id.split('/')[-1]
-                    product_info = subprocess.check_output(f'cat /sys/bus/usb/devices/{usb_device_addr}/uevent | grep PRODUCT', shell=True).decode().strip()
-                    (vendorId, productId, _) = product_info.split('=')[-1].split('/') # product_info = PRODUCT=1bc7/1204/318
-
-                    # enable the at serial interface after the switching. Without ant
-                    # for i in range(1):
-                    subprocess.check_call('modprobe option', shell=True)
-                    time.sleep(2)
-                    cmd = 'echo %s %s > /sys/bus/usb-serial/drivers/option1/new_id' % (vendorId, productId)
-                    subprocess.check_call(cmd, shell=True)
-                except Exception as e:
-                    fwglobals.log.error(f'lte_set_modem_to_mbim: failed to enable serial interface. {str(e)}')
-                    print("The modem has been switched to MBIM but the serial interface has not been activated.\nIf you want to use this interface, you can try running it manually.")
+                time.sleep(5) # telit reset modem might take more few seconds
             return (True, None)
         elif 'Sierra Wireless' in vendor:
             print('Please wait...')
