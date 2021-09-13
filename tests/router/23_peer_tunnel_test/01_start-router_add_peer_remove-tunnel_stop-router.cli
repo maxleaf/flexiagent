@@ -27,9 +27,12 @@
         "tunnel-id": 1,
         "peer": {
             "mtu": 1350,
+            "addr": "10.100.0.4/31",
             "multilink": {
                "labels": [ "green" ]
-            }
+            },
+            "urls": [],
+            "ips": []
         },
         "ikev2": {
             "role": "initiator",
