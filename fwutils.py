@@ -1165,6 +1165,21 @@ def vpp_sw_if_index_to_name(sw_if_index):
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
+def vpp_name_to_sw_if_index(name):
+    """Convert VPP sw_if_index into VPP interface name.
+
+     :param sw_if_index:      VPP sw_if_index.
+
+     :returns: VPP interface name.
+     """
+    sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
+    for sw_if in sw_interfaces:
+        if re.match(name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
+            return sw_if.sw_if_index
+
+    fwglobals.log.debug(f"vpp_name_to_sw_if_index({name}): not found")
+    return None
+
 def vpp_get_interface_state(sw_if_index):
     """Get VPP interface state.
 
@@ -2191,6 +2206,17 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
 
     if not linux_check_gateway_exist(via):
         return (True, None)
+
+    if not remove:
+        tunnel_addresses = fwtunnel_stats.get_tunnel_info()
+        if via in tunnel_addresses and tunnel_addresses[via] != 'up':
+            return (True, None)
+
+    if remove:
+        routes_linux = linux_get_routes()
+        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+        if not exist_in_linux:
+            return (True, None)
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
@@ -4136,7 +4162,16 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
                 return True
     return False
 
+def routes_thread_start():
+    fwglobals.g.static_route_reinstall_thread_start = False
+
+def routes_thread_stop():
+    fwglobals.g.static_route_reinstall_thread_start = True
+
 def check_reinstall_static_routes():
+    if fwglobals.g.static_route_reinstall_thread_start:
+        return
+
     routes_db = fwglobals.g.router_cfg.get_routes()
     routes_linux = linux_get_routes()
     tunnel_addresses = fwtunnel_stats.get_tunnel_info()
@@ -4148,13 +4183,28 @@ def check_reinstall_static_routes():
         dev = route.get('dev_id', None)
         exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
 
-        if tunnel_addresses.get(via) == 'down':
+        if via in tunnel_addresses and tunnel_addresses[via] == 'down':
             if exist_in_linux:
                 add_remove_static_route(addr, via, metric, True, dev)
             continue
 
         if not exist_in_linux:
             add_remove_static_route(addr, via, metric, False, dev)
+
+def add_remove_static_routes(via, is_add):
+    routes_db = fwglobals.g.router_cfg.get_routes()
+    routes_linux = linux_get_routes()
+
+    for route in routes_db:
+        if route['via'] != via:
+            continue
+
+        addr = route['addr']
+        metric = str(route.get('metric', '0'))
+        dev = route.get('dev_id', None)
+        via = route['via']
+
+        add_remove_static_route(addr, via, metric, not is_add, dev)
 
 def exec_with_timeout(cmd, timeout=60):
     """Run bash command with timeout option

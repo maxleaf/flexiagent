@@ -39,6 +39,7 @@ from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 from fwcfg_request_handler import FwCfgRequestHandler
 from fwikev2 import FwIKEv2
+from netaddr import IPNetwork, IPAddress
 
 import fwtunnel_stats
 import fw_vpp_coredump_utils
@@ -1046,23 +1047,40 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self._update_cache_sw_if_index(sw_if_index, type, False)
 
-    def _on_add_tunnel_after(self, sw_if_index):
+    def _on_add_tunnel_after(self, sw_if_index, params):
         """add-tunnel postprocessing
 
         :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
         :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
         """
+        fwutils.routes_thread_start()
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', True)
         fwutils.tunnel_change_postprocess(False, vpp_if_name)
 
-    def _on_remove_tunnel_before(self, sw_if_index):
+    def _on_remove_tunnel_before(self, sw_if_index, params):
         """remove-tunnel preprocessing
 
         :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
         :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
         """
+        fwutils.routes_thread_stop()
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
         fwutils.tunnel_change_postprocess(True, vpp_if_name)
+        fwutils.add_remove_static_routes(str(IPNetwork(params['peer']['addr']).ip), 0)
+
+    def _on_add_tunnel_before(self, params):
+        """add-tunnel preprocessing
+
+        :param params:   Parameters from Fleximanage.
+        """
+        fwutils.routes_thread_stop()
+
+    def _on_remove_tunnel_after(self, params):
+        """remove-tunnel postprocessing
+
+        :param params:   Parameters from Fleximanage.
+        """
+        fwutils.routes_thread_start()
 
     def _update_cache_sw_if_index(self, sw_if_index, type, add):
         """Updates persistent caches that store mapping of sw_if_index into
