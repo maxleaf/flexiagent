@@ -1446,10 +1446,7 @@ def add_tunnel(params):
     }
     cmd_list.append(cmd)
 
-    if 'peer' in params:
-        policy_interface_cache_key = 'ipip_tunnel_sw_if_index'
-    else:
-        policy_interface_cache_key = 'loop0_sw_if_index'
+    policy_interface_cache_key = 'ipip_tunnel_sw_if_index' if 'peer' in params else 'loop0_sw_if_index'
 
     cmd = {}
     cmd['cmd'] = {}
