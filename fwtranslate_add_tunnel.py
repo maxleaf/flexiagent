@@ -1285,6 +1285,25 @@ def add_tunnel(params):
 
     encryption_mode = params.get("encryption-mode", "psk")
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "preprocess add-tunnel"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_add_tunnel_before',
+                    'args'  : {'params':params}
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "postprocess remove-tunnel"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_on_remove_tunnel_after',
+                    'args'  : {'params':params}
+    }
+    cmd_list.append(cmd)
+
     if 'loopback-iface' in params:
         loop0_ip                = params['loopback-iface']['addr']
         remote_loop0_ip         = fwutils.build_remote_loop_ip_address(loop0_ip)       # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
@@ -1439,7 +1458,7 @@ def add_tunnel(params):
     cmd['cmd']['params']  = {
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_add_tunnel_after',
-                    'args'  : {},
+                    'args'  : {'params':params},
                     'substs': [ { 'add_param':'sw_if_index', 'val_by_key':policy_interface_cache_key} ]
     }
     cmd['revert'] = {}
@@ -1448,7 +1467,7 @@ def add_tunnel(params):
     cmd['revert']['params'] = {
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_remove_tunnel_before',
-                    'args'  : {},
+                    'args'  : {'params':params},
                     'substs': [ { 'add_param':'sw_if_index', 'val_by_key':policy_interface_cache_key} ]
     }
     cmd_list.append(cmd)

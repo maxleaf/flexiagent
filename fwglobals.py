@@ -450,6 +450,7 @@ class Fwglobals:
             return
 
         self.teardown = True   # Stop all helper threads in parallel to speedup gracefull exit
+        self.static_route_reinstall_thread_start = False
 
         self.wan_monitor.finalize()
         self.stun_wrapper.finalize()
