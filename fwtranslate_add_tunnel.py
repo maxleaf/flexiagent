@@ -635,9 +635,9 @@ def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, lo
     :param params:              Parameters from flexiManage.
     :param name:                Profile name.
     :param cache_key:           Tunnel interface cache_key.
-    :param auth_method:         Authenticate method.
-    :param local_fqdn:          Local FQDN.
-    :param remote_fqdn:         Remote FQDN.
+    :param auth_method:         Authenticate method, i.e. IKEV2_AUTH_METHOD_RSA_SIG(1) or IKEV2_AUTH_METHOD_SHARED_KEY_MIC(2)
+    :param local_fqdn:          Local FQDN stands for local domain name.
+    :param remote_fqdn:         Remote FQDN stands for remote domain name.
 
     :returns: None.
     """
