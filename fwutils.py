@@ -4155,7 +4155,7 @@ def linux_check_gateway_exist(gw):
     return False
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
-    metric = int(metric)
+    metric = int(metric) if metric else 0
     if metric in list(routes.keys()):
         if addr in list(routes[metric].keys()):
             if via in routes[metric][addr]:

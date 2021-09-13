@@ -349,6 +349,7 @@ class Fwglobals:
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
         self.teardown = False   # Flag that stops all helper threads in parallel to speedup gracefull exit
+        self.static_route_reinstall_thread_start = False
 
 
     def load_configuration_from_file(self):
