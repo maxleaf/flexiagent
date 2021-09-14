@@ -4433,23 +4433,6 @@ def build_second_loop_ip_address(addr):
     network.value  += IPAddress('0.1.0.0').value        # 10.100.0.4/31 -> 10.101.0.4/31
     return str(network)
 
-def linux_interface_set_state(sw_if_index, flags):
-    linux_if = vpp_sw_if_index_to_tap(sw_if_index)
-    if flags == 0:
-        cmd = 'ip link set dev %s down' % linux_if
-    else:
-        cmd = 'ip link set dev %s up' % linux_if
-    fwglobals.log.debug(cmd)
-    subprocess.check_call(cmd, shell=True)
-
-def linux_is_interface_up(sw_if_index):
-    linux_if = vpp_sw_if_index_to_tap(sw_if_index)
-    net_if_stats = psutil.net_if_stats()
-    for if_name, data in net_if_stats.items():
-        if if_name == linux_if:
-            return data.isup
-
-    return False
 def set_ip_on_bridge_bvi_interface(bridge_addr, dev_id, is_add):
     """Configure IP address on the BVI tap inerface if needed
 
