@@ -97,11 +97,13 @@ def tunnel_stats_clear():
     with tunnel_stats_global_lock:
         tunnel_stats_global.clear()
 
-def tunnel_stats_add_internal(tunnel_id, remote_ip, local_sw_if_index, local_tap = None):
+def tunnel_stats_add_internal(tunnel_id, hosts_to_ping, loopback_sw_if_index, vpp_peer_tunnel_name = None):
     """Add tunnel statistics entry into a dictionary.
 
-    :param tunnel_id:         Tunnel identifier.
-    :param remote_ip:         Remote end ip address.
+    :param tunnel_id:                Tunnel identifier.
+    :param hosts_to_ping:            Hosts to ping to get RTT and drop rate.
+    :param loopback_sw_if_index:     Loopback sw_if_index.
+    :param vpp_peer_tunnel_name:     Peer tunnel VPP interface name (ipipX).
 
     :returns: None.
     """
@@ -112,9 +114,9 @@ def tunnel_stats_add_internal(tunnel_id, remote_ip, local_sw_if_index, local_tap
     stats_entry['rtt'] = 0
     stats_entry['timestamp'] = 0
 
-    stats_entry['loopback_remote'] = remote_ip
-    stats_entry['tap'] = fwutils.vpp_sw_if_index_to_tap(local_sw_if_index)
-    stats_entry['local_tap'] = local_tap
+    stats_entry['hosts_to_ping'] = hosts_to_ping
+    stats_entry['loopback_tap_name'] = fwutils.vpp_sw_if_index_to_tap(loopback_sw_if_index)
+    stats_entry['vpp_peer_tunnel_name'] = vpp_peer_tunnel_name
 
     with tunnel_stats_global_lock:
         tunnel_stats_global[tunnel_id] = stats_entry
@@ -138,9 +140,9 @@ def tunnel_stats_test():
 
     tunnels = []
     for tunnel_id, tunnel_stats_entry in tunnel_stats_global_copy.items():
-        hosts = tunnel_stats_entry.get('loopback_remote', [])
-        interface = tunnel_stats_entry.get('tap', None)
-        tunnels.append({'tunnel_id':tunnel_id, 'interface':interface, 'hosts':hosts})
+        hosts = tunnel_stats_entry.get('hosts_to_ping', [])
+        loopback_tap_name = tunnel_stats_entry.get('loopback_tap_name', None)
+        tunnels.append({'tunnel_id':tunnel_id, 'interface':loopback_tap_name, 'hosts':hosts})
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
@@ -157,9 +159,9 @@ def tunnel_stats_test():
         stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
         stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
 
-        interface = stats.get('local_tap', None)
-        if interface:
-            fwutils.vpp_multilink_update_interface_quality(interface, stats['drop_rate'])
+        vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
+        if vpp_peer_tunnel_name:
+            fwutils.vpp_multilink_update_interface_quality(vpp_peer_tunnel_name, stats['drop_rate'])
 
         if (stats['sent'] == WINDOW_SIZE):
             stats['sent'] = 0
@@ -242,23 +244,22 @@ def tunnel_stats_add(params):
 
     :returns: None.
     """
-    tap_map = fwutils.vpp_get_tap_mapping()
     id   = params['tunnel-id']
 
     if 'peer' in params:
-        remote_ips = [params['dst']]
-        remote_ips += params['peer']['ips']
-        remote_ips += params['peer']['urls']
-        local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
-        if local_sw_if_index:
-            loop_name = fwutils.vpp_sw_if_index_to_name(local_sw_if_index)
-            local_tap = tap_map[loop_name]
+        tap_map = fwutils.vpp_get_tap_mapping()
+        hosts_to_ping = [params['dst']]
+        hosts_to_ping += params['peer']['ips']
+        hosts_to_ping += params['peer']['urls']
+        loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
+        loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
+        vpp_peer_tunnel_name = tap_map[loopback_name]
     else:
-        remote_ips = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
-        local_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-        local_tap = None
+        hosts_to_ping = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
+        loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+        vpp_peer_tunnel_name = None
 
-    tunnel_stats_add_internal(id, remote_ips, local_sw_if_index, local_tap)
+    tunnel_stats_add_internal(id, hosts_to_ping, loopback_sw_if_index, vpp_peer_tunnel_name)
 
 def fill_tunnel_stats_dict():
     """Get tunnels their corresponding loopbacks ip addresses
