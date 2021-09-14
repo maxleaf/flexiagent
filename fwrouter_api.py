@@ -1064,7 +1064,13 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
         fwutils.tunnel_change_postprocess(True, vpp_if_name)
-        fwutils.add_remove_static_routes(str(IPNetwork(params['peer']['addr']).ip), 0)
+
+        if 'peer' in params:
+            via = str(IPNetwork(params['peer']['addr']).ip)
+        else:
+            via = fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])
+
+        fwutils.add_remove_static_routes(via, False)
 
     def _update_cache_sw_if_index(self, sw_if_index, type, add):
         """Updates persistent caches that store mapping of sw_if_index into
