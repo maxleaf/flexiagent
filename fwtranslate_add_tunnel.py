@@ -1283,9 +1283,10 @@ def add_tunnel(params):
     loop0_ip = ''
     remote_loop0_ip = None
 
-    encryption_mode = params.get("encryption-mode", "psk")
-
-    if 'loopback-iface' in params:
+    if 'peer' in params:
+        _add_peer(cmd_list, params)
+    else:
+        encryption_mode         = params.get("encryption-mode", "psk")
         loop0_ip                = params['loopback-iface']['addr']
         remote_loop0_ip         = fwutils.build_tunnel_remote_loopback_ip(loop0_ip)       # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
 
@@ -1319,9 +1320,6 @@ def add_tunnel(params):
                                 }
         cmd_list.append(cmd)
 
-    if 'peer' in params:
-        _add_peer(cmd_list, params)
-    else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
             bridge_id = params['tunnel-id']*2
