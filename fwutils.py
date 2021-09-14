@@ -4171,7 +4171,7 @@ def check_reinstall_static_routes():
         dev = route.get('dev_id', None)
         exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
 
-        if via in tunnel_addresses and tunnel_addresses[via] == 'down':
+        if tunnel_addresses.get(via) == 'down':
             if exist_in_linux:
                 add_remove_static_route(addr, via, metric, True, dev)
             continue
