@@ -195,7 +195,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     # --------------------------------------------------------------------------
 
     addr = iface_params['addr']
-    mac  = iface_params.get('mac', None)
+    mac  = iface_params.get('mac')
     mtu  = iface_params['mtu']
 
     # ret_attr  - attribute of the object returned by command,
@@ -205,8 +205,7 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     #             of the 'ret_attr' attribute is stored.
     ret_attr = 'sw_if_index'
     mac_bytes = 0
-    if mac:
-        mac_bytes = fwutils.mac_str_to_bytes(mac)
+    mac_bytes = fwutils.mac_str_to_bytes(mac) if mac else 0
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']          = "create_loopback_instance"
