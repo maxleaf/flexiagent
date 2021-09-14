@@ -1456,7 +1456,7 @@ def modify_tunnel(new_params, old_params):
     remote_device_id = str(old_params['ikev2']['remote-device-id'])
     role = old_params['ikev2']['role']
 
-    certificate = new_params['ikev2'].get('certificate', None)
+    certificate = new_params['ikev2'].get('certificate')
     if certificate:
         # Add modify white list
         cmd = {}
