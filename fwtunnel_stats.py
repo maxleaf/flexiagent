@@ -204,7 +204,7 @@ def get_tunnel_info():
         if 'peer' in tunnel:
             ip = str(IPNetwork(tunnel['peer']['addr']).ip)
         else:
-            ip = fwutils.build_remote_loop_ip_address(tunnel['loopback-iface']['addr'])
+            ip = fwutils.build_tunnel_remote_loopback_ip(tunnel['loopback-iface']['addr'])
 
         if tunnel_id in tunnel_stats:
             status = tunnel_stats[tunnel_id]['status']
@@ -231,7 +231,7 @@ def tunnel_stats_add(params):
         loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
         vpp_peer_tunnel_name = tap_map[loopback_name]
     else:
-        hosts_to_ping = [fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])]
+        hosts_to_ping = [fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])]
         loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
 
     stats_entry = dict()

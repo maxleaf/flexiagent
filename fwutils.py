@@ -4423,12 +4423,12 @@ def is_ip(str_to_check):
     except:
         return False
 
-def build_remote_loop_ip_address(addr):
+def build_tunnel_remote_loopback_ip(addr):
     network = IPNetwork(addr)     # 10.100.0.4 / 10.100.0.5
     network.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
     return str(network.ip)
 
-def build_second_loop_ip_address(addr):
+def build_tunnel_second_loopback_ip(addr):
     network = IPNetwork(addr)     # 10.100.0.4/31
     network.value  += IPAddress('0.1.0.0').value        # 10.100.0.4/31 -> 10.101.0.4/31
     return str(network)

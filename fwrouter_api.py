@@ -1068,7 +1068,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         if 'peer' in params:
             via = str(IPNetwork(params['peer']['addr']).ip)
         else:
-            via = fwutils.build_remote_loop_ip_address(params['loopback-iface']['addr'])
+            via = fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])
 
         fwutils.add_remove_static_routes(via, False)
 

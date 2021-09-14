@@ -1179,9 +1179,9 @@ def _add_peer(cmd_list, params):
     auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
     mtu              = params['peer']['mtu']
     addr             = params['peer']['addr']
-    tunnel_addr      = fwutils.build_second_loop_ip_address(addr)
+    tunnel_addr      = fwutils.build_tunnel_second_loopback_ip(addr)
     iface_params     = params['peer']
-    next_hop         = fwutils.build_remote_loop_ip_address(addr)
+    next_hop         = fwutils.build_tunnel_remote_loopback_ip(addr)
     id               = params['tunnel-id']*2
 
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr, id)
@@ -1287,14 +1287,14 @@ def add_tunnel(params):
 
     if 'loopback-iface' in params:
         loop0_ip                = params['loopback-iface']['addr']
-        remote_loop0_ip         = fwutils.build_remote_loop_ip_address(loop0_ip)       # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
+        remote_loop0_ip         = fwutils.build_tunnel_remote_loopback_ip(loop0_ip)       # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
 
         loop0_mac               = EUI(params['loopback-iface']['mac'], dialect=mac_unix_expanded) # 02:00:27:fd:00:04 / 02:00:27:fd:00:05
         remote_loop0_mac        = copy.deepcopy(loop0_mac)
         remote_loop0_mac.value ^= EUI('00:00:00:00:00:01').value    # 02:00:27:fd:00:04 -> 02:00:27:fd:00:05 / 02:00:27:fd:00:05 -> 02:00:27:fd:00:04
 
-        loop1_ip                = fwutils.build_second_loop_ip_address(loop0_ip)    # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
-        remote_loop1_ip         = fwutils.build_remote_loop_ip_address(loop1_ip)    # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
+        loop1_ip                = fwutils.build_tunnel_second_loopback_ip(loop0_ip)    # 10.100.0.4 -> 10.101.0.4 / 10.100.0.5 -> 10.101.0.5
+        remote_loop1_ip         = fwutils.build_tunnel_remote_loopback_ip(loop1_ip)    # 10.101.0.4 -> 10.101.0.5 / 10.101.0.5 -> 10.101.0.4
 
         loop1_mac               = copy.deepcopy(loop0_mac)
         loop1_mac.value        += EUI('00:00:00:01:00:00').value           # 02:00:27:fd:00:04 -> 02:00:27:fe:00:04 / 02:00:27:fd:00:05 -> 02:00:27:fe:00:05
