@@ -4162,16 +4162,7 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
                 return True
     return False
 
-def routes_thread_start():
-    fwglobals.g.static_route_reinstall_thread_start = False
-
-def routes_thread_stop():
-    fwglobals.g.static_route_reinstall_thread_start = True
-
 def check_reinstall_static_routes():
-    if fwglobals.g.static_route_reinstall_thread_start:
-        return
-
     routes_db = fwglobals.g.router_cfg.get_routes()
     routes_linux = linux_get_routes()
     tunnel_addresses = fwtunnel_stats.get_tunnel_info()
