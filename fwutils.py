@@ -299,9 +299,6 @@ def get_tunnel_gateway(dst, dev_id):
     gw_ip, _ = get_interface_gateway('', if_dev_id=dev_id)
     return ipaddress.ip_address(gw_ip) if gw_ip else ipaddress.ip_address('0.0.0.0')
 
-def get_tunnel_gateway_str(dst, dev_id):
-    return str(get_tunnel_gateway(dst, dev_id))
-
 def is_interface_assigned_to_vpp(dev_id):
     """ Check if dev_id is assigned to vpp.
     This function could be called even deamon doesn't run.
@@ -1050,7 +1047,7 @@ def vpp_get_tap_mapping():
 
      :returns: tap info in list
      """
-    vpp_if_name_to_vpp_if_name = {}
+    vpp_loopback_name_to_tunnel_name = {}
     if not vpp_does_run():
         fwglobals.log.debug("vpp_get_tap_mapping: VPP is not running")
         return {}
@@ -1067,9 +1064,9 @@ def vpp_get_tap_mapping():
         if tap_info:
             vpp_if_name_dst = tap_info.group(1)
             vpp_if_name_src = tap_info.group(2)
-            vpp_if_name_to_vpp_if_name[vpp_if_name_dst] = vpp_if_name_src
+            vpp_loopback_name_to_tunnel_name[vpp_if_name_dst] = vpp_if_name_src
 
-    return vpp_if_name_to_vpp_if_name
+    return vpp_loopback_name_to_tunnel_name
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
