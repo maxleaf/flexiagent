@@ -1425,7 +1425,7 @@ def add_tunnel(params):
     }
     cmd_list.append(cmd)
 
-    policy_interface_cache_key = 'ipip_tunnel_sw_if_index' if 'peer' in params else 'loop0_sw_if_index'
+    tunnel_interface_cache_key = 'ipip_tunnel_sw_if_index' if 'peer' in params else 'loop0_sw_if_index'
 
     cmd = {}
     cmd['cmd'] = {}
@@ -1435,7 +1435,7 @@ def add_tunnel(params):
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_add_tunnel_after',
                     'args'  : {'params':params},
-                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':policy_interface_cache_key} ]
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_interface_cache_key} ]
     }
     cmd['revert'] = {}
     cmd['revert']['name']   = "python"
@@ -1444,7 +1444,7 @@ def add_tunnel(params):
                     'object': 'fwglobals.g.router_api',
                     'func'  : '_on_remove_tunnel_before',
                     'args'  : {'params':params},
-                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':policy_interface_cache_key} ]
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':tunnel_interface_cache_key} ]
     }
     cmd_list.append(cmd)
 

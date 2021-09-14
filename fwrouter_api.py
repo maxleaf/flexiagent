@@ -1050,7 +1050,7 @@ class FWROUTER_API(FwCfgRequestHandler):
     def _on_add_tunnel_after(self, sw_if_index, params):
         """add-tunnel postprocessing
 
-        :param sw_if_index: VPP sw_if_index of the tunnel loopback interface
+        :param sw_if_index: VPP sw_if_index of the tunnel interface
         :param params:      Parameters from Fleximanage.
         """
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', True)
@@ -1059,7 +1059,7 @@ class FWROUTER_API(FwCfgRequestHandler):
     def _on_remove_tunnel_before(self, sw_if_index, params):
         """remove-tunnel preprocessing
 
-        :param sw_if_index: VPP sw_if_index of the tunnel loopback interface
+        :param sw_if_index: VPP sw_if_index of the tunnel interface
         :param params:      Parameters from Fleximanage.
         """
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
