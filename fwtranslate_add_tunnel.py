@@ -1166,21 +1166,22 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
 
 
 
-def _add_peer(cmd_list, params, tunnel_cache_key, peer_loopback_cache_key):
+def _add_peer(cmd_list, params):
     """Add tunnel for a peer.
 
     :param cmd_list:            List of commands.
     :param params:              Parameters from flexiManage.
-    :param tunnel_cache_key:    Tunnel cache key.
 
     :returns: None.
     """
+    tunnel_cache_key = 'ipip_tunnel_sw_if_index'
+    peer_loopback_cache_key = 'peer_loopback_sw_if_index'
     auth_method      = 2 # IKEV2_AUTH_METHOD_SHARED_KEY_MIC
     mtu              = params['peer']['mtu']
     addr             = params['peer']['addr']
     tunnel_addr      = fwutils.build_second_loop_ip_address(addr)
     iface_params     = params['peer']
-    next_hop         = str(IPNetwork(addr).ip ^ IPAddress("0.0.0.1"))
+    next_hop         = fwutils.build_remote_loop_ip_address(addr)
     id               = params['tunnel-id']*2
 
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr, id)
@@ -1319,9 +1320,7 @@ def add_tunnel(params):
         cmd_list.append(cmd)
 
     if 'peer' in params:
-        tunnel_cache_key = 'ipip_tunnel_sw_if_index'
-        peer_loopback_cache_key = 'peer_loopback_sw_if_index'
-        _add_peer(cmd_list, params, tunnel_cache_key, peer_loopback_cache_key)
+        _add_peer(cmd_list, params)
     else:
         if encryption_mode == "none":
             loop0_cfg = {'addr':str(loop0_ip), 'mac':str(loop0_mac), 'mtu': 9000}
