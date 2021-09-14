@@ -1055,7 +1055,7 @@ def vpp_get_tap_mapping():
         fwglobals.log.debug("vpp_get_tap_mapping: VPP is not running")
         return {}
 
-    taps = _vppctl_read("show tap-inject mapping").strip()
+    taps = _vppctl_read("show tap-inject map interface").strip()
     if not taps:
         fwglobals.log.debug("vpp_get_tap_mapping: no TAPs configured")
         return {}
