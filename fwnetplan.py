@@ -394,8 +394,20 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
 
-            # For LTE interface with set-name we need to keep the `set-name` on the physical interface and not for the vppsb (see explanation above)
             if set_name and is_lte:
+                # For LTE interface with set-name we need to keep the `set-name` on the physical interface and not for the vppsb (see explanation above).
+                # The part of LTE in netplan should look like this
+                # vpp3 (vppsb interface):
+                #   addresses: [100.96.96.225/30]
+                #   dhcp4: false
+                #   mtu: 1500
+                #   nameservers:
+                #     addresses: [91.205.152.174, 91.205.152.204]
+                #   routes:
+                #   - {metric: 0, to: 0.0.0.0/0, via: 100.96.96.226}
+                # wwan0 (physical interface)::
+                #   match: {macaddress: '1e:10:c7:a5:5a:c7'}
+                #   set-name: WANLTE
                 del config_section['set-name']
                 del config_section['match'] # set-name requires 'match' property
                 ethernets[ifname] = config_section
@@ -419,7 +431,7 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 ethernets[ifname] = {}
                 ethernets[ifname]['dhcp4'] = False
 
-                # For the LTE interface with set-name,
+                # Explanation about LTE with set-name:
                 # when we want to remove it from netplan, we have here three variables:
                 #    'set_name' which is the new name for the physical interface(WANLTE)
                 #    'ifname' which is the vppsb interface name (vpp1).
