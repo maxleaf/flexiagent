@@ -59,6 +59,24 @@
 ,
 {
   "entity":  "agent",
+  "message": "modify-tunnel",
+    "params": {
+        "tunnel-id": 1,
+        "peer": {
+                "urls": [
+                    "www.google.com"
+                ],
+                "ips": [
+                    "9.9.9.9",
+                    "1.1.1.1",
+                    "8.8.8.8"
+                ]
+        }
+    }
+}
+,
+{
+  "entity":  "agent",
   "message": "remove-tunnel",
   "params": { "tunnel-id": 1 }
 }

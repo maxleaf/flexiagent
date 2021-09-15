@@ -1446,7 +1446,59 @@ def add_tunnel(params):
 
     return cmd_list
 
+def modify_peer_tunnel(new_params, old_params):
+    cmd_list = []
+    ips = new_params['peer'].get('ips')
+    urls = new_params['peer'].get('urls')
+
+    if not ips and not urls:
+        return []
+
+    whitelist = set()
+    if urls:
+        old_params['peer']['urls'] = urls
+        whitelist.add('urls')
+
+    if ips:
+        old_params['peer']['ips'] = ips
+        whitelist.add('ips')
+
+    # Modify whitelist
+    cmd = {}
+    cmd['modify'] = 'modify'
+    cmd['whitelist'] = whitelist
+    cmd_list.append(cmd)
+
+    # Remove tunnel statistics entry for this tunnel
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['descr']  = "tunnel stats remove"
+    cmd['cmd']['params'] = {
+                    'module': 'fwtunnel_stats',
+                    'func'  : 'tunnel_stats_remove',
+                    'args'  : { 'tunnel_id': old_params['tunnel-id']}
+    }
+    cmd_list.append(cmd)
+
+    # Add tunnel statistics entry for this tunnel
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "tunnel stats add"
+    cmd['cmd']['params']  = {
+                    'module': 'fwtunnel_stats',
+                    'func'  : 'tunnel_stats_add',
+                    'args'  : {'params': old_params}
+    }
+    cmd_list.append(cmd)
+
+    return cmd_list
+
 def modify_tunnel(new_params, old_params):
+    if 'peer' in new_params:
+        return modify_peer_tunnel(new_params, old_params)
+
     cmd_list = []
 
     remote_device_id = str(old_params['ikev2']['remote-device-id'])
