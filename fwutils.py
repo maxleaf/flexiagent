@@ -1162,21 +1162,6 @@ def vpp_sw_if_index_to_name(sw_if_index):
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
-def vpp_get_interface_state(sw_if_index):
-    """Get VPP interface state.
-
-     :param sw_if_index:      VPP sw_if_index.
-
-     :returns: State flags.
-     """
-    flags = 0
-    try:
-        flags = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)[0].flags
-    except Exception as e:
-        fwglobals.log.debug("vpp_get_interface_state: %s" % str(e))
-
-    return flags
-
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
 # To do that we dump all interfaces from VPP, find the one with the provided index,
