@@ -1162,21 +1162,6 @@ def vpp_sw_if_index_to_name(sw_if_index):
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
-def vpp_name_to_sw_if_index(name):
-    """Convert VPP sw_if_index into VPP interface name.
-
-     :param sw_if_index:      VPP sw_if_index.
-
-     :returns: VPP interface name.
-     """
-    sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump()
-    for sw_if in sw_interfaces:
-        if re.match(name, sw_if.interface_name):    # Use regex, as sw_if.interface_name might include trailing whitespaces
-            return sw_if.sw_if_index
-
-    fwglobals.log.debug(f"vpp_name_to_sw_if_index({name}): not found")
-    return None
-
 def vpp_get_interface_state(sw_if_index):
     """Get VPP interface state.
 
