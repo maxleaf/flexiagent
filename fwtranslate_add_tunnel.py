@@ -204,7 +204,6 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     # cache_key - key in cache, where the value
     #             of the 'ret_attr' attribute is stored.
     ret_attr = 'sw_if_index'
-    mac_bytes = 0
     mac_bytes = fwutils.mac_str_to_bytes(mac) if mac else 0
     cmd = {}
     cmd['cmd'] = {}
