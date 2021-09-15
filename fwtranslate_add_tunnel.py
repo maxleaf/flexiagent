@@ -1188,26 +1188,27 @@ def _add_peer(cmd_list, params):
     loopback_params = {'addr':addr, 'mtu': mtu}
     _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, id=id)
 
+    substs = [ {'replace':'DEV1-STUB', 'key': 'cmds', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':peer_loopback_cache_key},
+               {'replace':'DEV2-STUB', 'key': 'cmds', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':tunnel_cache_key}]
+
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name']    = "python"
     cmd['cmd']['descr']   = "add interface mapping"
     cmd['cmd']['params']  = {
-                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
-                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'substs': substs,
                     'module': 'fwutils',
-                    'func'  : 'vpp_tap_inject_map_interface',
-                    'args'  : {'is_add':1}
+                    'func'  : 'vpp_cli_execute',
+                    'args'  : {'cmds':['tap-inject map interface DEV1-STUB DEV2-STUB']}
     }
     cmd['revert'] = {}
     cmd['revert']['name']    = "python"
     cmd['revert']['descr']   = "remove interface mapping"
     cmd['revert']['params']  = {
-                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
-                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'substs': substs,
                     'module': 'fwutils',
-                    'func'  : 'vpp_tap_inject_map_interface',
-                    'args'  : {'is_add':0}
+                    'func'  : 'vpp_cli_execute',
+                    'args'  : {'cmds':['tap-inject map interface DEV1-STUB DEV2-STUB del']}
     }
     cmd_list.append(cmd)
 
@@ -1216,21 +1217,19 @@ def _add_peer(cmd_list, params):
     cmd['cmd']['name']    = "python"
     cmd['cmd']['descr']   = "add l3xc connection"
     cmd['cmd']['params']  = {
-                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
-                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'substs': substs,
                     'module': 'fwutils',
-                    'func'  : 'vpp_l3xc_connect',
-                    'args'  : {'is_add':1}
+                    'func'  : 'vpp_cli_execute',
+                    'args'  : {'cmds':['l3xc add DEV1-STUB via DEV2-STUB']}
     }
     cmd['revert'] = {}
     cmd['revert']['name']    = "python"
     cmd['revert']['descr']   = "remove l3xc connection"
     cmd['revert']['params']  = {
-                    'substs': [ { 'add_param':'src_sw_if_index', 'val_by_key':peer_loopback_cache_key},
-                                { 'add_param':'dst_sw_if_index', 'val_by_key':tunnel_cache_key} ],
+                    'substs': substs,
                     'module': 'fwutils',
-                    'func'  : 'vpp_l3xc_connect',
-                    'args'  : {'is_add':0}
+                    'func'  : 'vpp_cli_execute',
+                    'args'  : {'cmds':['l3xc del DEV1-STUB via DEV2-STUB']}
     }
     cmd_list.append(cmd)
 
