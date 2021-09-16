@@ -100,6 +100,7 @@ def start_router(params=None):
 
     dev_id_list         = []
     pci_list_vmxnet3 = []
+    assigned_linux_interfaces = []
 
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
@@ -122,6 +123,7 @@ def start_router(params=None):
             # Additional spacial logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
                 continue
+            assigned_linux_interfaces.append(linux_if)
 
             # Mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
@@ -196,6 +198,35 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "backup Linux netplan files"
+    cmd['cmd']['params']  = {
+        'module': 'fwnetplan',
+        'func'  : 'backup_linux_netplan_files'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "restore linux netplan files"
+    cmd['revert']['params']  = {
+        'module': 'fwnetplan',
+        'func'  : 'restore_linux_netplan_files'
+    }
+    cmd_list.append(cmd)
+
+    if assigned_linux_interfaces:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "Unload to-be-VPP interfaces from linux networkd"
+        cmd['cmd']['params']  = {
+            'module': 'fwnetplan',
+            'func'  : 'netplan_unload_vpp_assigned_ports',
+            'args'  : { 'assigned_linux_interfaces' : assigned_linux_interfaces }
+        }
+        cmd_list.append(cmd)
+
     #  Create commands that start vpp and configure it with addresses
     #  sudo systemtctl start vpp
     #  <connect to python bindings of vpp and than run the rest>
@@ -245,23 +276,6 @@ def start_router(params=None):
     cmd['cmd']['name'] = "exec"
     cmd['cmd']['params'] = ["sudo vppctl ip route add 255.255.255.255/32 via punt"]
     cmd['cmd']['descr'] = "punt ip broadcast"
-    cmd_list.append(cmd)
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "backup Linux netplan files"
-    cmd['cmd']['params']  = {
-        'module': 'fwnetplan',
-        'func'  : 'backup_linux_netplan_files'
-    }
-    cmd['revert'] = {}
-    cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "restore linux netplan files"
-    cmd['revert']['params']  = {
-        'module': 'fwnetplan',
-        'func'  : 'restore_linux_netplan_files'
-    }
     cmd_list.append(cmd)
 
     cmd = {}
