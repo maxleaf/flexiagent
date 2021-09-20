@@ -137,7 +137,8 @@ def tunnel_stats_test():
 
         vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
         if vpp_peer_tunnel_name:
-            fwutils.vpp_multilink_update_interface_quality(vpp_peer_tunnel_name, stats['drop_rate'])
+            vppctl_cmd = 'fwabf quality %s loss %u' % (vpp_peer_tunnel_name, stats['drop_rate'])
+            fwutils.vpp_cli_execute([vppctl_cmd])
 
         if (stats['sent'] == WINDOW_SIZE):
             stats['sent'] = 0

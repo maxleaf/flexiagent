@@ -2096,33 +2096,21 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
-def vpp_multilink_update_interface_quality(int_name, loss):
-    """Update interface quality in VPP FWABF plugin.
-
-    :param int_name:  The name of the interface in VPP
-    :param loss:      Loss in percents
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-
-    vppctl_cmd = 'fwabf quality %s loss %u' % (int_name, loss)
-
-    out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None or re.search('unknown|failed|ret=-', out):
-        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
-
-    return (True, None)
-
-def vpp_cli_execute(cmds):
+def vpp_cli_execute(cmds, debug = False):
     """Map interfaces inside tap-inject plugin.
 
     :param cmds:     List of VPP CLI commands
+    :param debug:    Print command to be executed
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
+    if not isinstance(cmds, list):
+        return (False, "Expect list of commands")
+
     for cmd in cmds:
-        fwglobals.log.debug(cmd)
+        if debug:
+            fwglobals.log.debug(cmd)
 
         out = _vppctl_read(cmd, wait=False)
         if out is None or re.search('unknown|failed|ret=-', out):
