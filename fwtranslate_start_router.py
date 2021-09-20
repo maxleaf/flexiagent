@@ -313,39 +313,6 @@ def start_router(params=None):
     cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'frr_setup_config'}
     cmd_list.append(cmd)
 
-    # We set up the redistribution filter now. We don't want to set it on every add_route translation.
-    # At this time, the filter list will be empty, so no kernel route will be redistributed.
-    # When we need to redistribute a static route, we'll add it to the filter list.
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-            'module': 'fwutils',
-            'func':   'frr_create_redistribution_filter',
-            'args': {
-                'router': 'router ospf',
-                'acl': fwglobals.g.FRR_OSPF_ACL,
-                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
-                'route_map_num': '1', # 1 is for OSPF
-            }
-    }
-    cmd['cmd']['descr']   =  "add ospf redistribution filter"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-            'module': 'fwutils',
-            'func':   'frr_create_redistribution_filter',
-            'args': {
-                'router': 'router ospf',
-                'acl': fwglobals.g.FRR_OSPF_ACL,
-                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
-                'route_map_num': '1', # 1 is for OSPF
-                'revert': True
-            }
-    }
-    cmd['revert']['descr']   =  "remove ospf redistribution filter"
-    cmd_list.append(cmd)
-
     # Setup Global VPP NAT parameters
     # Post VPP NAT/Firewall changes - The param need to be false
     cmd_list.append(fw_nat_command_helpers.get_nat_forwarding_config(False))
