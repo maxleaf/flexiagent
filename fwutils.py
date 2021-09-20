@@ -2106,6 +2106,7 @@ def vpp_cli_execute(cmds, debug = False):
     """
 
     if not isinstance(cmds, list):
+        fwglobals.log.error("vpp_cli_execute: expect list of commands")
         return (False, "Expect list of commands")
 
     for cmd in cmds:
