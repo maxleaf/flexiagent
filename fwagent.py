@@ -48,7 +48,6 @@ import yaml
 import fwglobals
 import fwikev2
 import fwmultilink
-import fwapplications
 import fwstats
 import fwutils
 import loadsimulator
@@ -867,9 +866,6 @@ def show(agent, configuration, database, status):
         elif database == 'multilink':
             with fwmultilink.FwMultilink(fwglobals.g.MULTILINK_DB_FILE, fill_if_empty=False) as multilink_db:
                 print(multilink_db.dumps())
-        elif database == 'applications':
-            with fwapplications.FwApps(fwglobals.g.APP_REC_DB_FILE) as app_db:
-                print(app_db.dumps())
 
     if status:
         if status == 'daemon':
