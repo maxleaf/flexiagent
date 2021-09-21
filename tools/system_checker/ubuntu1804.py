@@ -47,11 +47,16 @@ class Checker(fwsystem_checker_common.Checker):
         return False
 
     def _start_service(self, service):
-        """Return True if service is started"""
+        """Start and enable service"""
         os.system('/bin/systemctl unmask %s.service > /dev/null 2>&1' % service)
         os.system('/bin/systemctl enable %s.service > /dev/null 2>&1' % service)
         os.system('/bin/systemctl start %s.service > /dev/null 2>&1' % service)
-        return True
+
+    def _stop_service(self, service):
+        """Stop and disable service"""
+        os.system('/bin/systemctl stop %s.service > /dev/null 2>&1' % service)
+        os.system('/bin/systemctl disable %s.service > /dev/null 2>&1' % service)
+        os.system('/bin/systemctl mask %s.service > /dev/null 2>&1' % service)
 
     def soft_check_networkd(self, fix=False, silently=False, prompt=None):
         """Check if networkd is running.
@@ -78,23 +83,47 @@ class Checker(fwsystem_checker_common.Checker):
                 if silently:
                     # Run the daemon if not running
                     if not running:
-                        ret = self._start_service("systemd-networkd")
-                        if not ret:
-                            print(prompt + 'failed to start networkd')
-                            return ret
+                        self._start_service("systemd-networkd")
                     return True
                 else:
                     # Run the daemon if not running
                     if not running:
                         choice = input(prompt + "start networkd? [Y/n]: ")
                         if choice == 'y' or choice == 'Y' or choice == '':
-                            ret = self._start_service("systemd-networkd")
-                            if not ret:
-                                print(prompt + 'failed to start networkd')
-                                return ret
+                            self._start_service("systemd-networkd")
                             return True
                         else:
                             return False
+
+    def soft_check_network_manager(self, fix=False, silently=False, prompt=None):
+            """Check if NetworkManager is not running.
+
+            :param fix:             Stop NetworkManager.
+            :param silently:        Stop silently.
+            :param prompt:          Ask user for prompt.
+
+            :returns: 'True' if NetworkManager is not running, 'False' otherwise.
+            """
+            running = False
+            try:
+                running = self._is_service_active("NetworkManager")
+                if running == True:
+                    raise Exception(prompt + 'NetworkManager is running')
+                else:
+                    return True
+            except Exception as e:
+                print(prompt + str(e))
+                if not fix:
+                    return False
+                else:
+                    # Stop the daemon if running
+                    if running:
+                        if not silently:
+                            choice = input(prompt + "stop NetworkManager? [Y/n]: ")
+                            if choice != 'y' and choice != 'Y' and choice != '':
+                                return False
+                        self._stop_service("NetworkManager")
+                    return True
 
     def soft_check_disable_linux_autoupgrade(self, fix=False, silently=False, prompt=None):
         """Check if Linux autoupgrade is disabled.
