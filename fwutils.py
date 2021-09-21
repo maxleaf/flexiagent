@@ -2147,25 +2147,29 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     if not linux_check_gateway_exist(via):
         return (True, None)
 
-    if not remove:
-        tunnel_addresses = fwtunnel_stats.get_tunnel_info()
-        if via in tunnel_addresses and tunnel_addresses[via] != 'up':
-            return (True, None)
+    routes_linux = linux_get_routes()
+    exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
 
     if remove:
-        routes_linux = linux_get_routes()
-        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
         if not exist_in_linux:
+            return (True, None)
+    else:
+        if exist_in_linux:
+            return (True, None)
+
+        tunnel_addresses = fwtunnel_stats.get_tunnel_info()
+        if via in tunnel_addresses and tunnel_addresses[via] != 'up':
             return (True, None)
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
 
     cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
+    output  = ''
     try:
         output = subprocess.check_output(cmd_show, shell=True).decode()
-    except:
-        return False
+    except Exception as e:
+        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
     next_hop = ''
     if output:
@@ -2186,14 +2190,14 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
         cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
     else:
         if via in next_hop:
-            return False
+            return (False, "%s is in %s" % (via, next_hop))
         if not dev_id:
-            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
+            cmd = "sudo ip route %s %s%s proto static nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
             tap = dev_id_to_tap(dev_id)
             if not tap:
-                return False
-            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
+                return (False, "dev_id_to_tap could not find TAP interface")
+            cmd = "sudo ip route %s %s%s proto static nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
         fwglobals.log.debug(cmd)
@@ -2203,6 +2207,13 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
             fwglobals.log.debug("'%s' failed: %s, ignore this error" % (cmd, str(e)))
             return True
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+
+    # We need to re-apply Netplan configuration here to install default route that
+    # could be removed in the flow before.
+    # This will happen if static default route installed by user is exactly the same like
+    # default route generated based on interface configuration inside Netplan file.
+    if remove:
+        netplan_apply("add_remove_static_route")
 
     return True
 
@@ -4047,20 +4058,22 @@ def dump(filename=None, path=None, clean_log=False):
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 
 class IpRouteProto(enum.Enum):
-   BOOT = 3
+   BOOT = 3,
+   STATIC = 4
 
-def linux_get_routes(proto=IpRouteProto.BOOT.value):
+def linux_get_routes(proto=IpRouteProto.STATIC.value):
     routes_dict = {}
 
     with pyroute2.IPRoute() as ipr:
         routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
+
         for route in routes:
             nexthops = set()
-            dst = None # Some routes have no 'dst' (for example: LTE). Initialize the variable here
+            dst = None # Default routes have no RTA_DST
+            metric = 0
             for attr in route['attrs']:
-                metric = 0
                 if attr[0] == 'RTA_PRIORITY':
-                    metric = attr[1]
+                    metric = int(attr[1])
                 if attr[0] == 'RTA_DST':
                     dst = attr[1]
                 if attr[0] == 'RTA_GATEWAY':
@@ -4070,9 +4083,15 @@ def linux_get_routes(proto=IpRouteProto.BOOT.value):
                         for attr2 in elem['attrs']:
                             if attr2[0] == 'RTA_GATEWAY':
                                 nexthops.add(attr2[1])
-            if not dst:
-                continue
+            if not dst: # Default routes have no RTA_DST
+                dst = "0.0.0.0"
             addr = "%s/%u" % (dst, route['dst_len'])
+
+            # Hide the metric watermarks used for WAN failover from flexiManage.
+            # We need to hide them as soon as we want original routes to be
+            # compared with routes from edge DB.
+            if metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                metric = metric - fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
 
             if metric not in routes_dict:
                 routes_dict[metric] = {addr: copy.copy(nexthops)}
