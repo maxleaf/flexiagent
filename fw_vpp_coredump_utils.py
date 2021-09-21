@@ -29,8 +29,9 @@ import threading
 import shutil
 import datetime
 
-
-FW_VPP_COREDUMP_LOCATION = "/var/crash/"
+FW_VPP_COREDUMP_FOLDER = "/var/crash"
+FW_VPP_COREDUMP_PERMISSIONS = 0o775
+FW_VPP_COREDUMP_LOCATION = FW_VPP_COREDUMP_FOLDER + "/"
 FW_VPP_COREDUMP_START_STR = "core-vpp"
 FW_VPP_COREDUMP_END_STR = "-dump"
 FW_MAX_CORE_RETAIN_LIMIT = 3

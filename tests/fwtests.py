@@ -263,12 +263,15 @@ def vpp_pid():
     return pid
 
 def fwagent_daemon_pid():
-    try:
-        cmd = "ps -ef | egrep 'fwagent.* daemon' | grep -v grep | tr -s ' ' | cut -d ' ' -f2"
-        pid = subprocess.check_output(cmd, shell=True).decode()
-    except:
-        pid = None
-    return pid
+    for p in psutil.process_iter(["pid", "cmdline"]):
+        # {'cmdline': ['python3', '/path-to-fwagent/fwagent.py', 'daemon', '--dont_connect'], 'pid': 8428}
+        if 'daemon' in p.info['cmdline']:
+            for arg in p.info['cmdline']:
+                if 'fwagent' in arg:
+                    return str(p.info['pid'])
+    return None
+
+
 
 def linux_interfaces_count():
     cmd = 'ls -A /sys/class/net | wc -l'
@@ -365,11 +368,11 @@ def wait_vpp_to_start(timeout=1000000):
         return False
 
     # Wait for vpp to be ready to process cli requests
-    res = subprocess.call("sudo vppctl sh version > /dev/null", shell=True)
+    res = subprocess.call("sudo vppctl sh version > /dev/null 2>&1", shell=True)
     while res != 0 and timeout > 0:
         time.sleep(3)
         timeout -= 1
-        res = subprocess.call("sudo vppctl sh version > /dev/null", shell=True)
+        res = subprocess.call("sudo vppctl sh version > /dev/null 2>&1", shell=True)
     if timeout == 0:
         return False
     return True

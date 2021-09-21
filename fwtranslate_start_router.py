@@ -100,6 +100,7 @@ def start_router(params=None):
 
     dev_id_list         = []
     pci_list_vmxnet3 = []
+    assigned_linux_interfaces = []
 
     # Remove interfaces from Linux.
     #   sudo ip link set dev enp0s8 down
@@ -122,6 +123,7 @@ def start_router(params=None):
             # Additional spacial logic for these interfaces is at add_interface translator
             if fwutils.is_non_dpdk_interface(params['dev_id']):
                 continue
+            assigned_linux_interfaces.append(linux_if)
 
             # Mark 'vmxnet3' interfaces as they need special care:
             #   1. They should not appear in /etc/vpp/startup.conf.
@@ -196,6 +198,35 @@ def start_router(params=None):
         }
         cmd_list.append(cmd)
 
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name'] = "python"
+    cmd['cmd']['descr'] = "backup Linux netplan files"
+    cmd['cmd']['params']  = {
+        'module': 'fwnetplan',
+        'func'  : 'backup_linux_netplan_files'
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name'] = "python"
+    cmd['revert']['descr'] = "restore linux netplan files"
+    cmd['revert']['params']  = {
+        'module': 'fwnetplan',
+        'func'  : 'restore_linux_netplan_files'
+    }
+    cmd_list.append(cmd)
+
+    if assigned_linux_interfaces:
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "Unload to-be-VPP interfaces from linux networkd"
+        cmd['cmd']['params']  = {
+            'module': 'fwnetplan',
+            'func'  : 'netplan_unload_vpp_assigned_ports',
+            'args'  : { 'assigned_linux_interfaces' : assigned_linux_interfaces }
+        }
+        cmd_list.append(cmd)
+
     #  Create commands that start vpp and configure it with addresses
     #  sudo systemtctl start vpp
     #  <connect to python bindings of vpp and than run the rest>
@@ -250,23 +281,6 @@ def start_router(params=None):
     cmd = {}
     cmd['cmd'] = {}
     cmd['cmd']['name'] = "python"
-    cmd['cmd']['descr'] = "backup Linux netplan files"
-    cmd['cmd']['params']  = {
-        'module': 'fwnetplan',
-        'func'  : 'backup_linux_netplan_files'
-    }
-    cmd['revert'] = {}
-    cmd['revert']['name'] = "python"
-    cmd['revert']['descr'] = "restore linux netplan files"
-    cmd['revert']['params']  = {
-        'module': 'fwnetplan',
-        'func'  : 'restore_linux_netplan_files'
-    }
-    cmd_list.append(cmd)
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name'] = "python"
     cmd['cmd']['descr'] = "backup DHCP server files"
     cmd['cmd']['params']  = {
         'module': 'fwutils',
@@ -297,39 +311,6 @@ def start_router(params=None):
     cmd['cmd']['name'] = "python"
     cmd['cmd']['descr'] = "Setup FRR configuration"
     cmd['cmd']['params']  = {'module': 'fwutils', 'func' : 'frr_setup_config'}
-    cmd_list.append(cmd)
-
-    # We set up the redistribution filter now. We don't want to set it on every add_route translation.
-    # At this time, the filter list will be empty, so no kernel route will be redistributed.
-    # When we need to redistribute a static route, we'll add it to the filter list.
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']   = "python"
-    cmd['cmd']['params'] = {
-            'module': 'fwutils',
-            'func':   'frr_create_redistribution_filter',
-            'args': {
-                'router': 'router ospf',
-                'acl': fwglobals.g.FRR_OSPF_ACL,
-                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
-                'route_map_num': '1', # 1 is for OSPF
-            }
-    }
-    cmd['cmd']['descr']   =  "add ospf redistribution filter"
-    cmd['revert'] = {}
-    cmd['revert']['name']   = "python"
-    cmd['revert']['params'] = {
-            'module': 'fwutils',
-            'func':   'frr_create_redistribution_filter',
-            'args': {
-                'router': 'router ospf',
-                'acl': fwglobals.g.FRR_OSPF_ACL,
-                'route_map': fwglobals.g.FRR_OSPF_ROUTE_MAP,
-                'route_map_num': '1', # 1 is for OSPF
-                'revert': True
-            }
-    }
-    cmd['revert']['descr']   =  "remove ospf redistribution filter"
     cmd_list.append(cmd)
 
     # Setup Global VPP NAT parameters

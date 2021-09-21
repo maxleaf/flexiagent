@@ -73,6 +73,7 @@ soft_checkers = [
     { 'soft_check_multiple_interface_definitions': {'severity': 'critical'}},
     { 'soft_check_duplicate_netplan_sections': {'severity': 'critical'}},
     { 'soft_check_default_routes_metric'         : { 'severity': 'critical' }},
+    { 'soft_check_network_manager'    : { 'severity': 'critical' }},
     { 'soft_check_networkd'           : { 'severity': 'critical' }},
     { 'soft_check_utc_timezone'       : { 'severity': 'critical' }},
     { 'soft_check_disable_linux_autoupgrade'     : { 'severity': 'critical' }},
@@ -82,6 +83,7 @@ soft_checkers = [
     { 'soft_check_cpu_power_saving' : { 'severity': 'optional' , 'interactive': 'optional' }},
     { 'soft_check_lte_modem_configured_in_mbim_mode': { 'severity': 'critical' }},
     { 'soft_check_wifi_driver': { 'severity': 'critical' }},
+    { 'soft_check_coredump_settings': { 'severity': 'critical' }},
 ]
 
 class TXT_COLOR:
