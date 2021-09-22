@@ -2040,7 +2040,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
 
     if not add:
         for if_vpp_name in interfaces:
-            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, True)
+            vppctl_cmd = 'fwabf attach ip4 del policy %d priority %d %s' % (int(policy_id), priority, if_vpp_name)
+            vpp_cli_execute([vppctl_cmd])
         fwglobals.g.policies.remove_policy(policy_id)
 
     fallback = 'fallback drop' if re.match(fallback, 'drop') else ''
@@ -2068,31 +2069,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     if add:
         fwglobals.g.policies.add_policy(policy_id, priority)
         for if_vpp_name in interfaces:
-            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, False)
-
-    return (True, None)
-
-def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, remove):
-    """Attach VPP with flexiwan policy rules.
-
-    :param int_name:  The name of the interface in VPP
-    :param policy_id: The policy id (two byte integer)
-    :param priority:  The priority (integer)
-    :param is_ipv6:   True if policy should be applied on IPv6 packets, False otherwise.
-    :param remove:    True to remove rule, False to add.
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-
-    op = 'del' if remove else 'add'
-    ip_version = 'ip6' if is_ipv6 else 'ip4'
-
-    vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
-    fwglobals.log.debug(vppctl_cmd)
-
-    out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None or re.search('unknown|failed|ret=-', out):
-        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+            vppctl_cmd = 'fwabf attach ip4 add policy %d priority %d %s' % (int(policy_id), priority, if_vpp_name)
+            vpp_cli_execute([vppctl_cmd])
 
     return (True, None)
 
@@ -2245,8 +2223,11 @@ def tunnel_change_postprocess(remove, vpp_if_name):
     if len(policies) == 0:
         return
 
+    op = 'del' if remove else 'add'
+
     for policy_id, priority in list(policies.items()):
-        vpp_multilink_attach_policy_rule(vpp_if_name, int(policy_id), priority, 0, remove)
+        vppctl_cmd = 'fwabf attach ip4 %s policy %d priority %d %s' % (op, int(policy_id), priority, vpp_if_name)
+        vpp_cli_execute([vppctl_cmd])
 
 
 # The messages received from flexiManage are not perfect :)
