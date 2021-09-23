@@ -197,11 +197,17 @@ class FwWanMonitor:
             if not route.dev_id:
                 continue
 
+            # Filter out routes installed by user from Fleximanage.
+            #
+            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
+            if interfaces:
+                int_metric = int(interfaces[0].get('metric', 0))
+                if route.metric != int_metric and route.metric != int_metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
+                    continue
             # Filter out routes on interfaces where flexiManage disabled monitoring.
             # Note the 'monitorInternet' flag might not exist (in case of device
             # upgrade). In that case we enable the monitoring.
             #
-            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
             if interfaces and (interfaces[0].get('monitorInternet', True) == False):
                 if not route.dev_id in self.disabled_routes:
                     fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
