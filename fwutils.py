@@ -49,6 +49,8 @@ import threading
 import serial
 import ipaddress
 import pyroute2
+from pyroute2 import IPDB
+ipdb = IPDB()
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwapplications import FwApps
@@ -2114,8 +2116,8 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     if not linux_check_gateway_exist(via):
         return (True, None)
 
-    routes_linux = linux_get_routes()
-    exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+    routes_linux, int_dict = linux_get_routes()
+    exist_in_linux, if_state = linux_routes_dictionary_exist(routes_linux, int_dict, addr, metric, via)
 
     if remove:
         if not exist_in_linux:
@@ -4032,6 +4034,7 @@ class IpRouteProto(enum.Enum):
 
 def linux_get_routes(proto=IpRouteProto.STATIC.value):
     routes_dict = {}
+    int_dict = {}
 
     with pyroute2.IPRoute() as ipr:
         routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
@@ -4041,6 +4044,8 @@ def linux_get_routes(proto=IpRouteProto.STATIC.value):
             dst = None # Default routes have no RTA_DST
             metric = 0
             for attr in route['attrs']:
+                if attr[0] == 'RTA_OIF':
+                    if_name = ipdb.interfaces[attr[1]].ifname
                 if attr[0] == 'RTA_PRIORITY':
                     metric = int(attr[1])
                 if attr[0] == 'RTA_DST':
@@ -4056,18 +4061,22 @@ def linux_get_routes(proto=IpRouteProto.STATIC.value):
                 dst = "0.0.0.0"
             addr = "%s/%u" % (dst, route['dst_len'])
 
+            if if_name not in int_dict:
+                int_dict[if_name] = 'up'
+
             # Hide the metric watermarks used for WAN failover from flexiManage.
             # We need to hide them as soon as we want original routes to be
             # compared with routes from edge DB.
             if metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
                 metric = metric - fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
+                int_dict[if_name] = 'down'
 
             if metric not in routes_dict:
-                routes_dict[metric] = {addr: copy.copy(nexthops)}
-            else:
-                routes_dict[metric][addr] = copy.copy(nexthops)
+                routes_dict[metric] = {}
 
-    return routes_dict
+            routes_dict[metric][addr] = {'nexthops': copy.copy(nexthops), 'if_name': if_name}
+
+    return routes_dict, int_dict
 
 def linux_check_gateway_exist(gw):
     interfaces = psutil.net_if_addrs()
@@ -4082,17 +4091,17 @@ def linux_check_gateway_exist(gw):
 
     return False
 
-def linux_routes_dictionary_exist(routes, addr, metric, via):
+def linux_routes_dictionary_exist(routes, int_dict, addr, metric, via):
     metric = int(metric) if metric else 0
     if metric in list(routes.keys()):
         if addr in list(routes[metric].keys()):
-            if via in routes[metric][addr]:
-                return True
-    return False
+            if via in routes[metric][addr]['nexthops']:
+                return (True, int_dict[routes[metric][addr]['if_name']])
+    return (False, None)
 
 def check_reinstall_static_routes():
     routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_get_routes()
+    routes_linux, int_dict = linux_get_routes()
     tunnel_addresses = fwtunnel_stats.get_tunnel_info()
 
     for route in routes_db:
@@ -4100,19 +4109,22 @@ def check_reinstall_static_routes():
         via = route['via']
         metric = str(route.get('metric', '0'))
         dev = route.get('dev_id', None)
-        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+        exist_in_linux, if_state = linux_routes_dictionary_exist(routes_linux, int_dict, addr, metric, via)
 
         if tunnel_addresses.get(via) == 'down':
             if exist_in_linux:
                 add_remove_static_route(addr, via, metric, True, dev)
             continue
 
-        if not exist_in_linux:
+        if exist_in_linux and if_state == 'down':
+            add_remove_static_route(addr, via, metric, True, dev)
+            continue
+
+        if not exist_in_linux and if_state == 'up':
             add_remove_static_route(addr, via, metric, False, dev)
 
 def add_remove_static_routes(via, is_add):
     routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_get_routes()
 
     for route in routes_db:
         if route['via'] != via:
