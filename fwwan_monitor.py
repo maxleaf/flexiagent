@@ -307,7 +307,7 @@ class FwWanMonitor:
         # and not relay on 'netplan apply', as in last case VPPSB does not handle
         # properly kernel NETLINK messsages and does not update VPP FIB.
         #
-        success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, new_metric)
+        success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, route.metric, new_metric)
         if not success:
             route.ok = prev_ok
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
@@ -368,7 +368,7 @@ class FwWanMonitor:
                 if not success:
                     route.ok = prev_ok
                     fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                    fwutils.update_linux_metric(route.prefix, dev, route.metric)
+                    fwutils.update_linux_metric(route.prefix, dev, route.metric, route.metric)
                     return
             except Exception as e:
                 fwglobals.log.error("_update_metric failed: %s" % str(e))

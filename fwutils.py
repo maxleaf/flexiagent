@@ -3763,11 +3763,11 @@ def set_linux_socket_max_receive_buffer_size(value = 1024000):
     else:
         fwglobals.log.debug("Set maximum socket receive buffer size command successfully executed: %s" % (sys_cmd))
 
-def update_linux_metric(prefix, dev, metric):
+def update_linux_metric(prefix, dev, old_metric, metric):
     """Invokes 'ip route' commands to update metric on the provide device.
     """
     try:
-        cmd = "ip route show exact %s dev %s" % (prefix, dev)
+        cmd = "ip route show exact %s dev %s metric %u" % (prefix, dev, old_metric)
         os_route = subprocess.check_output(cmd, shell=True).decode().strip()
         if not os_route:
             raise Exception("'%s' returned nothing" % cmd)
