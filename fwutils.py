@@ -3976,13 +3976,14 @@ def linux_get_routes(proto=IpRouteProto.BOOT.value):
 
     with pyroute2.IPRoute() as ipr:
         routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
+
         for route in routes:
             nexthops = set()
-            dst = None # Some routes have no 'dst' (for example: LTE). Initialize the variable here
+            dst = None # Default routes have no RTA_DST
+            metric = 0
             for attr in route['attrs']:
-                metric = 0
                 if attr[0] == 'RTA_PRIORITY':
-                    metric = attr[1]
+                    metric = int(attr[1])
                 if attr[0] == 'RTA_DST':
                     dst = attr[1]
                 if attr[0] == 'RTA_GATEWAY':
@@ -3992,8 +3993,8 @@ def linux_get_routes(proto=IpRouteProto.BOOT.value):
                         for attr2 in elem['attrs']:
                             if attr2[0] == 'RTA_GATEWAY':
                                 nexthops.add(attr2[1])
-            if not dst:
-                continue
+            if not dst: # Default routes have no RTA_DST
+                dst = "0.0.0.0"
             addr = "%s/%u" % (dst, route['dst_len'])
 
             if metric not in routes_dict:
