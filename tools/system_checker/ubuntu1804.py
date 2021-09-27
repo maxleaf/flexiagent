@@ -38,7 +38,7 @@ class Checker(fwsystem_checker_common.Checker):
     def _is_service_active(self, service):
         """Return True if service is running"""
         cmd = '/bin/systemctl status %s.service' % service
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         lines = proc.communicate()[0].decode().split('\n')
         for line in lines:
             if 'Active:' in line:
@@ -123,6 +123,8 @@ class Checker(fwsystem_checker_common.Checker):
                             if choice != 'y' and choice != 'Y' and choice != '':
                                 return False
                         self._stop_service("NetworkManager")
+                        self._stop_service("NetworkManager-dispatcher")
+                        self._stop_service("NetworkManager-wait-online")
                     return True
 
     def soft_check_disable_linux_autoupgrade(self, fix=False, silently=False, prompt=None):
