@@ -2081,27 +2081,15 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     if not linux_check_gateway_exist(via):
         return (True, None)
 
+    routes_linux = linux_get_routes()
+    next_hop = ''
+    if metric in list(routes_linux.keys()):
+        if addr in list(routes_linux[metric].keys()):
+            for gw in routes_linux[metric][addr]:
+                next_hop += ' nexthop via ' + gw
+
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
-
-    cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
-    try:
-        output = subprocess.check_output(cmd_show, shell=True).decode()
-    except:
-        return False
-
-    next_hop = ''
-    if output:
-        removed = False
-        lines   = output.splitlines()
-        for line in lines:
-            words = line.split('via ')
-            if len(words) > 1:
-                if remove and not removed and re.search(via, words[1]):
-                    removed = True
-                    continue
-
-                next_hop += ' nexthop via ' + words[1]
 
     if remove:
         if not next_hop:
@@ -2111,12 +2099,12 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
         if via in next_hop:
             return False
         if not dev_id:
-            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
+            cmd = "sudo ip route %s %s%s proto static nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
             tap = dev_id_to_tap(dev_id)
             if not tap:
                 return False
-            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
+            cmd = "sudo ip route %s %s%s proto static nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
         fwglobals.log.debug(cmd)
@@ -3969,9 +3957,10 @@ def dump(filename=None, path=None, clean_log=False):
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 
 class IpRouteProto(enum.Enum):
-   BOOT = 3
+   BOOT = 3,
+   STATIC = 4
 
-def linux_get_routes(proto=IpRouteProto.BOOT.value):
+def linux_get_routes(proto=IpRouteProto.STATIC.value):
     routes_dict = {}
 
     with pyroute2.IPRoute() as ipr:
