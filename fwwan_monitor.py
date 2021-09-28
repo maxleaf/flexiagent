@@ -37,23 +37,23 @@ class FwWanRoute:
     """The object that represents routing rule found in OS.
     In addition it keeps statistics about internet connectivity on this route.
     """
-    def __init__(self, prefix, via, dev, proto=None, metric=0):
+    def __init__(self, prefix, nexthops, proto=None, metric=0):
+        dev             = list(nexthops.values())[0]
         self.prefix     = prefix
-        self.via        = via
         self.dev        = dev
+        self.nexthops   = nexthops
+        self.dev_id     = fwutils.get_interface_dev_id(dev)
+        if self.dev_id:
+            interfaces  = fwglobals.g.router_cfg.get_interfaces(dev_id=self.dev_id)
+        self.intf_type  = interfaces[0]['type'] if interfaces else None
         self.proto      = proto
         self.metric     = metric
-        self.dev_id     = fwutils.get_interface_dev_id(dev)
         self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
         self.ok         = True      # If True there is connectivity to internet
         self.default    = False     # If True the route is the default one - has lowest metric
 
     def __str__(self):
-        route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.dev_id)
-        if self.proto:
-            route += (' proto ' + str(self.proto))
-        if self.metric:
-            route += (' metric ' + str(self.metric))
+        route = '%s' % (self.prefix)
         return route
 
 class FwWanMonitor:
@@ -165,83 +165,71 @@ class FwWanMonitor:
         os_routes  = {}
         min_metric = sys.maxsize
 
-        out = []
-        cmd = 'ip route list match default | grep via'
-        for _ in range(5):
-            try:
-                out = subprocess.check_output(cmd, shell=True).decode().splitlines()
-                break
-            except Exception as e:
-                fwglobals.log.warning("no default routes found: %s" % str(e))
-                time.sleep(1)
+        routes_linux = fwutils.linux_get_routes()
 
-        for line in out:
-            m = self.route_rule_re.match(line)
-            if not m:
-                fwglobals.log.debug("not expected format: '%s'" % line)
-                continue
+        for metric, routes in routes_linux.items():
+            for addr, nexthops in routes.items():
+                if addr != '0.0.0.0/0':
+                    continue
 
-            route = FwWanRoute(prefix=m.group(1), via=m.group(2), dev=m.group(3))
-            if m.group(4) and 'proto ' in m.group(4):
-                route.proto = m.group(4).split('proto ')[1].split(' ')[0]
-            if m.group(4) and 'metric ' in m.group(4):
-                route.metric = int(m.group(4).split('metric ')[1].split(' ')[0])
+                route = FwWanRoute(prefix=addr, nexthops=nexthops)
+                route.proto = 'static'
+                route.metric = metric
 
-            if (route.metric % self.WATERMARK) < min_metric:
-                route.default = True
-                min_metric    = (route.metric % self.WATERMARK)
+                if (route.metric % self.WATERMARK) < min_metric:
+                    route.default = True
+                    min_metric    = (route.metric % self.WATERMARK)
 
-            # Filter out routes on tunnel interfaces.
-            # Tunnels use loopback interfaces that has no physical device, so dev_id should be None.
-            #
-            if not route.dev_id:
-                continue
+                # Filter out routes not on WAN interfaces
+                #
+                if route.intf_type != 'WAN':
+                    continue
 
-            # Filter out routes on interfaces where flexiManage disabled monitoring.
-            # Note the 'monitorInternet' flag might not exist (in case of device
-            # upgrade). In that case we enable the monitoring.
-            #
-            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
-            if interfaces and (interfaces[0].get('monitorInternet', True) == False):
-                if not route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
-                    self.disabled_routes[route.dev_id] = route
-                continue
-            # If monitoring was enabled again, log this.
-            if interfaces and route.dev_id in self.disabled_routes:
-                fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
-                del self.disabled_routes[route.dev_id]
+                # Filter out routes on interfaces where flexiManage disabled monitoring.
+                # Note the 'monitorInternet' flag might not exist (in case of device
+                # upgrade). In that case we enable the monitoring.
+                #
+                interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
+                if interfaces and (interfaces[0].get('monitorInternet', True) == False):
+                    if not route.dev_id in self.disabled_routes:
+                        fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
+                        self.disabled_routes[route.dev_id] = route
+                    continue
+                # If monitoring was enabled again, log this.
+                if interfaces and route.dev_id in self.disabled_routes:
+                    fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
+                    del self.disabled_routes[route.dev_id]
 
-            # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
-            #
-            if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
-                if not route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
-                    self.disabled_routes[route.dev_id] = route
-                continue
-            # If interface was assigned again, log this.
-            if not interfaces and route.dev_id in self.disabled_routes:
-                fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
-                del self.disabled_routes[route.dev_id]
+                # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
+                #
+                if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
+                    if not route.dev_id in self.disabled_routes:
+                        fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                        self.disabled_routes[route.dev_id] = route
+                    continue
+                # If interface was assigned again, log this.
+                if not interfaces and route.dev_id in self.disabled_routes:
+                    fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                    del self.disabled_routes[route.dev_id]
 
-            # if this route is known to us, update statistics from cache
-            #
-            if route.dev_id in self.routes:
-                cached = self.routes[route.dev_id]
-                route.probes    = cached.probes
-                route.ok        = cached.ok
-                route.default   = cached.default
-            else:
-                fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
+                # if this route is known to us, update statistics from cache
+                #
+                if route.dev_id in self.routes:
+                    cached = self.routes[route.dev_id]
+                    route.probes    = cached.probes
+                    route.ok        = cached.ok
+                    route.default   = cached.default
+                else:
+                    fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
 
-            # Finally store the route into cache.
-            #
-            self.routes[route.dev_id] = route
+                # Finally store the route into cache.
+                #
+                self.routes[route.dev_id] = route
 
-            # Record keys of routes fetched from OS.
-            # We will use them a bit later to remove stale routes from cache.
-            #
-            os_routes[route.dev_id] = None
+                # Record keys of routes fetched from OS.
+                # We will use them a bit later to remove stale routes from cache.
+                #
+                os_routes[route.dev_id] = None
 
         # Remove stale routes from cache
         #

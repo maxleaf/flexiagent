@@ -2087,7 +2087,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     next_hop = ''
     if metric in list(routes_linux.keys()):
         if addr in list(routes_linux[metric].keys()):
-            for gw in routes_linux[metric][addr]['nexthops']:
+            for gw in routes_linux[metric][addr].keys():
                 next_hop += ' nexthop via ' + gw
 
     metric = ' metric %s' % metric if metric else ' metric 0'
@@ -3969,31 +3969,36 @@ def linux_get_routes(proto=IpRouteProto.STATIC.value):
         routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
 
         for route in routes:
-            nexthops = set()
+            nexthops = {}
             dst = None # Default routes have no RTA_DST
             metric = 0
+            gw = None
             for attr in route['attrs']:
                 if attr[0] == 'RTA_PRIORITY':
                     metric = int(attr[1])
                 if attr[0] == 'RTA_OIF':
-                    if_name = ipdb.interfaces[attr[1]].ifname
+                    dev = ipdb.interfaces[attr[1]].ifname
                 if attr[0] == 'RTA_DST':
                     dst = attr[1]
                 if attr[0] == 'RTA_GATEWAY':
-                    nexthops.add(attr[1])
+                    gw = attr[1]
                 if attr[0] == 'RTA_MULTIPATH':
                     for elem in attr[1]:
+                        dev = ipdb.interfaces[elem['oif']].ifname
                         for attr2 in elem['attrs']:
                             if attr2[0] == 'RTA_GATEWAY':
-                                nexthops.add(attr2[1])
+                                nexthops[attr2[1]] = dev
             if not dst: # Default routes have no RTA_DST
                 dst = "0.0.0.0"
             addr = "%s/%u" % (dst, route['dst_len'])
 
+            if gw:
+                nexthops[gw] = dev
+
             if metric not in routes_dict:
                 routes_dict[metric] = {}
 
-            routes_dict[metric][addr] = {'nexthops': copy.copy(nexthops), 'if_name': if_name}
+            routes_dict[metric][addr] = nexthops
 
 
     return routes_dict
@@ -4014,7 +4019,7 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric)
     if metric in list(routes.keys()):
         if addr in list(routes[metric].keys()):
-            if via in routes[metric][addr]['nexthops']:
+            if via in routes[metric][addr].keys():
                 return True
     return False
 
