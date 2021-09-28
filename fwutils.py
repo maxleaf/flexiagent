@@ -4028,6 +4028,14 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
         if addr in list(routes[metric].keys()):
             if via in routes[metric][addr].keys():
                 return True
+
+    # Check if this route exist but with metric changed by WAN_MONITOR
+    #
+    metric = metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
+    if metric in list(routes.keys()):
+        if addr in list(routes[metric].keys()):
+            if via in routes[metric][addr].keys():
+                return True
     return False
 
 def check_reinstall_static_routes():
