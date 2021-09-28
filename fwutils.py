@@ -2089,6 +2089,11 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     if not remove and exist_in_linux:
         return (True, None)
 
+    # If default route is exactly the same like route installed from Netplan file
+    # do not remove it.
+    if remove and addr == '0.0.0.0/0' and is_default_route(via, metric):
+        return (True, None)
+
     next_hop = ''
     if metric in list(routes_linux.keys()):
         if addr in list(routes_linux[metric].keys()):
@@ -4057,6 +4062,24 @@ def check_reinstall_static_routes():
 
         if not exist_in_linux:
             add_remove_static_route(addr, via, metric, False, dev)
+
+def is_default_route(via, metric):
+    """Check if default route is the same like route
+        generated from interface configuration.
+
+    :param via:        Gateway address
+    :param metric:     Metric
+
+    :returns: True/False
+    """
+    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
+    for wan in wan_list:
+        gateway = wan.get('gateway')
+        int_metric = int(wan.get('metric'))
+        if gateway == via and metric == int_metric:
+            return True
+
+    return False
 
 def exec_with_timeout(cmd, timeout=60):
     """Run bash command with timeout option
