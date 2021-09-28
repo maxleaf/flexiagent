@@ -2088,6 +2088,8 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     if metric in list(routes_linux.keys()):
         if addr in list(routes_linux[metric].keys()):
             for gw in routes_linux[metric][addr].keys():
+                if remove and via == gw:
+                    continue
                 next_hop += ' nexthop via ' + gw
 
     metric = ' metric %s' % metric if metric else ' metric 0'
