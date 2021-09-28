@@ -2084,6 +2084,11 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
         return (True, None)
 
     routes_linux = linux_get_routes()
+    exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+
+    if not remove and exist_in_linux:
+        return (True, None)
+
     next_hop = ''
     if metric in list(routes_linux.keys()):
         if addr in list(routes_linux[metric].keys()):
