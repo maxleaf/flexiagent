@@ -49,6 +49,8 @@ import threading
 import serial
 import ipaddress
 import pyroute2
+from pyroute2 import IPDB
+ipdb = IPDB()
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwrouter_cfg   import FwRouterCfg
@@ -2085,7 +2087,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     next_hop = ''
     if metric in list(routes_linux.keys()):
         if addr in list(routes_linux[metric].keys()):
-            for gw in routes_linux[metric][addr]:
+            for gw in routes_linux[metric][addr]['nexthops']:
                 next_hop += ' nexthop via ' + gw
 
     metric = ' metric %s' % metric if metric else ' metric 0'
@@ -3973,6 +3975,8 @@ def linux_get_routes(proto=IpRouteProto.STATIC.value):
             for attr in route['attrs']:
                 if attr[0] == 'RTA_PRIORITY':
                     metric = int(attr[1])
+                if attr[0] == 'RTA_OIF':
+                    if_name = ipdb.interfaces[attr[1]].ifname
                 if attr[0] == 'RTA_DST':
                     dst = attr[1]
                 if attr[0] == 'RTA_GATEWAY':
@@ -3987,9 +3991,10 @@ def linux_get_routes(proto=IpRouteProto.STATIC.value):
             addr = "%s/%u" % (dst, route['dst_len'])
 
             if metric not in routes_dict:
-                routes_dict[metric] = {addr: copy.copy(nexthops)}
-            else:
-                routes_dict[metric][addr] = copy.copy(nexthops)
+                routes_dict[metric] = {}
+
+            routes_dict[metric][addr] = {'nexthops': copy.copy(nexthops), 'if_name': if_name}
+
 
     return routes_dict
 
@@ -4009,7 +4014,7 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric)
     if metric in list(routes.keys()):
         if addr in list(routes[metric].keys()):
-            if via in routes[metric][addr]:
+            if via in routes[metric][addr]['nexthops']:
                 return True
     return False
 
