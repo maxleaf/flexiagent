@@ -53,7 +53,11 @@ class FwWanRoute:
         self.default    = False     # If True the route is the default one - has lowest metric
 
     def __str__(self):
-        route = '%s' % (self.prefix)
+        route = '%s, nexthops: %s,' % (self.prefix, str(self.nexthops))
+        if self.proto:
+            route += (' proto ' + str(self.proto))
+        if self.metric:
+            route += (', metric ' + str(self.metric))
         return route
 
 class FwWanMonitor:
