@@ -38,18 +38,18 @@ class FwWanRoute:
     In addition it keeps statistics about internet connectivity on this route.
     """
     def _find_wan_dev(self, nexthops):
-        for dev in nexthops.values():
+        for via, dev in nexthops.items():
             dev_id = fwutils.get_interface_dev_id(dev)
             interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
             type = interfaces[0]['type'] if interfaces else None
             if type == 'WAN':
-                return (dev, dev_id)
-        return (None, None)
+                return (dev, dev_id, via)
+        return (None, None, None)
 
     def __init__(self, prefix, nexthops, proto=None, metric=0):
         self.prefix     = prefix
         self.nexthops   = nexthops
-        self.dev, self.dev_id = self._find_wan_dev(nexthops)
+        self.dev, self.dev_id, self.via = self._find_wan_dev(nexthops)
         self.proto      = proto
         self.metric     = metric
         self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
@@ -300,7 +300,7 @@ class FwWanMonitor:
         # and not relay on 'netplan apply', as in last case VPPSB does not handle
         # properly kernel NETLINK messsages and does not update VPP FIB.
         #
-        success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, new_metric)
+        success, err_str = fwutils.update_linux_metric(route.prefix, route.metric, route.via, new_metric)
         if not success:
             route.ok = prev_ok
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
@@ -361,7 +361,7 @@ class FwWanMonitor:
                 if not success:
                     route.ok = prev_ok
                     fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                    fwutils.update_linux_metric(route.prefix, dev, route.metric)
+                    fwutils.update_linux_metric(route.prefix, route.metric, route.via, route.metric)
                     return
             except Exception as e:
                 fwglobals.log.error("_update_metric failed: %s" % str(e))

@@ -68,7 +68,8 @@ def add_route(params):
                                     'via'   : params['via'],
                                     'metric': params.get('metric'),
                                     'remove': False,
-                                    'dev_id': params.get('dev_id')
+                                    'dev_id': params.get('dev_id'),
+                                    'ui'    : True
                                 }
                               }
     cmd['revert'] = {}
@@ -82,7 +83,8 @@ def add_route(params):
                                     'via'   : params['via'],
                                     'metric': params.get('metric'),
                                     'remove': True,
-                                    'dev_id': params.get('dev_id')
+                                    'dev_id': params.get('dev_id'),
+                                    'ui'    : True
                                 }
                               }
     cmd_list.append(cmd)

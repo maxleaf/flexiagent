@@ -2066,7 +2066,7 @@ def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, rem
 
     return (True, None)
 
-def add_remove_static_route(addr, via, metric, remove, dev_id=None):
+def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     """Add/Remove static route.
 
     :param addr:            Destination network.
@@ -2091,7 +2091,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
 
     # If default route is exactly the same like route installed from Netplan file
     # do not remove it.
-    if remove and addr == '0.0.0.0/0' and is_default_route(via, metric):
+    if ui and remove and addr == '0.0.0.0/0' and is_default_route(via, metric):
         return (True, None)
 
     next_hop = ''
@@ -2111,13 +2111,13 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
         cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
     else:
         if via in next_hop:
-            return False
+            return (False, "via in next_hop")
         if not dev_id:
             cmd = "sudo ip route %s %s%s proto static nexthop via %s %s" % (op, addr, metric, via, next_hop)
         else:
             tap = dev_id_to_tap(dev_id)
             if not tap:
-                return False
+                return (False, "Not tap")
             cmd = "sudo ip route %s %s%s proto static nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
 
     try:
@@ -2126,10 +2126,10 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     except Exception as e:
         if op == 'del':
             fwglobals.log.debug("'%s' failed: %s, ignore this error" % (cmd, str(e)))
-            return True
+            return (True, None)
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
-    return True
+    return (True, None)
 
 def vpp_set_dhcp_detect(dev_id, remove):
     """Enable/disable DHCP detect feature.
@@ -3707,32 +3707,21 @@ def set_linux_socket_max_receive_buffer_size(value = 1024000):
     else:
         fwglobals.log.debug("Set maximum socket receive buffer size command successfully executed: %s" % (sys_cmd))
 
-def update_linux_metric(prefix, dev, metric):
-    """Invokes 'ip route' commands to update metric on the provide device.
+def update_linux_metric(prefix, metric, via, new_metric):
+    """ Removes route and adds it back with a new metric.
     """
-    try:
-        cmd = "ip route show exact %s dev %s" % (prefix, dev)
-        os_route = subprocess.check_output(cmd, shell=True).decode().strip()
-        if not os_route:
-            raise Exception("'%s' returned nothing" % cmd)
-        cmd = "ip route del " + os_route
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            raise Exception("'%s' failed" % cmd)
-        if 'metric ' in os_route:  # Replace metric in os route string
-            os_route = re.sub('metric [0-9]+', 'metric %d' % metric, os_route)
-        else:
-            os_route += ' metric %d' % metric
-        cmd = "ip route add " + os_route
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            raise Exception("'%s' failed" % cmd)
-        return (True, None)
-    except Exception as e:
-        return (False, str(e))
+    success, err_str = add_remove_static_route(prefix, via, metric, True)
+    if not success:
+        return (False, err_str)
+
+    success, err_str = add_remove_static_route(prefix, via, new_metric, False)
+    if not success:
+        return (False, err_str)
+
+    return (True, None)
 
 def remove_linux_default_route(dev):
-    """Invokes 'ip route del' command to remove default route.
+    """ Invokes 'ip route del' command to remove default route.
     """
     try:
         cmd = "ip route del default dev %s" % dev
