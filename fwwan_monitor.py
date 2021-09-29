@@ -37,15 +37,19 @@ class FwWanRoute:
     """The object that represents routing rule found in OS.
     In addition it keeps statistics about internet connectivity on this route.
     """
+    def _find_wan_dev(self, nexthops):
+        for dev in nexthops.values():
+            dev_id = fwutils.get_interface_dev_id(dev)
+            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+            type = interfaces[0]['type'] if interfaces else None
+            if type == 'WAN':
+                return (dev, dev_id)
+        return (None, None)
+
     def __init__(self, prefix, nexthops, proto=None, metric=0):
-        dev             = list(nexthops.values())[0]
         self.prefix     = prefix
-        self.dev        = dev
         self.nexthops   = nexthops
-        self.dev_id     = fwutils.get_interface_dev_id(dev)
-        if self.dev_id:
-            interfaces  = fwglobals.g.router_cfg.get_interfaces(dev_id=self.dev_id)
-        self.intf_type  = interfaces[0]['type'] if interfaces else None
+        self.dev, self.dev_id = self._find_wan_dev(nexthops)
         self.proto      = proto
         self.metric     = metric
         self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
@@ -186,7 +190,7 @@ class FwWanMonitor:
 
                 # Filter out routes not on WAN interfaces
                 #
-                if route.intf_type != 'WAN':
+                if not route.dev_id:
                     continue
 
                 # Filter out routes on interfaces where flexiManage disabled monitoring.
