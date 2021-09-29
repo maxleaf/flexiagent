@@ -3974,7 +3974,7 @@ class IpRouteProto(enum.Enum):
    BOOT = 3,
    STATIC = 4
 
-def linux_get_routes(proto=IpRouteProto.STATIC.value):
+def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.value):
     routes_dict = {}
 
     with pyroute2.IPRoute() as ipr:
@@ -4007,11 +4007,16 @@ def linux_get_routes(proto=IpRouteProto.STATIC.value):
             if gw:
                 nexthops[gw] = dev
 
+            if preference and metric != preference:
+                continue
+
+            if prefix and addr != prefix:
+                continue
+
             if metric not in routes_dict:
                 routes_dict[metric] = {}
 
             routes_dict[metric][addr] = nexthops
-
 
     return routes_dict
 

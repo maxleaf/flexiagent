@@ -173,13 +173,10 @@ class FwWanMonitor:
         os_routes  = {}
         min_metric = sys.maxsize
 
-        routes_linux = fwutils.linux_get_routes()
+        routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0')
 
         for metric, routes in routes_linux.items():
             for addr, nexthops in routes.items():
-                if addr != '0.0.0.0/0':
-                    continue
-
                 route = FwWanRoute(prefix=addr, nexthops=nexthops)
                 route.proto = 'static'
                 route.metric = metric
