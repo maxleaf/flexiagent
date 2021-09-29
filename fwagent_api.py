@@ -156,12 +156,14 @@ class FWAGENT_API:
         :returns: Dictionary with information and status code.
         """
         try:
+            stats = fwstats.get_stats()
             info = {}
             # Load component versions
             with open(fwglobals.g.VERSIONS_FILE, 'r') as stream:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
             # Load network configuration.
             info['network'] = {}
+            info['stats'] = stats['message'][-1]
             info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
             info['reconfig'] = '' if loadsimulator.g.enabled() else fwutils.get_reconfig_hash()
             if fwglobals.g.ikev2.is_private_key_created():
