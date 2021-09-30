@@ -1021,8 +1021,6 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwutils.clear_linux_interfaces_cache()
 
-        with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
-            db_app_rec.clean()
         with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
             db_multilink.clean()
         with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
