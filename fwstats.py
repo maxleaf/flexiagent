@@ -97,6 +97,12 @@ def update_stats():
                             t_stats = tunnel_stats.get(tunnel_id)
                             if t_stats:
                                 t_stats.update(calc_stats)
+                        elif (intf.startswith('ipip')):
+                            ipip_id = int(intf[4:])
+                            tunnel_id = math.floor(ipip_id/2)
+                            t_stats = tunnel_stats.get(tunnel_id)
+                            if t_stats:
+                                t_stats.update(calc_stats)
                         else:
                             # For other interfaces try to get interface id
                             dev_id = fwutils.vpp_if_name_to_dev_id(intf)
