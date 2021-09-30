@@ -1041,6 +1041,32 @@ def vpp_get_tap_info():
 
     return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
 
+def vpp_get_tap_mapping():
+    """Get tap mapping
+
+     :returns: tap info in list
+     """
+    vpp_loopback_name_to_tunnel_name = {}
+    if not vpp_does_run():
+        fwglobals.log.debug("vpp_get_tap_mapping: VPP is not running")
+        return {}
+
+    taps = _vppctl_read("show tap-inject map interface").strip()
+    if not taps:
+        fwglobals.log.debug("vpp_get_tap_mapping: no TAPs configured")
+        return {}
+
+    taps = taps.splitlines()
+
+    for line in taps:
+        tap_info = re.search("([/\w-]+) -> ([\S]+)", line)
+        if tap_info:
+            vpp_if_name_dst = tap_info.group(1)
+            vpp_if_name_src = tap_info.group(2)
+            vpp_loopback_name_to_tunnel_name[vpp_if_name_dst] = vpp_if_name_src
+
+    return vpp_loopback_name_to_tunnel_name
+
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
 def tap_to_vpp_if_name(tap):
@@ -1170,6 +1196,7 @@ def vpp_ip_to_sw_if_index(ip):
             int_address = IPNetwork(int_address_str)
             if network == int_address:
                 return sw_if.sw_if_index
+    return None
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
@@ -1971,6 +1998,7 @@ def vpp_multilink_update_labels(labels, remove, next_hop=None, dev_id=None, sw_i
     op = 'del' if remove else 'add'
 
     vppctl_cmd = 'fwabf link %s label %s via %s %s' % (op, ids, next_hop, vpp_if_name)
+    fwglobals.log.debug(vppctl_cmd)
 
     out = _vppctl_read(vppctl_cmd, wait=False)
     if out is None:
@@ -2009,7 +2037,8 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
 
     if not add:
         for if_vpp_name in interfaces:
-            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, True)
+            vppctl_cmd = 'fwabf attach ip4 del policy %d priority %d %s' % (int(policy_id), priority, if_vpp_name)
+            vpp_cli_execute([vppctl_cmd])
         fwglobals.g.policies.remove_policy(policy_id)
 
     fallback = 'fallback drop' if re.match(fallback, 'drop') else ''
@@ -2037,30 +2066,31 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
     if add:
         fwglobals.g.policies.add_policy(policy_id, priority)
         for if_vpp_name in interfaces:
-            vpp_multilink_attach_policy_rule(if_vpp_name, int(policy_id), priority, 0, False)
+            vppctl_cmd = 'fwabf attach ip4 add policy %d priority %d %s' % (int(policy_id), priority, if_vpp_name)
+            vpp_cli_execute([vppctl_cmd])
 
     return (True, None)
 
-def vpp_multilink_attach_policy_rule(int_name, policy_id, priority, is_ipv6, remove):
-    """Attach VPP with flexiwan policy rules.
+def vpp_cli_execute(cmds, debug = False):
+    """Map interfaces inside tap-inject plugin.
 
-    :param int_name:  The name of the interface in VPP
-    :param policy_id: The policy id (two byte integer)
-    :param priority:  The priority (integer)
-    :param is_ipv6:   True if policy should be applied on IPv6 packets, False otherwise.
-    :param remove:    True to remove rule, False to add.
+    :param cmds:     List of VPP CLI commands
+    :param debug:    Print command to be executed
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
 
-    op = 'del' if remove else 'add'
-    ip_version = 'ip6' if is_ipv6 else 'ip4'
+    if not isinstance(cmds, list):
+        fwglobals.log.error("vpp_cli_execute: expect list of commands")
+        return (False, "Expect list of commands")
 
-    vppctl_cmd = 'fwabf attach %s %s policy %d priority %d %s' % (ip_version, op, policy_id, priority, int_name)
+    for cmd in cmds:
+        if debug:
+            fwglobals.log.debug(cmd)
 
-    out = _vppctl_read(vppctl_cmd, wait=False)
-    if out is None or re.search('unknown|failed|ret=-', out):
-        return (False, "failed vppctl_cmd=%s" % vppctl_cmd)
+        out = _vppctl_read(cmd, wait=False)
+        if out is None or re.search('unknown|failed|ret=-', out):
+            return (False, "failed vppctl_cmd=%s" % cmd)
 
     return (True, None)
 
@@ -2080,6 +2110,17 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
 
     if not linux_check_gateway_exist(via):
         return (True, None)
+
+    if not remove:
+        tunnel_addresses = fwtunnel_stats.get_tunnel_info()
+        if via in tunnel_addresses and tunnel_addresses[via] != 'up':
+            return (True, None)
+
+    if remove:
+        routes_linux = linux_get_routes()
+        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+        if not exist_in_linux:
+            return (True, None)
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
@@ -2168,8 +2209,11 @@ def tunnel_change_postprocess(remove, vpp_if_name):
     if len(policies) == 0:
         return
 
+    op = 'del' if remove else 'add'
+
     for policy_id, priority in list(policies.items()):
-        vpp_multilink_attach_policy_rule(vpp_if_name, int(policy_id), priority, 0, remove)
+        vppctl_cmd = 'fwabf attach ip4 %s policy %d priority %d %s' % (op, int(policy_id), priority, vpp_if_name)
+        vpp_cli_execute([vppctl_cmd])
 
 
 # The messages received from flexiManage are not perfect :)
@@ -4005,18 +4049,19 @@ def linux_get_routes(proto=IpRouteProto.BOOT.value):
 
 def linux_check_gateway_exist(gw):
     interfaces = psutil.net_if_addrs()
+    net_if_stats = psutil.net_if_stats()
     for if_name in interfaces:
         addresses = interfaces[if_name]
         for address in addresses:
             if address.family == socket.AF_INET:
                 network = IPNetwork(address.address + '/' + address.netmask)
-                if is_ip_in_subnet(gw, str(network)):
+                if net_if_stats[if_name].isup and is_ip_in_subnet(gw, str(network)):
                     return True
 
     return False
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
-    metric = int(metric)
+    metric = int(metric) if metric else 0
     if metric in list(routes.keys()):
         if addr in list(routes[metric].keys()):
             if via in routes[metric][addr]:
@@ -4042,6 +4087,21 @@ def check_reinstall_static_routes():
 
         if not exist_in_linux:
             add_remove_static_route(addr, via, metric, False, dev)
+
+def add_remove_static_routes(via, is_add):
+    routes_db = fwglobals.g.router_cfg.get_routes()
+    routes_linux = linux_get_routes()
+
+    for route in routes_db:
+        if route['via'] != via:
+            continue
+
+        addr = route['addr']
+        metric = str(route.get('metric', '0'))
+        dev = route.get('dev_id', None)
+        via = route['via']
+
+        add_remove_static_route(addr, via, metric, not is_add, dev)
 
 def exec_with_timeout(cmd, timeout=60):
     """Run bash command with timeout option
@@ -4271,6 +4331,16 @@ def is_ip(str_to_check):
         return True
     except:
         return False
+
+def build_tunnel_remote_loopback_ip(addr):
+    network = IPNetwork(addr)     # 10.100.0.4 / 10.100.0.5
+    network.value  ^= IPAddress('0.0.0.1').value        # 10.100.0.4 -> 10.100.0.5 / 10.100.0.5 -> 10.100.0.4
+    return str(network.ip)
+
+def build_tunnel_second_loopback_ip(addr):
+    network = IPNetwork(addr)     # 10.100.0.4/31
+    network.value  += IPAddress('0.1.0.0').value        # 10.100.0.4/31 -> 10.101.0.4/31
+    return str(network)
 
 def set_ip_on_bridge_bvi_interface(bridge_addr, dev_id, is_add):
     """Configure IP address on the BVI tap inerface if needed

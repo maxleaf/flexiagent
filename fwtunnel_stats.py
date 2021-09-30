@@ -31,39 +31,61 @@ import fwutils
 
 tunnel_stats_global = {}
 tunnel_stats_global_lock = threading.RLock()
+fping_processes = {}
 
 TIMEOUT = 15
 WINDOW_SIZE = 30
 APPROX_FACTOR = 16
 
-def tunnel_stats_get_simple_cmd_output(cmd, stderr=STDOUT):
+def start_fping_process(cmd):
     """Execute a simple external command and get its output.
 
     :param cmd:         Bash command
-    :param stderr:      Where to print errors.
 
     :returns: Command execution result.
     """
-    args = shlex.split(cmd)
-    return Popen(args, stdout=PIPE, stderr=stderr).communicate()[0].decode()
+    process = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True, universal_newlines=True)
+    return process
 
-def tunnel_stats_get_ping_time(hosts):
+def tunnel_stats_get_ping_time(tunnels):
     """Use fping to get RTT.
 
-    :param hosts:         IP addresses to ping.
+    :param tunnels:         IP addresses to ping.
 
     :returns: RTT values on success and 0 otherwise.
     """
     ret = {}
 
-    cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
-
     # cmd output example: "10.100.0.64  : 2.12 0.51 2.14"
     # 10.100.0.64 - host and calculate avg(2.12, 0.51, 2.14) as rtt
-    for row in tunnel_stats_get_simple_cmd_output(cmd).strip().splitlines():
-        host_rtt = [x.strip() for x in row.strip().split(':')]
-        rtt = [float(x) for x in host_rtt[-1].split() if x != '-']
-        ret[host_rtt[0]] = sum(rtt) / len(rtt) if len(rtt) > 0 else 0
+    for tunnel in tunnels:
+        interface = tunnel['interface']
+        tunnel_id = tunnel['tunnel_id']
+        hosts =  tunnel['hosts']
+        rows = None
+
+        cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(hosts))
+        cmd += " -I %s" % interface
+        if tunnel_id in fping_processes:
+            if fping_processes[tunnel_id].poll() is not None:
+                (output, errors) = fping_processes[tunnel_id].communicate()
+                rows = errors.strip().splitlines()
+                fping_processes[tunnel_id] = start_fping_process(cmd)
+        else:
+            fping_processes[tunnel_id] = start_fping_process(cmd)
+
+        if rows:
+            rtts = []
+            for row in rows:
+                host_rtt = [x.strip() for x in row.strip().split(':')]
+                try:
+                    float_rtt = float(host_rtt[1])
+                except ValueError:
+                    float_rtt = 0.0
+                rtts.append(float_rtt)
+            ret[tunnel_id] = sum(rtts) / len(rtts) if len(rtts) > 0 else 0
+        else:
+            ret[tunnel_id] = None
 
     return ret
 
@@ -75,35 +97,10 @@ def tunnel_stats_clear():
     with tunnel_stats_global_lock:
         tunnel_stats_global.clear()
 
-def tunnel_stats_add(tunnel_id, loopback_addr):
-    """Add tunnel statistics entry into a dictionary.
-
-    :param tunnel_id:         Tunnel identifier.
-    :param loopback_addr:     Loopback local end ip address.
-
-    :returns: None.
-    """
-    ip_addr = IPNetwork(loopback_addr)
-    stats_entry = dict()
-    stats_entry['loopback_network'] = str(ip_addr)
-    stats_entry['sent'] = 0
-    stats_entry['received'] = 0
-    stats_entry['drop_rate'] = 0
-    stats_entry['rtt'] = 0
-    stats_entry['timestamp'] = 0
-
-    for ip in ip_addr:
-        if (ip.value != ip_addr.value):
-            stats_entry['loopback_remote'] = str(ip)
-        else:
-            stats_entry['loopback_local'] = str(ip)
-
-    with tunnel_stats_global_lock:
-        tunnel_stats_global[tunnel_id] = stats_entry
-
 def tunnel_stats_remove(tunnel_id):
     with tunnel_stats_global_lock:
-        del tunnel_stats_global[tunnel_id]
+        if tunnel_id in tunnel_stats_global:
+            del tunnel_stats_global[tunnel_id]
 
 def tunnel_stats_test():
     """Update RTT, drop rate and other fields for all tunnels.
@@ -117,19 +114,31 @@ def tunnel_stats_test():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    hosts = [x.get('loopback_remote', '').split(':')[0] for x in tunnel_stats_global_copy.values()]
-    tunnel_rtt = tunnel_stats_get_ping_time(hosts)
+    tunnels = []
+    for tunnel_id, tunnel_stats_entry in tunnel_stats_global_copy.items():
+        hosts = tunnel_stats_entry.get('hosts_to_ping', [])
+        loopback_tap_name = tunnel_stats_entry.get('loopback_tap_name', None)
+        tunnels.append({'tunnel_id':tunnel_id, 'interface':loopback_tap_name, 'hosts':hosts})
+    tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
         stats['sent'] += 1
 
-        rtt = tunnel_rtt.get(stats['loopback_remote'], 0)
+        rtt = tunnel_rtt.get(tunnel_id, 0)
+        if rtt is None:
+            continue
+
         if rtt > 0:
             stats['received'] += 1
             stats['timestamp'] = time.time()
 
         stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
         stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
+
+        vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
+        if vpp_peer_tunnel_name:
+            vppctl_cmd = 'fwabf quality %s loss %u' % (vpp_peer_tunnel_name, stats['drop_rate'])
+            fwutils.vpp_cli_execute([vppctl_cmd])
 
         if (stats['sent'] == WINDOW_SIZE):
             stats['sent'] = 0
@@ -188,12 +197,65 @@ def get_tunnel_info():
     tunnels          = fwglobals.g.router_cfg.get_tunnels()
     remote_loopbacks = dict()
 
-    if tunnels and tunnel_stats:
-        for tunnel in tunnels:
-            tunnel_id = tunnel.get('tunnel-id')
-            if tunnel_id and tunnel_stats.get(tunnel_id):
-                remote_loop = IPNetwork(tunnel['loopback-iface']['addr'])
-                remote_loop.value ^= IPAddress('0.0.0.1').value
-                status = tunnel_stats[tunnel_id].get('status')
-                remote_loopbacks[str(remote_loop.ip)] = status
+    if not tunnels:
+        return {}
+
+    for tunnel in tunnels:
+        tunnel_id = tunnel.get('tunnel-id')
+        if 'peer' in tunnel:
+            ip = str(IPNetwork(tunnel['peer']['addr']).ip)
+        else:
+            ip = fwutils.build_tunnel_remote_loopback_ip(tunnel['loopback-iface']['addr'])
+
+        if tunnel_id in tunnel_stats:
+            status = tunnel_stats[tunnel_id]['status']
+        else:
+            status = 'down'
+        remote_loopbacks[ip] = status
     return remote_loopbacks
+
+def tunnel_stats_add(params):
+    """Add tunnel statistics entry into a dictionary.
+
+    :param params:         Tunnel parameters from Fleximanage.
+
+    :returns: None.
+    """
+    tunnel_id = params['tunnel-id']
+
+    if 'peer' in params:
+        tap_map = fwutils.vpp_get_tap_mapping()
+        hosts_to_ping = [params['dst']]
+        hosts_to_ping += params['peer']['ips']
+        hosts_to_ping += params['peer']['urls']
+        loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
+        loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
+        vpp_peer_tunnel_name = tap_map[loopback_name]
+    else:
+        hosts_to_ping = [fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])]
+        loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+
+    stats_entry = dict()
+    stats_entry['sent'] = 0
+    stats_entry['received'] = 0
+    stats_entry['drop_rate'] = 0
+    stats_entry['rtt'] = 0
+    stats_entry['timestamp'] = 0
+
+    stats_entry['hosts_to_ping'] = hosts_to_ping
+    stats_entry['loopback_tap_name'] = fwutils.vpp_sw_if_index_to_tap(loopback_sw_if_index)
+    if 'peer' in params:
+        stats_entry['vpp_peer_tunnel_name'] = vpp_peer_tunnel_name
+
+    with tunnel_stats_global_lock:
+        tunnel_stats_global[tunnel_id] = stats_entry
+
+def fill_tunnel_stats_dict():
+    """Get tunnels their corresponding loopbacks ip addresses
+    to be used by tunnel statistics thread.
+    """
+    tunnel_stats_clear()
+
+    tunnels = fwglobals.g.router_cfg.get_tunnels()
+    for params in tunnels:
+        tunnel_stats_add(params)
