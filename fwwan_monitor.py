@@ -175,10 +175,10 @@ class FwWanMonitor:
 
         routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0')
 
-        for (metric, addr), nexthops in routes_linux.items():
-            route = FwWanRoute(prefix=addr, nexthops=nexthops)
+        for ip_route_key, nexthops in routes_linux.items():
+            route = FwWanRoute(prefix=ip_route_key.addr, nexthops=nexthops)
             route.proto = 'static'
-            route.metric = metric
+            route.metric = ip_route_key.metric
 
             if (route.metric % self.WATERMARK) < min_metric:
                 route.default = True

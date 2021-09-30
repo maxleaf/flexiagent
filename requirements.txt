@@ -10,3 +10,4 @@ pyserial
 vpp-papi
 websocket-client
 pyroute2
+dataclasses

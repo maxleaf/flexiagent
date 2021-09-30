@@ -62,6 +62,8 @@ from fwikev2        import FwIKEv2
 from fw_traffic_identification import FwTrafficIdentifications
 import fwtranslate_add_switch
 
+from dataclasses import dataclass
+
 proto_map = {'any': 0, 'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
@@ -2123,7 +2125,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     exist_in_linux = False
     routes_linux = linux_get_routes(prefix=addr, preference=metric)
 
-    if routes_linux and via in routes_linux[(metric,addr)]:
+    if routes_linux and via in routes_linux[IpRouteKey(metric,addr)]:
         exist_in_linux = True
 
     if remove and not exist_in_linux:
@@ -2139,7 +2141,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
 
     next_hops = ''
     if routes_linux:
-        for gw in routes_linux[(metric,addr)].keys():
+        for gw in routes_linux[IpRouteKey(metric,addr)].keys():
             if remove and via == gw:
                 continue
             next_hops += ' nexthop via ' + gw
@@ -4008,6 +4010,12 @@ class IpRouteProto(enum.Enum):
    BOOT = 3,
    STATIC = 4
 
+@dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=True, frozen=False)
+class IpRouteKey:
+    """Class used as a route key."""
+    metric: int
+    addr: str
+
 def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.value):
     routes_dict = {}
     preference = int(preference) if preference else 0
@@ -4048,7 +4056,7 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
             if prefix and addr != prefix:
                 continue
 
-            routes_dict[(metric, addr)] = nexthops
+            routes_dict[IpRouteKey(metric,addr)] = nexthops
 
     return routes_dict
 
@@ -4067,15 +4075,15 @@ def linux_check_gateway_exist(gw):
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric) if metric else 0
-    if (metric, addr) in routes:
-        if via in routes[(metric,addr)]:
+    if IpRouteKey(metric, addr) in routes:
+        if via in routes[IpRouteKey(metric,addr)]:
             return True
 
     # Check if this route exist but with metric changed by WAN_MONITOR
     #
     metric = metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
-    if (metric, addr) in routes:
-        if via in routes[(metric,addr)]:
+    if IpRouteKey(metric, addr) in routes:
+        if via in routes[IpRouteKey(metric,addr)]:
             return True
     return False
 
