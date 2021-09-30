@@ -175,66 +175,65 @@ class FwWanMonitor:
 
         routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0')
 
-        for metric, routes in routes_linux.items():
-            for addr, nexthops in routes.items():
-                route = FwWanRoute(prefix=addr, nexthops=nexthops)
-                route.proto = 'static'
-                route.metric = metric
+        for (metric, addr), nexthops in routes_linux.items():
+            route = FwWanRoute(prefix=addr, nexthops=nexthops)
+            route.proto = 'static'
+            route.metric = metric
 
-                if (route.metric % self.WATERMARK) < min_metric:
-                    route.default = True
-                    min_metric    = (route.metric % self.WATERMARK)
+            if (route.metric % self.WATERMARK) < min_metric:
+                route.default = True
+                min_metric    = (route.metric % self.WATERMARK)
 
-                # Filter out routes not on WAN interfaces
-                #
-                if not route.dev_id:
-                    continue
+            # Filter out routes not on WAN interfaces
+            #
+            if not route.dev_id:
+                continue
 
-                # Filter out routes on interfaces where flexiManage disabled monitoring.
-                # Note the 'monitorInternet' flag might not exist (in case of device
-                # upgrade). In that case we enable the monitoring.
-                #
-                interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
-                if interfaces and (interfaces[0].get('monitorInternet', True) == False):
-                    if not route.dev_id in self.disabled_routes:
-                        fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
-                        self.disabled_routes[route.dev_id] = route
-                    continue
-                # If monitoring was enabled again, log this.
-                if interfaces and route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
-                    del self.disabled_routes[route.dev_id]
+            # Filter out routes on interfaces where flexiManage disabled monitoring.
+            # Note the 'monitorInternet' flag might not exist (in case of device
+            # upgrade). In that case we enable the monitoring.
+            #
+            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
+            if interfaces and (interfaces[0].get('monitorInternet', True) == False):
+                if not route.dev_id in self.disabled_routes:
+                    fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
+                    self.disabled_routes[route.dev_id] = route
+                continue
+            # If monitoring was enabled again, log this.
+            if interfaces and route.dev_id in self.disabled_routes:
+                fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
+                del self.disabled_routes[route.dev_id]
 
-                # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
-                #
-                if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
-                    if not route.dev_id in self.disabled_routes:
-                        fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
-                        self.disabled_routes[route.dev_id] = route
-                    continue
-                # If interface was assigned again, log this.
-                if not interfaces and route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
-                    del self.disabled_routes[route.dev_id]
+            # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
+            #
+            if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
+                if not route.dev_id in self.disabled_routes:
+                    fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                    self.disabled_routes[route.dev_id] = route
+                continue
+            # If interface was assigned again, log this.
+            if not interfaces and route.dev_id in self.disabled_routes:
+                fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                del self.disabled_routes[route.dev_id]
 
-                # if this route is known to us, update statistics from cache
-                #
-                if route.dev_id in self.routes:
-                    cached = self.routes[route.dev_id]
-                    route.probes    = cached.probes
-                    route.ok        = cached.ok
-                    route.default   = cached.default
-                else:
-                    fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
+            # if this route is known to us, update statistics from cache
+            #
+            if route.dev_id in self.routes:
+                cached = self.routes[route.dev_id]
+                route.probes    = cached.probes
+                route.ok        = cached.ok
+                route.default   = cached.default
+            else:
+                fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
 
-                # Finally store the route into cache.
-                #
-                self.routes[route.dev_id] = route
+            # Finally store the route into cache.
+            #
+            self.routes[route.dev_id] = route
 
-                # Record keys of routes fetched from OS.
-                # We will use them a bit later to remove stale routes from cache.
-                #
-                os_routes[route.dev_id] = None
+            # Record keys of routes fetched from OS.
+            # We will use them a bit later to remove stale routes from cache.
+            #
+            os_routes[route.dev_id] = None
 
         # Remove stale routes from cache
         #

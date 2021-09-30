@@ -2123,7 +2123,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     exist_in_linux = False
     routes_linux = linux_get_routes(prefix=addr, preference=metric)
 
-    if routes_linux and via in routes_linux[metric][addr]:
+    if routes_linux and via in routes_linux[(metric,addr)]:
         exist_in_linux = True
 
     if remove and not exist_in_linux:
@@ -2139,7 +2139,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
 
     next_hops = ''
     if routes_linux:
-        for gw in routes_linux[metric][addr].keys():
+        for gw in routes_linux[(metric,addr)].keys():
             if remove and via == gw:
                 continue
             next_hops += ' nexthop via ' + gw
@@ -4048,10 +4048,7 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
             if prefix and addr != prefix:
                 continue
 
-            if metric not in routes_dict:
-                routes_dict[metric] = {}
-
-            routes_dict[metric][addr] = nexthops
+            routes_dict[(metric, addr)] = nexthops
 
     return routes_dict
 
@@ -4070,18 +4067,16 @@ def linux_check_gateway_exist(gw):
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric) if metric else 0
-    if metric in list(routes.keys()):
-        if addr in list(routes[metric].keys()):
-            if via in routes[metric][addr].keys():
-                return True
+    if (metric, addr) in routes:
+        if via in routes[(metric,addr)]:
+            return True
 
     # Check if this route exist but with metric changed by WAN_MONITOR
     #
     metric = metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
-    if metric in list(routes.keys()):
-        if addr in list(routes[metric].keys()):
-            if via in routes[metric][addr].keys():
-                return True
+    if (metric, addr) in routes:
+        if via in routes[(metric,addr)]:
+            return True
     return False
 
 def check_reinstall_static_routes():
