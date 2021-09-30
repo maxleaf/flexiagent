@@ -2120,6 +2120,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
 
     exist_in_linux = False
     routes_linux = linux_get_routes(prefix=addr, preference=metric)
+
     if routes_linux and via in routes_linux[metric][addr]:
         exist_in_linux = True
 
@@ -2134,30 +2135,30 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     if ui and remove and addr == '0.0.0.0/0' and is_default_route(via, metric):
         return (True, None)
 
-    next_hop = ''
+    next_hops = ''
     if routes_linux:
         for gw in routes_linux[metric][addr].keys():
             if remove and via == gw:
                 continue
-            next_hop += ' nexthop via ' + gw
+            next_hops += ' nexthop via ' + gw
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
 
     if remove:
-        if not next_hop:
+        if not next_hops:
             op = 'del'
-        cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
+        cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hops)
     else:
-        if via in next_hop:
+        if via in next_hops:
             return (False, "via in next_hop")
         if not dev_id:
-            cmd = "sudo ip route %s %s%s proto static nexthop via %s %s" % (op, addr, metric, via, next_hop)
+            cmd = "sudo ip route %s %s%s proto static nexthop via %s %s" % (op, addr, metric, via, next_hops)
         else:
             tap = dev_id_to_tap(dev_id)
             if not tap:
                 return (False, "Not tap")
-            cmd = "sudo ip route %s %s%s proto static nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
+            cmd = "sudo ip route %s %s%s proto static nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hops)
 
     try:
         fwglobals.log.debug(cmd)
@@ -4120,7 +4121,6 @@ def is_default_route(via, metric):
 
 def add_remove_static_routes(via, is_add):
     routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_get_routes()
 
     for route in routes_db:
         if route['via'] != via:
