@@ -38,6 +38,7 @@ from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 from fwcfg_request_handler import FwCfgRequestHandler
 from fwikev2 import FwIKEv2
+from netaddr import IPNetwork, IPAddress
 
 import fwtunnel_stats
 import fw_vpp_coredump_utils
@@ -145,7 +146,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         Its function is to monitor tunnel state and RTT.
         It is implemented by pinging the other end of the tunnel.
         """
-        self._fill_tunnel_stats_dict()
+        fwtunnel_stats.fill_tunnel_stats_dict()
         while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
@@ -417,18 +418,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.set_logger(prev_logger)  # Restore logger if was changed
         return reply
-
-
-    def _fill_tunnel_stats_dict(self):
-        """Get tunnels their corresponding loopbacks ip addresses
-        to be used by tunnel statistics thread.
-        """
-        fwtunnel_stats.tunnel_stats_clear()
-        tunnels = self.cfg_db.get_tunnels()
-        for params in tunnels:
-            id   = params['tunnel-id']
-            addr = params['loopback-iface']['addr']
-            fwtunnel_stats.tunnel_stats_add(id, addr)
 
     def _call_simple(self, request):
         """Execute single request.
@@ -1032,6 +1021,13 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwutils.clear_linux_interfaces_cache()
 
+        with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
+            db_app_rec.clean()
+        with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
+            db_multilink.clean()
+        with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
+            db_policies.clean()
+
     def _on_add_interface_after(self, type, sw_if_index):
         """add-interface postprocessing
 
@@ -1048,23 +1044,30 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self._update_cache_sw_if_index(sw_if_index, type, False)
 
-    def _on_add_tunnel_after(self, sw_if_index):
+    def _on_add_tunnel_after(self, sw_if_index, params):
         """add-tunnel postprocessing
 
-        :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
-        :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
+        :param sw_if_index: VPP sw_if_index of the tunnel interface
+        :param params:      Parameters from Fleximanage.
         """
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', True)
         fwutils.tunnel_change_postprocess(False, vpp_if_name)
 
-    def _on_remove_tunnel_before(self, sw_if_index):
+    def _on_remove_tunnel_before(self, sw_if_index, params):
         """remove-tunnel preprocessing
 
-        :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
-        :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
+        :param sw_if_index: VPP sw_if_index of the tunnel interface
+        :param params:      Parameters from Fleximanage.
         """
         vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
         fwutils.tunnel_change_postprocess(True, vpp_if_name)
+
+        if 'peer' in params:
+            via = str(IPNetwork(params['peer']['addr']).ip)
+        else:
+            via = fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])
+
+        fwutils.add_remove_static_routes(via, False)
 
     def _update_cache_sw_if_index(self, sw_if_index, type, add):
         """Updates persistent caches that store mapping of sw_if_index into

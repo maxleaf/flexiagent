@@ -156,6 +156,8 @@ request_handlers = {
     'ikev2_set_responder':          {'name': '_call_vpp_api'},
     'ikev2_set_sa_lifetime':        {'name': '_call_vpp_api'},
     'ikev2_set_tunnel_interface':   {'name': '_call_vpp_api'},
+    'ipip_add_tunnel':              {'name': '_call_vpp_api'},
+    'ipip_del_tunnel':              {'name': '_call_vpp_api'},
     'ip_neighbor_add_del':          {'name': '_call_vpp_api'},
     'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
@@ -176,6 +178,7 @@ request_handlers = {
     'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
     'sw_interface_set_mac_address': {'name': '_call_vpp_api'},
     'sw_interface_set_mtu':         {'name': '_call_vpp_api'},
+    'sw_interface_set_unnumbered':  {'name': '_call_vpp_api'},
     'vmxnet3_create':               {'name': '_call_vpp_api'},
     'vmxnet3_delete':               {'name': '_call_vpp_api'},
     'vxlan_add_del_tunnel':         {'name': '_call_vpp_api'},
@@ -343,7 +346,6 @@ class Fwglobals:
                                 for n in dir(signal) if n.startswith('SIG') and '_' not in n )
 
         self.teardown = False   # Flag that stops all helper threads in parallel to speedup gracefull exit
-
 
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
