@@ -2107,6 +2107,8 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
+    metric = int(metric) if metric else 0
+
     if addr == 'default':
         return (True, None)
 
@@ -4008,6 +4010,7 @@ class IpRouteProto(enum.Enum):
 
 def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.value):
     routes_dict = {}
+    preference = int(preference) if preference else 0
 
     with pyroute2.IPRoute() as ipr:
         routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
