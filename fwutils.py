@@ -2083,8 +2083,11 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     if not linux_check_gateway_exist(via):
         return (True, None)
 
-    routes_linux = linux_get_routes()
-    exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+    exist_in_linux = False
+
+    routes_linux = linux_get_routes(prefix=addr, preference=metric)
+    if routes_linux and via in routes_linux[metric][addr]:
+        exist_in_linux = True
 
     if not remove and exist_in_linux:
         return (True, None)
@@ -2095,12 +2098,11 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
         return (True, None)
 
     next_hop = ''
-    if metric in list(routes_linux.keys()):
-        if addr in list(routes_linux[metric].keys()):
-            for gw in routes_linux[metric][addr].keys():
-                if remove and via == gw:
-                    continue
-                next_hop += ' nexthop via ' + gw
+    if routes_linux:
+        for gw in routes_linux[metric][addr].keys():
+            if remove and via == gw:
+                continue
+            next_hop += ' nexthop via ' + gw
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
