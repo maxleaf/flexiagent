@@ -1451,15 +1451,15 @@ def modify_peer_tunnel(new_params, old_params):
     ips = new_params['peer'].get('ips')
     urls = new_params['peer'].get('urls')
 
-    if not ips and not urls:
+    if ips is None and urls is None:
         return []
 
     whitelist = set()
-    if urls:
+    if urls is not None:
         old_params['peer']['urls'] = urls
         whitelist.add('urls')
 
-    if ips:
+    if ips is not None:
         old_params['peer']['ips'] = ips
         whitelist.add('ips')
 
