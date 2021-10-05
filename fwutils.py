@@ -3753,19 +3753,6 @@ def set_linux_socket_max_receive_buffer_size(value = 1024000):
     else:
         fwglobals.log.debug("Set maximum socket receive buffer size command successfully executed: %s" % (sys_cmd))
 
-def update_linux_metric(prefix, metric, via, new_metric):
-    """ Removes route and adds it back with a new metric.
-    """
-    success, err_str = add_remove_static_route(prefix, via, metric, True)
-    if not success:
-        return (False, err_str)
-
-    success, err_str = add_remove_static_route(prefix, via, new_metric, False)
-    if not success:
-        return (False, err_str)
-
-    return (True, None)
-
 def remove_linux_default_route(dev):
     """ Invokes 'ip route del' command to remove default route.
     """
@@ -3775,10 +3762,10 @@ def remove_linux_default_route(dev):
         ok = not subprocess.call(cmd, shell=True)
         if not ok:
             raise Exception("'%s' failed" % cmd)
-        return True
+        return (True, None)
     except Exception as e:
         fwglobals.log.error(str(e))
-        return False
+        return (False, str(e))
 
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by
