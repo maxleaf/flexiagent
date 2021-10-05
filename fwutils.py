@@ -2168,6 +2168,13 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
             return (True, None)
         return (False, "Exception: %s\nOutput: %s" % (str(e), output))
 
+    # We need to re-apply Netplan configuration here to install default route that
+    # could be removed in the flow before.
+    # This will happen if static default route installed by user is exactly the same like
+    # default route generated based on interface configuration inside Netplan file.
+    if remove:
+        netplan_apply("add_remove_static_route")
+
     return (True, None)
 
 def vpp_set_dhcp_detect(dev_id, remove):
