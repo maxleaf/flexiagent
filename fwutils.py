@@ -2134,11 +2134,6 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     if not remove and exist_in_linux:
         return (True, None)
 
-    # If default route is exactly the same like route installed from Netplan file
-    # do not remove it.
-    if ui and remove and addr == '0.0.0.0/0' and is_default_route(via, metric):
-        return (True, None)
-
     next_hops = ''
     if routes_linux:
         for ip_route_nexthop in routes_linux[IpRouteKey(metric,addr)]:
@@ -4117,24 +4112,6 @@ def check_reinstall_static_routes():
 
         if not exist_in_linux:
             add_remove_static_route(addr, via, metric, False, dev)
-
-def is_default_route(via, metric):
-    """Check if default route is the same like route
-        generated from interface configuration.
-
-    :param via:        Gateway address
-    :param metric:     Metric
-
-    :returns: True/False
-    """
-    wan_list = fwglobals.g.router_cfg.get_interfaces(type='wan')
-    for wan in wan_list:
-        gateway = wan.get('gateway')
-        int_metric = int(wan.get('metric'))
-        if gateway == via and metric == int_metric:
-            return True
-
-    return False
 
 def add_remove_static_routes(via, is_add):
     routes_db = fwglobals.g.router_cfg.get_routes()
