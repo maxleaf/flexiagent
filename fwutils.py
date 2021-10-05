@@ -2152,7 +2152,7 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
     if remove:
         if not next_hops:
             op = 'del'
-        cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hops)
+        cmd = "sudo ip route %s %s%s proto static %s" % (op, addr, metric, next_hops)
     else:
         if via in next_hops:
             return (False, "via in next_hop")
