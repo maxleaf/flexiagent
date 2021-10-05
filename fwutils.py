@@ -2122,11 +2122,8 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
         if via in tunnel_addresses and tunnel_addresses[via] != 'up':
             return (True, None)
 
-    exist_in_linux = False
     routes_linux = linux_get_routes(prefix=addr, preference=metric)
-
-    if routes_linux and via in routes_linux[IpRouteKey(metric,addr)]:
-        exist_in_linux = True
+    exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
 
     if remove and not exist_in_linux:
         return (True, None)
