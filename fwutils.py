@@ -2098,7 +2098,7 @@ def vpp_cli_execute(cmds, debug = False):
 
     return (True, None)
 
-def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
+def add_remove_static_route(addr, via, metric, remove, dev_id=None):
     """Add/Remove static route.
 
     :param addr:            Destination network.
