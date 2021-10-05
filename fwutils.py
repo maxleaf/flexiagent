@@ -2141,10 +2141,10 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None, ui=False):
 
     next_hops = ''
     if routes_linux:
-        for gw in routes_linux[IpRouteKey(metric,addr)].keys():
-            if remove and via == gw:
+        for ip_route_nexthop in routes_linux[IpRouteKey(metric,addr)]:
+            if remove and via == ip_route_nexthop.via:
                 continue
-            next_hops += ' nexthop via ' + gw
+            next_hops += ' nexthop via ' + ip_route_nexthop.via
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
@@ -4016,6 +4016,12 @@ class IpRouteKey:
     metric: int
     addr: str
 
+@dataclass
+class IpRouteNextHop:
+    """Class used as a route nexthop."""
+    via: str
+    dev: str
+
 def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.value):
     routes_dict = {}
     preference = int(preference) if preference else 0
@@ -4024,7 +4030,7 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
         routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
 
         for route in routes:
-            nexthops = {}
+            nexthops = []
             dst = None # Default routes have no RTA_DST
             metric = 0
             gw = None
@@ -4042,13 +4048,13 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
                         dev = ipdb.interfaces[elem['oif']].ifname
                         for attr2 in elem['attrs']:
                             if attr2[0] == 'RTA_GATEWAY':
-                                nexthops[attr2[1]] = dev
+                                nexthops.append(IpRouteNextHop(attr2[1],dev))
             if not dst: # Default routes have no RTA_DST
                 dst = "0.0.0.0"
             addr = "%s/%u" % (dst, route['dst_len'])
 
             if gw:
-                nexthops[gw] = dev
+                nexthops.append(IpRouteNextHop(gw,dev))
 
             if preference and metric != preference:
                 continue
@@ -4075,16 +4081,21 @@ def linux_check_gateway_exist(gw):
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric) if metric else 0
-    if IpRouteKey(metric, addr) in routes:
-        if via in routes[IpRouteKey(metric,addr)]:
-            return True
+    key = IpRouteKey(metric, addr)
+    if key in routes:
+        for ip_route_nexthop in routes[key]:
+            if via == ip_route_nexthop.via:
+                return True
 
     # Check if this route exist but with metric changed by WAN_MONITOR
     #
     metric = metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
-    if IpRouteKey(metric, addr) in routes:
-        if via in routes[IpRouteKey(metric,addr)]:
-            return True
+    key = IpRouteKey(metric, addr)
+    if key in routes:
+        for ip_route_nexthop in routes[key]:
+            if via == ip_route_nexthop.via:
+                return True
+
     return False
 
 def check_reinstall_static_routes():

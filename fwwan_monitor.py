@@ -38,12 +38,12 @@ class FwWanRoute:
     In addition it keeps statistics about internet connectivity on this route.
     """
     def _find_wan_dev(self, nexthops):
-        for via, dev in nexthops.items():
-            dev_id = fwutils.get_interface_dev_id(dev)
+        for ip_route_nexthop in nexthops:
+            dev_id = fwutils.get_interface_dev_id(ip_route_nexthop.dev)
             interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
             type = interfaces[0]['type'] if interfaces else None
             if type == 'WAN':
-                return (dev, dev_id, via)
+                return (ip_route_nexthop.dev, dev_id, ip_route_nexthop.via)
         return (None, None, None)
 
     def __init__(self, prefix, nexthops, proto=None, metric=0):
