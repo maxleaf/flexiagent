@@ -3993,8 +3993,9 @@ def dump(filename=None, path=None, clean_log=False):
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 
 class IpRouteProto(enum.Enum):
-   BOOT = 3,
+   BOOT = 3
    STATIC = 4
+   DHCP = 16
 
 @dataclass(init=True, repr=True, eq=True, order=True, unsafe_hash=True, frozen=False)
 class IpRouteKey:
@@ -4008,6 +4009,12 @@ class IpRouteNextHop:
     via: str
     dev: str
 
+@dataclass
+class IpRouteData:
+    """Class used as a route data."""
+    nexthops: list
+    proto: IpRouteProto
+
 def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.value):
     routes_dict = {}
     preference = int(preference) if preference else 0
@@ -4020,6 +4027,7 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
             dst = None # Default routes have no RTA_DST
             metric = 0
             gw = None
+
             for attr in route['attrs']:
                 if attr[0] == 'RTA_PRIORITY':
                     metric = int(attr[1])
@@ -4048,7 +4056,7 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
             if prefix and addr != prefix:
                 continue
 
-            routes_dict[IpRouteKey(metric,addr)] = nexthops
+            routes_dict[IpRouteKey(metric,addr)] = IpRouteData(nexthops,proto)
 
     return routes_dict
 
@@ -4069,8 +4077,8 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric) if metric else 0
     key = IpRouteKey(metric, addr)
     if key in routes:
-        for ip_route_nexthop in routes[key]:
-            if via == ip_route_nexthop.via:
+        for nexthop in routes[key].nexthops:
+            if via == nexthop.via:
                 return True
 
     # Check if this route exist but with metric changed by WAN_MONITOR
@@ -4078,8 +4086,8 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
     key = IpRouteKey(metric, addr)
     if key in routes:
-        for ip_route_nexthop in routes[key]:
-            if via == ip_route_nexthop.via:
+        for nexthop in routes[key].nexthops:
+            if via == nexthop.via:
                 return True
 
     return False

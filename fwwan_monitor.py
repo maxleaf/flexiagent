@@ -176,10 +176,15 @@ class FwWanMonitor:
         min_metric = sys.maxsize
 
         routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0')
+        dhcp_routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0',proto=fwutils.IpRouteProto.DHCP.value)
+        routes_linux.update(dhcp_routes_linux)
 
-        for ip_route_key, nexthops in routes_linux.items():
-            route = FwWanRoute(prefix=ip_route_key.addr, nexthops=nexthops)
-            route.proto = 'static'
+        for ip_route_key, ip_route_data in routes_linux.items():
+            route = FwWanRoute(prefix=ip_route_key.addr, nexthops=ip_route_data.nexthops)
+            if ip_route_data.proto == fwutils.IpRouteProto.DHCP.value:
+                route.proto = 'dhcp'
+            if ip_route_data.proto == fwutils.IpRouteProto.STATIC.value:
+                route.proto = 'static'
             route.metric = ip_route_key.metric
 
             if (route.metric % self.WATERMARK) < min_metric:
