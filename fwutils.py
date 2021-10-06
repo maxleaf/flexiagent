@@ -2123,7 +2123,8 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
             return (True, None)
 
     routes_linux = linux_get_routes(prefix=addr, preference=metric)
-    exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
+    nexthop = linux_get_routes(prefix=addr, preference=metric,via=via)
+    exist_in_linux = True if len(nexthop) >= 1 else False
 
     if remove and not exist_in_linux:
         return (True, None)
@@ -2133,10 +2134,10 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
 
     next_hops = ''
     if routes_linux:
-        for ip_route_nexthop in routes_linux[IpRouteKey(metric,addr)]:
-            if remove and via == ip_route_nexthop.via:
+        for key in routes_linux.keys():
+            if remove and via == key.via:
                 continue
-            next_hops += ' nexthop via ' + ip_route_nexthop.via
+            next_hops += ' nexthop via ' + key.via
 
     metric = ' metric %s' % metric if metric else ' metric 0'
     op     = 'replace'
@@ -4002,6 +4003,7 @@ class IpRouteKey:
     """Class used as a route key."""
     metric: int
     addr: str
+    via: str
 
 @dataclass
 class IpRouteNextHop:
@@ -4012,10 +4014,10 @@ class IpRouteNextHop:
 @dataclass
 class IpRouteData:
     """Class used as a route data."""
-    nexthops: list
+    dev: str
     proto: IpRouteProto
 
-def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.value):
+def linux_get_routes(prefix=None, preference=None, via=None, proto=IpRouteProto.STATIC.value):
     routes_dict = {}
     preference = int(preference) if preference else 0
 
@@ -4056,7 +4058,10 @@ def linux_get_routes(prefix=None, preference=None, proto=IpRouteProto.STATIC.val
             if prefix and addr != prefix:
                 continue
 
-            routes_dict[IpRouteKey(metric,addr)] = IpRouteData(nexthops,proto)
+            for nexthop in nexthops:
+                if via and via != nexthop.via:
+                    continue
+                routes_dict[IpRouteKey(metric, addr, nexthop.via)] = IpRouteData(nexthop.dev, proto)
 
     return routes_dict
 
@@ -4075,20 +4080,16 @@ def linux_check_gateway_exist(gw):
 
 def linux_routes_dictionary_exist(routes, addr, metric, via):
     metric = int(metric) if metric else 0
-    key = IpRouteKey(metric, addr)
+    key = IpRouteKey(metric, addr, via)
     if key in routes:
-        for nexthop in routes[key].nexthops:
-            if via == nexthop.via:
-                return True
+        return True
 
     # Check if this route exist but with metric changed by WAN_MONITOR
     #
     metric = metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK
-    key = IpRouteKey(metric, addr)
+    key = IpRouteKey(metric, addr, via)
     if key in routes:
-        for nexthop in routes[key].nexthops:
-            if via == nexthop.via:
-                return True
+        return True
 
     return False
 
