@@ -62,6 +62,8 @@ class FwWanRoute:
             route += (' proto ' + str(self.proto))
         if self.metric:
             route += (', metric ' + str(self.metric))
+        route += (', via ' + str(self.via))
+        route += (', dev ' + str(self.dev))
         return route
 
 class FwWanMonitor:
@@ -295,7 +297,7 @@ class FwWanMonitor:
         route.ok = True if new_metric < self.WATERMARK else False
 
         # Go and update Linux.
-        # Note we do that directly by 'ip route del' & 'ip route add' commands
+        # Note we do that directly by 'ip route del' command
         # and not relay on 'netplan apply', as in last case VPPSB does not handle
         # properly kernel NETLINK messsages and does not update VPP FIB.
         #
@@ -325,8 +327,6 @@ class FwWanMonitor:
             #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
             #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
             #
-            # Note we load fresh data for this route from OS again (`ip route`)
-            # in order to handle cases, where the interface is being modified under our legs.
             #
             try:
                 name = fwutils.dev_id_to_tap(route.dev_id) # as vpp runs we fetch ip from taps
@@ -334,17 +334,10 @@ class FwWanMonitor:
                     name = route.dev
 
                 ip   = fwutils.get_interface_address(name, log=False)
-                (via, dev, dev_id, proto) = fwutils.get_default_route(name)
-
-                if not proto:
-                    proto = route.proto
+                proto = route.proto
                 dhcp = 'yes' if proto == 'dhcp' else 'no'
-
-                if not via:
-                    via = route.via
-
-                if not dev:
-                    dev = route.dev
+                via = route.via
+                dev = route.dev
 
                 ifc = db_if[0] if db_if else {}
                 mtu = ifc.get('mtu')
