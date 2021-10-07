@@ -64,6 +64,8 @@ import fwtranslate_add_switch
 
 from dataclasses import dataclass
 
+from fwwan_monitor import check_metric_is_watermarked
+
 proto_map = {'any': 0, 'icmp': 1, 'tcp': 6, 'udp': 17}
 
 dpdk = __import__('dpdk-devbind')
@@ -4109,6 +4111,9 @@ def check_reinstall_static_routes():
         if tunnel_addresses.get(via) == 'down':
             if exist_in_linux:
                 add_remove_static_route(addr, via, metric, True, dev)
+            continue
+
+        if not exist_in_linux and check_metric_is_watermarked(metric):
             continue
 
         if not exist_in_linux:

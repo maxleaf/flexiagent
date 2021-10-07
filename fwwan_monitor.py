@@ -373,3 +373,11 @@ def get_wan_failover_metric(dev_id, metric):
     if not route or route.ok or metric >= fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK:
         return metric
     return (metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK)
+
+def check_metric_is_watermarked(metric):
+    metric = int(metric)
+    routes = fwglobals.g.cache.wan_monitor['enabled_routes'].values()
+    for route in routes:
+        if metric + fwglobals.g.WAN_FAILOVER_METRIC_WATERMARK == route.metric:
+            return True
+    return False
