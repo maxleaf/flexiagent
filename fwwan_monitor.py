@@ -166,8 +166,6 @@ class FwWanMonitor:
         min_metric = sys.maxsize
 
         routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0')
-        dhcp_routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0',proto=fwutils.IpRouteProto.DHCP.value)
-        routes_linux.update(dhcp_routes_linux)
 
         for key, data in routes_linux.items():
             if data.proto == fwutils.IpRouteProto.DHCP.value:

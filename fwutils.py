@@ -2122,8 +2122,8 @@ def add_remove_static_route(addr, via, metric, remove, dev_id=None):
         if via in tunnel_addresses and tunnel_addresses[via] != 'up':
             return (True, None)
 
-    routes_linux = linux_get_routes(prefix=addr, preference=metric)
-    nexthop = linux_get_routes(prefix=addr, preference=metric,via=via)
+    routes_linux = linux_get_routes(prefix=addr, preference=metric, proto=IpRouteProto.STATIC.value)
+    nexthop = linux_get_routes(prefix=addr, preference=metric,via=via, proto=IpRouteProto.STATIC.value)
     exist_in_linux = True if len(nexthop) >= 1 else False
 
     if remove and not exist_in_linux:
@@ -4015,9 +4015,9 @@ class IpRouteNextHop:
 class IpRouteData:
     """Class used as a route data."""
     dev: str
-    proto: IpRouteProto
+    proto: int
 
-def linux_get_routes(prefix=None, preference=None, via=None, proto=IpRouteProto.STATIC.value):
+def linux_get_routes(prefix=None, preference=None, via=None, proto=None):
     routes_dict = {}
     preference = int(preference) if preference else 0
 
@@ -4029,6 +4029,7 @@ def linux_get_routes(prefix=None, preference=None, via=None, proto=IpRouteProto.
             dst = None # Default routes have no RTA_DST
             metric = 0
             gw = None
+            protocol = route['proto']
 
             for attr in route['attrs']:
                 if attr[0] == 'RTA_PRIORITY':
@@ -4061,7 +4062,7 @@ def linux_get_routes(prefix=None, preference=None, via=None, proto=IpRouteProto.
             for nexthop in nexthops:
                 if via and via != nexthop.via:
                     continue
-                routes_dict[IpRouteKey(metric, addr, nexthop.via)] = IpRouteData(nexthop.dev, proto)
+                routes_dict[IpRouteKey(metric, addr, nexthop.via)] = IpRouteData(nexthop.dev, protocol)
 
     return routes_dict
 
@@ -4095,7 +4096,7 @@ def linux_routes_dictionary_exist(routes, addr, metric, via):
 
 def check_reinstall_static_routes():
     routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_get_routes()
+    routes_linux = linux_get_routes(proto=IpRouteProto.STATIC.value)
     tunnel_addresses = fwtunnel_stats.get_tunnel_info()
 
     for route in routes_db:
