@@ -51,14 +51,12 @@ class FwVppCoredumpProcess(threading.Thread):
         filename_parse = corefile.split("-")
         epoch_ts = int(filename_parse[len(filename_parse) - 2])
         ts_str = datetime.datetime.fromtimestamp(epoch_ts).strftime('%Y%m%d_%H%M%S')
-        corefile_ts_str = corefile + "-" +  ts_str
-        os.rename(corefile, corefile_ts_str)
-        out_tar_filename = corefile_ts_str + ".tar.gz"
+        out_tar_filename = corefile + "-" +  ts_str + ".tar.gz"
 
         # Write to temp file
         temp_out_tar_filename = FW_VPP_COREDUMP_LOCATION + "TEMP.core." + ts_str
         tar_file = tarfile.open(temp_out_tar_filename, "w:gz")
-        tar_file.add(corefile_ts_str, arcname=os.path.basename(corefile_ts_str))
+        tar_file.add(corefile, arcname=os.path.basename(corefile))
 
         # Include version and apt-repo file as part of coredump
         ts_str = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
@@ -74,7 +72,7 @@ class FwVppCoredumpProcess(threading.Thread):
 
         # replace / remove temp files
         os.rename(temp_out_tar_filename, out_tar_filename)
-        os.remove(corefile_ts_str)
+        os.remove(corefile)
         os.remove(version_file)
         os.remove(repo_file)
         fwglobals.log.info("vpp_coredump_compress: compressed : %s" % (corefile))
