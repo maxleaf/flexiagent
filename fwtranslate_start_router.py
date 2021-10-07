@@ -150,6 +150,22 @@ def start_router(params=None):
     }
     cmd_list.append(cmd)
 
+    # The 'no-pci' parameter in /etc/vpp/startup.conf is too dangerous - it
+    # causes vpp to boot up without interfaces. The stale 'no-pci' might cause
+    # constant start-router failure. To avoid this we just remove it now and
+    # will add it back a bit later if needed.
+    #
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "clean no-pci flag from %s" % vpp_filename
+    cmd['cmd']['params']  = {
+        'module': 'fwutils',
+        'func'  : 'vpp_startup_conf_remove_nopci',
+        'args'  : { 'vpp_config_filename' : vpp_filename }
+    }
+    cmd_list.append(cmd)
+
     # Add interfaces to the vpp configuration file, thus creating whitelist.
     # If whitelist exists, on bootup vpp captures only whitelisted interfaces.
     # Other interfaces will be not captured by vpp even if they are DOWN.
