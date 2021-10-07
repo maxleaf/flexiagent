@@ -37,33 +37,23 @@ class FwWanRoute:
     """The object that represents routing rule found in OS.
     In addition it keeps statistics about internet connectivity on this route.
     """
-    def _find_wan_dev(self, nexthops):
-        for ip_route_nexthop in nexthops:
-            dev_id = fwutils.get_interface_dev_id(ip_route_nexthop.dev)
-            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
-            type = interfaces[0]['type'] if interfaces else None
-            if type == 'WAN':
-                return (ip_route_nexthop.dev, dev_id, ip_route_nexthop.via)
-        return (None, None, None)
-
-    def __init__(self, prefix, nexthops, proto=None, metric=0):
+    def __init__(self, prefix, via, dev, proto=None, metric=0):
         self.prefix     = prefix
-        self.nexthops   = nexthops
-        self.dev, self.dev_id, self.via = self._find_wan_dev(nexthops)
+        self.via        = via
+        self.dev        = dev
         self.proto      = proto
         self.metric     = metric
+        self.dev_id     = fwutils.get_interface_dev_id(dev)
         self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
         self.ok         = True      # If True there is connectivity to internet
         self.default    = False     # If True the route is the default one - has lowest metric
 
     def __str__(self):
-        route = '%s, nexthops: %s,' % (self.prefix, str(self.nexthops))
+        route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.dev_id)
         if self.proto:
             route += (' proto ' + str(self.proto))
         if self.metric:
-            route += (', metric ' + str(self.metric))
-        route += (', via ' + str(self.via))
-        route += (', dev ' + str(self.dev))
+            route += (' metric ' + str(self.metric))
         return route
 
 class FwWanMonitor:
@@ -179,19 +169,19 @@ class FwWanMonitor:
         dhcp_routes_linux = fwutils.linux_get_routes(prefix='0.0.0.0/0',proto=fwutils.IpRouteProto.DHCP.value)
         routes_linux.update(dhcp_routes_linux)
 
-        for ip_route_key, ip_route_data in routes_linux.items():
-            route = FwWanRoute(prefix=ip_route_key.addr, nexthops=ip_route_data.nexthops)
-            if ip_route_data.proto == fwutils.IpRouteProto.DHCP.value:
-                route.proto = 'dhcp'
-            if ip_route_data.proto == fwutils.IpRouteProto.STATIC.value:
-                route.proto = 'static'
-            route.metric = ip_route_key.metric
+        for key, data in routes_linux.items():
+            if data.proto == fwutils.IpRouteProto.DHCP.value:
+                proto = 'dhcp'
+            if data.proto == fwutils.IpRouteProto.STATIC.value:
+                proto = 'static'
+            route = FwWanRoute(key.addr, key.via, data.dev, proto, key.metric)
 
             if (route.metric % self.WATERMARK) < min_metric:
                 route.default = True
                 min_metric    = (route.metric % self.WATERMARK)
 
-            # Filter out routes not on WAN interfaces
+            # Filter out routes on tunnel interfaces.
+            # Tunnels use loopback interfaces that has no physical device, so dev_id should be None.
             #
             if not route.dev_id:
                 continue
