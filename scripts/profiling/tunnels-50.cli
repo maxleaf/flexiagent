@@ -1,0 +1,1724 @@
+[
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.1",
+    "dstPort": "1068",
+    "tunnel-id": 1,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1000,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2000,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.2/31",
+      "mac":"08:00:27:fd:00:01",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.2",
+    "dstPort": "1068",
+    "tunnel-id": 2,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1002,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2002,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.4/31",
+      "mac":"08:00:27:fd:00:02",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.3",
+    "dstPort": "1068",
+    "tunnel-id": 3,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1004,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2004,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.6/31",
+      "mac":"08:00:27:fd:00:03",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.4",
+    "dstPort": "1068",
+    "tunnel-id": 4,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1006,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2006,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.8/31",
+      "mac":"08:00:27:fd:00:04",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.5",
+    "dstPort": "1068",
+    "tunnel-id": 5,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1008,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2008,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.10/31",
+      "mac":"08:00:27:fd:00:05",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.6",
+    "dstPort": "1068",
+    "tunnel-id": 6,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2010,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.12/31",
+      "mac":"08:00:27:fd:00:06",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.7",
+    "dstPort": "1068",
+    "tunnel-id": 7,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1012,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2012,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.14/31",
+      "mac":"08:00:27:fd:00:07",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.8",
+    "dstPort": "1068",
+    "tunnel-id": 8,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1014,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2014,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.16/31",
+      "mac":"08:00:27:fd:00:08",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.9",
+    "dstPort": "1068",
+    "tunnel-id": 9,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1016,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2016,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.18/31",
+      "mac":"08:00:27:fd:00:09",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.10",
+    "dstPort": "1068",
+    "tunnel-id": 10,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1018,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2018,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.20/31",
+      "mac":"08:00:27:fd:00:0A",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.11",
+    "dstPort": "1068",
+    "tunnel-id": 11,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1020,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2020,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.22/31",
+      "mac":"08:00:27:fd:00:0B",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.12",
+    "dstPort": "1068",
+    "tunnel-id": 12,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1022,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2022,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.24/31",
+      "mac":"08:00:27:fd:00:0C",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.13",
+    "dstPort": "1068",
+    "tunnel-id": 13,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1024,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2024,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.26/31",
+      "mac":"08:00:27:fd:00:0D",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.14",
+    "dstPort": "1068",
+    "tunnel-id": 14,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1026,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2026,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.28/31",
+      "mac":"08:00:27:fd:00:0E",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.15",
+    "dstPort": "1068",
+    "tunnel-id": 15,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1028,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2028,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.30/31",
+      "mac":"08:00:27:fd:00:0F",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.16",
+    "dstPort": "1068",
+    "tunnel-id": 16,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1030,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2030,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.32/31",
+      "mac":"08:00:27:fd:00:10",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.17",
+    "dstPort": "1068",
+    "tunnel-id": 17,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1032,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2032,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.34/31",
+      "mac":"08:00:27:fd:00:11",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.18",
+    "dstPort": "1068",
+    "tunnel-id": 18,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1034,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2034,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.36/31",
+      "mac":"08:00:27:fd:00:12",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.19",
+    "dstPort": "1068",
+    "tunnel-id": 19,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1036,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2036,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.38/31",
+      "mac":"08:00:27:fd:00:13",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.20",
+    "dstPort": "1068",
+    "tunnel-id": 20,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1038,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2038,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.40/31",
+      "mac":"08:00:27:fd:00:14",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.21",
+    "dstPort": "1068",
+    "tunnel-id": 21,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1040,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2040,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.42/31",
+      "mac":"08:00:27:fd:00:15",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.22",
+    "dstPort": "1068",
+    "tunnel-id": 22,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1042,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2042,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.44/31",
+      "mac":"08:00:27:fd:00:16",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.23",
+    "dstPort": "1068",
+    "tunnel-id": 23,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1044,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2044,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.46/31",
+      "mac":"08:00:27:fd:00:17",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.24",
+    "dstPort": "1068",
+    "tunnel-id": 24,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1046,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2046,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.48/31",
+      "mac":"08:00:27:fd:00:18",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.25",
+    "dstPort": "1068",
+    "tunnel-id": 25,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1048,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2048,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.50/31",
+      "mac":"08:00:27:fd:00:19",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.26",
+    "dstPort": "1068",
+    "tunnel-id": 26,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1050,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2050,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.52/31",
+      "mac":"08:00:27:fd:00:20",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.27",
+    "dstPort": "1068",
+    "tunnel-id": 27,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1052,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2052,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.54/31",
+      "mac":"08:00:27:fd:00:21",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.28",
+    "dstPort": "1068",
+    "tunnel-id": 28,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1054,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2054,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.56/31",
+      "mac":"08:00:27:fd:00:22",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.29",
+    "dstPort": "1068",
+    "tunnel-id": 29,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1056,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2056,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.58/31",
+      "mac":"08:00:27:fd:00:23",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.30",
+    "dstPort": "1068",
+    "tunnel-id": 30,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1058,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2058,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.60/31",
+      "mac":"08:00:27:fd:00:24",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.31",
+    "dstPort": "1068",
+    "tunnel-id": 31,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1060,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2060,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.62/31",
+      "mac":"08:00:27:fd:00:25",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.32",
+    "dstPort": "1068",
+    "tunnel-id": 32,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1062,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2062,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.64/31",
+      "mac":"08:00:27:fd:00:26",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.33",
+    "dstPort": "1068",
+    "tunnel-id": 33,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1064,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2064,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.66/31",
+      "mac":"08:00:27:fd:00:27",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.34",
+    "dstPort": "1068",
+    "tunnel-id": 34,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1066,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2066,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.68/31",
+      "mac":"08:00:27:fd:00:28",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.35",
+    "dstPort": "1068",
+    "tunnel-id": 35,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1068,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2068,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.70/31",
+      "mac":"08:00:27:fd:00:29",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.36",
+    "dstPort": "1068",
+    "tunnel-id": 36,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1070,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2070,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.72/31",
+      "mac":"08:00:27:fd:00:2A",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.37",
+    "dstPort": "1068",
+    "tunnel-id": 37,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1072,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2072,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.74/31",
+      "mac":"08:00:27:fd:00:2B",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.38",
+    "dstPort": "1068",
+    "tunnel-id": 38,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1074,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2074,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.76/31",
+      "mac":"08:00:27:fd:00:2C",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.39",
+    "dstPort": "1068",
+    "tunnel-id": 39,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1076,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2076,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.78/31",
+      "mac":"08:00:27:fd:00:2D",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.40",
+    "dstPort": "1068",
+    "tunnel-id": 40,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1078,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2078,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.80/31",
+      "mac":"08:00:27:fd:00:2E",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.41",
+    "dstPort": "1068",
+    "tunnel-id": 41,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1080,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2080,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.82/31",
+      "mac":"08:00:27:fd:00:2F",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.42",
+    "dstPort": "1068",
+    "tunnel-id": 42,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1082,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2082,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.84/31",
+      "mac":"08:00:27:fd:00:30",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.43",
+    "dstPort": "1068",
+    "tunnel-id": 43,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1084,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2084,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.86/31",
+      "mac":"08:00:27:fd:00:31",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.44",
+    "dstPort": "1068",
+    "tunnel-id": 44,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1086,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2086,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.88/31",
+      "mac":"08:00:27:fd:00:32",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.45",
+    "dstPort": "1068",
+    "tunnel-id": 45,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1088,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2088,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.90/31",
+      "mac":"08:00:27:fd:00:33",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.46",
+    "dstPort": "1068",
+    "tunnel-id": 46,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1090,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2090,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.92/31",
+      "mac":"08:00:27:fd:00:34",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.47",
+    "dstPort": "1068",
+    "tunnel-id": 47,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1092,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2092,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.94/31",
+      "mac":"08:00:27:fd:00:35",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.48",
+    "dstPort": "1068",
+    "tunnel-id": 48,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1094,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2094,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.96/31",
+      "mac":"08:00:27:fd:00:36",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.49",
+    "dstPort": "1068",
+    "tunnel-id": 49,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1096,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2096,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.98/31",
+      "mac":"08:00:27:fd:00:37",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "add-tunnel",
+  "params": {
+    "src": "192.168.1.74",
+    "dev_id":"pci:0000:00:03.0",
+    "dst": "192.168.1.50",
+    "dstPort": "1068",
+    "tunnel-id": 50,
+    "ipsec": {
+      "local-sa": {
+         "spi": 1098,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "1020aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key": "1020ff4b55523947594d6d3547666b45764e6a58"
+      },
+      "remote-sa": {
+         "spi": 2098,
+         "crypto-alg": "aes-cbc-128",
+         "crypto-key": "2010aa794f574265564551694d653768",
+         "integr-alg": "sha1-96",
+         "integr-key":  "2010ff4b55523947594d6d3547666b45764e6a58"
+      }
+    },
+    "loopback-iface": {
+      "addr":"10.100.0.100/31",
+      "mac":"08:00:27:fd:00:38",
+      "mtu":1420,
+	  "routing":"ospf"
+    }
+  }
+}
+,
+{
+  "entity":  "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+	  {
+		  "addr":         "192.168.1.74/24",
+		  "gateway":      "192.168.1.1",
+		  "type":         "wan",
+		  "dev_id":       "pci:0000:00:03.0",
+		  "name":         "enp0s3"
+	  },
+	  {
+		  "addr":         "10.0.0.4/24",
+		  "type":         "lan",
+		  "dev_id":       "pci:0000:00:08.0",
+		  "name":         "enp0s8",
+		  "routing":      "ospf"
+	  }
+    ]
+  }
+}
+]

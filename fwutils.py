@@ -971,6 +971,17 @@ def set_dev_id_to_tap(dev_id, tap):
     cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
     cache[dev_id_full] = tap
 
+def tunnel_to_tap(params):
+    """Retrieves TAP name of the tunnel loopback interface that is exposed to Linux.
+
+    :param params: parameters of tunnel taken from the router configuration database.
+                   It is 'params' field of the 'add-tunnel' request.
+    :returns: name of the tunnel loopback interface in Linux.
+    """
+    vpp_if_name = 'loop%d' % (params['tunnel-id']*2)
+    tap = fwglobals.g.db.get('router_api', {}).get('vpp_if_name_to_tap_if_name', {}).get('tunnel', {}).get(vpp_if_name)
+    return tap
+
 def vpp_enable_tap_inject():
     """Enable tap-inject plugin
      """
@@ -1040,32 +1051,6 @@ def vpp_get_tap_info():
             vpp_if_name_to_tap[vpp_if_name] = tap
 
     return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
-
-def vpp_get_tap_mapping():
-    """Get tap mapping
-
-     :returns: tap info in list
-     """
-    vpp_loopback_name_to_tunnel_name = {}
-    if not vpp_does_run():
-        fwglobals.log.debug("vpp_get_tap_mapping: VPP is not running")
-        return {}
-
-    taps = _vppctl_read("show tap-inject map interface").strip()
-    if not taps:
-        fwglobals.log.debug("vpp_get_tap_mapping: no TAPs configured")
-        return {}
-
-    taps = taps.splitlines()
-
-    for line in taps:
-        tap_info = re.search("([/\w-]+) -> ([\S]+)", line)
-        if tap_info:
-            vpp_if_name_dst = tap_info.group(1)
-            vpp_if_name_src = tap_info.group(2)
-            vpp_loopback_name_to_tunnel_name[vpp_if_name_dst] = vpp_if_name_src
-
-    return vpp_loopback_name_to_tunnel_name
 
 # 'tap_to_vpp_if_name' function maps name of vpp tap interface in Linux, e.g. vpp0,
 # into name of the vpp interface.
@@ -1177,26 +1162,6 @@ def vpp_sw_if_index_to_tap(sw_if_index):
      :returns: Linux TAP interface name.
      """
     return vpp_if_name_to_tap(vpp_sw_if_index_to_name(sw_if_index))
-
-def vpp_ip_to_sw_if_index(ip):
-    """Convert ip address into VPP sw_if_index.
-
-     :param ip: IP address.
-
-     :returns: sw_if_index.
-     """
-    network = IPNetwork(ip)
-
-    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
-        tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
-        if tap:
-            int_address_str = get_interface_address(tap)
-            if not int_address_str:
-                continue
-            int_address = IPNetwork(int_address_str)
-            if network == int_address:
-                return sw_if.sw_if_index
-    return None
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
@@ -1324,6 +1289,7 @@ def reset_device_config():
         fwglobals.g.db['lte'] = {}
 
     reset_router_api_db_sa_id() # sa_id-s are used in translations of router configuration, so clean them too.
+    reset_router_api_db(enforce=True)
 
     restore_dhcpd_files()
 
@@ -1360,6 +1326,9 @@ def reset_router_api_db(enforce=False):
         router_api_db['sw_if_index_to_vpp_if_name'] = {}
     if not 'vpp_if_name_to_sw_if_index' in router_api_db or enforce:
         router_api_db['vpp_if_name_to_sw_if_index'] = {
+            'tunnel': {}, 'lan': {}, 'wan': {} }
+    if not 'vpp_if_name_to_tap_if_name' in router_api_db or enforce:
+        router_api_db['vpp_if_name_to_tap_if_name'] = {
             'tunnel': {}, 'lan': {}, 'wan': {} }
 
     fwglobals.g.db['router_api'] = router_api_db
