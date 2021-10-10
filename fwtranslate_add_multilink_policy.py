@@ -93,6 +93,24 @@ import fwutils
 
 policy_index = 0
 
+ServiceAttrToVal = {
+                'telephony'                 : 0,
+                'broadcast-video'           : 1,
+                'real-time'                 : 2,
+                'signaling'                 : 3,
+                'network-control'           : 3,
+                'low-latency'               : 4,
+                'oam'                       : 5,
+                'high-throughput'           : 6,
+                'multimedia-conferencing'   : 7,
+                'multimedia-streaming'      : 8,
+                'default'                   : 9}
+
+ImportanceAttrToVal = {
+                'low'                       : 0,
+                'medium'                    : 1,
+                'high'                      : 2}
+
 def _generate_id(ret):
     """Generate identifier.
 
@@ -250,6 +268,7 @@ def add_multilink_policy(params):
         # single ACL object that will serve the policy.
         #
         traffic_rules = []
+        tag = ''
 
         prefix = rule['classification'].get('prefix')
         if prefix:
@@ -260,6 +279,7 @@ def add_multilink_policy(params):
             traffic_category   = app.get('category')
             traffic_class      = app.get('serviceClass')
             traffic_importance = app.get('importance')
+            tag = str(ServiceAttrToVal.get(traffic_class,9)) + ':' + str(ImportanceAttrToVal.get(traffic_importance,0))
 
             traffic_rules = fwglobals.g.traffic_identifications.get_traffic_rules(
                                 traffic_id, traffic_category, traffic_class, traffic_importance)
@@ -274,7 +294,7 @@ def add_multilink_policy(params):
                                 'acl_index': ctypes.c_uint(-1).value,
                                 'count':     len(acl_rules),
                                 'r':         acl_rules,
-                                'tag':       ''
+                                'tag':       tag
         }
         cmd['cmd']['cache_ret_val'] = ('acl_index', cache_key)
         cmd['cmd']['descr'] = f"add ACL for policy {rule['id']}"
