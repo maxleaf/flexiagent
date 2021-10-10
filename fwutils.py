@@ -2051,7 +2051,11 @@ def vpp_multilink_update_policy_rule(add, links, policy_id, fallback, order, acl
 
     group_id = 1
     for link in links:
-        order  = 'random' if re.match(link.get('order', 'None'), 'load-balancing') else ''
+        order = {
+            'priority': '',
+            'load-balancing': 'random',
+            'link-quality': 'quality'
+        }.get(link.get('order', 'None'), '')
         labels = link['pathlabels']
         ids_list = fwglobals.g.router_api.multilink.get_label_ids_by_names(labels)
         ids = ','.join(map(str, ids_list))
@@ -4374,3 +4378,28 @@ def set_ip_on_bridge_bvi_interface(bridge_addr, dev_id, is_add):
         return (True, None)
     except Exception as e:
         return (False, str(e))
+
+class SlidingWindow(list):
+    def __init__(self, window_size=30):
+        """ Initialize sliding window
+        : param window_size : number of points to keep in the window
+        : return : None
+        """
+        self.window_size = window_size
+        list.__init__(self)
+
+    def add_datapoint(self, datapoint):
+        """ Add data point to the sliding window, remove old entries to maintain size
+        :param datapoint: new data point
+        """
+        self.append(datapoint)
+        if len(self) >= self.window_size:
+            del self[0]
+
+    def get_average(self):
+        """ If list items support number arithmetic, returns sum/num.
+        : return : arithmetic average of list items.
+        """
+        if len(self) == 0:
+            return 0
+        return float(sum(self)) / float(len(self))

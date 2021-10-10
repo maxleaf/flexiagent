@@ -36,6 +36,8 @@ fping_processes = {}
 TIMEOUT = 15
 WINDOW_SIZE = 30
 APPROX_FACTOR = 16
+HYSTERESIS_LOSS = 1
+HYSTERESIS_DELAY = 30
 
 def start_fping_process(cmd):
     """Execute a simple external command and get its output.
@@ -122,27 +124,40 @@ def tunnel_stats_test():
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
-        stats['sent'] += 1
 
         rtt = tunnel_rtt.get(tunnel_id, 0)
         if rtt is None:
             continue
 
         if rtt > 0:
-            stats['received'] += 1
             stats['timestamp'] = time.time()
+            stats['drops'].add_datapoint(0)
+        else:
+            stats['drops'].add_datapoint(1)
 
         stats['rtt'] = stats['rtt'] + (rtt - stats['rtt']) / APPROX_FACTOR
-        stats['drop_rate'] = 100 - stats['received'] * 100 / stats['sent']
+        stats['drop_rate'] = 100.0 * stats['drops'].get_average()
 
+        update = False
         vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
         if vpp_peer_tunnel_name:
-            vppctl_cmd = 'fwabf quality %s loss %u' % (vpp_peer_tunnel_name, stats['drop_rate'])
-            fwutils.vpp_cli_execute([vppctl_cmd])
+            ifname = vpp_peer_tunnel_name
+        else:
+            ifname = stats['loopback_name']
 
-        if (stats['sent'] == WINDOW_SIZE):
-            stats['sent'] = 0
-            stats['received'] = 0
+        loss = round(stats['drop_rate'])
+        delay = round(stats['rtt'])
+
+        if abs(loss - stats['loss']) >= HYSTERESIS_LOSS:
+            stats['loss'] = loss
+            update = True
+        elif  abs(delay - stats['delay']) >= HYSTERESIS_DELAY:
+            stats['delay'] = delay
+            update = True
+
+        if update:
+            vppctl_cmd = 'fwabf quality %s loss %s delay %s jitter %s' % (ifname, loss, delay, 0)
+            fwutils.vpp_cli_execute([vppctl_cmd])
 
     with tunnel_stats_global_lock:
         for tunnel_id in list(tunnel_stats_global.keys()):
@@ -234,15 +249,18 @@ def tunnel_stats_add(params):
     else:
         hosts_to_ping = [fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])]
         loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
+        loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
 
     stats_entry = dict()
-    stats_entry['sent'] = 0
-    stats_entry['received'] = 0
     stats_entry['drop_rate'] = 0
+    stats_entry['drops'] = fwutils.SlidingWindow(WINDOW_SIZE)
     stats_entry['rtt'] = 0
     stats_entry['timestamp'] = 0
+    stats_entry['loss'] = 0
+    stats_entry['delay'] = 0
 
     stats_entry['hosts_to_ping'] = hosts_to_ping
+    stats_entry['loopback_name'] = loopback_name
     stats_entry['loopback_tap_name'] = fwutils.vpp_sw_if_index_to_tap(loopback_sw_if_index)
     if 'peer' in params:
         stats_entry['vpp_peer_tunnel_name'] = vpp_peer_tunnel_name
