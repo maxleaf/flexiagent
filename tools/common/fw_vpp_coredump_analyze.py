@@ -41,9 +41,13 @@ FW_PKG_URL = "https://deb.flexiwan.com/flexiWAN/pool/%s/f/flexiwan-router/"
 FW_PKG_RTR = "flexiwan-router_%s.%s_amd64.deb"
 FW_PKG_RTR_DBG = "flexiwan-router-dbg_%s.%s_amd64.deb"
 
+FW_VPP_CORE_GDB_SOLIB_PATH = "/usr/lib/x86_64-linux-gnu/:/lib/x86_64-linux-gnu/"
+FW_VPP_CORE_GDB_DEBUG_PATH = "/usr/lib/debug/"
 FW_VPP_CORE_GDB_SETUP =\
-        "set debug-file-directory %s/usr/lib/debug/\n" +\
-        "set solib-search-path %s\n" +\
+        "set solib-absolute-prefix %s\n" +\
+        "set solib-search-path %s" + ":" + FW_VPP_CORE_GDB_SOLIB_PATH +"\n" +\
+        "set debug-file-directory %s" + FW_VPP_CORE_GDB_DEBUG_PATH +\
+            ":" + FW_VPP_CORE_GDB_DEBUG_PATH + "\n" +\
         "file %s/usr/bin/vpp\n" +\
         "core-file %s\n"
 
@@ -129,7 +133,8 @@ class FwVppCoredumpAnalyze():
     @staticmethod
     def __perform_gdb_processing(vpp_coredump_file, work_dir, dump_backtrace_only):
 
-        out = FW_VPP_CORE_GDB_SETUP % (work_dir, work_dir, work_dir, (work_dir + vpp_coredump_file))
+        out = FW_VPP_CORE_GDB_SETUP % (work_dir, work_dir, work_dir, work_dir,
+            (work_dir + vpp_coredump_file))
         if not dump_backtrace_only:
             gdb_setup_file = work_dir + FW_VPP_CORE_GDB_SCRIPT
             with open(gdb_setup_file, 'w') as gdb_setup_script:
