@@ -1048,7 +1048,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         :param sw_if_index: VPP sw_if_index of the tunnel interface
         :param params:      Parameters from Fleximanage.
         """
-        vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', True, params=params)
+        vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
         fwutils.tunnel_change_postprocess(False, vpp_if_name)
 
     def _on_remove_tunnel_before(self, sw_if_index, params):
@@ -1057,14 +1057,13 @@ class FWROUTER_API(FwCfgRequestHandler):
         :param sw_if_index: VPP sw_if_index of the tunnel interface
         :param params:      Parameters from Fleximanage.
         """
-        vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
+        vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
         fwutils.tunnel_change_postprocess(True, vpp_if_name)
 
         if 'peer' in params:
             via = str(IPNetwork(params['peer']['addr']).ip)
         else:
             via = fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])
-
         fwutils.add_remove_static_routes(via, False)
 
     def _update_cache_sw_if_index(self, sw_if_index, type, add, params=None):
@@ -1079,22 +1078,24 @@ class FWROUTER_API(FwCfgRequestHandler):
         router_api_db  = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
         cache_by_index = router_api_db['sw_if_index_to_vpp_if_name']
         cache_by_name  = router_api_db['vpp_if_name_to_sw_if_index'][type]
-        cache_tap_by_name = router_api_db['vpp_if_name_to_tap_if_name'][type]
+        cache_tap_by_name = router_api_db['vpp_if_name_to_tap_if_name']
         if add:
             if type == 'tunnel':  # For tunnels use shortcut  - exploit vpp internals ;)
-                vpp_if_name = 'loop%d' % (params['tunnel-id'] * 2)
+                vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
             else:
                 vpp_if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
             cache_by_name[vpp_if_name]  = sw_if_index
             cache_by_index[sw_if_index] = vpp_if_name
-            cache_tap_by_name[vpp_if_name] = fwutils.vpp_if_name_to_tap(vpp_if_name)
+            tap = fwutils.vpp_if_name_to_tap(vpp_if_name)
+            if tap:
+                cache_tap_by_name[vpp_if_name] = tap
         else:
             vpp_if_name = cache_by_index[sw_if_index]
             del cache_by_name[vpp_if_name]
             del cache_by_index[sw_if_index]
-            del cache_tap_by_name[vpp_if_name]
+            if vpp_if_name in cache_tap_by_name:
+                del cache_tap_by_name[vpp_if_name]
         fwglobals.g.db['router_api'] = router_api_db
-        return vpp_if_name
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.

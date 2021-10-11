@@ -971,6 +971,17 @@ def set_dev_id_to_tap(dev_id, tap):
     cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
     cache[dev_id_full] = tap
 
+def tunnel_to_vpp_if_name(params):
+    """Finds the name of the tunnel loopback interface in vpp.
+    We exploit vpp internals to do it in simple way.
+
+    :param params: parameters of tunnel taken from the router configuration database.
+                   It is 'params' field of the 'add-tunnel' request.
+    :returns: name of the tunnel loopback interface in vpp.
+    """
+    vpp_if_name = 'loop%d' % (params['tunnel-id']*2)
+    return vpp_if_name
+
 def tunnel_to_tap(params):
     """Retrieves TAP name of the tunnel loopback interface that is exposed to Linux.
 
@@ -978,9 +989,8 @@ def tunnel_to_tap(params):
                    It is 'params' field of the 'add-tunnel' request.
     :returns: name of the tunnel loopback interface in Linux.
     """
-    vpp_if_name = 'loop%d' % (params['tunnel-id']*2)
-    tap = fwglobals.g.db.get('router_api', {}).get('vpp_if_name_to_tap_if_name', {}).get('tunnel', {}).get(vpp_if_name)
-    return tap
+    vpp_if_name = tunnel_to_vpp_if_name(params)
+    return vpp_if_name_to_tap(vpp_if_name)
 
 def vpp_enable_tap_inject():
     """Enable tap-inject plugin
@@ -1077,6 +1087,14 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
+    # Try to fetch name from cache firstly.
+    #
+    tap = fwglobals.g.db.get('router_api', {}).get('vpp_if_name_to_tap_if_name', {}).get(vpp_if_name)
+    if tap:
+        return tap
+
+    # Now go to the heavy route.
+    #
     _, vpp_if_name_to_tap, tap_info = vpp_get_tap_info()
     if not vpp_if_name in vpp_if_name_to_tap:
         fwglobals.log.debug(f"vpp_if_name_to_tap({vpp_if_name}): not found: {tap_info}")
@@ -1141,9 +1159,18 @@ def vpp_sw_if_index_to_name(sw_if_index):
 
      :returns: VPP interface name.
      """
+    # Try to fetch name from cache firstly.
+    #
+    vpp_if_name = fwglobals.g.db.get('router_api', {}).get('sw_if_index_to_vpp_if_name', {}).get(sw_if_index)
+    if vpp_if_name:
+        return vpp_if_name
+
+    # Now go to the heavy route.
+    #
     sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
     if not sw_interfaces:
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
+        return None
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
@@ -1328,8 +1355,7 @@ def reset_router_api_db(enforce=False):
         router_api_db['vpp_if_name_to_sw_if_index'] = {
             'tunnel': {}, 'lan': {}, 'wan': {} }
     if not 'vpp_if_name_to_tap_if_name' in router_api_db or enforce:
-        router_api_db['vpp_if_name_to_tap_if_name'] = {
-            'tunnel': {}, 'lan': {}, 'wan': {} }
+        router_api_db['vpp_if_name_to_tap_if_name'] = {}
 
     fwglobals.g.db['router_api'] = router_api_db
 

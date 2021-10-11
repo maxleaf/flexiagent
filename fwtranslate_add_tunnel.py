@@ -175,7 +175,7 @@ def validate_tunnel_id(tunnel_id):
     return (False,
         "tunnel_id %d can't be served due to out of available bridge id-s" % (tunnel_id))
 
-def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
+def _add_loopback(cmd_list, cache_key, iface_params, tunnel_params, id, internal=False):
     """Add loopback command into the list.
 
     :param cmd_list:            List of commands.
@@ -300,6 +300,33 @@ def _add_loopback(cmd_list, cache_key, iface_params, id, internal=False):
     # sudo ip link set dev <tap of loopback iface> up
     # sudo ip link set dev <tap of loopback iface> mtu <mtu of loopback iface>  // ensure length of Linux packets + overhead of vpp gre & ipsec & vxlan is below 1500
     if not internal:
+
+        # Add loopback interface to cache before the first call to vpp_sw_if_index_to_tap().
+        # Note we can't do it implicitly just from within the vpp_sw_if_index_to_tap(),
+        # because we need rule that removes interface from cache.
+        # Hence the explicit call to _update_cache_sw_if_index() below.
+        #
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "add sw_if_index to router_api cache"
+        cmd['cmd']['params']  = {
+                        'object': 'fwglobals.g.router_api',
+                        'func'  : '_update_cache_sw_if_index',
+                        'args'  : {'type': 'tunnel', 'params': tunnel_params, 'add': True },
+                        'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ]
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "remove sw_if_index from router_api cache"
+        cmd['revert']['params'] = {
+                        'object': 'fwglobals.g.router_api',
+                        'func'  : '_update_cache_sw_if_index',
+                        'args'  : {'type': 'tunnel', 'params': tunnel_params, 'add': False },
+                        'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ]
+        }
+        cmd_list.append(cmd)
+
         cmd = {}
         cmd['cmd'] = {}
         cmd['cmd']['name']      = "exec"
@@ -924,6 +951,7 @@ def _add_loop_bridge_l2gre_ipsec(cmd_list, params, l2gre_tunnel_ips, bridge_id, 
                 cmd_list,
                 loop_cache_key,
                 params['loopback-iface'],
+                params,
                 id=bridge_id)
     _add_bridge(
                 cmd_list, bridge_id)
@@ -1013,6 +1041,7 @@ def _add_loop_bridge_l2gre_ikev2(cmd_list, params, l2gre_tunnel_ips, bridge_id, 
                 cmd_list,
                 loop0_cache_key,
                 params['loopback-iface'],
+                params,
                 id=bridge_id)
     _add_bridge(
                 cmd_list, bridge_id)
@@ -1056,6 +1085,7 @@ def _add_loop0_bridge_l2gre(cmd_list, params, l2gre_tunnel_ips, bridge_id):
                 cmd_list,
                 'loop0_sw_if_index',
                 params['loopback-iface'],
+                params,
                 id=bridge_id)
     _add_bridge(
                 cmd_list, bridge_id)
@@ -1099,6 +1129,7 @@ def _add_loop_bridge_vxlan(cmd_list, params, loop_cfg, remote_loop_cfg, vxlan_ip
                 cmd_list,
                 loop_cache_key,
                 loop_cfg,
+                params,
                 id=bridge_id,
                 internal=internal)
     _add_bridge(
