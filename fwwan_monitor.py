@@ -37,7 +37,8 @@ class FwWanRoute:
     """The object that represents routing rule found in OS.
     In addition it keeps statistics about internet connectivity on this route.
     """
-    def __init__(self, prefix, via, dev, proto=None, metric=0):
+    def __init__(self, key, prefix, via, dev, proto=None, metric=0):
+        self.key        = key
         self.prefix     = prefix
         self.via        = via
         self.dev        = dev
@@ -172,49 +173,44 @@ class FwWanMonitor:
                 proto = 'dhcp'
             if data.proto == fwutils.IpRouteProto.STATIC.value:
                 proto = 'static'
-            route = FwWanRoute(key.addr, key.via, data.dev, proto, key.metric)
+            route = FwWanRoute(key, key.addr, key.via, data.dev, proto, key.metric)
 
             if (route.metric % self.WATERMARK) < min_metric:
                 route.default = True
                 min_metric    = (route.metric % self.WATERMARK)
 
-            # Filter out routes on tunnel interfaces.
-            # Tunnels use loopback interfaces that has no physical device, so dev_id should be None.
-            #
-            if not route.dev_id:
-                continue
-
             # Filter out routes on interfaces where flexiManage disabled monitoring.
             # Note the 'monitorInternet' flag might not exist (in case of device
             # upgrade). In that case we enable the monitoring.
             #
-            interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
-            if interfaces and (interfaces[0].get('monitorInternet', True) == False):
-                if not route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
-                    self.disabled_routes[route.dev_id] = route
-                continue
-            # If monitoring was enabled again, log this.
-            if interfaces and route.dev_id in self.disabled_routes:
-                fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
-                del self.disabled_routes[route.dev_id]
+            if route.dev_id:
+                interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
+                if interfaces and (interfaces[0].get('monitorInternet', True) == False):
+                    if not route.dev_id in self.disabled_routes:
+                        fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
+                        self.disabled_routes[route.dev_id] = route
+                    continue
+                # If monitoring was enabled again, log this.
+                if interfaces and route.dev_id in self.disabled_routes:
+                    fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
+                    del self.disabled_routes[route.dev_id]
 
-            # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
-            #
-            if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
-                if not route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
-                    self.disabled_routes[route.dev_id] = route
-                continue
-            # If interface was assigned again, log this.
-            if not interfaces and route.dev_id in self.disabled_routes:
-                fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
-                del self.disabled_routes[route.dev_id]
+                # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
+                #
+                if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
+                    if not route.dev_id in self.disabled_routes:
+                        fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                        self.disabled_routes[route.dev_id] = route
+                    continue
+                # If interface was assigned again, log this.
+                if not interfaces and route.dev_id in self.disabled_routes:
+                    fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                    del self.disabled_routes[route.dev_id]
 
             # if this route is known to us, update statistics from cache
             #
-            if route.dev_id in self.routes:
-                cached = self.routes[route.dev_id]
+            if route.key in self.routes:
+                cached = self.routes[route.key]
                 route.probes    = cached.probes
                 route.ok        = cached.ok
                 route.default   = cached.default
@@ -223,12 +219,12 @@ class FwWanMonitor:
 
             # Finally store the route into cache.
             #
-            self.routes[route.dev_id] = route
+            self.routes[route.key] = route
 
             # Record keys of routes fetched from OS.
             # We will use them a bit later to remove stale routes from cache.
             #
-            os_routes[route.dev_id] = None
+            os_routes[route.key] = None
 
         # Remove stale routes from cache
         #
@@ -300,55 +296,56 @@ class FwWanMonitor:
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
             return
 
-        fwutils.clear_linux_interfaces_cache()
+        if route.dev_id:
+            fwutils.clear_linux_interfaces_cache()
 
-        # If vpp runs and interface is under vpp control, i.e. assigned,
-        # go and adjust vpp configuration to the newer metric.
-        # Note the route does not have dev_id for virtual interfaces that are
-        # created in vpp/vvpsb by tap-inject for tapcli-X interfaces used for
-        # LTE/WiFi devices. These interfaces are assigned too.
-        #
-        db_if = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id) if route.dev_id else []
-        assigned = (not route.dev_id) or (db_if)
-        if fwglobals.g.router_api.state_is_started() and assigned:
-
-            # Update netplan yaml-s in order to:
-            # 1. Ensure that if 'netplan apply' is called due to some reason
-            #    like received 'modify-interface' for other interface the new
-            #    metric will be not overrode.
-            # 2. Keep interface rule in routing table in sync with metric in default route:
-            #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
-            #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
+            # If vpp runs and interface is under vpp control, i.e. assigned,
+            # go and adjust vpp configuration to the newer metric.
+            # Note the route does not have dev_id for virtual interfaces that are
+            # created in vpp/vvpsb by tap-inject for tapcli-X interfaces used for
+            # LTE/WiFi devices. These interfaces are assigned too.
             #
-            #
-            try:
-                name = fwutils.dev_id_to_tap(route.dev_id) # as vpp runs we fetch ip from taps
-                if not name:
-                    name = route.dev
+            db_if = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id) if route.dev_id else []
+            assigned = (not route.dev_id) or (db_if)
+            if fwglobals.g.router_api.state_is_started() and assigned:
 
-                ip   = fwutils.get_interface_address(name, log=False)
-                proto = route.proto
-                dhcp = 'yes' if proto == 'dhcp' else 'no'
-                via = route.via
-                dev = route.dev
+                # Update netplan yaml-s in order to:
+                # 1. Ensure that if 'netplan apply' is called due to some reason
+                #    like received 'modify-interface' for other interface the new
+                #    metric will be not overrode.
+                # 2. Keep interface rule in routing table in sync with metric in default route:
+                #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
+                #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
+                #
+                #
+                try:
+                    name = fwutils.dev_id_to_tap(route.dev_id) # as vpp runs we fetch ip from taps
+                    if not name:
+                        name = route.dev
 
-                ifc = db_if[0] if db_if else {}
-                mtu = ifc.get('mtu')
-                dnsServers  = ifc.get('dnsServers', [])
-                # If for any reason, static IP interface comes without static dns servers, we set the default automatically
-                if dhcp == 'no' and len(dnsServers) == 0:
-                    dnsServers = fwglobals.g.DEFAULT_DNS_SERVERS
-                dnsDomains  = ifc.get('dnsDomains', None)
+                    ip   = fwutils.get_interface_address(name, log=False)
+                    proto = route.proto
+                    dhcp = 'yes' if proto == 'dhcp' else 'no'
+                    via = route.via
+                    dev = route.dev
 
-                (success, err_str) = fwnetplan.add_remove_netplan_interface(\
-                                        True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
-                                        mtu, if_name=route.dev, validate_ip=False)
-                if not success:
-                    route.ok = prev_ok
-                    fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                    return
-            except Exception as e:
-                fwglobals.log.error("_update_metric failed: %s" % str(e))
+                    ifc = db_if[0] if db_if else {}
+                    mtu = ifc.get('mtu')
+                    dnsServers  = ifc.get('dnsServers', [])
+                    # If for any reason, static IP interface comes without static dns servers, we set the default automatically
+                    if dhcp == 'no' and len(dnsServers) == 0:
+                        dnsServers = fwglobals.g.DEFAULT_DNS_SERVERS
+                    dnsDomains  = ifc.get('dnsDomains', None)
+
+                    (success, err_str) = fwnetplan.add_remove_netplan_interface(\
+                                            True, route.dev_id, ip, via, new_metric, dhcp, 'WAN', dnsServers, dnsDomains,
+                                            mtu, if_name=route.dev, validate_ip=False)
+                    if not success:
+                        route.ok = prev_ok
+                        fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
+                        return
+                except Exception as e:
+                    fwglobals.log.error("_update_metric failed: %s" % str(e))
 
         # If defult route was changes as a result of metric update,
         # reconnect agent to flexiManage.
