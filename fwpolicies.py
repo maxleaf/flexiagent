@@ -20,17 +20,11 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import ctypes
-import fwglobals
-import fwutils
-import json
-import os
-import re
 from sqlitedict import SqliteDict
-import time
 
+from fwobject import FwObject
 
-class FwPolicies:
+class FwPolicies(FwObject):
     """Policies class representation.
     This is a persistent storage of VPP policies identifiers that are used on
     tunnel add/remove to reattach policies to the loopback interfaces.

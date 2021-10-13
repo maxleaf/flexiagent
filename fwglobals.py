@@ -22,11 +22,11 @@
 
 import copy
 import json
+import hashlib
 import os
 import Pyro4
 import re
 import signal
-import time
 import traceback
 import yaml
 import fwutils
@@ -36,6 +36,7 @@ import fw_vpp_coredump_utils
 from sqlitedict import SqliteDict
 
 from fwagent import FwAgent
+from fwobject import FwObject
 from fwrouter_api import FWROUTER_API
 from fwsystem_api import FWSYSTEM_API
 from fwagent_api import FWAGENT_API
@@ -191,7 +192,7 @@ global g_initialized
 g_initialized = False
 
 @Pyro4.expose
-class Fwglobals:
+class Fwglobals(FwObject):
     """This is global data class representation.
 
     """

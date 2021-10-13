@@ -20,7 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import hashlib
 import json
 import pickle
 import re
@@ -34,6 +33,7 @@ import fwglobals
 import fwutils
 
 from fwlog import FwSyslog
+from fwobject import FwObject
 
 def decode(obj):
     """Deserialize objects retrieved from SQLite."""
@@ -43,7 +43,7 @@ def encode(obj):
     """Deserialize objects retrieved from SQLite."""
     return sqlite3.Binary(pickle.dumps(obj, protocol=2))
 
-class FwCfgDatabase:
+class FwCfgDatabase(FwObject):
     """This is requests DB class representation.
     Persistent database that is used to keep configuration requests received from flexiManage.
     The requests are stored along with their translations into command list.
@@ -63,9 +63,10 @@ class FwCfgDatabase:
     def __init__(self, db_file):
         """Constructor method
         """
+        FwObject.__init__(self)
+
         self.db_filename = db_file
         self.db = SqliteDict(db_file, autocommit=True, encode=encode, decode=decode)
-        self.log = fwglobals.log if fwglobals.g_initialized else FwSyslog()
 
     def __enter__(self):
         return self

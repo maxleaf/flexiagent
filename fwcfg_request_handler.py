@@ -26,7 +26,9 @@ import traceback
 import json
 import re
 
-class FwCfgRequestHandler:
+from fwobject import FwObject
+
+class FwCfgRequestHandler(FwObject):
     """This is Request Handler class representation.
     The RequestHandler class enables user to execute requests received from flexiManage.
     To do that it provides following steps:
@@ -49,10 +51,11 @@ class FwCfgRequestHandler:
     def __init__(self, translators, cfg_db, revert_failure_callback = None):
         """Constructor method.
         """
+        FwObject.__init__(self)
+
         self.translators = translators
         self.cfg_db = cfg_db
         self.revert_failure_callback = revert_failure_callback
-        self.log                     = fwglobals.log
 
         self.cfg_db.set_translators(translators)
 

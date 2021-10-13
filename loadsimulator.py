@@ -34,13 +34,16 @@ import signal
 import sys
 import fwstats
 
-class LoadSimulator:
+from fwobject import FwObject
+
+class LoadSimulator(FwObject):
     """This is a load simulator class.
        It is used to emulate a big number of fake devices.
     """
     def __init__(self):
         """Constructor method
         """
+        FwObject.__init__(self)
         self.simulate_mode = 0
         self.simulate_count = 1
         self.simulate_id = 0
@@ -62,7 +65,7 @@ class LoadSimulator:
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
+        self.log_info("got %s" % fwglobals.g.signal_names[signum])
         self.stop()
         exit(1)
 
@@ -121,7 +124,7 @@ class LoadSimulator:
         self.data = json.loads(self.simulate_device_tokens[self.simulate_id])
 
         machine_id = self.get_generated_machine_id(self.simulate_id)
-        fwglobals.log.info("connecting to flexiManage with uuid %s" % machine_id)
+        self.log_info("connecting to flexiManage with uuid %s" % machine_id)
 
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
         header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
@@ -143,7 +146,7 @@ class LoadSimulator:
 
         :returns: None.
         """
-        fwglobals.log.info("started in simulate mode")
+        self.log_info("started in simulate mode")
 
         self.agent = fwglobals.g.initialize_agent()
         self.enable(int(count))
@@ -159,7 +162,7 @@ class LoadSimulator:
             # -------------------------------------
             while not self.agent.register() and self.started:
                 retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-                fwglobals.log.info("retry registration in %d seconds" % retry_sec)
+                self.log_info("retry registration in %d seconds" % retry_sec)
                 time.sleep(retry_sec)
 
         self.simulate_id = 0

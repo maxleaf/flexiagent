@@ -56,7 +56,7 @@ class FwRouterCfg(FwCfgDatabase):
         except KeyError:
             pass
         except Exception as e:
-            fwglobals.log.error("update(%s) failed: %s, %s" % \
+            self.log_error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
