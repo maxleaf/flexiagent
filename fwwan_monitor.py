@@ -31,30 +31,8 @@ import traceback
 
 import fwglobals
 import fwnetplan
+import fwroutes
 import fwutils
-
-class FwWanRoute:
-    """The object that represents routing rule found in OS.
-    In addition it keeps statistics about internet connectivity on this route.
-    """
-    def __init__(self, prefix, via, dev, proto=None, metric=0):
-        self.prefix     = prefix
-        self.via        = via
-        self.dev        = dev
-        self.proto      = proto
-        self.metric     = metric
-        self.dev_id     = fwutils.get_interface_dev_id(dev)
-        self.probes     = [True] * fwglobals.g.WAN_FAILOVER_WND_SIZE    # List of ping results
-        self.ok         = True      # If True there is connectivity to internet
-        self.default    = False     # If True the route is the default one - has lowest metric
-
-    def __str__(self):
-        route = '%s via %s dev %s(%s)' % (self.prefix, self.via, self.dev, self.dev_id)
-        if self.proto:
-            route += (' proto ' + str(self.proto))
-        if self.metric:
-            route += (' metric ' + str(self.metric))
-        return route
 
 class FwWanMonitor:
     """This object monitors internet connectivity over default WAN interface,
@@ -165,28 +143,9 @@ class FwWanMonitor:
         os_routes  = {}
         min_metric = sys.maxsize
 
-        out = []
-        cmd = 'ip route list match default | grep via'
-        for _ in range(5):
-            try:
-                out = subprocess.check_output(cmd, shell=True).decode().splitlines()
-                break
-            except Exception as e:
-                fwglobals.log.warning("no default routes found: %s" % str(e))
-                time.sleep(1)
+        routes_linux = fwroutes.FwLinuxRoutes(prefix='0.0.0.0/0')
 
-        for line in out:
-            m = self.route_rule_re.match(line)
-            if not m:
-                fwglobals.log.debug("not expected format: '%s'" % line)
-                continue
-
-            route = FwWanRoute(prefix=m.group(1), via=m.group(2), dev=m.group(3))
-            if m.group(4) and 'proto ' in m.group(4):
-                route.proto = m.group(4).split('proto ')[1].split(' ')[0]
-            if m.group(4) and 'metric ' in m.group(4):
-                route.metric = int(m.group(4).split('metric ')[1].split(' ')[0])
-
+        for key, route in routes_linux.items():
             if (route.metric % self.WATERMARK) < min_metric:
                 route.default = True
                 min_metric    = (route.metric % self.WATERMARK)
@@ -303,11 +262,11 @@ class FwWanMonitor:
         route.ok = True if new_metric < self.WATERMARK else False
 
         # Go and update Linux.
-        # Note we do that directly by 'ip route del' & 'ip route add' commands
+        # Note we do that directly by 'ip route del' command
         # and not relay on 'netplan apply', as in last case VPPSB does not handle
         # properly kernel NETLINK messsages and does not update VPP FIB.
         #
-        success, err_str = fwutils.update_linux_metric(route.prefix, route.dev, new_metric)
+        success, err_str = fwroutes.add_remove_route("0.0.0.0/0", route.via, route.metric, True, route.dev, route.proto)
         if not success:
             route.ok = prev_ok
             fwglobals.log.error("failed to update metric in OS: %s" % err_str)
@@ -333,8 +292,6 @@ class FwWanMonitor:
             #       default via 192.168.43.1 dev vpp1 proto dhcp src 192.168.43.99 metric 600
             #       192.168.43.1 dev vpp1 proto dhcp scope link src 192.168.43.99 metric 600
             #
-            # Note we load fresh data for this route from OS again (`ip route`)
-            # in order to handle cases, where the interface is being modified under our legs.
             #
             try:
                 name = fwutils.dev_id_to_tap(route.dev_id) # as vpp runs we fetch ip from taps
@@ -342,17 +299,10 @@ class FwWanMonitor:
                     name = route.dev
 
                 ip   = fwutils.get_interface_address(name, log=False)
-                (via, dev, dev_id, proto) = fwutils.get_default_route(name)
-
-                if not proto:
-                    proto = route.proto
+                proto = route.proto
                 dhcp = 'yes' if proto == 'dhcp' else 'no'
-
-                if not via:
-                    via = route.via
-
-                if not dev:
-                    dev = route.dev
+                via = route.via
+                dev = route.dev
 
                 ifc = db_if[0] if db_if else {}
                 mtu = ifc.get('mtu')
@@ -368,7 +318,6 @@ class FwWanMonitor:
                 if not success:
                     route.ok = prev_ok
                     fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
-                    fwutils.update_linux_metric(route.prefix, dev, route.metric)
                     return
             except Exception as e:
                 fwglobals.log.error("_update_metric failed: %s" % str(e))
