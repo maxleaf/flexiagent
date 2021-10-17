@@ -32,6 +32,7 @@ import subprocess
 import fwglobals
 import fwutils
 import fwnetplan
+import fwroutes
 
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
@@ -199,7 +200,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 continue  # Check routes every 5 seconds, while checking teardown every second
 
             try:  # Ensure thread doesn't exit on exception
-                fwutils.check_reinstall_static_routes()
+                fwroutes.check_reinstall_static_routes()
 
             except Exception as e:
                 fwglobals.log.error("%s: %s (%s)" %
@@ -1065,7 +1066,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         else:
             via = fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])
 
-        fwutils.add_remove_static_routes(via, False)
+        fwroutes.add_remove_static_routes(via, False)
 
     def _update_cache_sw_if_index(self, sw_if_index, type, add):
         """Updates persistent caches that store mapping of sw_if_index into
