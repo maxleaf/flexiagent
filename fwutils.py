@@ -48,7 +48,6 @@ from netaddr import IPNetwork, IPAddress
 import threading
 import serial
 import ipaddress
-import pyroute2
 from tools.common.fw_vpp_startupconf import FwStartupConf
 
 from fwrouter_cfg   import FwRouterCfg
@@ -2093,82 +2092,6 @@ def vpp_cli_execute(cmds, debug = False):
 
     return (True, None)
 
-def add_remove_static_route(addr, via, metric, remove, dev_id=None):
-    """Add/Remove static route.
-
-    :param addr:            Destination network.
-    :param via:             Gateway address.
-    :param metric:          Metric.
-    :param remove:          True to remove route.
-    :param dev_id:          Bus address of device to be used for outgoing packets.
-
-    :returns: (True, None) tuple on success, (False, <error string>) on failure.
-    """
-    if addr == 'default':
-        return (True, None)
-
-    if not linux_check_gateway_exist(via):
-        return (True, None)
-
-    if not remove:
-        tunnel_addresses = fwtunnel_stats.get_tunnel_info()
-        if via in tunnel_addresses and tunnel_addresses[via] != 'up':
-            return (True, None)
-
-    if remove:
-        routes_linux = linux_get_routes()
-        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
-        if not exist_in_linux:
-            return (True, None)
-
-    metric = ' metric %s' % metric if metric else ' metric 0'
-    op     = 'replace'
-
-    cmd_show = "sudo ip route show exact %s %s" % (addr, metric)
-    try:
-        output = subprocess.check_output(cmd_show, shell=True).decode()
-    except:
-        return False
-
-    next_hop = ''
-    if output:
-        removed = False
-        lines   = output.splitlines()
-        for line in lines:
-            words = line.split('via ')
-            if len(words) > 1:
-                if remove and not removed and re.search(via, words[1]):
-                    removed = True
-                    continue
-
-                next_hop += ' nexthop via ' + words[1]
-
-    if remove:
-        if not next_hop:
-            op = 'del'
-        cmd = "sudo ip route %s %s%s %s" % (op, addr, metric, next_hop)
-    else:
-        if via in next_hop:
-            return False
-        if not dev_id:
-            cmd = "sudo ip route %s %s%s nexthop via %s %s" % (op, addr, metric, via, next_hop)
-        else:
-            tap = dev_id_to_tap(dev_id)
-            if not tap:
-                return False
-            cmd = "sudo ip route %s %s%s nexthop via %s dev %s %s" % (op, addr, metric, via, tap, next_hop)
-
-    try:
-        fwglobals.log.debug(cmd)
-        output = subprocess.check_output(cmd, shell=True).decode()
-    except Exception as e:
-        if op == 'del':
-            fwglobals.log.debug("'%s' failed: %s, ignore this error" % (cmd, str(e)))
-            return True
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
-
-    return True
-
 def vpp_set_dhcp_detect(dev_id, remove):
     """Enable/disable DHCP detect feature.
 
@@ -3748,32 +3671,8 @@ def set_linux_socket_max_receive_buffer_size(value = 1024000):
     else:
         fwglobals.log.debug("Set maximum socket receive buffer size command successfully executed: %s" % (sys_cmd))
 
-def update_linux_metric(prefix, dev, metric):
-    """Invokes 'ip route' commands to update metric on the provide device.
-    """
-    try:
-        cmd = "ip route show exact %s dev %s" % (prefix, dev)
-        os_route = subprocess.check_output(cmd, shell=True).decode().strip()
-        if not os_route:
-            raise Exception("'%s' returned nothing" % cmd)
-        cmd = "ip route del " + os_route
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            raise Exception("'%s' failed" % cmd)
-        if 'metric ' in os_route:  # Replace metric in os route string
-            os_route = re.sub('metric [0-9]+', 'metric %d' % metric, os_route)
-        else:
-            os_route += ' metric %d' % metric
-        cmd = "ip route add " + os_route
-        ok = not subprocess.call(cmd, shell=True)
-        if not ok:
-            raise Exception("'%s' failed" % cmd)
-        return (True, None)
-    except Exception as e:
-        return (False, str(e))
-
 def remove_linux_default_route(dev):
-    """Invokes 'ip route del' command to remove default route.
+    """ Invokes 'ip route del' command to remove default route.
     """
     try:
         cmd = "ip route del default dev %s" % dev
@@ -3781,10 +3680,10 @@ def remove_linux_default_route(dev):
         ok = not subprocess.call(cmd, shell=True)
         if not ok:
             raise Exception("'%s' failed" % cmd)
-        return True
+        return (True, None)
     except Exception as e:
         fwglobals.log.error(str(e))
-        return False
+        return (False, str(e))
 
 def vmxnet3_unassigned_interfaces_up():
     """This function finds vmxnet3 interfaces that should NOT be controlled by
@@ -4011,41 +3910,6 @@ def dump(filename=None, path=None, clean_log=False):
     except Exception as e:
         fwglobals.log.error("failed to dump: %s" % (str(e)))
 
-class IpRouteProto(enum.Enum):
-   BOOT = 3
-
-def linux_get_routes(proto=IpRouteProto.BOOT.value):
-    routes_dict = {}
-
-    with pyroute2.IPRoute() as ipr:
-        routes = ipr.get_routes(family=socket.AF_INET, proto=proto)
-        for route in routes:
-            nexthops = set()
-            dst = None # Some routes have no 'dst' (for example: LTE). Initialize the variable here
-            for attr in route['attrs']:
-                metric = 0
-                if attr[0] == 'RTA_PRIORITY':
-                    metric = attr[1]
-                if attr[0] == 'RTA_DST':
-                    dst = attr[1]
-                if attr[0] == 'RTA_GATEWAY':
-                    nexthops.add(attr[1])
-                if attr[0] == 'RTA_MULTIPATH':
-                    for elem in attr[1]:
-                        for attr2 in elem['attrs']:
-                            if attr2[0] == 'RTA_GATEWAY':
-                                nexthops.add(attr2[1])
-            if not dst:
-                continue
-            addr = "%s/%u" % (dst, route['dst_len'])
-
-            if metric not in routes_dict:
-                routes_dict[metric] = {addr: copy.copy(nexthops)}
-            else:
-                routes_dict[metric][addr] = copy.copy(nexthops)
-
-    return routes_dict
-
 def linux_check_gateway_exist(gw):
     interfaces = psutil.net_if_addrs()
     net_if_stats = psutil.net_if_stats()
@@ -4058,49 +3922,6 @@ def linux_check_gateway_exist(gw):
                     return True
 
     return False
-
-def linux_routes_dictionary_exist(routes, addr, metric, via):
-    metric = int(metric) if metric else 0
-    if metric in list(routes.keys()):
-        if addr in list(routes[metric].keys()):
-            if via in routes[metric][addr]:
-                return True
-    return False
-
-def check_reinstall_static_routes():
-    routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_get_routes()
-    tunnel_addresses = fwtunnel_stats.get_tunnel_info()
-
-    for route in routes_db:
-        addr = route['addr']
-        via = route['via']
-        metric = str(route.get('metric', '0'))
-        dev = route.get('dev_id', None)
-        exist_in_linux = linux_routes_dictionary_exist(routes_linux, addr, metric, via)
-
-        if tunnel_addresses.get(via) == 'down':
-            if exist_in_linux:
-                add_remove_static_route(addr, via, metric, True, dev)
-            continue
-
-        if not exist_in_linux:
-            add_remove_static_route(addr, via, metric, False, dev)
-
-def add_remove_static_routes(via, is_add):
-    routes_db = fwglobals.g.router_cfg.get_routes()
-    routes_linux = linux_get_routes()
-
-    for route in routes_db:
-        if route['via'] != via:
-            continue
-
-        addr = route['addr']
-        metric = str(route.get('metric', '0'))
-        dev = route.get('dev_id', None)
-        via = route['via']
-
-        add_remove_static_route(addr, via, metric, not is_add, dev)
 
 def exec_with_timeout(cmd, timeout=60):
     """Run bash command with timeout option
