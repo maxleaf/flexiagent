@@ -25,8 +25,10 @@ import fnmatch
 import fwglobals
 import fwutils
 import time
-import subprocess
 import fwutils
+
+from fwobject import FwObject
+
 
 try:
     from vpp_papi import VPPApiClient
@@ -36,12 +38,13 @@ except Exception as e:
     from vpp_papi_dummy import VPPApiClient
     vppWrapper = True
 
-class VPP_API:
+class VPP_API(FwObject):
     """This is VPP API class representation.
     """
     def __init__(self):
         """Constructor method
         """
+        FwObject.__init__(self)
         self.connected_to_vpp = False
         self.interface_event_handlers = {}
         if fwutils.vpp_does_run():
@@ -70,20 +73,20 @@ class VPP_API:
         """
         if self.connected_to_vpp:
             return True
-        fwglobals.log.debug("connect_to_vpp: loading VPP API files")
+        self.log.debug("connect_to_vpp: loading VPP API files")
         self.jsonfiles = []
         for root, _, filenames in os.walk(vpp_json_dir):
             for filename in fnmatch.filter(filenames, '*.api.json'):
                 self.jsonfiles.append(os.path.join(root, filename))
         if not self.jsonfiles and not vppWrapper:
             raise Exception("connect_to_vpp: no vpp api files were found")
-        fwglobals.log.debug("connect_to_vpp: connecting")
+        self.log.debug("connect_to_vpp: connecting")
 
         self.vpp = VPPApiClient(apifiles=self.jsonfiles, use_socket=False, read_timeout=30)
         num_retries = 5
         for i in range(num_retries):
             try:
-                fwglobals.log.debug("connect_to_vpp: trying to connect, num " + str(i))
+                self.log.debug("connect_to_vpp: trying to connect, num " + str(i))
                 self.vpp.connect('fwagent')
                 break
             except Exception as e:
@@ -96,7 +99,7 @@ class VPP_API:
         self.connected_to_vpp = True
         self.vpp.api.want_interface_events(enable_disable=1,pid=os.getpid())
         self.vpp.register_event_callback(self.papi_event_handler)
-        fwglobals.log.debug("connect_to_vpp: connected")
+        self.log.debug("connect_to_vpp: connected")
 
 #        vpp_methods = []
 #        for method_name in dir(self.vpp):
@@ -117,9 +120,9 @@ class VPP_API:
         if self.connected_to_vpp:
             self.vpp.disconnect()
             self.connected_to_vpp = False
-            fwglobals.log.debug("disconnect_from_vpp: disconnected")
+            self.log.debug("disconnect_from_vpp: disconnected")
         else:
-            fwglobals.log.debug("disconnect_from_vpp: not connected")
+            self.log.debug("disconnect_from_vpp: not connected")
 
     # result - describes what field of the object returned by the API,
     #          should be stored in cache, what cache and what key
@@ -156,7 +159,7 @@ class VPP_API:
                 result['cache'][result['key']] = res
             reply = {'ok':1}
         else:
-            fwglobals.log.error('rv=%s: %s(%s)' % (rv.retval, api, format(params)))
+            self.log.error('rv=%s: %s(%s)' % (rv.retval, api, format(params)))
             reply = {'message':api + ' failed', 'ok':0}
         return reply
 
@@ -168,7 +171,7 @@ class VPP_API:
         :returns: Reply message.
         """
         if not self.connected_to_vpp:
-            fwglobals.log.excep("cli: not connected to VPP")
+            self.log.excep("cli: not connected to VPP")
             return None
         res = self.vpp.api.cli_inband(cmd=cmd)
         if res is None:

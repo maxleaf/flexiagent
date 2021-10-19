@@ -119,7 +119,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
-                    fwglobals.log.debug("watchdog: initiate restore")
+                    self.log.debug("watchdog: initiate restore")
 
                     self.vpp_api.disconnect_from_vpp()          # Reset connection to vpp to force connection renewal
                     fwutils.stop_vpp()                          # Release interfaces to Linux
@@ -131,14 +131,14 @@ class FWROUTER_API(FwCfgRequestHandler):
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
 
-                    fwglobals.log.debug("watchdog: restore finished")
+                    self.log.debug("watchdog: restore finished")
                     # Process if any VPP coredump
                     pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
                 elif pending_coredump_processing:
                     pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -153,7 +153,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             try:           # Ensure thread doesn't exit on exception
                 fwtunnel_stats.tunnel_stats_test()
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -177,7 +177,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     name = fwutils.dev_id_to_tap(wan['dev_id'])
                     addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
-                        fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
+                        self.log.debug("dhcpc_thread: %s has no ip address" % name)
                         apply_netplan = True
 
                 if apply_netplan:
@@ -185,7 +185,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     time.sleep(10)
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -203,7 +203,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                 fwroutes.check_reinstall_static_routes()
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -220,19 +220,19 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Restore failure state if recorded on disk:
         if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
             self.state_change(FwRouterState.FAILED, 'recorded failure was restored')
-            fwglobals.log.excep("router is in failed state, try to start it from flexiManage \
+            self.log.excep("router is in failed state, try to start it from flexiManage \
                 or use 'fwagent reset [--soft]' to recover")
 
         # If vpp runs already, or if management didn't request to start it, return.
         vpp_runs = fwutils.vpp_does_run()
         vpp_should_be_started = self.cfg_db.exists({'message': 'start-router'})
         if vpp_runs or not vpp_should_be_started:
-            fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
+            self.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
             if vpp_runs:
                 self.state_change(FwRouterState.STARTED)
             if self.state_is_started():
-                fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
+                self.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
                 # We use here read_from_disk because we can't fill the netplan cache from scratch when vpp is running.
                 # We use the original interface names in this cache,
@@ -247,7 +247,7 @@ class FWROUTER_API(FwCfgRequestHandler):
         return True
 
     def _restore_vpp(self):
-        fwglobals.log.info("===restore vpp: started===")
+        self.log.info("===restore vpp: started===")
         try:
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
@@ -265,29 +265,29 @@ class FWROUTER_API(FwCfgRequestHandler):
 
             fwglobals.g.handle_request({'message': 'start-router'})
         except Exception as e:
-            fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
+            self.log.excep("restore_vpp_if_needed: %s" % str(e))
             self.state_change(FwRouterState.FAILED, "failed to restore vpp configuration")
-        fwglobals.log.info("====restore vpp: finished===")
+        self.log.info("====restore vpp: finished===")
 
     def start_router(self):
         """Execute start router command.
         """
-        fwglobals.log.info("start_router")
+        self.log.info("start_router")
         if self.router_state == FwRouterState.STOPPED or self.router_state == FwRouterState.STOPPING:
             fwglobals.g.handle_request({'message': 'start-router'})
-        fwglobals.log.info("start_router: started")
+        self.log.info("start_router: started")
 
     def stop_router(self):
         """Execute stop router command.
         """
-        fwglobals.log.info("stop_router")
+        self.log.info("stop_router")
         if self.router_state == FwRouterState.STARTED or self.router_state == FwRouterState.STARTING:
             fwglobals.g.handle_request({'message':'stop-router'})
-        fwglobals.log.info("stop_router: stopped")
+        self.log.info("stop_router: stopped")
 
     def state_change(self, new_state, reason=''):
         log_reason = '' if not reason else ' (%s)' % reason
-        fwglobals.log.debug("%s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
+        self.log.debug("%s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
         if self.router_state == new_state:
             return
         old_state = self.router_state
@@ -304,7 +304,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     if fwutils.valid_message_string(reason):
                         fwutils.file_write_and_flush(f, reason + '\n')
                     else:
-                        fwglobals.log.excep("Not valid router failure reason string: '%s'" % reason)
+                        self.log.excep("Not valid router failure reason string: '%s'" % reason)
             fwutils.stop_vpp()
         elif old_state == FwRouterState.FAILED:
             if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):

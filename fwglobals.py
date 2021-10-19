@@ -22,11 +22,11 @@
 
 import copy
 import json
+import hashlib
 import os
 import Pyro4
 import re
 import signal
-import time
 import traceback
 import yaml
 import fwutils
@@ -36,6 +36,7 @@ import fw_vpp_coredump_utils
 from sqlitedict import SqliteDict
 
 from fwagent import FwAgent
+from fwobject import FwObject
 from fwrouter_api import FWROUTER_API
 from fwsystem_api import FWSYSTEM_API
 from fwagent_api import FWAGENT_API
@@ -191,7 +192,7 @@ global g_initialized
 g_initialized = False
 
 @Pyro4.expose
-class Fwglobals:
+class Fwglobals(FwObject):
     """This is global data class representation.
 
     """
@@ -267,6 +268,8 @@ class Fwglobals:
     def __init__(self, log=None):
         """Constructor method
         """
+        FwObject.__init__(self)
+
         # Set default configuration
         self.RETRY_INTERVAL_MIN  = 5 # seconds - is used for both registration and main connection
         self.RETRY_INTERVAL_MAX  = 15
@@ -356,8 +359,7 @@ class Fwglobals:
         self.cfg.__init__(self.FWAGENT_CONF_FILE, self.DATA_PATH)
         # Print loaded configuration into log
         if self.cfg.DEBUG:
-            global log
-            log.debug("Fwglobals configuration: " + self.__str__(), to_terminal=False)
+            self.log.debug("Fwglobals configuration: " + self.__str__(), to_terminal=False)
             # for a in dir(self.cfg):
             #     val = getattr(self, a)
             #     if isinstance(val, (int, float, str, unicode)):
@@ -375,8 +377,7 @@ class Fwglobals:
                            The standalone mode is used by CLI-based tests.
         """
         if self.fwagent:
-            global log
-            log.warning('Fwglobals.initialize_agent: agent exists')
+            self.log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
         # Create loggers

@@ -97,7 +97,7 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                         if not ok:
                             connected = fwutils.mbim_is_connected(dev_id)
                             if not connected:
-                                fwglobals.log.debug("lte modem is disconnected on %s" % dev_id)
+                                self.log.debug("lte modem is disconnected on %s" % dev_id)
                                 fwglobals.g.system_api.restore_configuration(types=['add-lte'])
                                 continue
 
@@ -115,7 +115,7 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                             iface_addr = fwutils.get_interface_address(name, log=False)
 
                             if iface_addr != modem_addr:
-                                fwglobals.log.debug("%s: LTE IP change detected: %s -> %s" % (dev_id, iface_addr, modem_addr))
+                                self.log.debug("%s: LTE IP change detected: %s -> %s" % (dev_id, iface_addr, modem_addr))
 
                                 fwutils.configure_lte_interface({
                                     'dev_id': dev_id,
@@ -129,10 +129,10 @@ class FWSYSTEM_API(FwCfgRequestHandler):
                                     params['gateway'] = fwutils.lte_get_ip_configuration(dev_id, 'gateway')
                                     fwglobals.g.handle_request({'message':'modify-interface','params': params})
 
-                                fwglobals.log.debug("%s: LTE IP was changed: %s -> %s" % (dev_id, iface_addr, modem_addr))
+                                self.log.debug("%s: LTE IP was changed: %s -> %s" % (dev_id, iface_addr, modem_addr))
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 

@@ -38,6 +38,7 @@ sys.path.append(agent_root_dir)
 import fwutils
 import fwglobals
 from fw_vpp_coredump_utils import vpp_coredump_copy_cores
+from fwobject import FwObject
 
 g = fwglobals.Fwglobals()
 
@@ -169,8 +170,10 @@ g_dumpers = {
     'vpp_vxlan_tunnel':             { 'shell_cmd': 'vppctl sh vxlan tunnel > <dumper_out_file>' },
 }
 
-class FwDump:
+class FwDump(FwObject):
     def __init__(self, temp_folder=None, quiet=False, include_vpp_core=None):
+
+        FwObject.__init__(self)
 
         self.temp_folder    = temp_folder
         self.quiet          = quiet
