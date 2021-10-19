@@ -53,6 +53,8 @@ import fwutils
 import loadsimulator
 import jwt
 
+from fwobject import FwObject
+
 # Global signal handler for clean exit
 def global_signal_handler(signum, frame):
     """Global signal handler for CTRL+C
@@ -66,7 +68,7 @@ def global_signal_handler(signum, frame):
 
 signal.signal(signal.SIGINT, global_signal_handler)
 
-class FwAgent:
+class FwAgent(FwObject):
     """This class implements abstraction of mediator between manager called
     flexiManage and device called flexiEdge. The manager runs on remote server,
     the Fwagent runs on device. The Fwagent establishes protected connection
@@ -82,6 +84,8 @@ class FwAgent:
     def __init__(self, handle_signals=True):
         """Constructor method
         """
+        FwObject.__init__(self)
+
         self.token                = None
         self.versions             = fwutils.get_device_versions(fwglobals.g.VERSIONS_FILE)
         self.ws                   = None
@@ -103,7 +107,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
+        self.log.info("got %s" % fwglobals.g.signal_names[signum])
         self.__exit__(None, None, None)
         exit(1)
 
@@ -130,26 +134,26 @@ class FwAgent:
         try:
             with open(fwglobals.g.CONN_FAILURE_FILE, 'w') as f:
                 fwutils.file_write_and_flush(f, 'Failed to connect to flexiManage: %s' % err)
-                fwglobals.log.debug("_mark_connection_failure: %s" % str(err))
+                self.log.debug("_mark_connection_failure: %s" % str(err))
         except Exception as e:
-            fwglobals.log.excep("Failed to create connection failure file: %s" % str(e))
+            self.log.excep("Failed to create connection failure file: %s" % str(e))
 
     def _clean_connection_failure(self):
         if os.path.exists(fwglobals.g.CONN_FAILURE_FILE):
             os.remove(fwglobals.g.CONN_FAILURE_FILE)
-            fwglobals.log.debug("_clean_connection_failure")
+            self.log.debug("_clean_connection_failure")
 
     def _setup_repository(self, repo):
         # Extract repo info. e.g. 'https://deb.flexiwan.com|flexiWAN|main'
         repo_split = repo.split('|')
         if len(repo_split) != 3:
-            fwglobals.log.error("Registration error: Incorrect repository info %s" % (repo))
+            self.log.error("Registration error: Incorrect repository info %s" % (repo))
             return False
         repo_server, repo_repo, repo_name = repo_split[0], repo_split[1], repo_split[2]
         # Get current repo configuration
         repo_files = glob.glob(fwglobals.g.REPO_SOURCE_DIR + "flexiwan*")
         if len(repo_files) != 1:
-            fwglobals.log.error("Registration error: Folder %s must include a single repository file, found %d" %
+            self.log.error("Registration error: Folder %s must include a single repository file, found %d" %
                 (fwglobals.g.REPO_SOURCE_DIR, len(repo_files)))
             return False
         repo_file = repo_files[0]
@@ -160,7 +164,7 @@ class FwAgent:
         repo_match = re.match(r'^deb[ \t]+\[[ \t]+arch=(.+)[ \t]+\][ \t]+(http.*)/(.+)[ \t]+(.+)[ \t]+(.+)$',
             repo_config)
         if not repo_match:
-            fwglobals.log.error("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
+            self.log.error("Registration error: repository configuration can't be parsed. File=%s, Config=%s" %
                 (repo_file, repo_config))
             return False
         (found_arch, found_server, found_repo, found_distro, found_name) = repo_match.group(1,2,3,4,5)
@@ -169,7 +173,7 @@ class FwAgent:
             new_repo_config = "deb [ arch=%s ] %s/%s %s %s\n" % (found_arch, repo_server, repo_repo, found_distro, repo_name)
             with open(repo_file, 'w') as f:
                 fwutils.file_write_and_flush(f, new_repo_config)
-            fwglobals.log.info("Overwriting repository from token, token_repo=%s, prev_repo_config=%s, new_repo_config=%s" %
+            self.log.info("Overwriting repository from token, token_repo=%s, prev_repo_config=%s, new_repo_config=%s" %
                 (repo, repo_config, new_repo_config))
         return True
 
@@ -203,7 +207,7 @@ class FwAgent:
         if server:
             # Use server from token
             fwglobals.g.cfg.MANAGEMENT_URL = server
-            fwglobals.log.info("Using management url from token: %s" % (server))
+            self.log.info("Using management url from token: %s" % (server))
 
         # Setup passed, return True
         return True
@@ -219,13 +223,13 @@ class FwAgent:
         :returns: `True` if registration succeeded, `False` otherwise.
         """
 
-        fwglobals.log.info("registering with flexiManage...")
+        self.log.info("registering with flexiManage...")
 
         self.register_error = ''
 
         if not loadsimulator.g.enabled():
             if os.path.exists(fwglobals.g.DEVICE_TOKEN_FILE):
-                fwglobals.log.info("register: already registered, to refresh run 'fwagent reset' and retry")
+                self.log.info("register: already registered, to refresh run 'fwagent reset' and retry")
                 return True
 
         try:
@@ -234,7 +238,7 @@ class FwAgent:
         except:
             err = "register: failed to load token from %s: %s (%s)" % \
                 (fwglobals.g.cfg.TOKEN_FILE, format(sys.exc_info()[1]),  format(sys.exc_info()[0]))
-            fwglobals.log.error(err)
+            self.log.error(err)
             return False
 
         # Token found, decode token and setup environment parameters from token
@@ -242,11 +246,11 @@ class FwAgent:
             if not self._decode_token_and_setup_environment(self.token):
                 return False
         except Exception as e:
-            fwglobals.log.excep("Failed to decode and setup environment: %s (%s)" %(str(e), traceback.format_exc()))
+            self.log.excep("Failed to decode and setup environment: %s (%s)" %(str(e), traceback.format_exc()))
             return False
 
         if fwutils.vpp_does_run():
-            fwglobals.log.error("register: router is running, it by 'fwagent stop' and retry by 'fwagent start'")
+            self.log.error("register: router is running, it by 'fwagent stop' and retry by 'fwagent start'")
             return False
 
         if loadsimulator.g.enabled():
@@ -254,7 +258,7 @@ class FwAgent:
         else:
             machine_id = fwutils.get_machine_id()
         if machine_id == None:
-            fwglobals.log.error("register: get_machine_id failed, make sure you're running in sudo privileges")
+            self.log.error("register: get_machine_id failed, make sure you're running in sudo privileges")
             return False
 
         machine_name = socket.gethostname()
@@ -278,7 +282,7 @@ class FwAgent:
                 'default_dev': dr_dev,
                 'interfaces': interfaces
         }
-        fwglobals.log.debug("Registering to %s with: %s" % (url, json.dumps(data)))
+        self.log.debug("Registering to %s with: %s" % (url, json.dumps(data)))
         data.update({'interfaces': json.dumps(interfaces)})
         data = uparse.urlencode(data).encode()
         req = ureq.Request(url, data)
@@ -297,19 +301,19 @@ class FwAgent:
             else:
                 with open(fwglobals.g.DEVICE_TOKEN_FILE, 'w') as f:
                     fwutils.file_write_and_flush(f, data)
-            fwglobals.log.info("Registation successful with parameters:")
-            fwglobals.log.info("  Hostname:  " + machine_name)
-            fwglobals.log.info("  IP List:   " + ip_list)
-            fwglobals.log.info("  Device ID: " + machine_id)
-            fwglobals.log.info("Run connect after approving device in flexiManage")
+            self.log.info("Registation successful with parameters:")
+            self.log.info("  Hostname:  " + machine_name)
+            self.log.info("  IP List:   " + ip_list)
+            self.log.info("  Device ID: " + machine_id)
+            self.log.info("Run connect after approving device in flexiManage")
 
         except uerr.URLError as e:
             if hasattr(e, 'code'):
                 server_response = e.read().decode()
                 latestVersion = e.headers.get('latestVersion','None')
-                fwglobals.log.error('register: got %s - %s' % (str(e.code), hsvr.BaseHTTPRequestHandler.responses[e.code][0]))
-                fwglobals.log.error('register: Server response: %s' % server_response)
-                fwglobals.log.error('latestVersion: %s' % (latestVersion))
+                self.log.error('register: got %s - %s' % (str(e.code), hsvr.BaseHTTPRequestHandler.responses[e.code][0]))
+                self.log.error('register: Server response: %s' % server_response)
+                self.log.error('latestVersion: %s' % (latestVersion))
                 try:
                     register_response = json.loads(server_response)
                     if 'error' in register_response:
@@ -317,13 +321,13 @@ class FwAgent:
                 except:
                     pass
                 if e.code == 403: # version too low, try to upgrade immediately
-                    fwglobals.log.error('Trying device auto upgrade...')
+                    self.log.error('Trying device auto upgrade...')
                     fwglobals.g.handle_request({'message':'upgrade-device-sw','params':{'version':latestVersion}})
             elif hasattr(e, 'reason'):
-                fwglobals.log.error('register: failed to connect to %s: %s' % (fwglobals.g.cfg.MANAGEMENT_URL, e.reason))
+                self.log.error('register: failed to connect to %s: %s' % (fwglobals.g.cfg.MANAGEMENT_URL, e.reason))
             return False
         except:
-            fwglobals.log.error('register: failed to send request to server %s: %s' % \
+            self.log.error('register: failed to send request to server %s: %s' % \
                         (fwglobals.g.cfg.MANAGEMENT_URL, format(sys.exc_info()[1])))
             return False
         return True
@@ -363,7 +367,7 @@ class FwAgent:
             loadsimulator.g.simulate_websockets[id].run_forever(sslopt={"cert_reqs": cert_required},
                                                                 ping_interval=25, ping_timeout=20)
             retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-            fwglobals.log.info("websocket_thread %d: retry connection in %d seconds" % (id, retry_sec))
+            self.log.info("websocket_thread %d: retry connection in %d seconds" % (id, retry_sec))
             time.sleep(retry_sec)
 
     def connect(self):
@@ -374,21 +378,21 @@ class FwAgent:
         :returns: `True` if connection was established and than was closed gracefully,
                   `False` otherwise.
         """
-        fwglobals.log.info("connecting to flexiManage...")
+        self.log.info("connecting to flexiManage...")
 
         self.connection_error_code = 0
 
         # Load device token obtained during registration
         device_token_fname = fwglobals.g.DEVICE_TOKEN_FILE
         if not os.path.exists(device_token_fname):
-            fwglobals.log.error("connect: device token not found (" + device_token_fname + "), please register first")
+            self.log.error("connect: device token not found (" + device_token_fname + "), please register first")
             return False
         try:
             with open(device_token_fname, 'r') as fin:
                     fdata = fin.readline()
                     self.data = json.loads(fdata)
         except:
-            fwglobals.log.error("connect: failed to load device token from " + device_token_fname + ": " + format())
+            self.log.error("connect: failed to load device token from " + device_token_fname + ": " + format())
             return False
 
         # WebSocket callbacks
@@ -406,7 +410,7 @@ class FwAgent:
 
         machine_id = fwutils.get_machine_id()
         if machine_id == None:
-            fwglobals.log.error("connect: can't connect (failed to retrieve machine ID in fwutils.py:get_machine_id")
+            self.log.error("connect: can't connect (failed to retrieve machine ID in fwutils.py:get_machine_id")
             return False
         url = "wss://%s/%s?token=%s" % (self.data['server'], machine_id, self.data['deviceToken'])
         header_UserAgent = "User-Agent: fwagent/%s" % (self.versions['components']['agent']['version'])
@@ -431,9 +435,9 @@ class FwAgent:
         #                    ping_interval=0, ping_timeout=0)
         if self.connection_error_code:
             error_str = "connection to flexiManage was closed due to %s" % self.connection_error_msg
-            fwglobals.log.error(error_str)
+            self.log.error(error_str)
             return False
-        fwglobals.log.info("connection to flexiManage was closed")
+        self.log.info("connection to flexiManage was closed")
         return True
 
     def reconnect(self):
@@ -447,11 +451,11 @@ class FwAgent:
         This function closes the current connection and opens the new one.
         """
         if self.ws == None:
-            fwglobals.log.info("flexiManage is not connected, ignore reconnection request")
+            self.log.info("flexiManage is not connected, ignore reconnection request")
         elif self.reconnecting:
-            fwglobals.log.info("reconnection to flexiManage was initiated already")
+            self.log.info("reconnection to flexiManage was initiated already")
         else:
-            fwglobals.log.info("initiate reconnection to flexiManage")
+            self.log.info("initiate reconnection to flexiManage")
             self.reconnecting = True
             self.ws.close()
             # The new connection will be opened by the FwagentDaemon object from
@@ -477,7 +481,7 @@ class FwAgent:
         else:
             self.connection_error_code = fwglobals.g.WS_STATUS_ERROR_LOCAL_ERROR
             self.connection_error_msg  = str(error)
-        fwglobals.log.error("_on_error: connection got error '%s'" % self.connection_error_msg)
+        self.log.error("_on_error: connection got error '%s'" % self.connection_error_msg)
 
         # Create a file to signal the upgrade process that the
         # upgraded agent failed to connect to the management.
@@ -492,7 +496,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("_on_close: connection to flexiManage is closed")
+        self.log.info("_on_close: connection to flexiManage is closed")
         if self.thread_statistics:
             self.connected = False
             self.thread_statistics.join()
@@ -504,7 +508,7 @@ class FwAgent:
 
         :returns: None.
         """
-        fwglobals.log.info("connected to flexiManage")
+        self.log.info("connected to flexiManage")
 
         self.connected    = True
         self.reconnecting = False
@@ -517,9 +521,9 @@ class FwAgent:
         # These are replies to messages that might have cause the connection
         # to the flexiManage to disconnect, and thus have to be sent on the new connection.
         if len(self.pending_msg_replies) > 0:
-            fwglobals.log.info("_on_open: send %d pending replies to flexiManage" % len(self.pending_msg_replies))
+            self.log.info("_on_open: send %d pending replies to flexiManage" % len(self.pending_msg_replies))
             for reply in self.pending_msg_replies:
-                fwglobals.log.debug("_on_open: sending reply: " + json.dumps(reply))
+                self.log.debug("_on_open: sending reply: " + json.dumps(reply))
                 ws.send(json.dumps(reply))
 
             del self.pending_msg_replies[:]
@@ -545,9 +549,9 @@ class FwAgent:
                         if self.received_request or self.handling_request:
                             self.received_request = False
                         else:
-                            fwglobals.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
+                            self.log.debug("connect: no request was received in %s seconds, drop connection" % timeout)
                             ws.close()
-                            fwglobals.log.debug("connect: connection was terminated")
+                            self.log.debug("connect: connection was terminated")
                             break
 
                         # Every 30 seconds update statistics
@@ -559,7 +563,7 @@ class FwAgent:
                         else:
                             fwstats.update_stats()
                 except Exception as e:
-                    fwglobals.log.excep("%s: %s (%s)" %
+                    self.log.excep("%s: %s (%s)" %
                         (threading.current_thread().getName(), str(e), traceback.format_exc()))
                     pass
 
@@ -572,7 +576,7 @@ class FwAgent:
         self.thread_statistics.start()
 
         if not fwutils.vpp_does_run():
-            fwglobals.log.info("connect: router is not running, start it in flexiManage")
+            self.log.info("connect: router is not running, start it in flexiManage")
 
 
     def _on_message(self, ws, message):
@@ -593,7 +597,7 @@ class FwAgent:
         seq     = str(pmsg['seq'])              # Sequence number of the received message
         job_id  = str(pmsg.get('jobid',''))     # ID of job on flexiManage that sent this message
 
-        fwglobals.log.debug(seq + " job_id=" + job_id + " request=" + json.dumps(request))
+        self.log.debug(seq + " job_id=" + job_id + " request=" + json.dumps(request))
 
         # In load simulator mode always reply ok on sync message
         if loadsimulator.g.enabled() and request["message"] == "sync-device":
@@ -602,7 +606,7 @@ class FwAgent:
             reply = self.handle_received_request(request)
 
         reply_str = reply if 'message' in request and not re.match('get-device-(logs|packet-traces)', request['message']) else {"ok":1}
-        fwglobals.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
+        self.log.debug(seq + " job_id=" + job_id + " reply=" + json.dumps(reply_str))
 
         # Messages that change the interfaces might break the existing connection
         # (for example, if the WAN interface IP/mask has changed). Since sending
@@ -612,7 +616,7 @@ class FwAgent:
         # we will pop the reply out of queue and will send it to the flexiManage.
         #
         if self.reconnecting == True:
-            fwglobals.log.info("_on_message: goes to reestablish connection, queue reply %s" % str(pmsg['seq']))
+            self.log.info("_on_message: goes to reestablish connection, queue reply %s" % str(pmsg['seq']))
             self.pending_msg_replies.append({'seq':pmsg['seq'], 'msg':reply})
         else:
             ws.send(json.dumps({'seq':pmsg['seq'], 'msg':reply}))
@@ -653,7 +657,7 @@ class FwAgent:
 
             if print_message:
                 log_line = "handle_received_request:request\n" + json.dumps(msg, sort_keys=True, indent=1)
-                fwglobals.log.debug(log_line)
+                self.log.debug(log_line)
                 if logger:
                     logger.debug(log_line)
 
@@ -665,14 +669,14 @@ class FwAgent:
 
             if print_message:
                 log_line = "handle_received_request:reply\n" + json.dumps(reply, sort_keys=True, indent=1)
-                fwglobals.log.debug(log_line)
+                self.log.debug(log_line)
                 if logger:
                     logger.debug(log_line)
 
             self.handling_request = False
 
         except Exception as e:
-             fwglobals.log.error("handle_received_request failed: %s" + str(e))
+             self.log.error("handle_received_request failed: %s" + str(e))
              return {'ok': 0, 'message': str(e)}
         return reply
 
@@ -688,7 +692,7 @@ class FwAgent:
                               rest of loaded requests will be not executed.
         :returns: N/A.
         """
-        fwglobals.log.debug("inject_requests(filename=%s, ignore_errors=%s)" % \
+        self.log.debug("inject_requests(filename=%s, ignore_errors=%s)" % \
             (filename, str(ignore_errors)))
 
         if json_requests:
@@ -879,7 +883,7 @@ def show(agent, configuration, database, status):
             fwglobals.log.info('Router state: %s (%s)' % (fwutils.get_router_state()[0], fwutils.get_router_state()[1]))
 
 @Pyro4.expose
-class FwagentDaemon(object):
+class FwagentDaemon(FwObject):
     """This class implements abstraction of Fwagent that runs in daemon mode.
     When the Fwagent runs as a daemon, someone has to create it and to invoke
     registration, connection and other Fwagent functionality, while keeping
@@ -903,6 +907,8 @@ class FwagentDaemon(object):
                            hence no need in network activity, like STUN.
                            The standalone mode is used by CLI-based tests.
         """
+        FwObject.__init__(self)
+
         self.agent          = None
         self.active         = False
         self.thread_main    = None
@@ -912,7 +918,7 @@ class FwagentDaemon(object):
         signal.signal(signal.SIGINT,  self._signal_handler)
 
     def _signal_handler(self, signum, frame):
-        fwglobals.log.info("got %s" % fwglobals.g.signal_names[signum])
+        self.log.info("got %s" % fwglobals.g.signal_names[signum])
         exit(1)
 
     def __enter__(self):
@@ -924,11 +930,11 @@ class FwagentDaemon(object):
         # caused the `with` statement execution to fail. If the `with`
         # statement finishes without an exception being raised, these
         # arguments will be `None`.
-        fwglobals.log.debug("goes to exit")
+        self.log.debug("goes to exit")
         self.stop(stop_router=False)  # Keep VPP running to continue packet routing. To stop is use 'fwagent stop'
         fwglobals.g.finalize_agent()
         self.agent = None
-        fwglobals.log.debug("exited")
+        self.log.debug("exited")
 
     def _check_system(self):
         """Check system requirements.
@@ -941,15 +947,15 @@ class FwagentDaemon(object):
             subprocess.check_call(['python3' , checker , '--check_only'])
             return True
         except subprocess.CalledProcessError as err:
-            fwglobals.log.excep("+====================================================")
-            fwglobals.log.excep("| System checker failed (%d)" % err.returncode)
-            fwglobals.log.excep("| Fix problems and run 'fwagent start'")
-            fwglobals.log.excep("| To check and configure system run 'fwsystem_checker'")
-            fwglobals.log.excep("+=====================================================")
+            self.log.excep("+====================================================")
+            self.log.excep("| System checker failed (%d)" % err.returncode)
+            self.log.excep("| Fix problems and run 'fwagent start'")
+            self.log.excep("| To check and configure system run 'fwsystem_checker'")
+            self.log.excep("+=====================================================")
             return False
 
     def ping(self):
-        fwglobals.log.debug("ping: alive")
+        self.log.debug("ping: alive")
 
     def start(self, start_vpp=False, check_system=True):
         """Starts the main daemon loop.
@@ -961,10 +967,10 @@ class FwagentDaemon(object):
 
         :returns: None.
         """
-        fwglobals.log.debug("start (start_vpp=%s)" % str(start_vpp))
+        self.log.debug("start (start_vpp=%s)" % str(start_vpp))
 
         if self.active:
-            fwglobals.log.debug("already started, ignore")
+            self.log.debug("already started, ignore")
             return
 
         # Reload configuration.
@@ -974,19 +980,19 @@ class FwagentDaemon(object):
         if check_system and fwglobals.g.router_api.state_is_started():
             check_system = False    # No need to check system if VPP runs, it is too late :)
         if check_system and self._check_system() == False:
-            fwglobals.log.excep("system checker failed")
+            self.log.excep("system checker failed")
 
         if start_vpp:
             try:
                 fwglobals.g.router_api.start_router()
-                fwglobals.log.debug("vpp started")
+                self.log.debug("vpp started")
             except Exception as e:
-                fwglobals.log.excep("failed to start vpp: " + str(e))
+                self.log.excep("failed to start vpp: " + str(e))
                 return
         self.active  = True
         self.thread_main = threading.Thread(target=self.main, name='FwagentDaemon Main Thread')
         self.thread_main.start()
-        fwglobals.log.debug("started")
+        self.log.debug("started")
 
     def stop(self, stop_router=True):
         """Stop main daemon loop.
@@ -997,35 +1003,35 @@ class FwagentDaemon(object):
 
         :returns: None.
         """
-        fwglobals.log.debug("stop")
+        self.log.debug("stop")
 
         # Initiate connection shutdown
         if self.active:
             self.active = False
             self.agent.disconnect()  # Break WebSocket connection event loop to get control back to main()
-            fwglobals.log.debug("disconnect from server was initiated")
+            self.log.debug("disconnect from server was initiated")
         # Stop vpp ASAP, as no more requests can arrive on connection
         if stop_router:
             try:
                 fwglobals.g.handle_request({'message':'stop-router'})
-                fwglobals.log.debug("router stopped")
+                self.log.debug("router stopped")
             except Exception as e:
-                fwglobals.log.excep("failed to stop router: " + str(e))
+                self.log.excep("failed to stop router: " + str(e))
         elif fwglobals.g.router_api.state_is_started():
-            fwglobals.log.debug("vpp alive, use 'fwagent stop' to stop it")
+            self.log.debug("vpp alive, use 'fwagent stop' to stop it")
         # Stop main connection loop
         if self.thread_main:
             self.thread_main.join()
             self.thread_main = None
 
-        fwglobals.log.debug("stopped")
+        self.log.debug("stopped")
 
     def reset(self):
         """Restart the main daemon loop.
 
         :returns: None.
         """
-        fwglobals.log.debug("reset")
+        self.log.debug("reset")
         self.stop()
         self.start()
 
@@ -1047,7 +1053,7 @@ class FwagentDaemon(object):
 
         :returns: None.
         """
-        fwglobals.log.info("connection loop was started, use 'fwagent stop' to stop it if needed")
+        self.log.info("connection loop was started, use 'fwagent stop' to stop it if needed")
 
         # Register with Manager
         # -------------------------------------
@@ -1058,7 +1064,7 @@ class FwagentDaemon(object):
             # Otherwise sleep random period and retry registration.
             if self.agent.register_error == 'token not found' or \
                self.agent.register_error == 'invalid token':
-                fwglobals.log.debug('poll %s for modification' % fwglobals.g.cfg.TOKEN_FILE)
+                self.log.debug('poll %s for modification' % fwglobals.g.cfg.TOKEN_FILE)
                 token   = self.agent.token
                 elapsed = 0
                 while token == self.agent.token and self.active:
@@ -1071,14 +1077,14 @@ class FwagentDaemon(object):
             # If we got same registration reject twice - stop retrials
             elif self.agent.register_error != '' and \
                  self.agent.register_error == prev_register_error:
-                fwglobals.log.info("stop registration trials, use 'fwagent start' to resume")
+                self.log.info("stop registration trials, use 'fwagent start' to resume")
                 self.active = False
                 return
             # Sleep a little bit and retry
             else:
                 prev_register_error = self.agent.register_error
                 retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
-                fwglobals.log.info("retry registration in %d seconds" % retry_sec)
+                self.log.info("retry registration in %d seconds" % retry_sec)
                 time.sleep(retry_sec)
 
         # Establish main connection to Manager.
@@ -1096,12 +1102,12 @@ class FwagentDaemon(object):
                     retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_MIN, fwglobals.g.RETRY_INTERVAL_MAX)
                 else:
                     retry_sec = random.randint(fwglobals.g.RETRY_INTERVAL_LONG_MIN, fwglobals.g.RETRY_INTERVAL_LONG_MAX)
-                fwglobals.log.info("retry connection in %d seconds" % retry_sec)
+                self.log.info("retry connection in %d seconds" % retry_sec)
                 while retry_sec > 0 and self.active:
                     time.sleep(1)   # Check self.active every second to detect Ctrl-C as soon as possible
                     retry_sec -= 1
 
-        fwglobals.log.info("connection loop was stopped, use 'fwagent start' to start it again")
+        self.log.info("connection loop was stopped, use 'fwagent start' to start it again")
 
 
     def api(self, api_name, api_args=None):

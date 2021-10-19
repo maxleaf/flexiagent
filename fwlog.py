@@ -50,19 +50,10 @@ class Fwlog:
         # We prefix every log line with name of class that invoked the log print.
         #
         date = ''
-        cls_name = ''
-
         if add_date:
             # "Jul  6 04:14:30" - like in syslog except zero padding of day
             date = datetime.today().strftime('%b %d %H:%M:%S') + ': '
-
-        stack = inspect.stack()
-        frame = stack[3]        # obj.f() -> fwlog.debug() -> _log() -> _build_log_line_prefix()
-        obj = frame[0].f_locals.get('self')
-        if obj:
-            cls_name = obj.__class__.__name__ + ': '
-
-        return date + cls_name
+        return date
 
     def excep(self, log_message, to_terminal=True, to_syslog=True):
         """Print exception message.
@@ -240,3 +231,34 @@ class FwLogFile(Fwlog):
             self.cur_size += total_len
             if self.cur_size > self.max_size:
                 self._rotate()
+
+
+class FwObjectLogger:
+    """Wraps the FwLog (by aggregation), while keeping object specific information,
+    e.g. name of object class. This name is prepended to the log lines.
+    For example if class FwCfgRequestHandler inherits from the FwObjectLogger,
+    the FwCfgRequestHandler::log() will print "FwCfgRequestHandler: ..." lines
+    into log.
+    """
+    def __init__(self, object_name, log=None):
+        import fwglobals
+        self.log = log if log else fwglobals.log if fwglobals.g_initialized else FwSyslog()
+        self.prefix = f"{object_name}: "
+
+    def excep(self, log_message, to_terminal=True, to_syslog=True):
+        self.log.excep(self.prefix + log_message, to_terminal=to_terminal, to_syslog=to_syslog)
+
+    def error(self, log_message, to_terminal=True, to_syslog=True):
+        self.log.error(self.prefix + log_message, to_terminal=to_terminal, to_syslog=to_syslog)
+
+    def warning(self, log_message, to_terminal=True, to_syslog=True):
+        self.log.warning(self.prefix + log_message, to_terminal=to_terminal, to_syslog=to_syslog)
+
+    def info(self, log_message, to_terminal=True, to_syslog=True):
+        self.log.info(self.prefix + log_message, to_terminal=to_terminal, to_syslog=to_syslog)
+
+    def debug(self, log_message, to_terminal=True, to_syslog=True):
+        self.log.debug(self.prefix + log_message, to_terminal=to_terminal, to_syslog=to_syslog)
+
+    def trace(self, log_message, to_terminal=True, to_syslog=True):
+        self.log.trace(self.prefix + log_message, to_terminal=to_terminal, to_syslog=to_syslog)

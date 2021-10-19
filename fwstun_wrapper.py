@@ -16,7 +16,9 @@ tools = os.path.join(os.path.dirname(os.path.realpath(__file__)) , 'tools')
 sys.path.append(tools)
 import fwstun
 
-class FwStunWrap:
+from fwobject import FwObject
+
+class FwStunWrap(FwObject):
     'Class to handle STUN requests and responses'
     """
     The router configuration file contains a list of interfaces that are
@@ -60,6 +62,7 @@ class FwStunWrap:
                                  do not want to sent STUN requests on their behalf as
                                  they will produce nothing.
         """
+        FwObject.__init__(self)
         self.stun_cache    = fwglobals.g.cache.stun_cache
         self.sym_nat_cache = fwglobals.g.cache.sym_nat_cache
         self.sym_nat_tunnels_cache = fwglobals.g.cache.sym_nat_tunnels_cache
@@ -76,7 +79,7 @@ class FwStunWrap:
                 # print only WAN address
                 if self.stun_cache[dev_id].get('local_ip') != '' and \
                     self.stun_cache[dev_id].get('gateway') != '':
-                    fwglobals.log.debug(dev_id + ':' + str(self.stun_cache[dev_id]))
+                    self.log.debug(dev_id + ':' + str(self.stun_cache[dev_id]))
 
     def initialize(self):
         """ Initialize STUN cache by sending STUN requests on all WAN interfaces before the first
@@ -86,13 +89,13 @@ class FwStunWrap:
         """
         if self.standalone:
             return
-        fwglobals.log.debug("Start sending STUN requests for all WAN interfaces")
+        self.log.debug("Start sending STUN requests for all WAN interfaces")
         ifaces = fwutils.get_all_interfaces()
         if ifaces:
             ips = [ifaces[dev_id]['addr'] for dev_id in ifaces if ifaces[dev_id]['addr'] != '' \
                                 and ifaces[dev_id]['gw'] != '']
 
-            fwglobals.log.debug("stun_thread initialize: collected WAN IPs: %s" %(str(ips)))
+            self.log.debug("stun_thread initialize: collected WAN IPs: %s" %(str(ips)))
             for dev_id in ifaces:
                 self.add_addr(dev_id, ifaces[dev_id].get('addr'), ifaces[dev_id].get('gw'))
             self._send_stun_requests()
@@ -119,8 +122,8 @@ class FwStunWrap:
         cache_ip_list       = [self.stun_cache[dev_id].get('local_ip') for dev_id in self.stun_cache \
                                 if self.stun_cache[dev_id].get('local_ip') != '' and self.stun_cache[dev_id].get('gateway') != '']
 
-        fwglobals.log.debug("_update_cache_from_OS: WAN IP list from OS %s" %(str(os_addr_list)))
-        fwglobals.log.debug("_update_cache_from_OS: WAN IP list from STUN cache %s" %(str(cache_ip_list)))
+        self.log.debug("_update_cache_from_OS: WAN IP list from OS %s" %(str(os_addr_list)))
+        self.log.debug("_update_cache_from_OS: WAN IP list from STUN cache %s" %(str(cache_ip_list)))
 
         # add updated IP from OS to Cache
         changed_flag = False
@@ -152,7 +155,7 @@ class FwStunWrap:
             # see if we can map the address to an existing dev id
             dev_id = self._map_ip_addr_to_dev_id(addr)
             if dev_id == None:
-                fwglobals.log.debug("add_addr: no dev_id was found for address %s, not updating cache" %(addr))
+                self.log.debug("add_addr: no dev_id was found for address %s, not updating cache" %(addr))
                 return
 
         # Add an updated address to dev id entry in the cache.
@@ -164,9 +167,9 @@ class FwStunWrap:
             cached_addr['server_index']     = 0
             cached_addr['nat_type']         = ''
             if addr:
-                fwglobals.log.debug("Updating dev_id address %s IP address %s in Cache" %(dev_id, addr))
+                self.log.debug("Updating dev_id address %s IP address %s in Cache" %(dev_id, addr))
             else:
-                fwglobals.log.debug("Updating dev_id address %s in Cache" %(dev_id))
+                self.log.debug("Updating dev_id address %s in Cache" %(dev_id))
 
 
     def find_addr(self, dev_id):
@@ -252,7 +255,7 @@ class FwStunWrap:
         cached_addr['send_time'] = time.time() + self.stun_retry # next retry after 60 seconds
         cached_addr['success'] = False
         cached_addr['server_index'] = 0
-        fwglobals.log.debug("_handle_stun_none_response: failed getting public IP/port for address %s, retry in %d seconds"\
+        self.log.debug("_handle_stun_none_response: failed getting public IP/port for address %s, retry in %d seconds"\
              %(cached_addr['local_ip'], self.stun_retry))
 
     def _handle_stun_response(self, dev_id, p_ip, p_port, nat_type, st_index):
@@ -269,7 +272,7 @@ class FwStunWrap:
         cached_addr = self.stun_cache.get(dev_id)
         if not cached_addr:
             return
-        fwglobals.log.debug("found external %s:%s for %s:4789" %(p_ip, p_port, cached_addr['local_ip']))
+        self.log.debug("found external %s:%s for %s:4789" %(p_ip, p_port, cached_addr['local_ip']))
         cached_addr['success']     = True
         cached_addr['send_time']   = 0
         cached_addr['nat_type']         = nat_type
@@ -321,7 +324,7 @@ class FwStunWrap:
         if dev_name == None:
             return '','','',''
 
-        fwglobals.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
+        self.log.debug("trying to find external %s:%s for device %s" %(lcl_src_ip,lcl_src_port, dev_name))
 
         nat_type, nat_ext_ip, nat_ext_port, stun_index = \
             fwstun.get_ip_info(lcl_src_ip, lcl_src_port, None, None, dev_name, stun_idx)
@@ -371,7 +374,7 @@ class FwStunWrap:
                         self._update_cache_from_OS()
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -424,7 +427,7 @@ class FwStunWrap:
             # is no longer valid. To make things safe, we check if the IP address exists
             # in the system. If it is not, no point on adding it to the STUN cache.
             if tunnel['src'] not in ips:
-                fwglobals.log.debug("Tunnel %d is down, but its source address %s was not found in the system"\
+                self.log.debug("Tunnel %d is down, but its source address %s was not found in the system"\
                     %(tunnel_id, tunnel['src']))
                 continue
 
@@ -434,7 +437,7 @@ class FwStunWrap:
             # updates its source IP address to the cache of addresses for which
             # we will send STUN requests.
             if tunnel['src'] not in ip_up_set:
-                fwglobals.log.debug("Tunnel %d is down, updating address %s in STUN interfaces cache"\
+                self.log.debug("Tunnel %d is down, updating address %s in STUN interfaces cache"\
                     %(tunnel_id, tunnel['src']))
                 # Force sending STUN request on behalf of the tunnel's source address
                 if self.stun_cache.get(dev_id):
@@ -447,17 +450,17 @@ class FwStunWrap:
             # Try to discover remote edge ip and port from incoming packets.
             if self.sym_nat_cache.get(dev_id):
                 if self.sym_nat_cache[dev_id]['probe_time'] == 0:
-                    fwglobals.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
+                    self.log.debug("Re-try to discover remote edge for tunnel: %d on dev %s"%(tunnel_id, dev_id))
                     self.sym_nat_cache[dev_id]['local_ip'] = tunnel['src']
                     self.sym_nat_cache[dev_id]['probe_time'] = time.time() + 25
             elif dev_id is not None:
-                fwglobals.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
+                self.log.debug("Try to discover remote edge for tunnel %d on dev %s"%(tunnel_id, dev_id))
                 self.sym_nat_cache[dev_id] = {
                             'local_ip'    : tunnel['src'],
                             'probe_time'  : time.time() + 25,
                         }
             else:
-                fwglobals.log.debug("Dev is %s for tunnel %d"%(dev_id, tunnel_id))
+                self.log.debug("Dev is %s for tunnel %d"%(dev_id, tunnel_id))
 
             # For IKEv2 tunnels, if we are behind symmetric NAT, and if we are IKE responder,
             # we have to send VxLAN packet to the remote end of the tunnel in order to pinhole the NAT.
@@ -465,7 +468,7 @@ class FwStunWrap:
             encryption_mode = tunnel.get("encryption-mode", "psk")
             role = tunnel.get("ikev2", {}).get("role", "")
             if encryption_mode == "ikev2" and role == "responder":
-                fwglobals.log.debug("ikev2 tunnel %d responder side is down on dev %s"%(tunnel_id, dev_id))
+                self.log.debug("ikev2 tunnel %d responder side is down on dev %s"%(tunnel_id, dev_id))
                 self.sym_nat_tunnels_cache[tunnel_id] = {
                             'src'       : tunnel['src'],
                             'dst'       : tunnel['dst'],
@@ -547,10 +550,10 @@ class FwStunWrap:
                 src_port = 4789
                 dev_name = fwutils.get_interface_name(src_ip)
 
-                fwglobals.log.debug("Tunnel: discovering remote ip for tunnels with src %s:%s on device %s" \
+                self.log.debug("Tunnel: discovering remote ip for tunnels with src %s:%s on device %s" \
                     %(src_ip, src_port, dev_name))
                 probe_tunnels_dev = fwstun.get_remote_ip_info(src_ip, src_port, dev_name)
-                fwglobals.log.debug("Tunnel: discovered tunnels %s on dev %s" %(probe_tunnels_dev, dev_name))
+                self.log.debug("Tunnel: discovered tunnels %s on dev %s" %(probe_tunnels_dev, dev_name))
                 probe_tunnels.update(probe_tunnels_dev)
                 cached_addr['probe_time'] = 0
 
@@ -574,12 +577,12 @@ class FwStunWrap:
                 vni = self._get_vni(tunnel_id, encryption_mode)
                 if vni in probe_tunnels:
                     if tunnel['dst'] != probe_tunnels[vni]["dst"] or tunnel['dstPort'] != probe_tunnels[vni]["dstPort"]:
-                        fwglobals.log.debug("Remove tunnel: %s" %(tunnel))
+                        self.log.debug("Remove tunnel: %s" %(tunnel))
                         fwglobals.g.handle_request({'message':'remove-tunnel', "params": tunnel})
 
                         tunnel['dst'] = probe_tunnels[vni]["dst"]
                         tunnel['dstPort'] = probe_tunnels[vni]["dstPort"]
-                        fwglobals.log.debug("Add tunnel: %s" %(tunnel))
+                        self.log.debug("Add tunnel: %s" %(tunnel))
                         fwglobals.g.handle_request({'message':'add-tunnel', "params": tunnel})
 
     def _send_symmetric_nat(self):

@@ -24,10 +24,14 @@ import fwglobals
 import json
 from sqlitedict import SqliteDict
 
-class FwMultilink:
+from fwobject import FwObject
+
+class FwMultilink(FwObject):
     """This is object that encapsulates data used by multi-link feature.
     """
     def __init__(self, db_file, fill_if_empty=True):
+        FwObject.__init__(self)
+
         self.db_filename = db_file
         # The DB contains:
         # db['labels']     - map of label strings (aka names) into integers (aka id-s) used by VPP.
@@ -125,6 +129,6 @@ class FwMultilink:
 
         gc_after = len(labels)
 
-        fwglobals.log.debug("get_label_ids_by_names: input=%s, remove=%s, output=%s, gc: %d -> %d" % \
+        self.log.debug("get_label_ids_by_names: input=%s, remove=%s, output=%s, gc: %d -> %d" % \
             (names, str(remove), ','.join(map(str, ids)), gc_before, gc_after))
         return ids

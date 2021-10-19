@@ -20,8 +20,6 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import json
-import os
 import re
 import subprocess
 import sys
@@ -34,7 +32,9 @@ import fwnetplan
 import fwroutes
 import fwutils
 
-class FwWanMonitor:
+from fwobject import FwObject
+
+class FwWanMonitor(FwObject):
     """This object monitors internet connectivity over default WAN interface,
     and if bad connectivity is detected, it updates routing table to use
     other WAN interface with lowest metric. Than the 'bad' interface is monitored
@@ -97,7 +97,7 @@ class FwWanMonitor:
 
 
     def main_loop(self):
-        fwglobals.log.debug("loop started")
+        self.log.debug("loop started")
 
         prev_time = time.time()
 
@@ -106,7 +106,7 @@ class FwWanMonitor:
             try: # Ensure thread doesn't exit on exception
 
                 while fwglobals.g.router_api.state_is_starting_stopping():
-                    fwglobals.log.debug("vpp is being started/stopped")
+                    self.log.debug("vpp is being started/stopped")
                     time.sleep(5)
 
                 server = self._get_server()
@@ -117,7 +117,7 @@ class FwWanMonitor:
                     self._check_connectivity(r, server)
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -130,7 +130,7 @@ class FwWanMonitor:
             else:
                 prev_time = current_time
 
-        fwglobals.log.debug("loop stopped")
+        self.log.debug("loop stopped")
 
 
     def _get_server(self):
@@ -163,24 +163,24 @@ class FwWanMonitor:
             interfaces = fwglobals.g.router_cfg.get_interfaces(dev_id=route.dev_id)
             if interfaces and (interfaces[0].get('monitorInternet', True) == False):
                 if not route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
+                    self.log.debug("disabled on %s(%s)" % (route.dev, route.dev_id))
                     self.disabled_routes[route.dev_id] = route
                 continue
             # If monitoring was enabled again, log this.
             if interfaces and route.dev_id in self.disabled_routes:
-                fwglobals.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
+                self.log.debug("enabled on %s(%s)" % (route.dev, route.dev_id))
                 del self.disabled_routes[route.dev_id]
 
             # Filter out unassigned interfaces, if fwagent_conf.yaml orders that.
             #
             if not interfaces and not fwglobals.g.cfg.MONITOR_UNASSIGNED_INTERFACES:
                 if not route.dev_id in self.disabled_routes:
-                    fwglobals.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                    self.log.debug("disabled on unassigned %s(%s)" % (route.dev, route.dev_id))
                     self.disabled_routes[route.dev_id] = route
                 continue
             # If interface was assigned again, log this.
             if not interfaces and route.dev_id in self.disabled_routes:
-                fwglobals.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
+                self.log.debug("enabled on unassigned %s(%s)" % (route.dev, route.dev_id))
                 del self.disabled_routes[route.dev_id]
 
             # if this route is known to us, update statistics from cache
@@ -191,7 +191,7 @@ class FwWanMonitor:
                 route.ok        = cached.ok
                 route.default   = cached.default
             else:
-                fwglobals.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
+                self.log.debug("Start WAN Monitoring on '%s'" % (str(route)))
 
             # Finally store the route into cache.
             #
@@ -206,7 +206,7 @@ class FwWanMonitor:
         #
         stale_keys = list(set(self.routes.keys()) - set(os_routes.keys()))
         for key in stale_keys:
-            fwglobals.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
+            self.log.debug("Stop WAN Monitoring on '%s'" % (str(self.routes[key])))
             del self.routes[key]
 
         return list(self.routes.values())
@@ -231,16 +231,16 @@ class FwWanMonitor:
         new_metric = None
         if route.metric < self.WATERMARK and failures >= self.THRESHOLD:
             new_metric = route.metric + self.WATERMARK
-            fwglobals.log.debug("WAN Monitor: Link down Metric Update - From: %d To: %d" %
+            self.log.debug("WAN Monitor: Link down Metric Update - From: %d To: %d" %
                 (route.metric, new_metric))
         elif route.metric >= self.WATERMARK and successes >= self.THRESHOLD:
             new_metric = route.metric - self.WATERMARK
-            fwglobals.log.debug("WAN Monitor: Link up Metric Update - From: %d To: %d" %
+            self.log.debug("WAN Monitor: Link up Metric Update - From: %d To: %d" %
                 (route.metric, new_metric))
 
         if new_metric != None:
             state = 'lost' if new_metric >= self.WATERMARK else 'restored'
-            fwglobals.log.debug("connectivity %s on %s" % (state, route.dev))
+            self.log.debug("connectivity %s on %s" % (state, route.dev))
             self._update_metric(route, new_metric)
 
 
@@ -251,7 +251,7 @@ class FwWanMonitor:
         :param route:   the route to be updated with new metric
         :param new_metric:  the new metric
         '''
-        fwglobals.log.debug("'%s' update metric: %d -> %d" % \
+        self.log.debug("'%s' update metric: %d -> %d" % \
             (str(route), route.metric, new_metric))
 
         # Firsly update the route status, so if get_wan_failover_metric() is called
@@ -269,7 +269,7 @@ class FwWanMonitor:
         success, err_str = fwroutes.add_remove_route("0.0.0.0/0", route.via, route.metric, True, route.dev, route.proto)
         if not success:
             route.ok = prev_ok
-            fwglobals.log.error("failed to update metric in OS: %s" % err_str)
+            self.log.error("failed to update metric in OS: %s" % err_str)
             return
 
         fwutils.clear_linux_interfaces_cache()
@@ -317,10 +317,10 @@ class FwWanMonitor:
                                         mtu, if_name=route.dev, validate_ip=False)
                 if not success:
                     route.ok = prev_ok
-                    fwglobals.log.error("failed to update metric in netplan: %s" % err_str)
+                    self.log.error("failed to update metric in netplan: %s" % err_str)
                     return
             except Exception as e:
-                fwglobals.log.error("_update_metric failed: %s" % str(e))
+                self.log.error("_update_metric failed: %s" % str(e))
 
         # If defult route was changes as a result of metric update,
         # reconnect agent to flexiManage.
@@ -328,7 +328,7 @@ class FwWanMonitor:
         if route.default:
             fwglobals.g.fwagent.reconnect()
 
-        fwglobals.log.debug("'%s' update metric: %d -> %d - done" % \
+        self.log.debug("'%s' update metric: %d -> %d - done" % \
             (str(route), route.metric, new_metric))
 
 
