@@ -1160,6 +1160,19 @@ def vpp_sw_if_index_to_name(sw_if_index):
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
+def vpp_if_name_to_sw_if_index(vpp_if_name, type):
+    """Convert VPP interface name into VPP sw_if_index.
+
+     :param vpp_if_name:      VPP interface name.
+     :param type:             Interface type.
+
+     :returns: VPP sw_if_index.
+     """
+    router_api_db  = fwglobals.g.db['router_api']
+    cache_by_name  = router_api_db['vpp_if_name_to_sw_if_index'][type]
+    sw_if_index  = cache_by_name[vpp_if_name]
+    return sw_if_index
+
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
 # e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
 # To do that we dump all interfaces from VPP, find the one with the provided index,
@@ -1196,6 +1209,26 @@ def vpp_ip_to_sw_if_index(ip):
             if network == int_address:
                 return sw_if.sw_if_index
     return None
+
+def vpp_get_interface_status(sw_if_index):
+    """Get VPP interface state.
+
+     :param sw_if_index:      VPP sw_if_index.
+
+     :returns: Status.
+     """
+    flags = 0
+    status = 'down'
+
+    try:
+        flags = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)[0].flags
+        # flags are equal to IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP when interface is up
+        # and flags is equal to 0 when interface is down
+        status = 'down' if flags == 0 else 'up'
+    except Exception as e:
+        fwglobals.log.debug("vpp_get_interface_state: %s" % str(e))
+
+    return status
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
