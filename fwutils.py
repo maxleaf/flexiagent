@@ -1221,10 +1221,12 @@ def vpp_get_interface_status(sw_if_index):
     status = 'down'
 
     try:
-        flags = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)[0].flags
-        # flags are equal to IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP when interface is up
-        # and flags is equal to 0 when interface is down
-        status = 'down' if flags == 0 else 'up'
+        interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
+        if len(interfaces) == 1:
+            flags = interfaces[0].flags
+            # flags are equal to IF_STATUS_API_FLAG_LINK_UP|IF_STATUS_API_FLAG_ADMIN_UP when interface is up
+            # and flags is equal to 0 when interface is down
+            status = 'down' if flags == 0 else 'up'
     except Exception as e:
         fwglobals.log.debug("vpp_get_interface_state: %s" % str(e))
 
