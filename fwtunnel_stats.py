@@ -124,9 +124,19 @@ def tunnel_stats_test():
     tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
+        vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
+        if vpp_peer_tunnel_name:
+            sw_if_index = fwutils.vpp_if_name_to_sw_if_index(vpp_peer_tunnel_name, 'tunnel')
+            status = fwutils.vpp_get_interface_status(sw_if_index)
+            if 'status' not in stats or ('status' in stats and stats['status'] != status):
+                stats['status'] = status
+                loss = 100 if status == 'down' else 0
+                vppctl_cmd = 'fwabf quality %s loss %u delay 0 jitter 0' % (vpp_peer_tunnel_name, loss)
+                fwutils.vpp_cli_execute([vppctl_cmd])
 
         rtt = tunnel_rtt.get(tunnel_id, 0)
         if rtt is None:
+            stats['rtt'] = 0
             continue
 
         if rtt > 0:
@@ -139,7 +149,6 @@ def tunnel_stats_test():
         stats['drop_rate'] = 100.0 * stats['drops'].get_average()
 
         update = False
-        vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
         if vpp_peer_tunnel_name:
             ifname = vpp_peer_tunnel_name
         else:
@@ -179,13 +188,17 @@ def tunnel_stats_get():
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
         tunnel_stats[tunnel_id] = {}
-        tunnel_stats[tunnel_id]['rtt'] = stats['rtt']
-        tunnel_stats[tunnel_id]['drop_rate'] = stats['drop_rate']
+        tunnel_stats[tunnel_id]['rtt'] = stats.get('rtt')
+        tunnel_stats[tunnel_id]['drop_rate'] = stats.get('drop_rate')
 
-        if ((stats['timestamp'] == 0) or (cur_time - stats['timestamp'] > TIMEOUT)):
-            tunnel_stats[tunnel_id]['status'] = 'down'
-        else:
-            tunnel_stats[tunnel_id]['status'] = 'up'
+        status = stats.get('status')
+        tunnel_stats[tunnel_id]['status'] = status if status else 'down'
+
+        if tunnel_stats[tunnel_id]['rtt'] and tunnel_stats[tunnel_id]['rtt'] > 0:
+            if ((stats['timestamp'] == 0) or (cur_time - stats['timestamp'] > TIMEOUT)):
+                tunnel_stats[tunnel_id]['status'] = 'down'
+            else:
+                tunnel_stats[tunnel_id]['status'] = 'up'
 
     return tunnel_stats
 
@@ -240,8 +253,7 @@ def tunnel_stats_add(params):
 
     if 'peer' in params:
         tap_map = fwutils.vpp_get_tap_mapping()
-        hosts_to_ping = [params['dst']]
-        hosts_to_ping += params['peer']['ips']
+        hosts_to_ping = params['peer']['ips']
         hosts_to_ping += params['peer']['urls']
         loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
         loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
