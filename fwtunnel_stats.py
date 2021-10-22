@@ -49,7 +49,7 @@ def start_fping_process(cmd):
     process = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True, universal_newlines=True)
     return process
 
-def tunnel_stats_get_ping_time(tunnels):
+def peer_stats_get_ping_time(tunnels):
     """Use fping to get RTT.
 
     :param tunnels:         IP addresses to ping.
@@ -91,6 +91,38 @@ def tunnel_stats_get_ping_time(tunnels):
 
     return ret
 
+def tunnel_stats_get_ping_time(tunnels):
+    """Use fping to get RTT.
+    :param tunnels:         IP addresses to ping.
+    :returns: RTT values on success and 0 otherwise.
+    """
+    ret = {}
+
+    if not tunnels:
+        return ret
+
+    cmd = "fping {hosts} -C 1 -q".format(hosts=" ".join(tunnels.keys()))
+
+    # use single process with process_id = 0 for all non-peering tunnels
+    # and combine fping into one call with multiple destinations
+    process_id = 0
+    rows = []
+
+    if process_id in fping_processes:
+        if fping_processes[process_id].poll() is not None:
+            (output, errors) = fping_processes[process_id].communicate()
+            rows = errors.strip().splitlines()
+            fping_processes[process_id] = start_fping_process(cmd)
+    else:
+        fping_processes[process_id] = start_fping_process(cmd)
+
+    for row in rows:
+        host_rtt = [x.strip() for x in row.strip().split(':')]
+        float_rtt = float(host_rtt[1]) if host_rtt[1] != '-' else 0.0
+        ret[tunnels[host_rtt[0]]] = float_rtt
+
+    return ret
+
 def tunnel_stats_clear():
     """Clear previously collected statistics.
 
@@ -116,12 +148,20 @@ def tunnel_stats_test():
     with tunnel_stats_global_lock:
         tunnel_stats_global_copy = copy.deepcopy(tunnel_stats_global)
 
-    tunnels = []
+    peers = []
+    tunnels = {}
     for tunnel_id, tunnel_stats_entry in tunnel_stats_global_copy.items():
-        hosts = tunnel_stats_entry.get('hosts_to_ping', [])
-        loopback_tap_name = tunnel_stats_entry.get('loopback_tap_name', None)
-        tunnels.append({'tunnel_id':tunnel_id, 'interface':loopback_tap_name, 'hosts':hosts})
-    tunnel_rtt = tunnel_stats_get_ping_time(tunnels)
+        if tunnel_stats_entry.get('vpp_peer_tunnel_name'):
+            hosts = tunnel_stats_entry.get('hosts_to_ping', [])
+            loopback_tap_name = tunnel_stats_entry.get('loopback_tap_name', None)
+            peers.append({'tunnel_id':tunnel_id, 'interface':loopback_tap_name, 'hosts':hosts})
+        else:
+            hosts = " ".join(tunnel_stats_entry.get('hosts_to_ping'))
+            if hosts:
+                tunnels[hosts] = tunnel_id
+
+    tunnel_rtt = peer_stats_get_ping_time(peers)
+    tunnel_rtt.update(tunnel_stats_get_ping_time(tunnels))
 
     for tunnel_id, stats in tunnel_stats_global_copy.items():
         vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
@@ -134,7 +174,7 @@ def tunnel_stats_test():
                 vppctl_cmd = 'fwabf quality %s loss %u delay 0 jitter 0' % (vpp_peer_tunnel_name, loss)
                 fwutils.vpp_cli_execute([vppctl_cmd])
 
-        rtt = tunnel_rtt.get(tunnel_id, 0)
+        rtt = tunnel_rtt.get(tunnel_id)
         if rtt is None:
             stats['rtt'] = 0
             continue
@@ -158,9 +198,11 @@ def tunnel_stats_test():
         delay = round(stats['rtt'])
 
         if abs(loss - stats['loss']) >= HYSTERESIS_LOSS:
+            fwglobals.log.debug(f"Link {ifname} loss quality is changed from {stats['loss']}% to {loss}%")
             stats['loss'] = loss
             update = True
         elif  abs(delay - stats['delay']) >= HYSTERESIS_DELAY:
+            fwglobals.log.debug(f"Link {ifname} delay quality is changed from {stats['delay']}ms to {delay}ms")
             stats['delay'] = delay
             update = True
 

@@ -4249,7 +4249,7 @@ class SlidingWindow(list):
         :param datapoint: new data point
         """
         self.append(datapoint)
-        if len(self) >= self.window_size:
+        if len(self) > self.window_size:
             del self[0]
 
     def get_average(self):
