@@ -970,6 +970,27 @@ def set_dev_id_to_tap(dev_id, tap):
     cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
     cache[dev_id_full] = tap
 
+def tunnel_to_vpp_if_name(params):
+    """Finds the name of the tunnel loopback interface in vpp.
+    We exploit vpp internals to do it in simple way.
+
+    :param params: parameters of tunnel taken from the router configuration database.
+                   It is 'params' field of the 'add-tunnel' request.
+    :returns: name of the tunnel loopback interface in vpp.
+    """
+    vpp_if_name = 'loop%d' % (params['tunnel-id']*2)
+    return vpp_if_name
+
+def tunnel_to_tap(params):
+    """Retrieves TAP name of the tunnel loopback interface that is exposed to Linux.
+
+    :param params: parameters of tunnel taken from the router configuration database.
+                   It is 'params' field of the 'add-tunnel' request.
+    :returns: name of the tunnel loopback interface in Linux.
+    """
+    vpp_if_name = tunnel_to_vpp_if_name(params)
+    return vpp_if_name_to_tap(vpp_if_name)
+
 def vpp_enable_tap_inject():
     """Enable tap-inject plugin
      """
@@ -993,28 +1014,37 @@ def vpp_enable_tap_inject():
 #   root@ubuntu-server-1:/# vppctl sh tap-inject
 #       GigabitEthernet0/8/0 -> vpp0
 #       GigabitEthernet0/9/0 -> vpp1
-def vpp_get_tap_info():
+def vpp_get_tap_info(vpp_if_name=None, vpp_sw_if_index=None, tap_if_name=None):
     """Get tap information
 
      :returns: tap info in list
      """
-    tap_to_vpp_if_name = {}
-    vpp_if_name_to_tap = {}
     if not vpp_does_run():
         fwglobals.log.debug("tap_info_get: VPP is not running")
         return ({}, {}, 'None')
 
-    taps = _vppctl_read("show tap-inject").strip()
+    if vpp_if_name:
+        vppctl_cmd = f"show tap-inject {vpp_if_name}"
+    elif vpp_sw_if_index:
+        vppctl_cmd = f"show tap-inject sw_if_index {vpp_sw_if_index}"
+    elif tap_if_name:
+        vppctl_cmd = f"show tap-inject tap {tap_if_name}"
+    else:
+        fwglobals.log.debug("tap_info_get: no arguments provided")
+        return (None, None)
+
+    taps = _vppctl_read(vppctl_cmd).strip()
     if not taps:
-        fwglobals.log.debug("tap_info_get: no TAPs configured")
-        return ({}, {}, taps)
+        fwglobals.log.debug(f"tap_info_get: '{vppctl_cmd}' returned nothing")
+        return (None, None)
 
     # check if tap-inject is configured and enabled
     if 'not enabled' in taps:
-        fwglobals.log.debug("tap_info_get: %s" % taps)
-        return ({}, {}, taps)
+        fwglobals.log.debug("tap_info_get: tap-inject disabled")
+        return (None, None)
 
-    taps = taps.splitlines()
+    tap_lines = taps.splitlines()
+
     # the output of "show tap-inject" might be messy,
     # Here are some examples we dealt with during the time:
     # [
@@ -1030,15 +1060,15 @@ def vpp_get_tap_info():
     # 'tap0 -> vpp3'
     # ]
     # we use a regex check to get the closest words before and after the arrow
-    for line in taps:
+    for line in tap_lines:
         tap_info = re.search(r'([/\w-]+) -> ([\S]+)', line)
         if tap_info:
             vpp_if_name = tap_info.group(1)
             tap = tap_info.group(2)
-            tap_to_vpp_if_name[tap] = vpp_if_name
-            vpp_if_name_to_tap[vpp_if_name] = tap
+            return (vpp_if_name, tap)
 
-    return (tap_to_vpp_if_name, vpp_if_name_to_tap, taps)
+    fwglobals.log.debug(f"tap_info_get: interface not found: {taps}")
+    return (None, None)
 
 def vpp_get_tap_mapping():
     """Get tap mapping
@@ -1075,12 +1105,8 @@ def tap_to_vpp_if_name(tap):
 
      :returns: Vpp interface name.
      """
-    tap_to_vpp_if_name, _, tap_info = vpp_get_tap_info()
-    if not tap in tap_to_vpp_if_name:
-        fwglobals.log.debug(f"tap_to_vpp_if_name({tap}): not found: {tap_info}")
-        return None
-    return tap_to_vpp_if_name[tap]
-
+    vpp_if_name, _ = vpp_get_tap_info(tap_if_name=tap)
+    return vpp_if_name
 
 # 'vpp_if_name_to_tap' function maps name of interface in VPP, e.g. loop0,
 # into name of correspondent tap interface in Linux.
@@ -1091,11 +1117,8 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
-    _, vpp_if_name_to_tap, tap_info = vpp_get_tap_info()
-    if not vpp_if_name in vpp_if_name_to_tap:
-        fwglobals.log.debug(f"vpp_if_name_to_tap({vpp_if_name}): not found: {tap_info}")
-        return None
-    return vpp_if_name_to_tap[vpp_if_name]
+    _, tap_if_name = vpp_get_tap_info(vpp_if_name=vpp_if_name)
+    return tap_if_name
 
 def generate_linux_interface_short_name(prefix, linux_if_name, max_length=15):
     """
@@ -1158,6 +1181,7 @@ def vpp_sw_if_index_to_name(sw_if_index):
     sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
     if not sw_interfaces:
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
+        return None
     return sw_interfaces[0].interface_name.rstrip(' \t\r\n\0')
 
 # 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
@@ -1175,27 +1199,8 @@ def vpp_sw_if_index_to_tap(sw_if_index):
 
      :returns: Linux TAP interface name.
      """
-    return vpp_if_name_to_tap(vpp_sw_if_index_to_name(sw_if_index))
-
-def vpp_ip_to_sw_if_index(ip):
-    """Convert ip address into VPP sw_if_index.
-
-     :param ip: IP address.
-
-     :returns: sw_if_index.
-     """
-    network = IPNetwork(ip)
-
-    for sw_if in fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump():
-        tap = vpp_sw_if_index_to_tap(sw_if.sw_if_index)
-        if tap:
-            int_address_str = get_interface_address(tap)
-            if not int_address_str:
-                continue
-            int_address = IPNetwork(int_address_str)
-            if network == int_address:
-                return sw_if.sw_if_index
-    return None
+    _, tap_if_name = vpp_get_tap_info(vpp_sw_if_index=sw_if_index)
+    return tap_if_name
 
 def _vppctl_read(cmd, wait=True):
     """Read command from VPP.
