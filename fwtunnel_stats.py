@@ -192,7 +192,7 @@ def tunnel_stats_test():
         if vpp_peer_tunnel_name:
             ifname = vpp_peer_tunnel_name
         else:
-            ifname = stats['loopback_name']
+            ifname = stats['loopback_tap_name']
 
         loss = round(stats['drop_rate'])
         delay = round(stats['rtt'])
@@ -291,36 +291,34 @@ def tunnel_stats_add(params):
 
     :returns: None.
     """
-    tunnel_id = params['tunnel-id']
-
-    if 'peer' in params:
-        tap_map = fwutils.vpp_get_tap_mapping()
-        hosts_to_ping = params['peer']['ips']
-        hosts_to_ping += params['peer']['urls']
-        loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['peer']['addr'])
-        loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
-        vpp_peer_tunnel_name = tap_map[loopback_name]
-    else:
-        hosts_to_ping = [fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])]
-        loopback_sw_if_index = fwutils.vpp_ip_to_sw_if_index(params['loopback-iface']['addr'])
-        loopback_name = fwutils.vpp_sw_if_index_to_name(loopback_sw_if_index)
-
     stats_entry = dict()
+    stats_entry['sent'] = 0
+    stats_entry['received'] = 0
     stats_entry['drop_rate'] = 0
     stats_entry['drops'] = fwutils.SlidingWindow(WINDOW_SIZE)
     stats_entry['rtt'] = 0
     stats_entry['timestamp'] = 0
     stats_entry['loss'] = 0
     stats_entry['delay'] = 0
+    stats_entry['loopback_tap_name'] = fwutils.tunnel_to_tap(params)
 
-    stats_entry['hosts_to_ping'] = hosts_to_ping
-    stats_entry['loopback_name'] = loopback_name
-    stats_entry['loopback_tap_name'] = fwutils.vpp_sw_if_index_to_tap(loopback_sw_if_index)
     if 'peer' in params:
-        stats_entry['vpp_peer_tunnel_name'] = vpp_peer_tunnel_name
+        # The peer tunnel uses two vpp interfaces - the loopback interface to
+        # provide access to peer tunnel from Linux, and the ip-ip tunnel interface.
+        # The first one has 'loopX' name, the other one - 'ipipX' name, where
+        # X is (tunnel-id * 2).
+        #
+        stats_entry['vpp_peer_tunnel_name'] = 'ipip%d' %  (params['tunnel-id'] * 2)
+
+    if 'peer' in params:
+        hosts_to_ping = params['peer']['ips']
+        hosts_to_ping += params['peer']['urls']
+    else:
+        hosts_to_ping = [fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])]
+    stats_entry['hosts_to_ping'] = hosts_to_ping
 
     with tunnel_stats_global_lock:
-        tunnel_stats_global[tunnel_id] = stats_entry
+        tunnel_stats_global[params['tunnel-id']] = stats_entry
 
 def fill_tunnel_stats_dict():
     """Get tunnels their corresponding loopbacks ip addresses
