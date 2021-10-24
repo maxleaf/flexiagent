@@ -551,6 +551,7 @@ def get_linux_interfaces(cached=True):
                 elif is_lte:
                     interface['deviceType'] = 'lte'
                     interface['dhcp'] = 'yes'
+                    interface['gateway'], interface['metric'] = get_interface_gateway(tap_name)
                     interface['deviceParams'] = {
                         'initial_pin1_state': lte_get_pin_state(dev_id),
                         'default_settings':   lte_get_default_settings(dev_id)
