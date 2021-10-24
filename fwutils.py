@@ -1117,6 +1117,14 @@ def vpp_if_name_to_tap(vpp_if_name):
 
      :returns: Linux TAP interface name.
      """
+    # Try to fetch name from cache firstly.
+    #
+    tap_if_name = fwglobals.g.db.get('router_api', {}).get('vpp_if_name_to_tap_if_name', {}).get(vpp_if_name)
+    if tap_if_name:
+        return tap_if_name
+
+    # Now go to the heavy route.
+    #
     _, tap_if_name = vpp_get_tap_info(vpp_if_name=vpp_if_name)
     return tap_if_name
 
@@ -1178,6 +1186,14 @@ def vpp_sw_if_index_to_name(sw_if_index):
 
      :returns: VPP interface name.
      """
+    # Try to fetch name from cache firstly.
+    #
+    vpp_if_name = fwglobals.g.db.get('router_api', {}).get('sw_if_index_to_vpp_if_name', {}).get(sw_if_index)
+    if vpp_if_name:
+        return vpp_if_name
+
+    # Now go to the heavy route.
+    #
     sw_interfaces = fwglobals.g.router_api.vpp_api.vpp.api.sw_interface_dump(sw_if_index=sw_if_index)
     if not sw_interfaces:
         fwglobals.log.debug(f"vpp_sw_if_index_to_name({sw_if_index}): not found")
@@ -1197,21 +1213,21 @@ def vpp_if_name_to_sw_if_index(vpp_if_name, type):
     sw_if_index  = cache_by_name[vpp_if_name]
     return sw_if_index
 
-# 'sw_if_index_to_tap' function maps sw_if_index assigned by VPP to some interface,
-# e.g '4' into interface in Linux created by 'vppctl enable tap-inject' command, e.g. vpp2.
-# To do that we dump all interfaces from VPP, find the one with the provided index,
-# take its name, e.g. loop0, and grep output of 'vppctl sh tap-inject' by this name:
-#   root@ubuntu-server-1:/# vppctl sh tap-inject
-#       GigabitEthernet0/8/0 -> vpp0
-#       GigabitEthernet0/9/0 -> vpp1
-#       loop0 -> vpp2
 def vpp_sw_if_index_to_tap(sw_if_index):
-    """Convert VPP sw_if_index into Linux TAP interface name.
+    """Convert VPP sw_if_index into Linux TAP interface name created by 'vppctl enable tap-inject' command.
 
      :param sw_if_index:      VPP sw_if_index.
 
      :returns: Linux TAP interface name.
      """
+    # Try to fetch name from cache firstly.
+    #
+    tap_if_name = fwglobals.g.db.get('router_api', {}).get('sw_if_index_to_tap_if_name', {}).get(sw_if_index)
+    if tap_if_name:
+        return tap_if_name
+
+    # Now go to the heavy route.
+    #
     _, tap_if_name = vpp_get_tap_info(vpp_sw_if_index=sw_if_index)
     return tap_if_name
 
@@ -1363,6 +1379,7 @@ def reset_device_config():
         fwglobals.g.db['lte'] = {}
 
     reset_router_api_db_sa_id() # sa_id-s are used in translations of router configuration, so clean them too.
+    reset_router_api_db(enforce=True)
 
     restore_dhcpd_files()
 
@@ -1400,7 +1417,10 @@ def reset_router_api_db(enforce=False):
     if not 'vpp_if_name_to_sw_if_index' in router_api_db or enforce:
         router_api_db['vpp_if_name_to_sw_if_index'] = {
             'tunnel': {}, 'lan': {}, 'wan': {} }
-
+    if not 'vpp_if_name_to_tap_if_name' in router_api_db or enforce:
+        router_api_db['vpp_if_name_to_tap_if_name'] = {}
+    if not 'sw_if_index_to_tap_if_name' in router_api_db or enforce:
+        router_api_db['sw_if_index_to_tap_if_name'] = {}
     fwglobals.g.db['router_api'] = router_api_db
 
 def print_system_config(full=False):
