@@ -532,27 +532,30 @@ def get_linux_interfaces(cached=True):
                     if addr.netmask != None:
                         interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            if is_wifi_interface(if_name):
-                interface['deviceType'] = 'wifi'
-                interface['deviceParams'] = wifi_get_capabilities(dev_id)
+            is_wifi = is_wifi_interface(if_name)
+            is_lte = is_lte_interface(if_name)
 
-            if is_lte_interface(if_name):
-                interface['deviceType'] = 'lte'
-                interface['dhcp'] = 'yes'
-                interface['deviceParams'] = {
-                    'initial_pin1_state': lte_get_pin_state(dev_id),
-                    'default_settings':   lte_get_default_settings(dev_id)
-                }
-
-                # LTE physical device has no IP, GW etc. so we take this info from vppsb interface (vpp1)
+            # special logic for non-dpdk interfaces
+            if is_wifi or is_lte:
+                # LTE/WiFi physical devices have no IP, GW etc. so we take this info from vppsb interface (vpp1)
                 tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
                 if tap_name:
-                    interface['gateway'], interface['metric'] = get_interface_gateway(tap_name)
                     int_addr = get_interface_address(tap_name)
-                    if int_addr:
-                        int_addr = int_addr.split('/')
-                        interface['IPv4'] = int_addr[0]
-                        interface['IPv4Mask'] = int_addr[1]
+                    int_addr = int_addr.split('/')
+                    interface['IPv4'] = int_addr[0]
+                    interface['IPv4Mask'] = int_addr[1]
+
+                if is_wifi:
+                    interface['deviceType'] = 'wifi'
+                    interface['deviceParams'] = wifi_get_capabilities(dev_id)
+                elif is_lte:
+                    interface['deviceType'] = 'lte'
+                    interface['dhcp'] = 'yes'
+                    interface['gateway'], interface['metric'] = get_interface_gateway(tap_name)
+                    interface['deviceParams'] = {
+                        'initial_pin1_state': lte_get_pin_state(dev_id),
+                        'default_settings':   lte_get_default_settings(dev_id)
+                    }
 
             # Add information specific for WAN interfaces
             #
