@@ -1217,7 +1217,7 @@ def _add_peer(cmd_list, params):
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr, id)
 
     loopback_params = {'addr':addr, 'mtu': mtu}
-    _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, id=id)
+    _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, params, id=id)
 
     substs = [ {'replace':'DEV1-STUB', 'key': 'cmds', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':peer_loopback_cache_key},
                {'replace':'DEV2-STUB', 'key': 'cmds', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':tunnel_cache_key}]
