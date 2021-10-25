@@ -37,7 +37,9 @@
         "ikev2": {
             "role": "initiator",
             "mode": "psk",
+            "local-device-id-type": "fqdn",
             "local-device-id": "b0bbd024d5",
+            "remote-device-id-type": "fqdn",
             "remote-device-id": "104.193.146.116",
             "lifetime": 3600,
             "ike": {
