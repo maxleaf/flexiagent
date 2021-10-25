@@ -473,18 +473,19 @@ def _add_gre_tunnel(cmd_list, cache_key, src, dst, local_sa_id = None, remote_sa
                                 }
         cmd_list.append(cmd)
 
-def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr, instance):
+def _add_ipip_tunnel(cmd_list, cache_key, params, addr, instance):
     """Add IPIP tunnel command into the list.
 
     :param cmd_list:             List of commands.
     :param cache_key:            Cache key of the tunnel to be used by others.
-    :param src:                  Source ip address.
-    :param dst:                  Destination ip address.
+    :param params:               'params' field of the 'add-tunnel' request received from flexiManage
     :param addr:                 Interface ip address.
     :param instance:             Tunnel instance number.
 
     :returns: None.
     """
+    src, dst = params['src'], params['dst']
+
     # ipip.api.json: ipip_add_tunnel (tunnel <type vl_api_ipip_tunnel_t>)
     tunnel = {
         'src': ipaddress.ip_address(src),
@@ -516,6 +517,28 @@ def _add_ipip_tunnel(cmd_list, cache_key, src, dst, addr, instance):
     cmd['revert']['params'] = { 'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ],
                                 'is_add':0, 'prefix':addr }
     cmd_list.append(cmd)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']    = "python"
+    cmd['cmd']['descr']   = "add  peer tunnel sw_if_index to router_api cache"
+    cmd['cmd']['params']  = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_update_cache_sw_if_index',
+                    'args'  : {'type': 'peer-tunnel', 'params': params, 'add': True },
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ]
+    }
+    cmd['revert'] = {}
+    cmd['revert']['name']   = "python"
+    cmd['revert']['descr']  = "remove  peer tunnel sw_if_index from router_api cache"
+    cmd['revert']['params'] = {
+                    'object': 'fwglobals.g.router_api',
+                    'func'  : '_update_cache_sw_if_index',
+                    'args'  : {'type': 'peer-tunnel', 'params': params, 'add': False },
+                    'substs': [ { 'add_param':'sw_if_index', 'val_by_key':cache_key} ]
+    }
+    cmd_list.append(cmd)
+
 
 def _add_vxlan_tunnel(cmd_list, cache_key, dev_id, bridge_id, src, dst, params):
     """Add VxLAN tunnel command into the list.
@@ -1247,7 +1270,7 @@ def _add_peer(cmd_list, params):
     next_hop         = fwutils.build_tunnel_remote_loopback_ip(addr)
     id               = params['tunnel-id']*2
 
-    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params['src'], params['dst'], tunnel_addr, id)
+    _add_ipip_tunnel(cmd_list, tunnel_cache_key, params, tunnel_addr, id)
 
     loopback_params = {'addr':addr, 'mtu': mtu}
     _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, params, id=id)

@@ -984,6 +984,22 @@ def tunnel_to_vpp_if_name(params):
     vpp_if_name = 'loop%d' % (params['tunnel-id']*2)
     return vpp_if_name
 
+def peer_tunnel_to_vpp_if_name(params):
+    """Finds the name of the peer tunnel ipip interface in vpp.
+    We exploit vpp internals to do it in simple way.
+
+    :param params: parameters of tunnel taken from the router configuration database.
+                   It is 'params' field of the 'add-tunnel' request.
+    :returns: name of the tunnel loopback interface in vpp.
+    """
+    # The peer tunnel uses two vpp interfaces - the loopback interface to
+    # provide access to peer tunnel from Linux, and the ip-ip tunnel interface.
+    # The first one has 'loopX' name, the other one - 'ipipX' name, where
+    # X is (tunnel-id * 2).
+    #
+    vpp_if_name = 'ipip%d' % (params['tunnel-id']*2)
+    return vpp_if_name
+
 def tunnel_to_tap(params):
     """Retrieves TAP name of the tunnel loopback interface that is exposed to Linux.
 

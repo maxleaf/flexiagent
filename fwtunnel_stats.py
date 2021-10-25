@@ -166,7 +166,7 @@ def tunnel_stats_test():
     for tunnel_id, stats in tunnel_stats_global_copy.items():
         vpp_peer_tunnel_name = stats.get('vpp_peer_tunnel_name')
         if vpp_peer_tunnel_name:
-            sw_if_index = fwutils.vpp_if_name_to_sw_if_index(vpp_peer_tunnel_name, 'tunnel')
+            sw_if_index = fwutils.vpp_if_name_to_sw_if_index(vpp_peer_tunnel_name, 'peer-tunnel')
             status = fwutils.vpp_get_interface_status(sw_if_index)
             if 'status' not in stats or ('status' in stats and stats['status'] != status):
                 stats['status'] = status
@@ -303,12 +303,7 @@ def tunnel_stats_add(params):
     stats_entry['loopback_tap_name'] = fwutils.tunnel_to_tap(params)
 
     if 'peer' in params:
-        # The peer tunnel uses two vpp interfaces - the loopback interface to
-        # provide access to peer tunnel from Linux, and the ip-ip tunnel interface.
-        # The first one has 'loopX' name, the other one - 'ipipX' name, where
-        # X is (tunnel-id * 2).
-        #
-        stats_entry['vpp_peer_tunnel_name'] = 'ipip%d' %  (params['tunnel-id'] * 2)
+        stats_entry['vpp_peer_tunnel_name'] = fwutils.peer_tunnel_to_vpp_if_name(params)
 
     if 'peer' in params:
         hosts_to_ping = params['peer']['ips']
