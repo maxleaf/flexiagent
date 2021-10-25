@@ -1023,7 +1023,7 @@ def vpp_get_tap_info(vpp_if_name=None, vpp_sw_if_index=None, tap_if_name=None):
      :returns: tap info in list
      """
     if not vpp_does_run():
-        fwglobals.log.debug("tap_info_get: VPP is not running")
+        fwglobals.log.debug("vpp_get_tap_info: VPP is not running")
         return ({}, {}, 'None')
 
     if vpp_if_name:
@@ -1031,19 +1031,19 @@ def vpp_get_tap_info(vpp_if_name=None, vpp_sw_if_index=None, tap_if_name=None):
     elif vpp_sw_if_index:
         vppctl_cmd = f"show tap-inject sw_if_index {vpp_sw_if_index}"
     elif tap_if_name:
-        vppctl_cmd = f"show tap-inject tap {tap_if_name}"
+        vppctl_cmd = f"show tap-inject tap_name {tap_if_name}"
     else:
-        fwglobals.log.debug("tap_info_get: no arguments provided")
+        fwglobals.log.debug("vpp_get_tap_info: no arguments provided")
         return (None, None)
 
     taps = _vppctl_read(vppctl_cmd).strip()
     if not taps:
-        fwglobals.log.debug(f"tap_info_get: '{vppctl_cmd}' returned nothing")
+        fwglobals.log.debug(f"vpp_get_tap_info: '{vppctl_cmd}' returned nothing")
         return (None, None)
 
     # check if tap-inject is configured and enabled
     if 'not enabled' in taps:
-        fwglobals.log.debug("tap_info_get: tap-inject disabled")
+        fwglobals.log.debug("vpp_get_tap_info: tap-inject disabled")
         return (None, None)
 
     tap_lines = taps.splitlines()
@@ -1070,7 +1070,8 @@ def vpp_get_tap_info(vpp_if_name=None, vpp_sw_if_index=None, tap_if_name=None):
             tap = tap_info.group(2)
             return (vpp_if_name, tap)
 
-    fwglobals.log.debug(f"tap_info_get: interface not found: {taps}")
+    fwglobals.log.debug("vpp_get_tap_info(vpp_if_name=%s, vpp_sw_if_index=%s, tap_if_name=%s): interface not found: %s") % \
+        (str(vpp_if_name), str(vpp_sw_if_index), str(tap_if_name), str(taps))
     return (None, None)
 
 def vpp_get_tap_mapping():
