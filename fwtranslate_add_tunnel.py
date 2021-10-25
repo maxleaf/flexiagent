@@ -653,6 +653,44 @@ def _add_ipsec_sa(cmd_list, local_sa, local_sa_id):
     cmd['revert']['descr']  = "remove SA rule no.%d (spi=%d, crypto=%s, integrity=%s)" % (local_sa_id, local_sa['spi'], local_sa['crypto-alg'] , local_sa['integr-alg'])
     cmd_list.append(cmd)
 
+def _add_ikev2_traffic_selector(cmd_list, name, params, is_local, ts_section):
+    """Add IKEv2 traffic selector commands into the list.
+
+    :param cmd_list:            List of commands.
+    :param name:                Profile name.
+    :param params:              Parameters from flexiManage.
+    :param is_local:            Indicator if traffic selector is local.
+    :param ts_section:          Traffic selector section name in ikev2 section.
+
+    :returns: None.
+    """
+    ts = {'is_local'    : is_local,
+          'protocol_id' : 0,
+          'start_port'  : 0,
+          'end_port'    : 65535,
+          'start_addr'  : ipaddress.ip_address('0.0.0.0'),
+          'end_addr'    : ipaddress.ip_address('255.255.255.255')}
+
+    if ts_section in params['ikev2']:
+        ts_params = params['ikev2'][ts_section]
+
+        protocol = ts_params.get('protocol', 'any')
+        if not protocol in fwutils.proto_map:
+            raise Exception("_add_ikev2_traffic_selector: protocol %s is not supported" % protocol)
+
+        ts['protocol_id'] = int(fwutils.proto_map[protocol])
+        ts['start_port'] = int(ts_params.get('start-port', 0))
+        ts['end_port'] = int(ts_params.get('end-port', 65535))
+        ts['start_addr'] = ipaddress.ip_address((ts_params.get('start-addr', '0.0.0.0')))
+        ts['end_addr'] = ipaddress.ip_address((ts_params.get('end-addr', '255.255.255.255')))
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_ts"
+    cmd['cmd']['params']    = { 'name':name, 'ts':ts }
+    cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
+    cmd_list.append(cmd)
+
 def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, local_id_type, local_id, remote_id_type, remote_id):
     """Add IKEv2 common profile commands into the list.
 
@@ -735,34 +773,10 @@ def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, lo
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':1)
-    local_ts = {'is_local'    : 1,
-                'protocol_id' : 0,
-                'start_port'  : 0,
-                'end_port'    : 65535,
-                'start_addr'  : ipaddress.ip_address('0.0.0.0'),
-                'end_addr'    : ipaddress.ip_address('255.255.255.255')}
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "ikev2_profile_set_ts"
-    cmd['cmd']['params']    = { 'name':name, 'ts':local_ts }
-    cmd['cmd']['descr']     = "set IKEv2 local traffic selector, profile %s" % name
-    cmd_list.append(cmd)
+    _add_ikev2_traffic_selector(cmd_list, name, params, 1, 'local-ts')
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':0)
-    remote_ts = {'is_local'    : 0,
-                 'protocol_id' : 0,
-                 'start_port'  : 0,
-                 'end_port'    : 65535,
-                 'start_addr'  : ipaddress.ip_address('0.0.0.0'),
-                 'end_addr'    : ipaddress.ip_address('255.255.255.255')}
-
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "ikev2_profile_set_ts"
-    cmd['cmd']['params']    = { 'name':name, 'ts':remote_ts }
-    cmd['cmd']['descr']     = "set IKEv2 remote traffic selector, profile %s" % name
-    cmd_list.append(cmd)
+    _add_ikev2_traffic_selector(cmd_list, name, params, 0, 'remote-ts')
 
 def _add_ikev2_certificates(cmd_list, remote_device_id, certificate):
     """Add IKEv2 certificate commands into the list.

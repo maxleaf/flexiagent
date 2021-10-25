@@ -54,6 +54,20 @@
                 "dh-group": "ecp-256",
                 "key-size": 256
             },
+            "local-ts": {
+                "start-addr": "0.0.0.0",
+                "end-addr": "255.255.255.255",
+                "start-port": "0",
+                "end-port": "65535",
+                "protocol": "any"
+            },
+            "remote-ts": {
+                "start-addr": "0.0.0.0",
+                "end-addr": "255.255.255.255",
+                "start-port": "0",
+                "end-port": "65535",
+                "protocol": "any"
+            },
             "psk": "abc243f5621c1a95997997c8cd597956"
         }
     }
