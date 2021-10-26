@@ -51,7 +51,6 @@
             "esp": {
                 "crypto-alg": "aes-cbc",
                 "integ-alg": "hmac-sha2-256-128",
-                "dh-group": "ecp-256",
                 "key-size": 256
             },
             "local-ts": {

@@ -687,12 +687,7 @@ def _add_ikev2_traffic_selector(cmd_list, name, params, is_local, ts_section):
 
     :returns: None.
     """
-    ts = {'is_local'    : is_local,
-          'protocol_id' : 0,
-          'start_port'  : 0,
-          'end_port'    : 65535,
-          'start_addr'  : ipaddress.ip_address('0.0.0.0'),
-          'end_addr'    : ipaddress.ip_address('255.255.255.255')}
+    ts = {'is_local':is_local}
 
     if ts_section in params['ikev2']:
         ts_params = params['ikev2'][ts_section]
@@ -714,6 +709,41 @@ def _add_ikev2_traffic_selector(cmd_list, name, params, is_local, ts_section):
     cmd['cmd']['descr']     = "set IKEv2 traffic selector, profile %s" % name
     cmd_list.append(cmd)
 
+def _add_ikev2_id(cmd_list, name, is_local, id, id_type):
+    """Add IKEv2 id commands into the list.
+
+    :param cmd_list:            List of commands.
+    :param name:                Profile name.
+    :param is_local:            Indicator if traffic selector is local.
+    :param id_type:             ID value.
+    :param id_type:             ID type.
+
+    :returns: None.
+    """
+    id_types = {
+        "ip4-addr":     1,  # IKEV2_ID_TYPE_ID_IPV4_ADDR
+        "fqdn":         2,  # IKEV2_ID_TYPE_ID_FQDN
+        "rfc822":       3,  # IKEV2_ID_TYPE_ID_RFC822_ADDR
+        "ip6-addr":     5,  # IKEV2_ID_TYPE_ID_IPV6_ADDR
+        "der-asn1-dn":  9,  # IKEV2_ID_TYPE_ID_DER_ASN1_DN
+        "der-asn1-gn":  10, # IKEV2_ID_TYPE_ID_DER_ASN1_GN
+        "key-id":       11  # IKEV2_ID_TYPE_ID_KEY_ID
+    }
+
+    if not id_type in id_types:
+        raise Exception("_add_ikev2_common_profile: id type %s is not supported" % id_type)
+
+    cmd = {}
+    cmd['cmd'] = {}
+    cmd['cmd']['name']      = "ikev2_profile_set_id"
+    if id_type == 'ip4-addr' or id_type == 'ip6-addr':
+        data = ipaddress.ip_address(id).packed
+    else:
+        data = id.encode()
+    cmd['cmd']['params']    = { 'name':name, 'is_local':is_local, 'id_type':id_types[id_type], 'data':data, 'data_len':len(data) }
+    cmd['cmd']['descr']     = "set IKEv2 id, profile %s" % name
+    cmd_list.append(cmd)
+
 def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, local_id_type, local_id, remote_id_type, remote_id):
     """Add IKEv2 common profile commands into the list.
 
@@ -729,22 +759,6 @@ def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, lo
 
     :returns: None.
     """
-    id_types = {
-        "ip4-addr":     1,  # IKEV2_ID_TYPE_ID_IPV4_ADDR
-        "fqdn":         2,  # IKEV2_ID_TYPE_ID_FQDN
-        "rfc822":       3,  # IKEV2_ID_TYPE_ID_RFC822_ADDR
-        "ip6-addr":     5,  # IKEV2_ID_TYPE_ID_IPV6_ADDR
-        "der-asn1-dn":  9,  # IKEV2_ID_TYPE_ID_DER_ASN1_DN
-        "der-asn1-gn":  10, # IKEV2_ID_TYPE_ID_DER_ASN1_GN
-        "key-id":       11  # IKEV2_ID_TYPE_ID_KEY_ID
-    }
-
-    if not local_id_type in id_types:
-        raise Exception("_add_ikev2_common_profile: local id type %s is not supported" % local_id_type)
-
-    if not remote_id_type in id_types:
-        raise Exception("_add_ikev2_common_profile: remote id type %s is not supported" % remote_id_type)
-
     # ikev2.api.json: ikev2_profile_add_del (...)
     cmd = {}
     cmd['cmd'] = {}
@@ -780,20 +794,10 @@ def _add_ikev2_common_profile(cmd_list, params, name, cache_key, auth_method, lo
     cmd_list.append(cmd)
 
     # ikev2.api.json: ikev2_profile_set_id (..., 'is_local':1)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':1, 'id_type':id_types[local_id_type], 'data':local_id.encode(), 'data_len':len(local_id) }
-    cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
-    cmd_list.append(cmd)
+    _add_ikev2_id(cmd_list, name, 1, local_id, local_id_type)
 
     # ikev2.api.json: ikev2_profile_set_id (..., 'is_local':0)
-    cmd = {}
-    cmd['cmd'] = {}
-    cmd['cmd']['name']      = "ikev2_profile_set_id"
-    cmd['cmd']['params']    = { 'name':name, 'is_local':0, 'id_type':id_types[remote_id_type], 'data':remote_id.encode(), 'data_len':len(remote_id) }
-    cmd['cmd']['descr']     = "set IKEv2 local id, profile %s" % name
-    cmd_list.append(cmd)
+    _add_ikev2_id(cmd_list, name, 0, remote_id, remote_id_type)
 
     # ikev2.api.json: ikev2_profile_set_ts (..., 'is_local':1)
     _add_ikev2_traffic_selector(cmd_list, name, params, 1, 'local-ts')
@@ -914,8 +918,6 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime,
         raise Exception("_add_ikev2_initiator_profile: esp integ-alg %s is not supported" % esp['integ-alg'])
     if not ike['dh-group'] in dh_type_algs:
         raise Exception("_add_ikev2_initiator_profile: ike dh-group %s is not supported" % ike['dh-group'])
-    if not esp['dh-group'] in dh_type_algs:
-        raise Exception("_add_ikev2_initiator_profile: esp dh-group %s is not supported" % esp['dh-group'])
 
     if responder_cache_key:
         # ikev2.api.json: ikev2_set_responder (...)
@@ -956,8 +958,7 @@ def _add_ikev2_initiator_profile(cmd_list, name, lifetime,
     esp_tr = {
               'crypto_alg'      : crypto_algs[esp['crypto-alg']],
               'crypto_key_size' : esp['key-size'],
-              'integ_alg'       : integ_algs[esp['integ-alg']],
-              'dh_group'        : dh_type_algs[esp['dh-group']]
+              'integ_alg'       : integ_algs[esp['integ-alg']]
              }
 
     cmd = {}
@@ -1043,8 +1044,6 @@ def _add_ikev2(cmd_list, params, responder_ip_address, tunnel_intf_cache_key, au
     """
     local_id = ''
     remote_id = ''
-    local_id_type = params['ikev2'].get('local-device-id-type', 'fqdn')
-    remote_id_type = params['ikev2'].get('remote-device-id-type', 'fqdn')
 
     if 'certificate' in params['ikev2']:
         local_id = fwutils.get_machine_id() + '-' + str(params['tunnel-id'])
@@ -1056,6 +1055,10 @@ def _add_ikev2(cmd_list, params, responder_ip_address, tunnel_intf_cache_key, au
     else:
         local_id = params['ikev2']['local-device-id']
         remote_id = params['ikev2']['remote-device-id']
+
+    default_id_type = 'fqdn'
+    local_id_type = params['ikev2'].get('local-device-id-type', default_id_type)
+    remote_id_type = params['ikev2'].get('remote-device-id-type', default_id_type)
 
     ikev2_profile_name = fwglobals.g.ikev2.profile_name_get(params['tunnel-id'])
     _add_ikev2_common_profile(
