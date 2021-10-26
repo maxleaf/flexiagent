@@ -520,6 +520,7 @@ def get_linux_interfaces(cached=True):
                 'public_ip':        '',
                 'public_port':      '',
                 'nat_type':         '',
+                'link':             '',
             }
 
             interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
@@ -579,6 +580,8 @@ def get_linux_interfaces(cached=True):
                     interface['internetAccess'] = True
             else:
                 interface['internetAccess'] = False  # If interface has no GW
+
+            interface['link'] = get_interface_link_state(if_name)
 
             interfaces[dev_id] = interface
 
@@ -3439,10 +3442,19 @@ def is_wifi_interface(if_name):
 
     return False
 
-def get_ethtool_value(linuxif, ethtool_key):
+def get_ethtool_value(if_name, ethtool_key):
+    """Gets requested value from ethtool command output
+
+    :param if_name: linux interface name (e.g. enp0s3).
+    :param ethtool_key: a key to retrieve the value from.
+
+    :returns: string.
+    """
+    cmd = f'ethtool -i {if_name}' \
+          if ethtool_key == 'driver' \
+          else f'ethtool {if_name}'
     val = ''
     try:
-        cmd = 'ethtool -i %s' % linuxif
         lines = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT).decode().splitlines()
         for line in lines:
             if ethtool_key in line:
@@ -3452,6 +3464,50 @@ def get_ethtool_value(linuxif, ethtool_key):
         pass
 
     return val
+
+def get_interface_link_state(if_name):
+    """Gets interface link state.
+
+    :param if_name: interface name (e.g enp0s3).
+
+    :returns: up if link is detected, down if not detected.
+    """
+    if not if_name:
+        fwglobals.log.error('get_interface_link_state: if_name is empty')
+        return ''
+    # First, check if interface is managed by vpp (vppctl).
+    # Otherwise, check as linux interface (ethtool).
+    if fwglobals.g.router_api.state_is_started():
+        vpp_if_name = tap_to_vpp_if_name(if_name)
+        if vpp_if_name:
+            state = ''
+            try:
+                cmd = 'show hardware-interfaces brief'
+                vppctl_read_response = _vppctl_read(cmd, False)
+                if vppctl_read_response:
+                    lines = vppctl_read_response.splitlines()
+                    for line in lines:
+                        if vpp_if_name in line:
+                            # Here is an example response from the command. We are interested in the
+                            # Link column, hence using index 2 after the split
+                            #               Name                Idx   Link  Hardware
+                            # GigabitEthernet0/3/0               1     up   GigabitEthernet0/3/0
+                            #   Link speed: 1 Gbps
+                            # GigabitEthernet0/8/0               2     up   GigabitEthernet0/8/0
+                            #   Link speed: 1 Gbps
+                            # local0                             0    down  local0
+                            #   Link speed: unknown
+                            state = line.split(None, 4)[2]
+                            break
+            except subprocess.CalledProcessError:
+                pass
+
+            if state:
+                return state
+
+    state = get_ethtool_value(if_name, 'Link detected')
+    # 'Link detected' field has yes/no values, so conversion is needed
+    return 'up' if state == 'yes' else 'down' if state == 'no' else ''
 
 def get_interface_driver_by_dev_id(dev_id):
     if_name = dev_id_to_linux_if(dev_id)
