@@ -1089,8 +1089,8 @@ def vpp_get_tap_info(vpp_if_name=None, vpp_sw_if_index=None, tap_if_name=None):
             tap = tap_info.group(2)
             return (vpp_if_name, tap)
 
-    fwglobals.log.debug("vpp_get_tap_info(vpp_if_name=%s, vpp_sw_if_index=%s, tap_if_name=%s): interface not found: %s") % \
-        (str(vpp_if_name), str(vpp_sw_if_index), str(tap_if_name), str(taps))
+    fwglobals.log.debug("vpp_get_tap_info(vpp_if_name=%s, vpp_sw_if_index=%s, tap_if_name=%s): interface not found: %s" % \
+        (str(vpp_if_name), str(vpp_sw_if_index), str(tap_if_name), str(taps)))
     return (None, None)
 
 def vpp_get_tap_mapping():
@@ -1439,7 +1439,7 @@ def reset_router_api_db(enforce=False):
         router_api_db['sw_if_index_to_vpp_if_name'] = {}
     if not 'vpp_if_name_to_sw_if_index' in router_api_db or enforce:
         router_api_db['vpp_if_name_to_sw_if_index'] = {
-            'tunnel': {}, 'lan': {}, 'wan': {} }
+            'tunnel': {}, 'peer-tunnel': {}, 'lan': {}, 'wan': {} }
     if not 'vpp_if_name_to_tap_if_name' in router_api_db or enforce:
         router_api_db['vpp_if_name_to_tap_if_name'] = {}
     if not 'sw_if_index_to_tap_if_name' in router_api_db or enforce:
