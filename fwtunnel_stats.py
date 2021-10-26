@@ -198,11 +198,9 @@ def tunnel_stats_test():
         delay = round(stats['rtt'])
 
         if abs(loss - stats['loss']) >= HYSTERESIS_LOSS:
-            fwglobals.log.debug(f"Link {ifname} loss quality is changed from {stats['loss']}% to {loss}%")
             stats['loss'] = loss
             update = True
         elif  abs(delay - stats['delay']) >= HYSTERESIS_DELAY:
-            fwglobals.log.debug(f"Link {ifname} delay quality is changed from {stats['delay']}ms to {delay}ms")
             stats['delay'] = delay
             update = True
 
