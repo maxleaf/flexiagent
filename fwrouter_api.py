@@ -1085,14 +1085,17 @@ class FWROUTER_API(FwCfgRequestHandler):
         if add:
             if type == 'tunnel':  # For tunnels use shortcut  - exploit vpp internals ;)
                 vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
+            elif type == 'peer-tunnel':
+                vpp_if_name = fwutils.peer_tunnel_to_vpp_if_name(params)
             else:
                 vpp_if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
             cache_by_name[vpp_if_name]  = sw_if_index
             cache_by_index[sw_if_index] = vpp_if_name
-            tap = fwutils.vpp_if_name_to_tap(vpp_if_name)
-            if tap:
-                cache_tap_by_vpp_if_name[vpp_if_name] = tap
-                cache_tap_by_sw_if_index[sw_if_index] = tap
+            if type != 'peer-tunnel':  # ipipX tunnels are not exposed to Linux
+                tap = fwutils.vpp_if_name_to_tap(vpp_if_name)
+                if tap:
+                    cache_tap_by_vpp_if_name[vpp_if_name] = tap
+                    cache_tap_by_sw_if_index[sw_if_index] = tap
         else:
             vpp_if_name = cache_by_index[sw_if_index]
             del cache_by_name[vpp_if_name]

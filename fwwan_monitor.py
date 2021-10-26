@@ -57,6 +57,8 @@ class FwWanMonitor(FwObject):
         if self.standalone:
             return
 
+        FwObject.__init__(self)
+
         # Make few shortcuts to get more readable code
         #
         self.SERVERS         = fwglobals.g.WAN_FAILOVER_SERVERS
