@@ -176,7 +176,6 @@ def tunnel_stats_test():
 
         rtt = tunnel_rtt.get(tunnel_id)
         if rtt is None:
-            stats['rtt'] = 0
             continue
 
         if rtt > 0:
@@ -290,8 +289,6 @@ def tunnel_stats_add(params):
     :returns: None.
     """
     stats_entry = dict()
-    stats_entry['sent'] = 0
-    stats_entry['received'] = 0
     stats_entry['drop_rate'] = 0
     stats_entry['drops'] = fwutils.SlidingWindow(WINDOW_SIZE)
     stats_entry['rtt'] = 0
