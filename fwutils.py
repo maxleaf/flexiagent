@@ -4360,3 +4360,29 @@ class SlidingWindow(list):
         if len(self) == 0:
             return 0
         return float(sum(self)) / float(len(self))
+
+def restart_service(service, timeout=0):
+    '''Restart service
+
+    :param service:     Service name.
+    :param timeout:     Number of retrials.
+
+    :returns: (True, None) tuple on success, (False, <error string>) on failure.
+    '''
+    try:
+        while timeout >= 0:
+            cmd = 'systemctl restart %s.service > /dev/null 2>&1;' % service
+            os.system(cmd)
+
+            cmd = 'service %s status' % service
+            rc = os.system(cmd)
+            if rc == 0:
+                return (True, None)
+
+            timeout-= 1
+            time.sleep(1)
+
+    except Exception as e:
+        return (False, str(e))
+
+    return (False, "Service is not running")
