@@ -62,13 +62,26 @@ def _restart_dhcp_server(cmd_list):
     """
     cmd = {}
     cmd['cmd'] = {}
-    cmd['cmd']['name'] = "exec"
-    cmd['cmd']['params'] = ["sudo systemctl restart isc-dhcp-server"]
+    cmd['cmd']['name']   = "python"
+    cmd['cmd']['params'] = {
+                'module': 'fwutils',
+                'func': 'restart_service',
+                'args': {
+                    'service': 'isc-dhcp-server',
+                    'timeout': 5
+                }
+    }
     cmd['cmd']['descr'] = "restart dhcp service"
     cmd['revert'] = {}
-    cmd['revert']['name'] = 'exec'
-    cmd['revert']['params'] = ["sudo systemctl restart isc-dhcp-server"]
-    cmd['revert']['filter'] = 'must'   # When 'remove-XXX' commands are generated out of the 'add-XXX' commands, run this command even if vpp doesn't run
+    cmd['revert']['name']   = "python"
+    cmd['revert']['params'] = {
+                'module': 'fwutils',
+                'func': 'restart_service',
+                'args': {
+                    'service': 'isc-dhcp-server',
+                    'timeout': 5
+                }
+    }
     cmd['revert']['descr'] = "restart dhcp service"
     cmd_list.append(cmd)
 
