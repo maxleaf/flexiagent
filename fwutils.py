@@ -480,6 +480,23 @@ def clear_linux_interfaces_cache():
     with fwglobals.g.cache.lock:
         fwglobals.g.cache.linux_interfaces.clear()
 
+def is_bridged_interface(dev_id):
+    """Indicates if the interface is bridged.
+
+    :param dev_id: dev_id of the interface to check.
+
+    :return: bridge address if it is, None if not a bridged interface.
+    """
+    ifc = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
+    if not ifc:
+        return None
+
+    bridged_addr = ifc[0].get('bridge_addr')
+    if bridged_addr:
+        return bridged_addr
+
+    return None
+
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
 
@@ -521,9 +538,35 @@ def get_linux_interfaces(cached=True):
                 'public_port':      '',
                 'nat_type':         '',
                 'link':             '',
+                'tap_name':         '',
             }
 
+            interface['link'] = get_interface_link_state(if_name)
+
             interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
+
+            is_wifi = is_wifi_interface(if_name)
+            is_lte = is_lte_interface(if_name)
+
+            # Some interfaces need special logic to get their ip
+            # For LTE/WiFi/Bridged interfaces - we need to take it from the tap
+            if vpp_does_run():
+                tap_name = None
+
+                if is_lte or is_wifi:
+                    tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+
+                # bridged interface is only when vpp is running
+                bridge_addr = is_bridged_interface(dev_id)
+                if bridge_addr:
+                    tap_name = bridge_addr_to_bvi_interface_tap(bridge_addr)
+
+                if tap_name:
+                    if_name = tap_name
+                    addrs = linux_inf[tap_name]
+                    interface['tap_name'] = tap_name
+
+
             interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
 
             for addr in addrs:
@@ -533,30 +576,17 @@ def get_linux_interfaces(cached=True):
                     if addr.netmask != None:
                         interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            is_wifi = is_wifi_interface(if_name)
-            is_lte = is_lte_interface(if_name)
+            if is_lte:
+                interface['deviceType'] = 'lte'
+                interface['dhcp'] = 'yes'
+                interface['deviceParams'] = {
+                    'initial_pin1_state': lte_get_pin_state(dev_id),
+                    'default_settings':   lte_get_default_settings(dev_id)
+                }
 
-            # special logic for non-dpdk interfaces
-            if is_wifi or is_lte:
-                # LTE/WiFi physical devices have no IP, GW etc. so we take this info from vppsb interface (vpp1)
-                tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
-                if tap_name:
-                    int_addr = get_interface_address(tap_name)
-                    int_addr = int_addr.split('/')
-                    interface['IPv4'] = int_addr[0]
-                    interface['IPv4Mask'] = int_addr[1]
-
-                if is_wifi:
-                    interface['deviceType'] = 'wifi'
-                    interface['deviceParams'] = wifi_get_capabilities(dev_id)
-                elif is_lte:
-                    interface['deviceType'] = 'lte'
-                    interface['dhcp'] = 'yes'
-                    interface['gateway'], interface['metric'] = get_interface_gateway(tap_name)
-                    interface['deviceParams'] = {
-                        'initial_pin1_state': lte_get_pin_state(dev_id),
-                        'default_settings':   lte_get_default_settings(dev_id)
-                    }
+            if is_wifi:
+                interface['deviceType'] = 'wifi'
+                interface['deviceParams'] = wifi_get_capabilities(dev_id)
 
             # Add information specific for WAN interfaces
             #
@@ -580,8 +610,6 @@ def get_linux_interfaces(cached=True):
                     interface['internetAccess'] = True
             else:
                 interface['internetAccess'] = False  # If interface has no GW
-
-            interface['link'] = get_interface_link_state(if_name)
 
             interfaces[dev_id] = interface
 
@@ -912,6 +940,9 @@ def dev_id_to_vpp_sw_if_index(dev_id):
 # 'bridge_addr_to_bvi_interface_tap' function get the addr of the interface in a bridge
 # and return the tap interface of the BVI interface
 def bridge_addr_to_bvi_interface_tap(bridge_addr):
+    if not vpp_does_run():
+        return None
+
     # check if interface indeed in a bridge
     bd_id = fwtranslate_add_switch.get_bridge_id(bridge_addr)
     if not bd_id:
@@ -3866,11 +3897,9 @@ def get_reconfig_hash():
     for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]['name']
 
-        is_lte = is_lte_interface(name)
-        if is_lte:
-            tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
-            if tap_name:
-                name = tap_name
+        tap_name = linux_interfaces[dev_id].get('tap_name')
+        if tap_name:
+            name = tap_name
 
         addr = get_interface_address(name, log=False)
         gw, metric = get_interface_gateway(name)
