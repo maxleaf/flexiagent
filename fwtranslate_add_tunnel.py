@@ -1273,9 +1273,18 @@ def _add_peer(cmd_list, params):
     next_hop         = fwutils.build_tunnel_remote_loopback_ip(addr)
     id               = params['tunnel-id']*2
 
+    # Use very specific MAC address for the peer tunnel loopback interface,
+    # so vppsb will detect it and will create TUN tun/tap device in Linux,
+    # and not TAP. The TUN works on level 3 and does not use MAC addresses.
+    # So we exploit this fact and use MAC address as a marker for the peer tunnel
+    # loopback.
+    #
+    tunnel_id_hex    = '{:04x}'.format(int(params['tunnel-id']))[-4:]  # Assume that tunnel-id never exceed 65536
+    mac              = f"ff:ff:ff:ff:{tunnel_id_hex[:2]}:{tunnel_id_hex[-2:]}"
+
     _add_ipip_tunnel(cmd_list, tunnel_cache_key, params, tunnel_addr, id)
 
-    loopback_params = {'addr':addr, 'mtu': mtu}
+    loopback_params = {'addr':addr, 'mtu': mtu, 'mac': mac}
     _add_loopback(cmd_list, peer_loopback_cache_key, loopback_params, params, id=id)
 
     substs = [ {'replace':'DEV1-STUB', 'key': 'cmds', 'val_by_func':'vpp_sw_if_index_to_name', 'arg_by_key':peer_loopback_cache_key},
