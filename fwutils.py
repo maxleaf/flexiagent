@@ -549,7 +549,7 @@ def get_linux_interfaces(cached=True):
             is_lte = is_lte_interface(if_name)
 
             # Some interfaces need special logic to get their ip
-            # # For LTE/WiFi/Bridged interfaces - we need to take it from the tap
+            # For LTE/WiFi/Bridged interfaces - we need to take it from the tap
             if vpp_does_run():
                 tap_name = None
 
