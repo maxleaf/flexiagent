@@ -480,12 +480,12 @@ def clear_linux_interfaces_cache():
     with fwglobals.g.cache.lock:
         fwglobals.g.cache.linux_interfaces.clear()
 
-def is_bridged_interfaces(dev_id):
+def is_bridged_interface(dev_id):
     """Indicates if the interface is bridged.
 
     :param dev_id: dev_id of the interface to check.
 
-    :return: Boolean.
+    :return: bridge address if it is, None if not a bridged interface.
     """
     ifc = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
     if not ifc:
@@ -557,7 +557,7 @@ def get_linux_interfaces(cached=True):
                     tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
 
                 # bridged interface is only when vpp is running
-                bridge_addr = is_bridged_interfaces(dev_id)
+                bridge_addr = is_bridged_interface(dev_id)
                 if bridge_addr:
                     tap_name = bridge_addr_to_bvi_interface_tap(bridge_addr)
 
