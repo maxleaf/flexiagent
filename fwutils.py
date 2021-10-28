@@ -480,7 +480,7 @@ def clear_linux_interfaces_cache():
     with fwglobals.g.cache.lock:
         fwglobals.g.cache.linux_interfaces.clear()
 
-def is_bridged_ifc(dev_id):
+def is_bridged_interfaces(dev_id):
     """Indicates if the interface is bridged.
 
     :param dev_id: dev_id of the interface to check.
@@ -489,36 +489,13 @@ def is_bridged_ifc(dev_id):
     """
     ifc = fwglobals.g.router_cfg.get_interfaces(dev_id=dev_id)
     if not ifc:
-        return (False, None)
+        return None
 
     bridged_addr = ifc[0].get('bridge_addr')
     if bridged_addr:
-        return (True, bridged_addr)
+        return bridged_addr
 
-    return (False, None)
-
-def get_tap_ip_info(tap_name):
-    """Get IP information about a tap interface.
-
-    :param tap_name: tap interface name.
-
-    :return: Tuple (ip, mask, gateway, metric).
-    """
-    ip = ''
-    mask = ''
-    gateway = ''
-    metric = ''
-
-    if tap_name:
-        gateway, metric = get_interface_gateway(tap_name)
-
-        int_addr = get_interface_address(tap_name)
-        if int_addr:
-            int_addr = int_addr.split('/')
-            ip = int_addr[0]
-            mask = int_addr[1]
-
-    return (ip, mask, gateway, metric)
+    return None
 
 def get_linux_interfaces(cached=True):
     """Fetch interfaces from Linux.
@@ -561,9 +538,35 @@ def get_linux_interfaces(cached=True):
                 'public_port':      '',
                 'nat_type':         '',
                 'link':             '',
+                'tap_name':         '',
             }
 
+            interface['link'] = get_interface_link_state(if_name)
+
             interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
+
+            is_wifi = is_wifi_interface(if_name)
+            is_lte = is_lte_interface(if_name)
+
+            # Some interfaces need special logic to get their ip
+            # # For LTE/WiFi/Bridged interfaces - we need to take it from the tap
+            if vpp_does_run():
+                tap_name = None
+
+                if is_lte or is_wifi:
+                    tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
+
+                # bridged interface is only when vpp is running
+                bridge_addr = is_bridged_interfaces(dev_id)
+                if bridge_addr:
+                    tap_name = bridge_addr_to_bvi_interface_tap(bridge_addr)
+
+                if tap_name:
+                    if_name = tap_name
+                    addrs = linux_inf[tap_name]
+                    interface['tap_name'] = tap_name
+
+
             interface['gateway'], interface['metric'] = get_interface_gateway(if_name)
 
             for addr in addrs:
@@ -573,36 +576,17 @@ def get_linux_interfaces(cached=True):
                     if addr.netmask != None:
                         interface[addr_af_name + 'Mask'] = (str(IPAddress(addr.netmask).netmask_bits()))
 
-            is_wifi = is_wifi_interface(if_name)
-            is_lte = is_lte_interface(if_name)
+            if is_lte:
+                interface['deviceType'] = 'lte'
+                interface['dhcp'] = 'yes'
+                interface['deviceParams'] = {
+                    'initial_pin1_state': lte_get_pin_state(dev_id),
+                    'default_settings':   lte_get_default_settings(dev_id)
+                }
 
-            # Some interfaces need special logic to get their ip
-            # For LTE/WiFi/Bridged interfaces - we need to take from the tap
-            if is_lte or is_wifi:
-                tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
-                if tap_name:
-                    ip, mask, gateway, metric = get_tap_ip_info(tap_name)
-                    interface['IPv4'] = ip
-                    interface['IPv4Mask'] = mask
-                    interface['gateway'] = gateway
-                    interface['metric'] = metric
-
-                if is_wifi:
-                    interface['deviceType'] = 'wifi'
-                    interface['deviceParams'] = wifi_get_capabilities(dev_id)
-                elif is_lte:
-                    interface['deviceType'] = 'lte'
-                    interface['dhcp'] = 'yes'
-                    interface['deviceParams'] = {
-                        'initial_pin1_state': lte_get_pin_state(dev_id),
-                        'default_settings':   lte_get_default_settings(dev_id)
-                    }
-
-            is_bridged, bridge_addr = is_bridged_ifc(dev_id)
-            if is_bridged:
-                tap_name = bridge_addr_to_bvi_interface_tap(bridge_addr)
-                if tap_name:
-                    interface['IPv4'], interface['IPv4Mask'], _, _ = get_tap_ip_info(tap_name)
+            if is_wifi:
+                interface['deviceType'] = 'wifi'
+                interface['deviceParams'] = wifi_get_capabilities(dev_id)
 
             # Add information specific for WAN interfaces
             #
@@ -626,8 +610,6 @@ def get_linux_interfaces(cached=True):
                     interface['internetAccess'] = True
             else:
                 interface['internetAccess'] = False  # If interface has no GW
-
-            interface['link'] = get_interface_link_state(if_name)
 
             interfaces[dev_id] = interface
 
@@ -3915,18 +3897,9 @@ def get_reconfig_hash():
     for dev_id in linux_interfaces:
         name = linux_interfaces[dev_id]['name']
 
-        is_lte = is_lte_interface(name)
-        is_wifi = is_wifi_interface(name)
-        if is_lte or is_wifi:
-            tap_name = dev_id_to_tap(dev_id, check_vpp_state=True)
-            if tap_name:
-                name = tap_name
-
-        is_bridged, bridge_addr = is_bridged_ifc(dev_id)
-        if is_bridged:
-            tap_name = bridge_addr_to_bvi_interface_tap(bridge_addr)
-            if tap_name:
-                name = tap_name
+        tap_name = linux_interfaces[dev_id].get('tap_name')
+        if tap_name:
+            name = tap_name
 
         addr = get_interface_address(name, log=False)
         gw, metric = get_interface_gateway(name)
