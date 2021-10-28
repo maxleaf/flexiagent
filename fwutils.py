@@ -3634,7 +3634,7 @@ def frr_setup_config():
     # Setup basics on frr.conf.
     frr_commands = [
         "password zebra",
-        "log file /var/log/frr/frr.log informational",
+        "log file /var/log/frr/ospfd.log informational",
         "log stdout",
         "log syslog informational"
     ]
