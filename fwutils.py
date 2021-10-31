@@ -729,6 +729,20 @@ def dev_id_to_linux_if(dev_id):
         return None
     return output.rstrip().split('/')[-1]
 
+def dev_id_to_linux_if_name(dev_id):
+    """Convert device bus address into Linux interface name.
+    If vpp runs, the name of tap interface if fetched, otherwise the device name is used.
+
+    :param dev_id: device bus address.
+
+    :returns: interface name in Linux.
+    """
+    if fwglobals.g.router_api.state_is_started():
+        tap_if_name = dev_id_to_tap(dev_id)
+        if tap_if_name:
+            return tap_if_name
+    return dev_id_to_linux_if(dev_id)
+
 def dev_id_is_vmxnet3(dev_id):
     """Check if device bus address is vmxnet3.
 

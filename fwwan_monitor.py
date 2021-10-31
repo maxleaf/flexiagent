@@ -259,8 +259,7 @@ class FwWanMonitor(FwObject):
         # Firsly update the route status, so if get_wan_failover_metric() is called
         # from the other thread it will reflect the actual status.
         #
-        prev_ok     = route.ok
-        prev_metric = route.metric
+        prev_ok  = route.ok
         route.ok = True if new_metric < self.WATERMARK else False
 
         # Go and update Linux.
@@ -268,10 +267,10 @@ class FwWanMonitor(FwObject):
         # and not relay on 'netplan apply', as in last case VPPSB does not handle
         # properly kernel NETLINK messsages and does not update VPP FIB.
         #
-        success, err_str = fwroutes.add_remove_route("0.0.0.0/0", route.via, route.metric, True, route.dev, route.proto)
+        success = fwroutes.update_route_metric(route, new_metric)
         if not success:
             route.ok = prev_ok
-            self.log.error("failed to update metric in OS: %s" % err_str)
+            self.log.error(f"failed to modify metric in OS for {route.dev}: {route.metric} -> {new_metric}")
             return
 
         fwutils.clear_linux_interfaces_cache()
@@ -304,7 +303,6 @@ class FwWanMonitor(FwObject):
                 proto = route.proto
                 dhcp = 'yes' if proto == 'dhcp' else 'no'
                 via = route.via
-                dev = route.dev
 
                 ifc = db_if[0] if db_if else {}
                 mtu = ifc.get('mtu')

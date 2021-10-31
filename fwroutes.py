@@ -155,7 +155,7 @@ class FwLinuxRoutes(dict):
 
         return False
 
-def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static'):
+def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static', dev=None, netplan_apply=True):
     """Add/Remove route.
 
     :param addr:            Destination network.
@@ -164,10 +164,18 @@ def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static'):
     :param remove:          True to remove route.
     :param dev_id:          Bus address of device to be used for outgoing packets.
     :param proto:           Route protocol.
+    :param dev:             Name of device in Linux to be used for the route.
+                            This parameter has higher priority than the 'dev_id'.
+    :param netplan_apply:   If False, the 'netplan apply' command will be not run at the end of this function.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     metric = int(metric) if metric else 0
+
+    if dev_id and not dev:
+        dev = fwutils.dev_id_to_linux_if_name(dev_id)
+        if not dev:
+            return (False, f"add_remove_route: interface was not found for dev_id {str(dev_id)}")
 
     if addr == 'default':
         return (True, None)
@@ -207,13 +215,10 @@ def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static'):
     else:
         if via in next_hops:
             return (False, "via in next_hop")
-        if not dev_id:
+        if not dev:
             cmd = "sudo ip route %s %s%s proto %s nexthop via %s %s" % (op, addr, metric, proto, via, next_hops)
         else:
-            tap = fwutils.dev_id_to_tap(dev_id)
-            if not tap:
-                return (False, "Not tap")
-            cmd = "sudo ip route %s %s%s proto %s nexthop via %s dev %s %s" % (op, addr, metric, proto, via, tap, next_hops)
+            cmd = "sudo ip route %s %s%s proto %s nexthop via %s dev %s %s" % (op, addr, metric, proto, via, dev, next_hops)
 
     try:
         fwglobals.log.debug(cmd)
@@ -222,13 +227,13 @@ def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static'):
         if op == 'del':
             fwglobals.log.debug("'%s' failed: %s, ignore this error" % (cmd, str(e)))
             return (True, None)
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % (str(e)))
 
     # We need to re-apply Netplan configuration here to install default route that
     # could be removed in the flow before.
     # This will happen if static default route installed by user is exactly the same like
     # default route generated based on interface configuration inside Netplan file.
-    if remove:
+    if remove and netplan_apply:
         fwutils.netplan_apply("add_remove_route")
 
     return (True, None)
@@ -267,3 +272,24 @@ def add_remove_static_routes(via, is_add):
 
         add_remove_route(addr, via, metric, not is_add, dev)
 
+
+def update_route_metric(route, new_metric, netplan_apply=False):
+    """Updates metric of the specific route in Linux.
+
+    :param route:           The FwRouteData object that reflects route rule in kernel
+    :param new_metric:      The new metric to be set for the route.
+    :param netplan_apply:   If True the 'netplan apply' command will be run after
+                            the update. Take a caution: netplan apply might cancel
+                            the metric update by restoring original configuration!
+
+    :returns: True on success, False on failure.
+    """
+    success, err_str = add_remove_route(route.prefix, route.via, route.metric, True, dev=route.dev, proto=route.proto, netplan_apply=netplan_apply)
+    if not success:
+        fwglobals.log.error(f"update_route_metric({str(route)}): failed to remove route: {err_str}")
+        return False
+    success, err_str = add_remove_route(route.prefix, route.via, new_metric, False, dev=route.dev, proto=route.proto, netplan_apply=netplan_apply)
+    if not success:
+        fwglobals.log.error(f"update_route_metric({str(route)}): failed to add route with new metric: {err_str}")
+        return False
+    return True
