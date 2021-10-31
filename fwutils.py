@@ -541,7 +541,7 @@ def get_linux_interfaces(cached=True):
                 'tap_name':         '',
             }
 
-            interface['link'] = get_interface_link_state(if_name)
+            interface['link'] = get_interface_link_state(if_name, dev_id)
 
             interface['dhcp'] = fwnetplan.get_dhcp_netplan_interface(if_name)
 
@@ -642,7 +642,7 @@ def get_interface_dev_id(if_name):
             interface.update({'dev_id': dev_id})
             return dev_id
 
-        if not vpp_does_run():
+        if not vpp_does_run() or is_interface_assigned_to_vpp(dev_id) == False:
             # don't update cache
             return ''
 
@@ -3510,10 +3510,11 @@ def get_ethtool_value(if_name, ethtool_key):
 
     return val
 
-def get_interface_link_state(if_name):
+def get_interface_link_state(if_name, dev_id):
     """Gets interface link state.
 
     :param if_name: interface name (e.g enp0s3).
+    :param dev_id:  interface bus address (e.g '0000:00:16.0').
 
     :returns: up if link is detected, down if not detected.
     """
@@ -3522,7 +3523,7 @@ def get_interface_link_state(if_name):
         return ''
     # First, check if interface is managed by vpp (vppctl).
     # Otherwise, check as linux interface (ethtool).
-    if fwglobals.g.router_api.state_is_started():
+    if fwglobals.g.router_api.state_is_started() and is_interface_assigned_to_vpp(dev_id):
         vpp_if_name = tap_to_vpp_if_name(if_name)
         if vpp_if_name:
             state = ''
