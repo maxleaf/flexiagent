@@ -60,7 +60,7 @@ g_dumpers = {
     'linux_grub':                   { 'shell_cmd': 'cp /etc/default/grub <temp_folder>/linux_grub.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
-    'linux_wifi':                   { 'shell_cmd': 'iwconfig > <dumper_out_file>' },
+    'linux_wifi':                   { 'shell_cmd': 'iwconfig > <dumper_out_file> 2>/dev/null ;' },
     'linux_lsb_release':            { 'shell_cmd': 'cp /etc/lsb-release <temp_folder>/linux_lsb-release.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_lspci':                  { 'shell_cmd': 'lspci -Dvmmn > <dumper_out_file>' },
