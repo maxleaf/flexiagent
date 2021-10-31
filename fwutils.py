@@ -4403,7 +4403,7 @@ def restart_service(service, timeout=0):
             cmd = 'systemctl restart %s.service > /dev/null 2>&1;' % service
             os.system(cmd)
 
-            cmd = 'service %s status' % service
+            cmd = 'systemctl is-active --quiet %s' % service
             rc = os.system(cmd)
             if rc == 0:
                 return (True, None)
