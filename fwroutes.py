@@ -164,10 +164,18 @@ def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static', dev
     :param remove:          True to remove route.
     :param dev_id:          Bus address of device to be used for outgoing packets.
     :param proto:           Route protocol.
+    :param dev:             Name of device in Linux to be used for the route.
+                            This parameter has higher priority than the 'dev_id'.
+    :param netplan_apply:   If False, the 'netplan apply' command will be not run at the end of this function.
 
     :returns: (True, None) tuple on success, (False, <error string>) on failure.
     """
     metric = int(metric) if metric else 0
+
+    if dev_id and not dev:
+        dev = fwutils.dev_id_to_linux_if_name(dev_id)
+        if not dev:
+            return (False, f"add_remove_route: interface was not found for dev_id {str(dev_id)}")
 
     if addr == 'default':
         return (True, None)
@@ -207,13 +215,9 @@ def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static', dev
     else:
         if via in next_hops:
             return (False, "via in next_hop")
-        if not dev_id and not dev:
+        if not dev:
             cmd = "sudo ip route %s %s%s proto %s nexthop via %s %s" % (op, addr, metric, proto, via, next_hops)
         else:
-            if not dev:
-                dev = fwutils.dev_id_to_linux_if_name(dev_id)
-            if not dev:
-                return (False, f"add_remove_route: {str(dev)}/{str(dev_id)} interface was not found")
             cmd = "sudo ip route %s %s%s proto %s nexthop via %s dev %s %s" % (op, addr, metric, proto, via, dev, next_hops)
 
     try:
@@ -223,7 +227,7 @@ def add_remove_route(addr, via, metric, remove, dev_id=None, proto='static', dev
         if op == 'del':
             fwglobals.log.debug("'%s' failed: %s, ignore this error" % (cmd, str(e)))
             return (True, None)
-        return (False, "Exception: %s\nOutput: %s" % (str(e), output))
+        return (False, "Exception: %s" % (str(e)))
 
     # We need to re-apply Netplan configuration here to install default route that
     # could be removed in the flow before.
