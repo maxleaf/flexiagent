@@ -4427,6 +4427,8 @@ def restart_service(service, timeout=0):
             time.sleep(1)
 
     except Exception as e:
+        fwglobals.log.error(f'restart_service({service}): {str(e)}')
         return (False, str(e))
 
+    fwglobals.log.error(f'restart_service({service}): failed on timeout ({timeout} seconds)')
     return (False, "Service is not running")

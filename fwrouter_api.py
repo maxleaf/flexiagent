@@ -355,7 +355,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             #    In this case we have to ping the GW-s after modification.
             #    See explanations on that workaround later in this function.
             #
-            (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
+            (restart_router, reconnect_agent, gateways, restart_dhcp_service) = self._analyze_request(request)
 
             # Some requests require preprocessing.
             # For example before handling 'add-application' the currently configured
@@ -380,6 +380,12 @@ class FWROUTER_API(FwCfgRequestHandler):
             #
             if restart_router:
                 fwglobals.g.router_api._call_simple({'message':'start-router'})
+
+            # Restart DHCP service if needed
+            #
+            if restart_dhcp_service:
+                if not restart_router: # on router restart DHCP service is restarted as well
+                    fwutils.restart_service(service='isc-dhcp-server', timeout=5)
 
             # Reconnect agent if needed
             #
@@ -500,6 +506,11 @@ class FWROUTER_API(FwCfgRequestHandler):
                         So we ping the gateways to enforces Linux to update the
                         neighbor table. That causes VPPSB to propagate the ARP
                         information into VPP FIB.
+            restart_dhcp_service - DHCP service should be restarted if modify-interface
+                        was received. This is because modify-interface might remove interface
+                        from VPP/Linux (see usage of "vppctl delete tap") and recreate them again.
+                        That causes DHCP service to stop monitoring of the recreated interface.
+                        Therefor we have to restart it on modify-interface completion.
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
@@ -513,8 +524,8 @@ class FWROUTER_API(FwCfgRequestHandler):
             return False
 
 
-        (restart_router, reconnect_agent, gateways) = \
-        (False,          False,           [])
+        (restart_router, reconnect_agent, gateways, restart_dhcp_service) = \
+        (False,          False,           [],       False)
 
         if self.state_is_started():
             if re.match('(add|remove)-interface', request['message']):
@@ -522,12 +533,14 @@ class FWROUTER_API(FwCfgRequestHandler):
                 reconnect_agent = True
             elif request['message'] == 'modify-interface':
                 reconnect_agent = _should_reconnect_agent_on_modify_interface(request['params'])
+                restart_dhcp_service = True
             elif request['message'] == 'aggregated':
                 for _request in request['params']['requests']:
                     if re.match('(add|remove)-interface', _request['message']):
                         restart_router = True
                         reconnect_agent = True
                     elif _request['message'] == 'modify-interface':
+                        restart_dhcp_service = True
                         if _should_reconnect_agent_on_modify_interface(_request['params']):
                             reconnect_agent = True
 
@@ -546,7 +559,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     if gw:
                         gateways.append(gw)
 
-        return (restart_router, reconnect_agent, gateways)
+        return (restart_router, reconnect_agent, gateways, restart_dhcp_service)
 
     def _preprocess_request(self, request):
         """Some requests require preprocessing. For example before handling

@@ -111,9 +111,8 @@ def add_interface(params):
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
-    is_non_dpdk = is_wifi or is_lte
 
-    if is_non_dpdk:
+    if is_wifi or is_lte:
         # Create tap interface in linux and vpp.
         # This command will create three interfaces:
         #   1. linux tap interface.
@@ -644,7 +643,6 @@ def add_interface(params):
         ]
         cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
         cmd_list.append(cmd)
-
 
     cmd = {}
     cmd['cmd'] = {}
