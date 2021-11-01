@@ -124,9 +124,6 @@ def add_interface(params):
         cmd['cmd']['name']    = "exec"
         cmd['cmd']['descr']   = "create tap interface in vpp and linux"
         cmd['cmd']['params']  = ["sudo vppctl create tap host-if-name %s" % fwutils.generate_linux_interface_short_name("tap", iface_name)]
-        # The following revert command breaks the DHCP server configuration for WiFi.
-        # But we want to execute this command to completely clear any configuration belonging to the given interface.
-        # That's why at the end of this process the agent will restart the DHCP server service.
         cmd['revert'] = {}
         cmd['revert']['name']    = "exec"
         cmd['revert']['params'] = [ {'substs': [ {'replace':'DEV-TAP', 'val_by_func':'dev_id_to_vpp_sw_if_index', 'arg':dev_id } ]},
@@ -646,24 +643,6 @@ def add_interface(params):
         ]
         cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
         cmd_list.append(cmd)
-
-    if is_wifi:
-        # Usually, WiFi is going with DHCP server configuration.
-        # But, the "modify" process for WiFi breaks the DHCP server  (see explanation above).
-        # Hence we restart the DHCP server now.
-        cmd = {}
-        cmd['cmd'] = {}
-        cmd['cmd']['name']   = "python"
-        cmd['cmd']['params'] = {
-                    'module': 'fwutils',
-                    'func': 'restart_service',
-                    'args': {
-                        'service': 'isc-dhcp-server',
-                        'timeout': 5
-                    }
-        }
-        cmd_list.append(cmd)
-
 
     cmd = {}
     cmd['cmd'] = {}
