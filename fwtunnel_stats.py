@@ -174,6 +174,17 @@ def tunnel_stats_test():
                 vppctl_cmd = 'fwabf quality %s loss %u delay 0 jitter 0' % (vpp_peer_tunnel_name, loss)
                 fwutils.vpp_cli_execute([vppctl_cmd])
 
+                # Workaround for disconnection of peer tunnel after lifetime expires.
+                # The reason for disconnection is missing PFS feature in VPP, i.e.
+                # VPP uses the same key for both Phase-1 and Phase-2 of IKEv2 negotiation.
+                # It creates an issue when remote peer side, e.g. AWS VPC, works only with
+                # clients that do support PFS. As a result on re-keying after lifetime expiries,
+                # sides can not agree on which cipher parameters to use and leave IKEv2 connection
+                # in 'bad' state (without child sa established) as a result ipip tunnel is put down.
+                # The current solution is to restart IKEv2 connection.
+                if status == 'down':
+                    fwglobals.g.ikev2.reinitiate_session(tunnel_id, 'initiator')
+
         rtt = tunnel_rtt.get(tunnel_id)
         if rtt is None:
             continue
