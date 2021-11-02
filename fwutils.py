@@ -737,7 +737,7 @@ def dev_id_to_linux_if_name(dev_id):
 
     :returns: interface name in Linux.
     """
-    if fwglobals.g.router_api.state_is_started():
+    if not fwglobals.g.router_api.state_is_stopped():
         tap_if_name = dev_id_to_tap(dev_id)
         if tap_if_name:
             return tap_if_name
@@ -986,21 +986,22 @@ def dev_id_to_tap(dev_id, check_vpp_state=False):
     :param check_vpp_state: If True ensure that vpp runs so taps are available.
     :returns: Linux TAP interface name.
     """
+    dev_id_full = dev_id_to_full(dev_id)
 
     if check_vpp_state:
-        is_assigned = is_interface_assigned_to_vpp(dev_id)
-        if not (is_assigned and vpp_does_run()):
+        is_assigned = is_interface_assigned_to_vpp(dev_id_full)
+        vpp_runs    = vpp_does_run()
+        if not (is_assigned and vpp_runs):
+            fwglobals.log.debug('dev_id_to_tap(%s): is_assigned=%s, vpp_runs=%s' %
+                (dev_id, str(is_assigned), str(vpp_runs)))
             return None
 
-    dev_id_full = dev_id_to_full(dev_id)
-    cache    = fwglobals.g.cache.dev_id_to_vpp_tap_name
-
+    cache = fwglobals.g.cache.dev_id_to_vpp_tap_name
     tap = cache.get(dev_id_full)
-
     if tap:
         return tap
 
-    vpp_if_name = dev_id_to_vpp_if_name(dev_id)
+    vpp_if_name = dev_id_to_vpp_if_name(dev_id_full)
     if vpp_if_name is None:
         return None
     tap = vpp_if_name_to_tap(vpp_if_name)
@@ -1008,7 +1009,7 @@ def dev_id_to_tap(dev_id, check_vpp_state=False):
         cache[dev_id_full] = tap
     return tap
 
-def set_dev_id_to_tap(dev_id, tap):
+def set_dev_id_to_tap(dev_id_full, tap):
     """Update cache.
 
     :param dev_id:          Bus address.
