@@ -4252,6 +4252,32 @@ def replace_file_variables(template_fname, replace_fname):
 
     return requests
 
+def is_need_to_reload_lte_drivers():
+    # 2c7c:0125 is the vendor Id and product Id of quectel EC25 card.
+    ec25_card_exists = os.popen('lsusb | grep 2c7c:0125').read()
+    if not ec25_card_exists:
+        return False
+
+    # check if driver is associated with the modem. (see the problematic output "Driver=").
+    # venko@PCENGINE2:~$ lsusb -t
+    # /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=ehci-pci/2p, 480M
+    #     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+    #         |__ Port 3: Dev 3, If 0, Class=Vendor Specific Class, Driver=option, 480M
+    #         |__ Port 3: Dev 3, If 1, Class=Vendor Specific Class, Driver=option, 480M
+    #         |__ Port 3: Dev 3, If 2, Class=Vendor Specific Class, Driver=option, 480M
+    #         |__ Port 3: Dev 3, If 3, Class=Vendor Specific Class, Driver=option, 480M
+    #         |__ Port 3: Dev 3, If 4, Class=Communications, Driver=, 480M
+    #         |__ Port 3: Dev 3, If 5, Class=CDC Data, Driver=option, 480M
+    cmd = 'lsusb -t | grep "Class=Communications" | awk -F "Driver=" {\'print $2\'} | awk -F "," {\'print $1\'}'
+    driver = os.popen(cmd).read().strip()
+    if not driver:
+        return True
+    return False
+
+def reload_lte_drivers_if_needed():
+    if is_need_to_reload_lte_drivers():
+        reload_lte_drivers()
+
 def reload_lte_drivers():
     modules = [
         'cdc_mbim',
