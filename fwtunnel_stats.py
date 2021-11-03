@@ -191,7 +191,7 @@ def tunnel_stats_test():
         if vpp_peer_tunnel_name:
             ifname = vpp_peer_tunnel_name
         else:
-            ifname = stats['loopback_tap_name']
+            ifname = stats['vpp_if_name']
 
         loss = round(stats['drop_rate'])
         delay = round(stats['rtt'])
@@ -295,10 +295,12 @@ def tunnel_stats_add(params):
     stats_entry['timestamp'] = 0
     stats_entry['loss'] = 0
     stats_entry['delay'] = 0
-    stats_entry['loopback_tap_name'] = fwutils.tunnel_to_tap(params)
 
     if 'peer' in params:
         stats_entry['vpp_peer_tunnel_name'] = fwutils.peer_tunnel_to_vpp_if_name(params)
+        stats_entry['loopback_tap_name'] = fwutils.tunnel_to_tap(params)
+    else:
+        stats_entry['vpp_if_name'] = fwutils.tunnel_to_vpp_if_name(params)
 
     if 'peer' in params:
         hosts_to_ping = params['peer']['ips']
