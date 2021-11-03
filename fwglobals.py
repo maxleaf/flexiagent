@@ -32,7 +32,6 @@ import yaml
 import fwutils
 import threading
 import fw_vpp_coredump_utils
-import subprocess
 
 from sqlitedict import SqliteDict
 
