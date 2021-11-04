@@ -1009,7 +1009,7 @@ def dev_id_to_tap(dev_id, check_vpp_state=False):
         cache[dev_id_full] = tap
     return tap
 
-def set_dev_id_to_tap(dev_id_full, tap):
+def set_dev_id_to_tap(dev_id, tap):
     """Update cache.
 
     :param dev_id:          Bus address.
