@@ -394,7 +394,7 @@ class Fwglobals(FwObject):
         # We run it only if vpp is not running to make sure that we reload the driver
         # only on boot, and not if a user run `systemctl restart flexiwan-router` when vpp is running.
         if not fwutils.vpp_does_run():
-            fwutils.reload_lte_drivers()
+            fwutils.reload_lte_drivers_if_needed()
 
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
