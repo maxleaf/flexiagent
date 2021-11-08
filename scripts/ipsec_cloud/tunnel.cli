@@ -1,0 +1,135 @@
+[
+{
+    "entity": "agent",
+    "message": "add-tunnel",
+    "params": {
+        "encryption-mode": "ikev2",
+        "src": "192.168.0.106",
+        "dst": "104.193.146.116",
+        "tunnel-id": 1,
+        "peer": {
+            "addr": "20.20.20.1/32",
+            "mtu": 1350,
+	    "multilink": {
+              "labels": [ "green" ]
+	    }
+        },
+        "dev_id": "pci:0000:00:03.00",
+        "ikev2": {
+            "role": "initiator",
+            "mode": "psk",
+            "local-device-id": "b0bbd024d5",
+            "remote-device-id": "104.193.146.116",
+            "lifetime": 3600,
+            "ike": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "modp-2048",
+                "key-size": 256
+            },
+            "esp": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "ecp-256",
+                "key-size": 256
+            },
+            "psk": "abc243f5621c1a95997997c8cd597956"
+        }
+    }
+},
+{
+    "entity": "agent",
+    "message": "add-tunnel",
+    "params": {
+        "encryption-mode": "ikev2",
+        "src": "192.168.0.106",
+        "dst": "149.19.194.14",
+        "tunnel-id": 2,
+        "peer": {
+            "addr": "20.20.20.2/32",
+            "mtu": 1350,
+	    "multilink": {
+              "labels": [ "red" ]
+	    }
+        },
+        "dev_id": "pci:0000:00:03.00",
+        "ikev2": {
+            "role": "initiator",
+            "mode": "psk",
+            "local-device-id": "bb6afde66b",
+            "remote-device-id": "149.19.194.14",
+            "lifetime": 3600,
+            "ike": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "modp-2048",
+                "key-size": 256
+            },
+            "esp": {
+                "crypto-alg": "aes-cbc",
+                "integ-alg": "hmac-sha2-256-128",
+                "dh-group": "ecp-256",
+                "key-size": 256
+            },
+            "psk": "1d53d5ec8e4587fd6ad379c3e17573a0"
+        }
+    }
+},
+{
+  "entity": "agent",
+  "message": "add-multilink-policy",
+  "params": {
+    "id": "5ed4127aa81d8258b96b4853",
+    "rules": [
+      {
+        "id": "1",
+        "priority": 0,
+        "classification": {
+          "prefix": {
+            "ip": "8.8.8.8/32",
+            "ports": "",
+            "protocol": ""
+          }
+        },
+        "action": {
+          "links": [
+            {
+              "pathlabels": [ "green" ],
+              "order": "load-balance"
+            }
+          ],
+          "order": "load-balance",
+          "fallback": "by-destination"
+        }
+      }
+    ]
+  }
+},
+{
+  "entity": "agent",
+  "message": "start-router",
+  "params": {
+    "interfaces": [
+     {
+	"dev_id": "pci:0000:00:03.00",
+	"addr": "192.168.0.106/24",
+	"gateway": "192.168.0.1",
+	"type":"WAN",
+        "multilink": {
+            "labels": [
+                "green",
+                "blue",
+                "red"]
+        }
+     },
+     {
+	"dev_id": "pci:0000:00:08.00",
+	"addr": "10.10.10.1/24",
+	"routing":"ospf",
+	"type":"LAN"
+     }
+   ]  
+  }
+}
+]
+

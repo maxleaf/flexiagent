@@ -36,7 +36,8 @@ def add_acl_rule(acl_id, source, destination, permit, is_ingress, add_last_deny_
     :param destination: json/dict message repersenting the destination
     :param action: json/dict message repersenting the action
     :param is_ingress: Boolean representing is ingress or not
-    :return: Dict representing the command
+    :return: Dict representing the command. None can be returned if the given
+             traffic tags based match does not have a valid match in the app/traffic ID DB
     """
 
     def convert_match_to_acl_param(rule):
@@ -137,6 +138,7 @@ def add_acl_rule(acl_id, source, destination, permit, is_ingress, add_last_deny_
         dest_matches = []
         source_matches = []
         any_match = {}
+        tags_based = False
 
         if destination:
             traffic_id = destination.get('trafficId')
@@ -154,6 +156,7 @@ def add_acl_rule(acl_id, source, destination, permit, is_ingress, add_last_deny_
                     importance = traffic_tags.get('importance')
                     dest_matches = fwglobals.g.traffic_identifications.get_traffic_rules(
                         None, category, service_class, importance)
+                    tags_based = True
             else:
                 dest_matches = fwglobals.g.traffic_identifications.get_traffic_rules(
                     traffic_id, None, None, None)
@@ -180,7 +183,7 @@ def add_acl_rule(acl_id, source, destination, permit, is_ingress, add_last_deny_
                     acl_rules.extend(rules)
                     source_match_prev = source_match
 
-        return acl_rules
+        return acl_rules, tags_based
 
 
     def generate_acl_rule(acl_id, acl_rules):
@@ -215,17 +218,26 @@ def add_acl_rule(acl_id, source, destination, permit, is_ingress, add_last_deny_
 
     cmd = {}
 
-    acl_rules = generate_acl_params(source, destination, permit, is_ingress)
+    acl_rules, tags_based = generate_acl_params(source, destination, permit, is_ingress)
     if not acl_rules:
-        fwglobals.log.error('Generated ACL rule is empty.\
-                Check traffic tags. Source: %s Destination: %s' % (source, destination))
-        raise Exception('Firewall policy - ACL generation failed')
+        fwglobals.log.warning('Generated ACL rule is empty. ' +
+            'Check if traffic tags has a valid match.' +
+            'Source: %s Destination: %s' % (source, destination))
+        if tags_based:
+            # It may not be fatal if traffic tags based classification does not exist
+            # Allow the caller to make the decision
+            return None
+        else:
+            raise Exception ('Generated ACL rule is empty')
     else:
         # Allow list ACL use case - At end of allow list, add the deny
         # Append acl definition with a deny entry - Block all other sources
         if add_last_deny_ace:
-            acl_rules.extend(generate_acl_params(
-                None, destination, False, is_ingress))
+            last_acl, __  = generate_acl_params(None, destination, False, is_ingress)
+            if last_acl:
+                acl_rules.extend(last_acl)
+            else:
+                raise Exception ('Generated default last Deny ACL rule is empty')
         cmd = generate_acl_rule(acl_id, acl_rules)
     return cmd
 

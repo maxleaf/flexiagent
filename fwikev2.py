@@ -26,8 +26,12 @@ import glob
 import os
 import subprocess
 
-class FwIKEv2:
+from fwobject import FwObject
+
+class FwIKEv2(FwObject):
     def __init__(self):
+        FwObject.__init__(self)
+
         self.IKEV2_PRIVATE_KEY_FILE = self.private_key_filename_get()
         self.IKEV2_PUBLIC_CERTIFICATE_FILE = self.certificate_filename_get()
         self.private_key_created = False
@@ -99,7 +103,7 @@ class FwIKEv2:
             fwglobals.g.router_api.vpp_api.vpp.api.ikev2_set_local_key(key_file=private_pem)
 
         except Exception as e:
-            fwglobals.log.error("%s" % str(e))
+            self.log.error("%s" % str(e))
             return False
 
         return True
@@ -122,7 +126,7 @@ class FwIKEv2:
                 os.makedirs(fwglobals.g.IKEV2_FOLDER)
 
             cmd = "openssl req -new -newkey rsa:4096 -days %u -nodes -x509 -subj '/CN=%s' -keyout %s -out %s" % (days, machine_id, private_pem, public_pem)
-            fwglobals.log.debug(cmd)
+            self.log.debug(cmd)
             ok = not subprocess.call(cmd, shell=True)
             if not ok:
                 return {'ok': 0, 'message': 'Cannot create certificate'}
@@ -164,7 +168,7 @@ class FwIKEv2:
                                                             data_len=len(public_pem))
 
         except Exception as e:
-            fwglobals.log.error("%s" % str(e))
+            self.log.error("%s" % str(e))
             pass
 
     def add_public_certificate(self, device_id, certificate):
@@ -193,5 +197,5 @@ class FwIKEv2:
                 fwglobals.g.router_api.vpp_api.vpp.api.ikev2_initiate_sa_init(name=profile)
 
         except Exception as e:
-            fwglobals.log.error("%s" % str(e))
+            self.log.error("%s" % str(e))
             pass

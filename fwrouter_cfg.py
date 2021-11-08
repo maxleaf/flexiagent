@@ -56,7 +56,7 @@ class FwRouterCfg(FwCfgDatabase):
         except KeyError:
             pass
         except Exception as e:
-            fwglobals.log.error("update(%s) failed: %s, %s" % \
+            self.log.error("update(%s) failed: %s, %s" % \
                         (req_key, str(e), str(traceback.format_exc())))
             raise Exception('failed to update request database')
 
@@ -73,6 +73,7 @@ class FwRouterCfg(FwCfgDatabase):
                 'add-dhcp-config',
                 'add-application',
                 'add-multilink-policy',
+                'add-firewall-policy',
                 'add-ospf',
             ]
 
@@ -96,6 +97,7 @@ class FwRouterCfg(FwCfgDatabase):
             'add-dhcp-config':      "=========== DHCP CONFIG ===========",
             'add-application':      "============ APPLICATIONS ============",
             'add-multilink-policy': "============= POLICIES =============",
+            'add-firewall-policy':  "============= FIREWALL POLICY =============",
             'add-ospf':             "============= OSPF =============",
         }
 

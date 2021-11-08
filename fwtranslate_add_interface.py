@@ -111,9 +111,8 @@ def add_interface(params):
 
     is_wifi = fwutils.is_wifi_interface_by_dev_id(dev_id)
     is_lte = fwutils.is_lte_interface_by_dev_id(dev_id) if not is_wifi else False
-    is_non_dpdk = is_wifi or is_lte
 
-    if is_non_dpdk:
+    if is_wifi or is_lte:
         # Create tap interface in linux and vpp.
         # This command will create three interfaces:
         #   1. linux tap interface.
@@ -326,6 +325,36 @@ def add_interface(params):
                 { 'add_param':'bd_id', 'val_by_func': 'fwtranslate_add_switch.get_bridge_id', 'arg': bridge_addr }
             ],
             'enable':0
+        }
+        cmd_list.append(cmd)
+
+        # set the bridge IP address here.
+        # If the bridged interface exists in original netplan with set-name it might cause issues,
+        # So we configure the IP address for the BVI interface here
+        cmd = {}
+        cmd['cmd'] = {}
+        cmd['cmd']['name']    = "python"
+        cmd['cmd']['descr']   = "set %s to BVI loopback interface in Linux" % bridge_addr
+        cmd['cmd']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'set_ip_on_bridge_bvi_interface',
+            'args'  : {
+                'bridge_addr': bridge_addr,
+                'dev_id':      dev_id,
+                'is_add':      True,
+            }
+        }
+        cmd['revert'] = {}
+        cmd['revert']['name']   = "python"
+        cmd['revert']['descr']  = "unset %s to BVI loopback interface in Linux" % bridge_addr
+        cmd['revert']['params']  = {
+            'module': 'fwutils',
+            'func'  : 'set_ip_on_bridge_bvi_interface',
+            'args'  : {
+                'bridge_addr': bridge_addr,
+                'dev_id':      dev_id,
+                'is_add':      False,
+            }
         }
         cmd_list.append(cmd)
 
@@ -614,7 +643,6 @@ def add_interface(params):
         ]
         cmd['cmd']['descr'] = "add filter traffic control command for tap and wwan interfaces"
         cmd_list.append(cmd)
-
 
     cmd = {}
     cmd['cmd'] = {}

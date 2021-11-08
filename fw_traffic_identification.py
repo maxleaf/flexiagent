@@ -25,13 +25,17 @@ from sqlitedict import SqliteDict
 
 import fwglobals
 
-class FwTrafficIdentifications(object):
+from fwobject import FwObject
+
+class FwTrafficIdentifications(FwObject):
 
     """ Encapsulates functions associated with storing/removing/searching traffic identifiers.
     Each traffic identifier is a set of rules with match conditions and  carries traffic tags like
     category type, traffic class type and traffic importance
     """
     def __init__(self, db_file, logger=None):
+        FwObject.__init__(self)
+
         # Traffic id to match rules
         self.traffic_id_map = SqliteDict(
             db_file, 'traffic_id', autocommit=True)
@@ -43,7 +47,8 @@ class FwTrafficIdentifications(object):
         # Importance to traffic id(s)
         self.importance_map = SqliteDict(
             db_file, 'importance', autocommit=True)
-        self.log = logger if logger else fwglobals.log
+        if logger:
+            self.log = logger   # override default logger created by FwObject.__init__() 
 
     def finalize(self):
         """

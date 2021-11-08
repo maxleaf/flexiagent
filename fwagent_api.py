@@ -20,20 +20,17 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import json
 import loadsimulator
 import yaml
 import sys
-import subprocess
 import os
 from shutil import copyfile
 import fwglobals
-import fwikev2
 import fwstats
 import fwutils
-import fwsystem_api
-import fwrouter_api
-import re
+
+from fwobject import FwObject
+
 from pyroute2 import IPDB
 ipdb = IPDB()
 
@@ -89,13 +86,16 @@ routes_protocol_map = {
     192: 'eigrp',
 }
 
-class FWAGENT_API:
+class FWAGENT_API(FwObject):
     """This class implements fwagent level APIs of flexiEdge device.
        Typically these APIs are used to monitor various components of flexiEdge.
        They are invoked by the flexiManage over secure WebSocket
        connection using JSON requests.
        For list of available APIs see the 'fwagent_api' variable.
     """
+    def __init__(self):
+        FwObject.__init__(self)
+
     def call(self, request):
         """Invokes API specified by the 'req' parameter.
 
@@ -144,7 +144,7 @@ class FWAGENT_API:
                     })
 
             except Exception as e:
-                fwglobals.log.excep("failed to create tunnel information %s" % str(e))
+                self.log.excep("failed to create tunnel information %s" % str(e))
                 raise e
         return tunnel_info
 
@@ -156,10 +156,12 @@ class FWAGENT_API:
         :returns: Dictionary with information and status code.
         """
         try:
+            stats = fwstats.get_stats()
             info = {}
             # Load component versions
             with open(fwglobals.g.VERSIONS_FILE, 'r') as stream:
                 info = yaml.load(stream, Loader=yaml.BaseLoader)
+            info['stats'] = stats['message'][-1]
             # Load network configuration.
             info['network'] = {}
             info['network']['interfaces'] = list(fwutils.get_linux_interfaces(cached=False).values())
@@ -289,7 +291,7 @@ class FWAGENT_API:
                             'protocol': protocol
                         })
             except Exception as e:
-                fwglobals.log.error("_get_device_os_routes: failed to parse route %s.\nroutes=%s." % \
+                self.log.error("_get_device_os_routes: failed to parse route %s.\nroutes=%s." % \
                     (str(route), str(ip.routes)))
                 pass
 
@@ -336,7 +338,7 @@ class FWAGENT_API:
                         }
         :returns: Dictionary with status code.
         """
-        fwglobals.log.info("_sync_device STARTED")
+        self.log.info("_sync_device STARTED")
 
         full_sync_enforced = params.get('type', '') == 'full-sync'
 
@@ -354,7 +356,7 @@ class FWAGENT_API:
         # At this point the sync succeeded.
         # In case of failure - exception is raised by sync()
         fwutils.reset_device_config_signature()
-        fwglobals.log.info("_sync_device FINISHED")
+        self.log.info("_sync_device FINISHED")
         return {'ok': 1}
 
     def _get_wifi_info(self, params):
@@ -411,7 +413,7 @@ class FWAGENT_API:
             }
             return {'message': response, 'ok': 1}
         except Exception as e:
-            fwglobals.log.error('Failed to get LTE information. %s' % str(e))
+            self.log.error('Failed to get LTE information. %s' % str(e))
             return {'message': str(e), 'ok': 0}
 
     def _reset_lte(self, params):

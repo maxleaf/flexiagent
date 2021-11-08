@@ -20,18 +20,14 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 ################################################################################
 
-import os
 import Pyro4
-import re
-import time
-import traceback
 
-import fwagent
 import fwglobals
-import fwutils
+
+from fwobject import FwObject
 
 
-class FwagentCli:
+class FwagentCli(FwObject):
     """This class implements abstraction of fwagent shell.
     On construction it connects to agent that runs on background,
     and than runs infinite read-and-execute loop:
@@ -48,6 +44,8 @@ class FwagentCli:
     def __init__(self):
         """Constructor.
         """
+        FwObject.__init__(self)
+
         self.daemon       = None
         self.agent        = None
         self.prompt       = 'fwagent> '
@@ -56,7 +54,7 @@ class FwagentCli:
             self.daemon = Pyro4.Proxy(fwglobals.g.FWAGENT_DAEMON_URI)
             self.daemon.ping()   # Check if daemon runs. If it does not, create local instance of Fwagent
         except Pyro4.errors.CommunicationError:
-            fwglobals.log.warning("no daemon Fwagent was found, use local instance")
+            self.log.warning("no daemon Fwagent was found, use local instance")
             self.daemon = None
 
     def __enter__(self):
@@ -90,10 +88,10 @@ class FwagentCli:
                 else:
                     ret = self.execute(api_str)
                     if ret['succeeded']:
-                        fwglobals.log.info(self.prompt + 'SUCCESS')
+                        self.log.info(self.prompt + 'SUCCESS')
                     else:
-                        fwglobals.log.info(self.prompt + 'FAILURE')
-                        fwglobals.log.error(self.prompt + ret['error'])
+                        self.log.info(self.prompt + 'FAILURE')
+                        self.log.error(self.prompt + ret['error'])
             except Exception as e:
                 print(self.prompt + 'FAILURE: ' + str(e))
 

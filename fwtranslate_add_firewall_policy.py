@@ -162,11 +162,19 @@ def add_firewall_policy(params):
             action = rule['action']
             permit = action['permit']
             ingress_id = 'fw_lan_ingress_rule_%d' % rule_index
-            cmd_list.append(fw_acl_command_helpers.add_acl_rule(
-                ingress_id, source, destination, permit, True, False))
-            egress_id = 'fw_lan_egress_rule_%d' % rule_index
-            cmd_list.append(fw_acl_command_helpers.add_acl_rule(
-                egress_id, source, destination, permit, False, False))
+            cmd1 = fw_acl_command_helpers.add_acl_rule(ingress_id, source, destination,
+                    permit, True, False)
+            if cmd1:
+                egress_id = 'fw_lan_egress_rule_%d' % rule_index
+                cmd2 = fw_acl_command_helpers.add_acl_rule(egress_id, source, destination,
+                        permit, False, False)
+            if cmd1 and cmd2:
+                cmd_list.append(cmd1)
+                cmd_list.append(cmd2)
+            else:
+                fwglobals.log.warning('Outbound firewall: Match conditions ' +
+                    'do not exist for rule index: %d' % rule_index)
+                continue
 
             # interfaces ['Array of LAN device ids]
             dev_id_params = action.get('interfaces', [])

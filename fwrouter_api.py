@@ -32,13 +32,14 @@ import subprocess
 import fwglobals
 import fwutils
 import fwnetplan
+import fwroutes
 
-from fwapplications import FwApps
 from fwmultilink import FwMultilink
 from fwpolicies import FwPolicies
 from vpp_api import VPP_API
 from fwcfg_request_handler import FwCfgRequestHandler
 from fwikev2 import FwIKEv2
+from netaddr import IPNetwork, IPAddress
 
 import fwtunnel_stats
 import fw_vpp_coredump_utils
@@ -58,11 +59,11 @@ fwrouter_translators = {
     'remove-dhcp-config':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
     'add-application':          {'module': __import__('fwtranslate_add_app'),         'api':'add_app'},
     'remove-application':       {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
-    'add-multilink-policy':     {'module': __import__('fwtranslate_add_policy'),      'api':'add_policy'},
+    'add-multilink-policy':     {'module': __import__('fwtranslate_add_multilink_policy'), 'api':'add_multilink_policy'},
     'remove-multilink-policy':  {'module': __import__('fwtranslate_revert'),          'api':'revert'},
     'add-switch':               {'module': __import__('fwtranslate_add_switch'),      'api':'add_switch'},
     'remove-switch':            {'module': __import__('fwtranslate_revert') ,         'api':'revert'},
-    'add-firewall-policy':      {'module': __import__('fwtranslate_firewall_policy'), 'api':'add_firewall_policy'},
+    'add-firewall-policy':      {'module': __import__('fwtranslate_add_firewall_policy'), 'api':'add_firewall_policy'},
     'remove-firewall-policy':   {'module': __import__('fwtranslate_revert'),          'api':'revert'},
     'add-ospf':                 {'module': __import__('fwtranslate_add_ospf'),        'api':'add_ospf'},
     'remove-ospf':              {'module': __import__('fwtranslate_revert'),          'api':'revert'},
@@ -118,7 +119,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
                 if not fwutils.vpp_does_run():      # This 'if' prevents debug print by restore_vpp_if_needed() every second
-                    fwglobals.log.debug("watchdog: initiate restore")
+                    self.log.debug("watchdog: initiate restore")
 
                     self.vpp_api.disconnect_from_vpp()          # Reset connection to vpp to force connection renewal
                     fwutils.stop_vpp()                          # Release interfaces to Linux
@@ -130,14 +131,14 @@ class FWROUTER_API(FwCfgRequestHandler):
                     self.state_change(FwRouterState.STOPPED)    # Reset state so configuration will applied correctly
                     self._restore_vpp()                         # Rerun VPP and apply configuration
 
-                    fwglobals.log.debug("watchdog: restore finished")
+                    self.log.debug("watchdog: restore finished")
                     # Process if any VPP coredump
                     pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
                 elif pending_coredump_processing:
                     pending_coredump_processing = fw_vpp_coredump_utils.vpp_coredump_process()
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -146,13 +147,13 @@ class FWROUTER_API(FwCfgRequestHandler):
         Its function is to monitor tunnel state and RTT.
         It is implemented by pinging the other end of the tunnel.
         """
-        self._fill_tunnel_stats_dict()
+        fwtunnel_stats.fill_tunnel_stats_dict()
         while self.state_is_started() and not fwglobals.g.teardown:
             time.sleep(1)  # 1 sec
             try:           # Ensure thread doesn't exit on exception
                 fwtunnel_stats.tunnel_stats_test()
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -176,7 +177,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     name = fwutils.dev_id_to_tap(wan['dev_id'])
                     addr = fwutils.get_interface_address(name, log=False)
                     if not addr:
-                        fwglobals.log.debug("dhcpc_thread: %s has no ip address" % name)
+                        self.log.debug("dhcpc_thread: %s has no ip address" % name)
                         apply_netplan = True
 
                 if apply_netplan:
@@ -184,7 +185,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     time.sleep(10)
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -199,10 +200,10 @@ class FWROUTER_API(FwCfgRequestHandler):
                 continue  # Check routes every 5 seconds, while checking teardown every second
 
             try:  # Ensure thread doesn't exit on exception
-                fwutils.check_reinstall_static_routes()
+                fwroutes.check_reinstall_static_routes()
 
             except Exception as e:
-                fwglobals.log.error("%s: %s (%s)" %
+                self.log.error("%s: %s (%s)" %
                     (threading.current_thread().getName(), str(e), traceback.format_exc()))
                 pass
 
@@ -219,19 +220,19 @@ class FWROUTER_API(FwCfgRequestHandler):
         # Restore failure state if recorded on disk:
         if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
             self.state_change(FwRouterState.FAILED, 'recorded failure was restored')
-            fwglobals.log.excep("router is in failed state, try to start it from flexiManage \
+            self.log.excep("router is in failed state, try to start it from flexiManage \
                 or use 'fwagent reset [--soft]' to recover")
 
         # If vpp runs already, or if management didn't request to start it, return.
         vpp_runs = fwutils.vpp_does_run()
         vpp_should_be_started = self.cfg_db.exists({'message': 'start-router'})
         if vpp_runs or not vpp_should_be_started:
-            fwglobals.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
+            self.log.debug("restore_vpp_if_needed: no need to restore(vpp_runs=%s, vpp_should_be_started=%s)" %
                 (str(vpp_runs), str(vpp_should_be_started)))
             if vpp_runs:
                 self.state_change(FwRouterState.STARTED)
             if self.state_is_started():
-                fwglobals.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
+                self.log.debug("restore_vpp_if_needed: vpp_pid=%s" % str(fwutils.vpp_pid()))
                 self._start_threads()
                 # We use here read_from_disk because we can't fill the netplan cache from scratch when vpp is running.
                 # We use the original interface names in this cache,
@@ -246,10 +247,8 @@ class FWROUTER_API(FwCfgRequestHandler):
         return True
 
     def _restore_vpp(self):
-        fwglobals.log.info("===restore vpp: started===")
+        self.log.info("===restore vpp: started===")
         try:
-            with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
-                db_app_rec.clean()
             with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
                 db_multilink.clean()
             with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
@@ -266,29 +265,29 @@ class FWROUTER_API(FwCfgRequestHandler):
 
             fwglobals.g.handle_request({'message': 'start-router'})
         except Exception as e:
-            fwglobals.log.excep("restore_vpp_if_needed: %s" % str(e))
+            self.log.excep("restore_vpp_if_needed: %s" % str(e))
             self.state_change(FwRouterState.FAILED, "failed to restore vpp configuration")
-        fwglobals.log.info("====restore vpp: finished===")
+        self.log.info("====restore vpp: finished===")
 
     def start_router(self):
         """Execute start router command.
         """
-        fwglobals.log.info("start_router")
+        self.log.info("start_router")
         if self.router_state == FwRouterState.STOPPED or self.router_state == FwRouterState.STOPPING:
             fwglobals.g.handle_request({'message': 'start-router'})
-        fwglobals.log.info("start_router: started")
+        self.log.info("start_router: started")
 
     def stop_router(self):
         """Execute stop router command.
         """
-        fwglobals.log.info("stop_router")
+        self.log.info("stop_router")
         if self.router_state == FwRouterState.STARTED or self.router_state == FwRouterState.STARTING:
             fwglobals.g.handle_request({'message':'stop-router'})
-        fwglobals.log.info("stop_router: stopped")
+        self.log.info("stop_router: stopped")
 
     def state_change(self, new_state, reason=''):
         log_reason = '' if not reason else ' (%s)' % reason
-        fwglobals.log.debug("%s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
+        self.log.debug("%s -> %s%s" % (str(self.router_state), str(new_state), log_reason))
         if self.router_state == new_state:
             return
         old_state = self.router_state
@@ -305,7 +304,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     if fwutils.valid_message_string(reason):
                         fwutils.file_write_and_flush(f, reason + '\n')
                     else:
-                        fwglobals.log.excep("Not valid router failure reason string: '%s'" % reason)
+                        self.log.excep("Not valid router failure reason string: '%s'" % reason)
             fwutils.stop_vpp()
         elif old_state == FwRouterState.FAILED:
             if os.path.exists(fwglobals.g.ROUTER_STATE_FILE):
@@ -356,7 +355,7 @@ class FWROUTER_API(FwCfgRequestHandler):
             #    In this case we have to ping the GW-s after modification.
             #    See explanations on that workaround later in this function.
             #
-            (restart_router, reconnect_agent, gateways) = self._analyze_request(request)
+            (restart_router, reconnect_agent, gateways, restart_dhcp_service) = self._analyze_request(request)
 
             # Some requests require preprocessing.
             # For example before handling 'add-application' the currently configured
@@ -381,6 +380,12 @@ class FWROUTER_API(FwCfgRequestHandler):
             #
             if restart_router:
                 fwglobals.g.router_api._call_simple({'message':'start-router'})
+
+            # Restart DHCP service if needed
+            #
+            if restart_dhcp_service:
+                if not restart_router: # on router restart DHCP service is restarted as well
+                    fwutils.restart_service(service='isc-dhcp-server', timeout=5)
 
             # Reconnect agent if needed
             #
@@ -420,18 +425,6 @@ class FWROUTER_API(FwCfgRequestHandler):
 
         self.set_logger(prev_logger)  # Restore logger if was changed
         return reply
-
-
-    def _fill_tunnel_stats_dict(self):
-        """Get tunnels their corresponding loopbacks ip addresses
-        to be used by tunnel statistics thread.
-        """
-        fwtunnel_stats.tunnel_stats_clear()
-        tunnels = self.cfg_db.get_tunnels()
-        for params in tunnels:
-            id   = params['tunnel-id']
-            addr = params['loopback-iface']['addr']
-            fwtunnel_stats.tunnel_stats_add(id, addr)
 
     def _call_simple(self, request):
         """Execute single request.
@@ -513,6 +506,11 @@ class FWROUTER_API(FwCfgRequestHandler):
                         So we ping the gateways to enforces Linux to update the
                         neighbor table. That causes VPPSB to propagate the ARP
                         information into VPP FIB.
+            restart_dhcp_service - DHCP service should be restarted if modify-interface
+                        was received. This is because modify-interface might remove interface
+                        from VPP/Linux (see usage of "vppctl delete tap") and recreate them again.
+                        That causes DHCP service to stop monitoring of the recreated interface.
+                        Therefor we have to restart it on modify-interface completion.
         """
 
         def _should_reconnect_agent_on_modify_interface(new_params):
@@ -526,8 +524,8 @@ class FWROUTER_API(FwCfgRequestHandler):
             return False
 
 
-        (restart_router, reconnect_agent, gateways) = \
-        (False,          False,           [])
+        (restart_router, reconnect_agent, gateways, restart_dhcp_service) = \
+        (False,          False,           [],       False)
 
         if self.state_is_started():
             if re.match('(add|remove)-interface', request['message']):
@@ -535,12 +533,14 @@ class FWROUTER_API(FwCfgRequestHandler):
                 reconnect_agent = True
             elif request['message'] == 'modify-interface':
                 reconnect_agent = _should_reconnect_agent_on_modify_interface(request['params'])
+                restart_dhcp_service = True
             elif request['message'] == 'aggregated':
                 for _request in request['params']['requests']:
                     if re.match('(add|remove)-interface', _request['message']):
                         restart_router = True
                         reconnect_agent = True
                     elif _request['message'] == 'modify-interface':
+                        restart_dhcp_service = True
                         if _should_reconnect_agent_on_modify_interface(_request['params']):
                             reconnect_agent = True
 
@@ -559,7 +559,7 @@ class FWROUTER_API(FwCfgRequestHandler):
                     if gw:
                         gateways.append(gw)
 
-        return (restart_router, reconnect_agent, gateways)
+        return (restart_router, reconnect_agent, gateways, restart_dhcp_service)
 
     def _preprocess_request(self, request):
         """Some requests require preprocessing. For example before handling
@@ -1035,6 +1035,11 @@ class FWROUTER_API(FwCfgRequestHandler):
         fwglobals.g.cache.dev_id_to_vpp_if_name.clear()
         fwutils.clear_linux_interfaces_cache()
 
+        with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
+            db_multilink.clean()
+        with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
+            db_policies.clean()
+
     def _on_add_interface_after(self, type, sw_if_index):
         """add-interface postprocessing
 
@@ -1051,45 +1056,68 @@ class FWROUTER_API(FwCfgRequestHandler):
         """
         self._update_cache_sw_if_index(sw_if_index, type, False)
 
-    def _on_add_tunnel_after(self, sw_if_index):
+    def _on_add_tunnel_after(self, sw_if_index, params):
         """add-tunnel postprocessing
 
-        :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
-        :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
+        :param sw_if_index: VPP sw_if_index of the tunnel interface
+        :param params:      Parameters from Fleximanage.
         """
-        vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', True)
+        vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
         fwutils.tunnel_change_postprocess(False, vpp_if_name)
 
-    def _on_remove_tunnel_before(self, sw_if_index):
+    def _on_remove_tunnel_before(self, sw_if_index, params):
         """remove-tunnel preprocessing
 
-        :param tunnel_id:   tunnel ID received from flexiManage. Not in use for now.
-        :param sw_if_index: vpp sw_if_index of the tunnel loopback interface
+        :param sw_if_index: VPP sw_if_index of the tunnel interface
+        :param params:      Parameters from Fleximanage.
         """
-        vpp_if_name = self._update_cache_sw_if_index(sw_if_index, 'tunnel', False)
+        vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
         fwutils.tunnel_change_postprocess(True, vpp_if_name)
 
-    def _update_cache_sw_if_index(self, sw_if_index, type, add):
+        if 'peer' in params:
+            via = str(IPNetwork(params['peer']['addr']).ip)
+        else:
+            via = fwutils.build_tunnel_remote_loopback_ip(params['loopback-iface']['addr'])
+
+        fwroutes.add_remove_static_routes(via, False)
+
+    def _update_cache_sw_if_index(self, sw_if_index, type, add, params=None):
         """Updates persistent caches that store mapping of sw_if_index into
-        name of vpp interface and via versa.
+        name of vpp interface and via versa, and other caches.
 
         :param sw_if_index: vpp sw_if_index of the vpp software interface
         :param type:        "wan"/"lan"/"tunnel" - type of interface
         :param add:         True to add to cache, False to remove from cache
+        :param params:      the 'params' section of 'add-interface'/'add-tunnel' request
         """
         router_api_db  = fwglobals.g.db['router_api']  # SqlDict can't handle in-memory modifications, so we have to replace whole top level dict
         cache_by_index = router_api_db['sw_if_index_to_vpp_if_name']
         cache_by_name  = router_api_db['vpp_if_name_to_sw_if_index'][type]
+        cache_tap_by_vpp_if_name = router_api_db['vpp_if_name_to_tap_if_name']
+        cache_tap_by_sw_if_index = router_api_db['sw_if_index_to_tap_if_name']
         if add:
-            vpp_if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
+            if type == 'tunnel':  # For tunnels use shortcut  - exploit vpp internals ;)
+                vpp_if_name = fwutils.tunnel_to_vpp_if_name(params)
+            elif type == 'peer-tunnel':
+                vpp_if_name = fwutils.peer_tunnel_to_vpp_if_name(params)
+            else:
+                vpp_if_name = fwutils.vpp_sw_if_index_to_name(sw_if_index)
             cache_by_name[vpp_if_name]  = sw_if_index
             cache_by_index[sw_if_index] = vpp_if_name
+            if type != 'peer-tunnel':  # ipipX tunnels are not exposed to Linux
+                tap = fwutils.vpp_if_name_to_tap(vpp_if_name)
+                if tap:
+                    cache_tap_by_vpp_if_name[vpp_if_name] = tap
+                    cache_tap_by_sw_if_index[sw_if_index] = tap
         else:
             vpp_if_name = cache_by_index[sw_if_index]
             del cache_by_name[vpp_if_name]
             del cache_by_index[sw_if_index]
+            if vpp_if_name in cache_tap_by_vpp_if_name:
+                del cache_tap_by_vpp_if_name[vpp_if_name]
+            if sw_if_index in cache_tap_by_sw_if_index:
+                del cache_tap_by_sw_if_index[sw_if_index]
         fwglobals.g.db['router_api'] = router_api_db
-        return vpp_if_name
 
     def _on_apply_router_config(self):
         """Apply router configuration on successful VPP start.

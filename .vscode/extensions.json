@@ -4,7 +4,8 @@
 
 	// List of extensions which should be recommended for users of this workspace.
 	"recommendations": [
-		"ms-python.python",
-		"streetsidesoftware.code-spell-checker"
-	]
+        "ms-python.python",
+        "streetsidesoftware.code-spell-checker",
+        "shardulm94.trailing-spaces"
+    ]
 }

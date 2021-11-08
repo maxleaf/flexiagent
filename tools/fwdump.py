@@ -38,6 +38,7 @@ sys.path.append(agent_root_dir)
 import fwutils
 import fwglobals
 from fw_vpp_coredump_utils import vpp_coredump_copy_cores
+from fwobject import FwObject
 
 g = fwglobals.Fwglobals()
 
@@ -59,6 +60,7 @@ g_dumpers = {
     'linux_grub':                   { 'shell_cmd': 'cp /etc/default/grub <temp_folder>/linux_grub.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_interfaces':             { 'shell_cmd': 'ip addr > <dumper_out_file>' },
+    'linux_wifi':                   { 'shell_cmd': 'iwconfig > <dumper_out_file> 2>/dev/null ;' },
     'linux_lsb_release':            { 'shell_cmd': 'cp /etc/lsb-release <temp_folder>/linux_lsb-release.log 2>/dev/null ; ' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_lspci':                  { 'shell_cmd': 'lspci -Dvmmn > <dumper_out_file>' },
@@ -72,8 +74,8 @@ g_dumpers = {
                                                    'cp /run/netplan/*yaml* <temp_folder>/linux_netplan/run 2>/dev/null ;' +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
     'linux_pidof_vpp':              { 'shell_cmd': 'echo "vpp: $(pidof vpp)" > <dumper_out_file>; ' +
-                                                   'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; ' +
-                                                   'ps -elf | grep vpp >> <dumper_out_file>' },
+                                                   'echo "vppctl: $(pidof vppctl)" >> <dumper_out_file>; '},
+    'linux_ps':                     { 'shell_cmd': 'ps -ww -elf > <dumper_out_file>' },
     'linux_ram':                    { 'shell_cmd': 'free > <dumper_out_file>' },
     'linux_resolvconf':             { 'shell_cmd': 'mkdir -p <temp_folder>/linux_resolvconf/ && ' +
                                                    'cp /etc/resolv.conf <temp_folder>/linux_resolvconf 2>/dev/null ; ' +
@@ -120,7 +122,6 @@ g_dumpers = {
     'hostapd.log':                  { 'shell_cmd': 'cp %s <temp_folder>/hostapd.log 2>/dev/null ;' % (g.HOSTAPD_LOG_FILE) +
                                                    'true' },       # Add 'true' to avoid error status code returned by shell_cmd if file does not exists
 
-    'fwagent_db_applications':      { 'shell_cmd': 'fwagent show --database applications > <dumper_out_file>' },
     'fwagent_db_general':           { 'shell_cmd': 'fwagent show --database general > <dumper_out_file>' },
     'fwagent_db_multilink':         { 'shell_cmd': 'fwagent show --database multilink > <dumper_out_file>' },
     'fwagent_multilink_cfg':        { 'shell_cmd': 'fwagent show --configuration multilink-policy > <dumper_out_file>' },
@@ -169,8 +170,10 @@ g_dumpers = {
     'vpp_vxlan_tunnel':             { 'shell_cmd': 'vppctl sh vxlan tunnel > <dumper_out_file>' },
 }
 
-class FwDump:
+class FwDump(FwObject):
     def __init__(self, temp_folder=None, quiet=False, include_vpp_core=None):
+
+        FwObject.__init__(self)
 
         self.temp_folder    = temp_folder
         self.quiet          = quiet

@@ -29,6 +29,7 @@ import fwglobals
 import fwutils
 import shutil
 import yaml
+import copy
 
 from fwwan_monitor import get_wan_failover_metric
 
@@ -73,6 +74,58 @@ def restore_linux_netplan_files():
 
     if files:
         fwutils.netplan_apply('restore_linux_netplan_files')
+
+
+def netplan_get_filepaths():
+
+    return glob.glob("/etc/netplan/*.yaml") + \
+           glob.glob("/lib/netplan/*.yaml") + \
+           glob.glob("/run/netplan/*.yaml")
+
+
+def netplan_unload_vpp_assigned_ports(assigned_linux_interfaces):
+    '''
+    The function is called after taking backup of original netplan file and
+    before adding VPP tap interfaces to netplan. The function modifies the system
+    netplan files (Common example: Modifies 50-cloud-init.yaml) i.e removes the
+    ports assigned to VPP from it and applies the updated config. Doing this is
+    needed to prevent, VPP tap-inject interfaces from getting renamed immediately
+    after create (due to set-name) by linux system network service.
+
+    params assigned_linux_interfaces: List of Linux interface names assigned to VPP
+    '''
+    files = netplan_get_filepaths()
+    netplan_apply = False
+
+    for fname in files:
+
+        changed = False
+        config = None
+        with open(fname, 'r') as stream:
+            config = yaml.safe_load(stream)
+            if config is None:
+                continue
+            if 'network' in config:
+                network = config['network']
+                if 'ethernets' in network:
+                    ethernets = network['ethernets']
+                    ethernets_updates = copy.deepcopy(ethernets)
+                    for dev in ethernets:
+                        set_name = ethernets[dev].get('set-name', dev)
+                        if set_name in assigned_linux_interfaces:
+                            del ethernets_updates[dev]
+                            changed = True
+                            fwglobals.log.debug("netplan_unload_vpp_assigned_ports: Device: %s \
+                                File: %s" % (set_name, fname))
+        if changed:
+            config['network']['ethernets'] = ethernets_updates
+            with open(fname, 'w') as file_stream:
+                yaml.dump(config, file_stream)
+            netplan_apply = True
+
+    if netplan_apply:
+        fwutils.netplan_apply('netplan_unload_vpp_assigned_ports')
+
 
 def load_netplan_filenames(read_from_disk=False, get_only=False):
     '''Parses currently active netplan yaml files into dict of device info by
@@ -253,7 +306,7 @@ def _set_netplan_section_dhcp(config_section, dhcp, type, metric, ip, gw, dnsSer
 
     return config_section
 
-def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, validate_ip=False):
+def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dnsServers, dnsDomains, mtu=None, if_name=None, validate_ip=True):
     '''
     :param metric:  integer (whole number)
     '''
@@ -330,37 +383,55 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
         is_lte = fwutils.is_lte_interface_by_dev_id(dev_id)
 
         if is_add == 1:
+            '''
+            With 'set-name' attribute or not, the main name shall not be changed. Example below:
+            enp0s3:
+                 set-name: wan3
+            After VPP start, Changed as:
+            vpp<x>:
+                 set-name: wan3
+            '''
             if old_ifname in ethernets:
                 del ethernets[old_ifname]
-            if set_name in ethernets:
-                del ethernets[set_name]
 
-            # For LTE interface with set-name we need to keep the `set-name` on the physical interface and not for the vppsb (see explanation above)
-            if set_name:
-                if not is_lte:
-                    ethernets[set_name] = config_section
-                else:
-                    del config_section['set-name']
-                    del config_section['match'] # set-name requires 'match' property
-                    ethernets[ifname] = config_section
+            if set_name and is_lte:
+                # For LTE interface with set-name we need to keep the `set-name` on the physical interface and not for the vppsb (see explanation above).
+                # The part of LTE in netplan should look like this
+                # vpp3 (vppsb interface):
+                #   addresses: [100.96.96.225/30]
+                #   dhcp4: false
+                #   mtu: 1500
+                #   nameservers:
+                #     addresses: [91.205.152.174, 91.205.152.204]
+                #   routes:
+                #   - {metric: 0, to: 0.0.0.0/0, via: 100.96.96.226}
+                # wwan0 (physical interface)::
+                #   match: {macaddress: '1e:10:c7:a5:5a:c7'}
+                #   set-name: WANLTE
+                del config_section['set-name']
+                del config_section['match'] # set-name requires 'match' property
+                ethernets[ifname] = config_section
 
-                    # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
-                    # So for lte with set-name both interfaces should be listed in netplan files.
-                    # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
-                    if old_ethernets and old_ifname in old_ethernets:
-                        ethernets[old_ifname] = old_ethernets[old_ifname]
+                # Keep the old_ifname for LTE (wwan0 e.g) in order to apply the set-name for this interface.
+                # So for lte with set-name both interfaces should be listed in netplan files.
+                # The physical interface with set-name, and the vppsb (vppX) with IP configuration.
+                if old_ethernets and old_ifname in old_ethernets:
+                    ethernets[old_ifname] = old_ethernets[old_ifname]
 
-                        # When vpp runs, we don't need the nameservers on the physical interface but the vppsb
-                        if 'nameservers' in ethernets[old_ifname]:
-                            del ethernets[old_ifname]['nameservers']
+                    # When vpp runs, we don't need the nameservers on the physical interface but the vppsb
+                    if 'nameservers' in ethernets[old_ifname]:
+                        del ethernets[old_ifname]['nameservers']
             else:
                 ethernets[ifname] = config_section
         else:
             # This part of the function is executed when the VPP is running, and we will not stop it.
             # This means that the interface will remain under VPP control and will not be released to Linux control.
             # Hence, when we come to remove an interface, the intention is only to clear its configuration.
-            if set_name:
-                # For the LTE interface with set-name,
+            if ifname in ethernets:
+                ethernets[ifname] = {}
+                ethernets[ifname]['dhcp4'] = False
+
+                # Explanation about LTE with set-name:
                 # when we want to remove it from netplan, we have here three variables:
                 #    'set_name' which is the new name for the physical interface(WANLTE)
                 #    'ifname' which is the vppsb interface name (vpp1).
@@ -379,18 +450,6 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
                 #    'wwan0': {'match': {'macaddress': 'ba:2a:be:44:38:e8'}, 'set-name': 'WANLTE'}
                 # }
                 # So we need to clear the ip configuration for vpp1, and keep the the set-name on the wwan0
-                if is_lte:
-                    if ifname in ethernets:
-                        ethernets[ifname] = {}
-                        ethernets[ifname]['dhcp4'] = False
-                else:
-                    if set_name in ethernets:
-                        ethernets[set_name] = {}
-                        ethernets[set_name]['dhcp4'] = False
-            else:
-                if ifname in ethernets:
-                    ethernets[ifname] = {}
-                    ethernets[ifname]['dhcp4'] = False
 
         with open(fname_run, 'w') as stream:
             yaml.safe_dump(config, stream)
@@ -403,14 +462,8 @@ def add_remove_netplan_interface(is_add, dev_id, ip, gw, metric, dhcp, type, dns
 
         fwutils.netplan_apply('add_remove_netplan_interface')
 
-        # make sure IP address is applied in Linux.
-        if is_add and set_name:
-            if set_name != ifname and not is_lte:
-                cmd = 'ip link set %s name %s' % (ifname, set_name)
-                fwglobals.log.debug(cmd)
-                os.system(cmd)
-                fwutils.netplan_apply('add_remove_netplan_interface')
-                ifname = set_name
+        if is_add and set_name and not is_lte:
+            ifname = set_name
 
         # On interface adding or removal update caches interface related caches.
         #

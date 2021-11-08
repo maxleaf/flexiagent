@@ -22,11 +22,11 @@
 
 import copy
 import json
+import hashlib
 import os
 import Pyro4
 import re
 import signal
-import time
 import traceback
 import yaml
 import fwutils
@@ -36,6 +36,7 @@ import fw_vpp_coredump_utils
 from sqlitedict import SqliteDict
 
 from fwagent import FwAgent
+from fwobject import FwObject
 from fwrouter_api import FWROUTER_API
 from fwsystem_api import FWSYSTEM_API
 from fwagent_api import FWAGENT_API
@@ -45,7 +46,6 @@ from fwlog import FwLogFile
 from fwlog import FwSyslog
 from fwlog import FWLOG_LEVEL_INFO
 from fwlog import FWLOG_LEVEL_DEBUG
-from fwapplications import FwApps
 from fwpolicies import FwPolicies
 from fwrouter_cfg import FwRouterCfg
 from fwsystem_cfg import FwSystemCfg
@@ -59,7 +59,6 @@ from fw_traffic_identification import FwTrafficIdentifications
 modules = {
     'fwsystem_api':     { 'module': __import__('fwsystem_api'),   'sync': True,  'object': 'system_api' }, # fwglobals.g.system_api
     'fwagent_api':      { 'module': __import__('fwagent_api'),    'sync': False, 'object': 'agent_api' },  # fwglobals.g.agent_api
-    'fwapplications':   { 'module': __import__('fwapplications'), 'sync': False, 'object': 'apps' }, # fwglobals.g.apps
     'fwrouter_api':     { 'module': __import__('fwrouter_api'),   'sync': True,  'object': 'router_api' }, # fwglobals.g.router_api
     'os_api':           { 'module': __import__('os_api'),         'sync': False, 'object': 'os_api' }, # fwglobals.g.os_api
     'fwservices_api':   { 'module': __import__('fwservices_api'), 'sync': False, 'object': 'services_api' }, # fwglobals.g.services_api,
@@ -166,6 +165,8 @@ request_handlers = {
     'ikev2_set_responder':          {'name': '_call_vpp_api'},
     'ikev2_set_sa_lifetime':        {'name': '_call_vpp_api'},
     'ikev2_set_tunnel_interface':   {'name': '_call_vpp_api'},
+    'ipip_add_tunnel':              {'name': '_call_vpp_api'},
+    'ipip_del_tunnel':              {'name': '_call_vpp_api'},
     'ip_neighbor_add_del':          {'name': '_call_vpp_api'},
     'ipsec_sad_entry_add_del':      {'name': '_call_vpp_api'},
     'ipsec_spd_add_del':            {'name': '_call_vpp_api'},
@@ -186,6 +187,7 @@ request_handlers = {
     'sw_interface_set_l2_bridge':   {'name': '_call_vpp_api'},
     'sw_interface_set_mac_address': {'name': '_call_vpp_api'},
     'sw_interface_set_mtu':         {'name': '_call_vpp_api'},
+    'sw_interface_set_unnumbered':  {'name': '_call_vpp_api'},
     'vmxnet3_create':               {'name': '_call_vpp_api'},
     'vmxnet3_delete':               {'name': '_call_vpp_api'},
     'vxlan_add_del_tunnel':         {'name': '_call_vpp_api'},
@@ -198,7 +200,7 @@ global g_initialized
 g_initialized = False
 
 @Pyro4.expose
-class Fwglobals:
+class Fwglobals(FwObject):
     """This is global data class representation.
 
     """
@@ -274,6 +276,8 @@ class Fwglobals:
     def __init__(self, log=None):
         """Constructor method
         """
+        FwObject.__init__(self)
+
         # Set default configuration
         self.RETRY_INTERVAL_MIN  = 5 # seconds - is used for both registration and main connection
         self.RETRY_INTERVAL_MAX  = 15
@@ -313,7 +317,6 @@ class Fwglobals:
         self.DHCPD_CONFIG_FILE_BACKUP = '/etc/dhcp/dhcpd.conf.fworig'
         self.ISC_DHCP_CONFIG_FILE = '/etc/default/isc-dhcp-server'
         self.ISC_DHCP_CONFIG_FILE_BACKUP = '/etc/default/isc-dhcp-server.fworig'
-        self.APP_REC_DB_FILE     = self.DATA_PATH + '.app_rec.sqlite'
         self.POLICY_REC_DB_FILE  = self.DATA_PATH + '.policy.sqlite'
         self.MULTILINK_DB_FILE   = self.DATA_PATH + '.multilink.sqlite'
         self.DATA_DB_FILE        = self.DATA_PATH + '.data.sqlite'
@@ -356,7 +359,6 @@ class Fwglobals:
 
         self.teardown = False   # Flag that stops all helper threads in parallel to speedup gracefull exit
 
-
     def load_configuration_from_file(self):
         """Load configuration from YAML file.
 
@@ -366,8 +368,7 @@ class Fwglobals:
         self.cfg.__init__(self.FWAGENT_CONF_FILE, self.DATA_PATH)
         # Print loaded configuration into log
         if self.cfg.DEBUG:
-            global log
-            log.debug("Fwglobals configuration: " + self.__str__(), to_terminal=False)
+            self.log.debug("Fwglobals configuration: " + self.__str__(), to_terminal=False)
             # for a in dir(self.cfg):
             #     val = getattr(self, a)
             #     if isinstance(val, (int, float, str, unicode)):
@@ -385,8 +386,7 @@ class Fwglobals:
                            The standalone mode is used by CLI-based tests.
         """
         if self.fwagent:
-            global log
-            log.warning('Fwglobals.initialize_agent: agent exists')
+            self.log.warning('Fwglobals.initialize_agent: agent exists')
             return self.fwagent
 
         # Create loggers
@@ -403,7 +403,7 @@ class Fwglobals:
         # We run it only if vpp is not running to make sure that we reload the driver
         # only on boot, and not if a user run `systemctl restart flexiwan-router` when vpp is running.
         if not fwutils.vpp_does_run():
-            fwutils.reload_lte_drivers()
+            fwutils.reload_lte_drivers_if_needed()
 
         self.db           = SqliteDict(self.DATA_DB_FILE, autocommit=True)  # IMPORTANT! Load data at the first place!
         self.fwagent      = FwAgent(handle_signals=False)
@@ -414,7 +414,6 @@ class Fwglobals:
         self.router_api   = FWROUTER_API(self.router_cfg, self.MULTILINK_DB_FILE)
         self.services_api = FWSERVICES_API()
         self.os_api       = OS_API()
-        self.apps         = FwApps(self.APP_REC_DB_FILE)
         self.policies     = FwPolicies(self.POLICY_REC_DB_FILE)
         self.wan_monitor  = FwWanMonitor(standalone)
         self.stun_wrapper = FwStunWrap(standalone)
@@ -467,7 +466,6 @@ class Fwglobals:
 
         del self.wan_monitor
         del self.stun_wrapper
-        del self.apps
         del self.policies
         del self.traffic_identifications
         del self.os_api
@@ -576,8 +574,6 @@ class Fwglobals:
                 func = getattr(self.router_api, params['func'])
             elif params['object'] == 'fwglobals.g.router_api.vpp_api':
                 func = getattr(self.router_api.vpp_api, params['func'])
-            elif params['object'] == 'fwglobals.g.apps':
-                func = getattr(self.apps, params['func'])
             elif params['object'] == 'fwglobals.g.ikev2':
                 func = getattr(self.ikev2, params['func'])
             elif params['object'] == 'fwglobals.g.traffic_identifications':
