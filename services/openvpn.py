@@ -40,7 +40,8 @@ class OpenVPN:
         """
 
         try:
-            version = params.get('version', 'stable')
+            # version = params.get('version', 'stable')
+            version = 'stable'
 
             os.system('mkdir -p /etc/openvpn/server')
             os.system('mkdir -p /etc/openvpn/client')
@@ -242,8 +243,8 @@ class OpenVPN:
                 'echo "duplicate-cn" >> %s' % destFile,
                 'echo "client-to-client" >> %s' % destFile,
                 'echo "explicit-exit-notify" >> %s' % destFile,
-                'echo "up /etc/openvpn/server/up-script.sh" >> %s' % destFile,
-                'echo "down /etc/openvpn/server/down-script.sh" >> %s' % destFile
+                # 'echo "up /etc/openvpn/server/up-script.sh" >> %s' % destFile,
+                # 'echo "down /etc/openvpn/server/down-script.sh" >> %s' % destFile
             ]
 
             # Split tunnel
@@ -285,7 +286,7 @@ class OpenVPN:
             commands = [
                 ' > %s' % destFile,
                 'echo "client" >> %s' % destFile,
-                'echo "dev tun" >> %s' % destFile,
+                'echo "dev tap0" >> %s' % destFile,
                 'echo "proto udp" >> %s' % destFile,
                 'echo "remote %s" >> %s' % (params['deviceWANIp'], destFile),
                 'echo "resolv-retry infinite" >> %s' % destFile,
@@ -293,7 +294,7 @@ class OpenVPN:
                 'echo "nobind" >> %s' % destFile,
                 'echo "persist-key" >> %s' % destFile,
                 'echo "persist-tun" >> %s' % destFile,
-                'echo "remote-cert-tls server" >> %s' % destFile,
+                # 'echo "remote-cert-tls server" >> %s' % destFile,
                 'echo "auth SHA512" >> %s' % destFile,
                 'echo "cipher AES-256-CBC" >> %s' % destFile,
                 'echo "ignore-unknown-option block-outside-dns" >> %s' % destFile,
