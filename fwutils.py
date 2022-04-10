@@ -835,7 +835,7 @@ def stop_vpp():
                 break
     fwstats.update_state(False)
     netplan_apply('stop_vpp')
-    ikev2_remove_remote_certificates()
+    ikev2_clean()
 
 def reset_router_config():
     """Reset router config by cleaning DB and removing config files.
@@ -856,15 +856,13 @@ def reset_router_config():
         os.remove(fwglobals.g.CONN_FAILURE_FILE)
     with FwApps(fwglobals.g.APP_REC_DB_FILE) as db_app_rec:
         db_app_rec.clean()
-    with FwIKEv2Tunnels(fwglobals.g.IKEV2_DB_FILE) as db_ikev2:
-        db_ikev2.clean()
     with FwMultilink(fwglobals.g.MULTILINK_DB_FILE) as db_multilink:
         db_multilink.clean()
     with FwPolicies(fwglobals.g.POLICY_REC_DB_FILE) as db_policies:
         db_policies.clean()
 
     fwnetplan.restore_linux_netplan_files()
-    ikev2_remove_remote_certificates()
+    ikev2_clean()
     reset_dhcpd()
 
 def print_router_config(basic=True, full=False, multilink=False, signature=False):
@@ -2105,6 +2103,9 @@ def ikev2_gre_tunnel_get(src):
 
     return None
 
-def ikev2_remove_remote_certificates():
+def ikev2_clean():
+    with FwIKEv2Tunnels(fwglobals.g.IKEV2_DB_FILE) as db_ikev2:
+        db_ikev2.clean()
+
     for cert in glob.glob(fwglobals.g.IKEV2_FOLDER + '/' + 'remote*.pem'):
         os.remove(cert)
